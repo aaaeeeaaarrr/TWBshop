@@ -80,11 +80,11 @@ bakery-bot/
 ## Build Phases — Do These In Order
 
 ### Phase 1 — Foundation (Current Phase)
-- [ ] Telegram bot connects and receives messages
-- [ ] Bot can reply and send buttons
-- [ ] SQLite database initialised with orders table
-- [ ] Config file set up (token, chat IDs)
-- [ ] Basic logging working
+- [x] Telegram bot connects and receives messages (bot.py)
+- [x] Bot can reply and send buttons (orders.py — InlineKeyboardMarkup)
+- [x] SQLite database initialised with orders table (database.py)
+- [x] Config file set up (token, chat IDs) — config.example.py; copy to config.py
+- [x] Basic logging working (all modules use logging)
 
 ### Phase 2 — Customer Ordering
 - [ ] Menu defined in menu.py with aliases
@@ -132,9 +132,9 @@ bakery-bot/
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** [date]
-**Phase:** 1 — Foundation
-**Last completed:** Nothing yet — first session
-**Next task:** Set up bot.py with Telegram connection and a basic echo reply
-**Known issues:** None yet
-**Notes:** —
+**Last updated:** 2026-05-21
+**Phase:** 1 — Foundation ✓ COMPLETE → moving to Phase 2
+**Last completed:** Full scaffold created — all modules, stubs, DB, gitignore, initial commit
+**Next task:** Phase 2 — test menu matching, wire up callback handler in bot.py, fill in real menu items
+**Known issues:** None
+**Notes:** config.py is gitignored; copy config.example.py → config.py and set BOT_TOKEN before running
