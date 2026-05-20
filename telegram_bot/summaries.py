@@ -6,7 +6,7 @@ from datetime import date
 from telegram import Bot
 
 import config
-from database import get_daily_totals, get_orders_by_user
+from shared.database import get_daily_totals, get_orders_by_user
 
 logger = logging.getLogger(__name__)
 

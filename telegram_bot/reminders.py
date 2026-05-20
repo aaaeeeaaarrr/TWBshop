@@ -5,7 +5,7 @@ from datetime import date
 from telegram import Bot
 
 import config
-from database import get_submissions_today
+from shared.database import get_submissions_today
 
 logger = logging.getLogger(__name__)
 

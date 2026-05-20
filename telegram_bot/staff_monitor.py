@@ -13,7 +13,7 @@ async def check_staff_message(text: str, prior_context: list) -> dict:
     if not getattr(config, "ANTHROPIC_API_KEY", None):
         return {"action": "none", "flag": False, "reason": ""}
 
-    from ai_client import check_staff_message_ai
+    from shared.ai_client import check_staff_message_ai
     return await check_staff_message_ai(text, prior_context)
 
 

@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import config
-from database import save_photo_submission
+from shared.database import save_photo_submission
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ async def analyze_photo(image_bytes: bytes, photo_type: str) -> dict:
     if not getattr(config, "ANTHROPIC_API_KEY", None):
         return {"status": "pending", "notes": "manual review required (API key not configured)"}
 
-    from ai_client import analyze_stock_sheet, analyze_compliance_photo
+    from shared.ai_client import analyze_stock_sheet, analyze_compliance_photo
 
     if photo_type == "stock_sheet":
         return await analyze_stock_sheet(image_bytes)

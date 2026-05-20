@@ -7,7 +7,7 @@ from collections import defaultdict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
 from menu import ALIAS_MAP, menu_list_text
-from database import save_order
+from shared.database import save_order
 
 logger = logging.getLogger(__name__)
 

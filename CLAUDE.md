@@ -13,11 +13,11 @@ A Telegram-based bakery operations system that handles:
 
 ## Core Architectural Rules (READ BEFORE WRITING ANY CODE)
 
-### 1. Zero AI Runtime API Calls — Until Explicitly Told Otherwise
-Do NOT import or use Anthropic, OpenAI, or any other LLM API for live bot interactions.
-All natural language parsing must use rule-based matching: dictionaries, regex (`re`),
-alias tables, and `difflib` fuzzy matching. When in doubt, ask the user to confirm
-via Telegram buttons — never silently guess.
+### 1. AI API Calls Only via shared/ai_client.py
+All Claude API calls go through `shared/ai_client.py`. No other module imports the
+`anthropic` SDK directly. Natural language order parsing stays rule-based (regex,
+difflib) — AI is used only for photo analysis and staff message monitoring.
+When ANTHROPIC_API_KEY is empty the system falls back to manual-review mode automatically.
 
 ### 2. Always Build the Interface First
 For every future AI-powered feature, create the function stub now with a placeholder return.
@@ -58,22 +58,40 @@ relevant in future sessions without hitting context limits.
 
 ---
 
-## Project File Structure (Target)
+## Repo Structure
+One repo, one business. Each system gets its own folder. Shared infrastructure lives in `shared/`.
+
 ```
-bakery-bot/
-├── CLAUDE.md              ← This file
-├── bot.py                 ← Telegram bot entry point and handler registration
-├── orders.py              ← Order intake, menu matching, confirmation flow
-├── database.py            ← SQLite setup, all read/write functions
-├── summaries.py           ← Production totals and per-customer fulfillment lists
-├── photos.py              ← Photo receiving, storage, and analyze_photo() stub
-├── staff_monitor.py       ← Staff message logging and check_staff_message() stub
-├── menu.py                ← Menu items, aliases, synonym tables
-├── config.py              ← Bot token, group chat IDs, file paths (no secrets in code)
-├── reminders.py           ← Deadline checks, missing photo alerts (scheduled jobs)
-└── logs/
-    └── unmatched.log      ← All text patterns the bot couldn't match
+TWBshop/                        ← one GitHub repo for the whole business
+├── CLAUDE.md                   ← project-wide rules and status
+├── config.example.py           ← all settings for all systems (copy → config.py)
+├── requirements.txt            ← combined dependencies
+├── run_bot.py                  ← entry point: python run_bot.py
+│
+├── shared/                     ← imported by any system
+│   ├── database.py             ← SQLite: all tables and queries
+│   └── ai_client.py            ← Anthropic client (vision + text)
+│
+├── telegram_bot/               ← Telegram bakery bot (current system)
+│   ├── bot.py                  ← handler registration and scheduled jobs
+│   ├── orders.py               ← order intake, menu matching, confirmation flow
+│   ├── menu.py                 ← menu items, aliases, synonym tables
+│   ├── summaries.py            ← production totals and fulfillment lists
+│   ├── photos.py               ← photo receiving, storage, AI analysis
+│   ├── staff_monitor.py        ← staff message logging and AI monitoring
+│   └── reminders.py            ← missing photo deadline checks
+│
+├── photos/                     ← shared photo storage (gitignored)
+└── logs/                       ← shared logs (gitignored)
+    └── unmatched.log           ← text patterns the bot couldn't match
 ```
+
+### Adding a new system
+1. Create a new folder at the root (e.g. `web_dashboard/`)
+2. Import shared code with `from shared.database import ...`
+3. Add a launcher at root if needed (e.g. `run_dashboard.py`)
+4. Add its dependencies to `requirements.txt`
+5. Document its phases in this CLAUDE.md under a new section
 
 ---
 
@@ -135,8 +153,8 @@ bakery-bot/
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-21
-**Phase:** 6 — API Layer ✓ COMPLETE → all phases done
-**Last completed:** ai_client.py with prompt caching; photo analysis + stock sheet OCR + staff message monitoring all wired and live
-**Next task:** None — system complete. Future work: tune prompts, add per-item stock thresholds, manager alert chat
+**Phase:** All phases complete. Repo restructured as mono-repo for the business.
+**Last completed:** Moved to shared/ + telegram_bot/ layout; run_bot.py launcher; all imports updated
+**Next task:** Start next system when ready (new folder + section in this file)
 **Known issues:** None
-**Notes:** Set ANTHROPIC_API_KEY + CLAUDE_MODEL in config.py to enable AI. Leave ANTHROPIC_API_KEY empty for manual-review-only mode.
+**Notes:** Run with `python run_bot.py`. Set ANTHROPIC_API_KEY in config.py to enable AI features.

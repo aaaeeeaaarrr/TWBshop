@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 import config
-import database
+from shared import database
 from orders import handle_order_text, handle_callback, handle_menu_command
 from photos import handle_incoming_photo, handle_photo_type_callback
 from reminders import check_missing_photos
