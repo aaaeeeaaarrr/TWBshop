@@ -19,6 +19,9 @@ STAFF_NAMES: dict[int, str] = {
 
 # Photo types every staff member must submit each day.
 # Remove a type to stop checking for it.
+# Note: "stock_sheet" is intentionally excluded — stock sheets are submitted
+# on-demand, not on a fixed daily schedule. The staff group is alerted
+# automatically whenever one arrives.
 REQUIRED_PHOTO_TYPES: list[str] = ["workstation", "fridge"]
 
 # Time (UTC) to automatically post the daily production summary to the staff group.

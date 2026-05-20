@@ -17,6 +17,7 @@ _pending_photos: dict[int, str] = {}
 _TYPE_LABELS = {
     "workstation": "Workstation cleaning",
     "fridge": "Fridge display",
+    "stock_sheet": "Stock sheet",
 }
 
 
@@ -88,3 +89,12 @@ async def handle_photo_type_callback(update: Update, context: ContextTypes.DEFAU
 
     label = _TYPE_LABELS.get(photo_type, photo_type)
     await query.edit_message_text(f"{label} photo saved. Thank you!")
+
+    # Stock sheets need a human to read them — alert the staff group immediately.
+    if photo_type == "stock_sheet":
+        from datetime import date
+        await context.bot.send_message(
+            config.STAFF_GROUP_ID,
+            f"Stock sheet received from {staff_name} ({date.today().isoformat()}).\n"
+            "Manual review required — check the photos folder.",
+        )

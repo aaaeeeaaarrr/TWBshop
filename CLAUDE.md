@@ -107,9 +107,9 @@ bakery-bot/
 - [x] Missing photo deadline reminders (scheduled check via JobQueue at REMINDER_HOUR:MINUTE)
 
 ### Phase 5 — Stock Sheets
-- [ ] Staff can submit stock sheet photos
-- [ ] Photos stored, analyze_photo() stub handles them
-- [ ] Manual review fallback in place
+- [x] Staff can submit stock sheet photos (added to type-button menu)
+- [x] Photos stored, analyze_photo() stub handles them
+- [x] Manual review fallback: staff group notified immediately on receipt; not in REQUIRED_PHOTO_TYPES (on-demand, not daily)
 
 ### Phase 6 — API Layer (Add Later, One Feature at a Time)
 - [ ] Stock sheet OCR via Claude API (first API feature)
@@ -134,8 +134,8 @@ bakery-bot/
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-21
-**Phase:** 4 — Photo Flow ✓ COMPLETE → moving to Phase 5
-**Last completed:** photo_submissions table, pending-photo → type-button flow, reminder job, STAFF_NAMES/REQUIRED_PHOTO_TYPES config
-**Next task:** Phase 5 — stock sheet photo submissions (same flow, separate type)
+**Phase:** 5 — Stock Sheets ✓ COMPLETE → Phases 1–5 done, bot is fully operational without any API calls
+**Last completed:** stock_sheet added to photo type menu; staff group alerted on receipt for manual review
+**Next task:** Phase 6 — API layer (stock sheet OCR first, then workstation/fridge analysis, then staff message monitoring)
 **Known issues:** None
 **Notes:** config.py is gitignored; copy config.example.py → config.py and fill BOT_TOKEN, STAFF_GROUP_ID, STAFF_USER_IDS, STAFF_NAMES before running
