@@ -26,6 +26,15 @@ def init_db() -> None:
                 status        TEXT    NOT NULL DEFAULT 'confirmed',
                 created_at    TEXT    NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS photo_submissions (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                staff_name   TEXT    NOT NULL,
+                photo_type   TEXT    NOT NULL,
+                file_path    TEXT    NOT NULL,
+                submitted_at TEXT    NOT NULL
+            );
         """)
         # Migration: add customer_name to databases created before Phase 3
         try:
@@ -61,6 +70,28 @@ def get_daily_totals(date: str) -> list[sqlite3.Row]:
             GROUP BY item
             ORDER BY item
         """, (date,)).fetchall()
+
+
+def save_photo_submission(user_id: int, staff_name: str, photo_type: str, file_path: str) -> None:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO photo_submissions (user_id, staff_name, photo_type, file_path, submitted_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, staff_name, photo_type, file_path, now),
+        )
+    logger.info("Photo submission saved: %s by %s (%s)", photo_type, staff_name, user_id)
+
+
+def get_submissions_today(photo_type: str, date: str) -> list[sqlite3.Row]:
+    """Return all submissions of a given type for a given date (YYYY-MM-DD)."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT user_id, staff_name, file_path, submitted_at
+            FROM photo_submissions
+            WHERE photo_type = ?
+              AND DATE(submitted_at) = ?
+        """, (photo_type, date)).fetchall()
 
 
 def get_orders_by_user(date: str) -> list[sqlite3.Row]:

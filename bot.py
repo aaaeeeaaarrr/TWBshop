@@ -15,6 +15,8 @@ from telegram.ext import (
 import config
 import database
 from orders import handle_order_text, handle_callback, handle_menu_command
+from photos import handle_incoming_photo, handle_photo_type_callback
+from reminders import check_missing_photos
 from summaries import send_production_summary, send_fulfillment_list
 
 logging.basicConfig(
@@ -66,6 +68,10 @@ async def _job_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
     await send_fulfillment_list(context.bot)
 
 
+async def _job_check_missing_photos(context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_missing_photos(context.bot)
+
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -78,25 +84,36 @@ def main() -> None:
     # Customer handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", handle_menu_command))
-    app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order_text))
 
     # Staff handlers
     app.add_handler(CommandHandler("summary", cmd_summary))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_incoming_photo))
+
+    # Callback handlers — pattern-matched so order and photo buttons don't conflict
+    app.add_handler(CallbackQueryHandler(handle_callback, pattern=r"^(confirm|edit|cancel)$"))
+    app.add_handler(CallbackQueryHandler(handle_photo_type_callback, pattern=r"^photo:"))
 
     # Catch-all for unknown commands (must be last)
     app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 
-    # Schedule daily summary at the configured UTC time
+    # Schedule daily summary
     summary_time = datetime.time(
         hour=config.SUMMARY_HOUR,
         minute=config.SUMMARY_MINUTE,
         tzinfo=datetime.timezone.utc,
     )
     app.job_queue.run_daily(_job_daily_summary, time=summary_time)
-    logger.info(
-        "Daily summary scheduled at %02d:%02d UTC", config.SUMMARY_HOUR, config.SUMMARY_MINUTE
+    logger.info("Daily summary scheduled at %02d:%02d UTC", config.SUMMARY_HOUR, config.SUMMARY_MINUTE)
+
+    # Schedule missing-photo reminder
+    reminder_time = datetime.time(
+        hour=config.REMINDER_HOUR,
+        minute=config.REMINDER_MINUTE,
+        tzinfo=datetime.timezone.utc,
     )
+    app.job_queue.run_daily(_job_check_missing_photos, time=reminder_time)
+    logger.info("Photo reminder scheduled at %02d:%02d UTC", config.REMINDER_HOUR, config.REMINDER_MINUTE)
 
     logger.info("Bot started.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -100,11 +100,11 @@ bakery-bot/
 - [x] /summary staff command for manual trigger; STAFF_USER_IDS access control
 
 ### Phase 4 — Photo Flow
-- [ ] Staff can submit workstation cleaning photos
-- [ ] Staff can submit fridge display photos
-- [ ] Photos stored locally with timestamp and staff ID
-- [ ] analyze_photo() stub in place — just stores photo, flags for manual review
-- [ ] Missing photo deadline reminders (scheduled check)
+- [x] Staff can submit workstation cleaning photos
+- [x] Staff can submit fridge display photos
+- [x] Photos stored locally with timestamp and staff ID; recorded in photo_submissions table
+- [x] analyze_photo() stub in place — stores photo, flags for manual review
+- [x] Missing photo deadline reminders (scheduled check via JobQueue at REMINDER_HOUR:MINUTE)
 
 ### Phase 5 — Stock Sheets
 - [ ] Staff can submit stock sheet photos
@@ -134,8 +134,8 @@ bakery-bot/
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-21
-**Phase:** 3 — Production Summaries ✓ COMPLETE → moving to Phase 4
-**Last completed:** customer_name stored in DB, scheduled daily summary via JobQueue, /summary staff command, fulfillment list sorted by name
-**Next task:** Phase 4 — staff photo submissions (workstation, fridge); missing photo deadline reminders
+**Phase:** 4 — Photo Flow ✓ COMPLETE → moving to Phase 5
+**Last completed:** photo_submissions table, pending-photo → type-button flow, reminder job, STAFF_NAMES/REQUIRED_PHOTO_TYPES config
+**Next task:** Phase 5 — stock sheet photo submissions (same flow, separate type)
 **Known issues:** None
-**Notes:** config.py is gitignored; copy config.example.py → config.py and set BOT_TOKEN, STAFF_GROUP_ID, SUMMARY_HOUR before running
+**Notes:** config.py is gitignored; copy config.example.py → config.py and fill BOT_TOKEN, STAFF_GROUP_ID, STAFF_USER_IDS, STAFF_NAMES before running
