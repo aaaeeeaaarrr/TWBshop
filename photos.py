@@ -1,8 +1,8 @@
-"""Photo receiving, storage, and analyze_photo() stub."""
+"""Photo receiving, storage, and AI analysis."""
 
 import os
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -21,10 +21,15 @@ _TYPE_LABELS = {
 }
 
 
-def analyze_photo(image_bytes: bytes, photo_type: str) -> dict:
-    # Placeholder: will connect to Claude API later
-    # photo_type: "workstation" | "fridge" | "stock_sheet"
-    return {"status": "pending", "notes": "manual review required"}
+async def analyze_photo(image_bytes: bytes, photo_type: str) -> dict:
+    if not getattr(config, "ANTHROPIC_API_KEY", None):
+        return {"status": "pending", "notes": "manual review required (API key not configured)"}
+
+    from ai_client import analyze_stock_sheet, analyze_compliance_photo
+
+    if photo_type == "stock_sheet":
+        return await analyze_stock_sheet(image_bytes)
+    return await analyze_compliance_photo(image_bytes, photo_type)
 
 
 def _save_photo_file(image_bytes: bytes, user_id: int, photo_type: str) -> str:
@@ -37,8 +42,38 @@ def _save_photo_file(image_bytes: bytes, user_id: int, photo_type: str) -> str:
     return path
 
 
+async def _notify_staff(bot, photo_type: str, staff_name: str, result: dict) -> None:
+    """Send actionable AI results to the staff group."""
+    today = date.today().isoformat()
+
+    if photo_type == "stock_sheet":
+        items = result.get("items")
+        if items:
+            lines = [f"Stock sheet from {staff_name} ({today}):"]
+            for item in items:
+                unit = item.get("unit", "")
+                lines.append(f"  • {item['name']}: {item['quantity']}{' ' + unit if unit else ''}")
+            if result.get("notes"):
+                lines.append(f"\nNotes: {result['notes']}")
+        else:
+            notes = result.get("notes", "manual review required")
+            lines = [f"Stock sheet from {staff_name} ({today}) — {notes}"]
+        await bot.send_message(config.STAFF_GROUP_ID, "\n".join(lines))
+
+    elif photo_type in ("workstation", "fridge"):
+        if result.get("passed") is False:
+            label = _TYPE_LABELS[photo_type]
+            issues = result.get("issues", [])
+            lines = [f"{label} issues — {staff_name}:"]
+            lines.extend(f"  • {issue}" for issue in issues)
+            if result.get("notes"):
+                lines.append(f"Notes: {result['notes']}")
+            await bot.send_message(config.STAFF_GROUP_ID, "\n".join(lines))
+        # passed=True or passed=None → no staff group alert needed
+
+
 async def handle_incoming_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Receive a photo from any user; ask staff to label it, ignore non-staff."""
+    """Receive a photo; ask staff to label it, reject non-staff."""
     user_id = update.effective_user.id
 
     if config.STAFF_USER_IDS and user_id not in config.STAFF_USER_IDS:
@@ -47,7 +82,6 @@ async def handle_incoming_photo(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    # Store the largest available file_id until the staff picks the type
     file_id = update.message.photo[-1].file_id
     _pending_photos[user_id] = file_id
 
@@ -67,34 +101,36 @@ async def handle_photo_type_callback(update: Update, context: ContextTypes.DEFAU
     await query.answer()
 
     user_id = query.from_user.id
-    photo_type = query.data.split(":", 1)[1]  # "photo:workstation" → "workstation"
+    photo_type = query.data.split(":", 1)[1]
 
     file_id = _pending_photos.pop(user_id, None)
     if not file_id:
         await query.edit_message_text("No pending photo found. Please send the photo again.")
         return
 
-    # Download and save
+    # Download, save to disk, record in DB
     file = await context.bot.get_file(file_id)
     image_bytes = bytes(await file.download_as_bytearray())
     file_path = _save_photo_file(image_bytes, user_id, photo_type)
 
-    # Record in DB
     staff_name = config.STAFF_NAMES.get(user_id, str(user_id))
     save_photo_submission(user_id, staff_name, photo_type, file_path)
 
-    # Run stub analysis
-    result = analyze_photo(image_bytes, photo_type)
-    logger.info("Photo saved: %s | analysis: %s", file_path, result)
-
     label = _TYPE_LABELS.get(photo_type, photo_type)
-    await query.edit_message_text(f"{label} photo saved. Thank you!")
+    await query.edit_message_text(f"{label} photo saved. Analysing...")
 
-    # Stock sheets need a human to read them — alert the staff group immediately.
-    if photo_type == "stock_sheet":
-        from datetime import date
-        await context.bot.send_message(
-            config.STAFF_GROUP_ID,
-            f"Stock sheet received from {staff_name} ({date.today().isoformat()}).\n"
-            "Manual review required — check the photos folder.",
-        )
+    # Analyse and notify staff group with results
+    result = await analyze_photo(image_bytes, photo_type)
+    logger.info("Photo analysis result for %s: %s", file_path, result)
+
+    await _notify_staff(context.bot, photo_type, staff_name, result)
+
+    # Update the submitter's message to confirm completion
+    passed = result.get("passed")
+    if passed is True:
+        status = "passed"
+    elif passed is False:
+        status = "issues found — staff group notified"
+    else:
+        status = "saved"
+    await query.edit_message_text(f"{label} photo {status}. Thank you!")

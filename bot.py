@@ -17,6 +17,7 @@ import database
 from orders import handle_order_text, handle_callback, handle_menu_command
 from photos import handle_incoming_photo, handle_photo_type_callback
 from reminders import check_missing_photos
+from staff_monitor import handle_staff_message
 from summaries import send_production_summary, send_fulfillment_list
 
 logging.basicConfig(
@@ -84,6 +85,13 @@ def main() -> None:
     # Customer handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", handle_menu_command))
+
+    # Staff group text messages — must be registered before the general order handler
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Chat(config.STAFF_GROUP_ID),
+        handle_staff_message,
+    ))
+    # All other text → customer ordering
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order_text))
 
     # Staff handlers

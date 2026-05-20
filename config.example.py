@@ -1,6 +1,13 @@
 # Copy this file to config.py and fill in your values.
 # config.py is gitignored — never commit it.
 
+# Anthropic API — required for Phase 6 features (photo analysis, stock sheet OCR,
+# staff message monitoring). Leave empty to run in manual-review-only mode.
+ANTHROPIC_API_KEY = ""
+
+# Claude model used for all AI analysis.
+CLAUDE_MODEL = "claude-sonnet-4-6"
+
 BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
 
 # Telegram chat IDs (get them from @userinfobot or bot logs)
