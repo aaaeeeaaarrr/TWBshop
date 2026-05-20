@@ -3,9 +3,10 @@
 import re
 import difflib
 import logging
+from collections import defaultdict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
-from menu import ALIAS_MAP, MENU
+from menu import ALIAS_MAP, menu_list_text
 from database import save_order
 
 logger = logging.getLogger(__name__)
@@ -13,33 +14,60 @@ logger = logging.getLogger(__name__)
 # Pending orders awaiting confirmation: {user_id: parsed_order_dict}
 _pending: dict[int, dict] = {}
 
+_WORD_NUMBERS = {
+    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4,
+    "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+}
+
+# Noise phrases stripped before parsing
+_NOISE = re.compile(
+    r"^(i('d)?\s+(want|like|would\s+like)|can\s+i\s+(get|have|order)|"
+    r"please\s+(give\s+me|send\s+me)?|i('ll\s+have)?|"
+    r"i\s+need|give\s+me|order[:\s]+|id\s+like)\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_noise(text: str) -> str:
+    return _NOISE.sub("", text).strip()
+
 
 def _parse_items(text: str) -> list[tuple[str, int]]:
     """Return list of (canonical_item, quantity) matched from raw text."""
-    text = text.lower().strip()
-    results = []
+    text = _strip_noise(text.lower().strip())
+    totals: dict[str, int] = defaultdict(int)
 
-    # Tokenise on commas and "and"
+    # Split on commas and "and" (but not "almond danish" etc.) — word boundary "and"
     parts = re.split(r",|\band\b", text)
     for part in parts:
         part = part.strip()
         if not part:
             continue
 
-        # Extract leading number if present (e.g. "2 croissants")
+        # Extract leading quantity: digit or word-number
+        qty = 1
         qty_match = re.match(r"^(\d+)\s+(.+)$", part)
         if qty_match:
             qty = int(qty_match.group(1))
             item_text = qty_match.group(2).strip()
         else:
-            qty = 1
-            item_text = part
+            word_match = re.match(
+                r"^(" + "|".join(_WORD_NUMBERS.keys()) + r")\s+(.+)$", part
+            )
+            if word_match:
+                qty = _WORD_NUMBERS[word_match.group(1)]
+                item_text = word_match.group(2).strip()
+            else:
+                item_text = part
 
-        # Exact alias match first
+        # Strip trailing plural 's' only when it doesn't break an alias
+        # (try with 's' first, then without)
         canonical = ALIAS_MAP.get(item_text)
+        if not canonical and item_text.endswith("s"):
+            canonical = ALIAS_MAP.get(item_text[:-1])
+
         if not canonical:
-            # Fuzzy fallback
-            matches = difflib.get_close_matches(item_text, ALIAS_MAP.keys(), n=1, cutoff=0.7)
+            matches = difflib.get_close_matches(item_text, ALIAS_MAP.keys(), n=1, cutoff=0.72)
             if matches:
                 canonical = ALIAS_MAP[matches[0]]
             else:
@@ -47,9 +75,9 @@ def _parse_items(text: str) -> list[tuple[str, int]]:
                 _log_unmatched(item_text)
                 continue
 
-        results.append((canonical, qty))
+        totals[canonical] += qty
 
-    return results
+    return list(totals.items())
 
 
 def _log_unmatched(text: str) -> None:
@@ -64,6 +92,10 @@ def _format_order(items: list[tuple[str, int]]) -> str:
     return "\n".join(f"  • {qty}x {name}" for name, qty in items)
 
 
+async def handle_menu_command(update: Update, context) -> None:
+    await update.message.reply_text(f"Our menu:\n\n{menu_list_text()}")
+
+
 async def handle_order_text(update: Update, context) -> None:
     user_id = update.effective_user.id
     text = update.message.text
@@ -71,8 +103,9 @@ async def handle_order_text(update: Update, context) -> None:
     items = _parse_items(text)
     if not items:
         await update.message.reply_text(
-            "Sorry, I couldn't match any menu items in your message. "
-            "Please check our menu and try again."
+            "Sorry, I couldn't match any menu items in your message.\n\n"
+            f"Our menu:\n{menu_list_text()}\n\n"
+            "You can also type /menu anytime."
         )
         return
 

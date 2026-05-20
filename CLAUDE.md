@@ -87,11 +87,11 @@ bakery-bot/
 - [x] Basic logging working (all modules use logging)
 
 ### Phase 2 — Customer Ordering
-- [ ] Menu defined in menu.py with aliases
-- [ ] Fuzzy text matching against menu items
-- [ ] Confirmation flow with Telegram inline buttons (Confirm / Edit / Cancel)
-- [ ] Confirmed orders saved to database
-- [ ] Order rejection and retry handling
+- [x] Menu defined in menu.py with aliases (plurals, misspellings, short forms)
+- [x] Fuzzy text matching against menu items (difflib, noise stripping, word-numbers)
+- [x] Confirmation flow with Telegram inline buttons (Confirm / Edit / Cancel)
+- [x] Confirmed orders saved to database
+- [x] Order rejection shows full menu; /menu command added
 
 ### Phase 3 — Production Summaries
 - [ ] Aggregate confirmed orders into production totals
@@ -133,8 +133,8 @@ bakery-bot/
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-21
-**Phase:** 1 — Foundation ✓ COMPLETE → moving to Phase 2
-**Last completed:** Full scaffold created — all modules, stubs, DB, gitignore, initial commit
-**Next task:** Phase 2 — test menu matching, wire up callback handler in bot.py, fill in real menu items
+**Phase:** 2 — Customer Ordering ✓ COMPLETE → moving to Phase 3
+**Last completed:** CallbackQueryHandler wired, init_db() on startup, noise stripping, word-numbers, duplicate merging, /menu command, rejection shows menu
+**Next task:** Phase 3 — daily production summary and per-customer fulfillment list sent to staff group
 **Known issues:** None
 **Notes:** config.py is gitignored; copy config.example.py → config.py and set BOT_TOKEN before running
