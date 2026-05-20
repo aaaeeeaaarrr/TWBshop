@@ -109,7 +109,8 @@ async def handle_order_text(update: Update, context) -> None:
         )
         return
 
-    _pending[user_id] = {"items": items, "chat_id": update.effective_chat.id}
+    customer_name = update.effective_user.full_name or update.effective_user.first_name or "Unknown"
+    _pending[user_id] = {"items": items, "chat_id": update.effective_chat.id, "customer_name": customer_name}
 
     summary = _format_order(items)
     keyboard = [
@@ -133,7 +134,7 @@ async def handle_callback(update: Update, context) -> None:
     if query.data == "confirm":
         order = _pending.pop(user_id, None)
         if order:
-            save_order(user_id, order["items"])
+            save_order(user_id, order["customer_name"], order["items"])
             await query.edit_message_text("Your order has been saved. Thank you!")
         else:
             await query.edit_message_text("No pending order found. Please send your order again.")

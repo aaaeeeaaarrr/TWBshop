@@ -1,6 +1,7 @@
 """Production totals and per-customer fulfillment lists."""
 
 import logging
+from collections import defaultdict
 from datetime import date
 from telegram import Bot
 
@@ -16,12 +17,12 @@ async def send_production_summary(bot: Bot, target_date: str | None = None) -> N
     totals = get_daily_totals(day)
 
     if not totals:
-        await bot.send_message(config.STAFF_GROUP_ID, f"No orders for {day}.")
+        await bot.send_message(config.STAFF_GROUP_ID, f"No confirmed orders for {day}.")
         return
 
-    lines = [f"Production totals for {day}:"]
+    lines = [f"PRODUCTION TOTALS — {day}", ""]
     for row in totals:
-        lines.append(f"  • {row['item']}: {row['total']}")
+        lines.append(f"  {row['item']}: {row['total']}")
 
     await bot.send_message(config.STAFF_GROUP_ID, "\n".join(lines))
     logger.info("Sent production summary for %s", day)
@@ -36,17 +37,18 @@ async def send_fulfillment_list(bot: Bot, target_date: str | None = None) -> Non
         await bot.send_message(config.STAFF_GROUP_ID, f"No fulfillment items for {day}.")
         return
 
-    # Group by user
-    by_user: dict[int, list] = {}
+    # Group rows by customer name
+    by_customer: dict[str, list[str]] = defaultdict(list)
     for row in rows:
-        by_user.setdefault(row["user_id"], []).append(
+        by_customer[row["customer_name"]].append(
             f"    {row['quantity']}x {row['item']}"
         )
 
-    lines = [f"Fulfillment list for {day}:"]
-    for user_id, items in by_user.items():
-        lines.append(f"  User {user_id}:")
+    lines = [f"FULFILLMENT LIST — {day}", ""]
+    for name, items in sorted(by_customer.items()):
+        lines.append(f"  {name}:")
         lines.extend(items)
+        lines.append("")
 
-    await bot.send_message(config.STAFF_GROUP_ID, "\n".join(lines))
+    await bot.send_message(config.STAFF_GROUP_ID, "\n".join(lines).rstrip())
     logger.info("Sent fulfillment list for %s", day)

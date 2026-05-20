@@ -94,9 +94,10 @@ bakery-bot/
 - [x] Order rejection shows full menu; /menu command added
 
 ### Phase 3 — Production Summaries
-- [ ] Aggregate confirmed orders into production totals
-- [ ] Bot posts daily summary to bakery staff group
-- [ ] Per-customer fulfillment list (name, items, pickup/delivery, time)
+- [x] Aggregate confirmed orders into production totals
+- [x] Bot posts daily summary to bakery staff group (scheduled via JobQueue, SUMMARY_HOUR/MINUTE in config)
+- [x] Per-customer fulfillment list (name + items, sorted alphabetically, sent to staff group)
+- [x] /summary staff command for manual trigger; STAFF_USER_IDS access control
 
 ### Phase 4 — Photo Flow
 - [ ] Staff can submit workstation cleaning photos
@@ -133,8 +134,8 @@ bakery-bot/
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-21
-**Phase:** 2 — Customer Ordering ✓ COMPLETE → moving to Phase 3
-**Last completed:** CallbackQueryHandler wired, init_db() on startup, noise stripping, word-numbers, duplicate merging, /menu command, rejection shows menu
-**Next task:** Phase 3 — daily production summary and per-customer fulfillment list sent to staff group
+**Phase:** 3 — Production Summaries ✓ COMPLETE → moving to Phase 4
+**Last completed:** customer_name stored in DB, scheduled daily summary via JobQueue, /summary staff command, fulfillment list sorted by name
+**Next task:** Phase 4 — staff photo submissions (workstation, fridge); missing photo deadline reminders
 **Known issues:** None
-**Notes:** config.py is gitignored; copy config.example.py → config.py and set BOT_TOKEN before running
+**Notes:** config.py is gitignored; copy config.example.py → config.py and set BOT_TOKEN, STAFF_GROUP_ID, SUMMARY_HOUR before running
