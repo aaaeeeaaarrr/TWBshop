@@ -71,11 +71,15 @@ _STAFF_MSG_SYSTEM = (
 )
 
 _B2B_ORDER_TEXT_SYSTEM = (
-    "You are a B2B bakery order parser. The customer typed something our bot couldn't fully understand. "
-    "Match it to items from the provided menu list. Return only valid JSON:\n"
+    "You are a B2B bakery order parser. Extract all ordered items and quantities from the customer's message.\n"
+    "The customer may use typos, shorthand, or informal language — match to the closest menu item.\n"
+    "Return only valid JSON:\n"
     '{"items": [{"item": "<exact menu name from list>", "qty": <integer>}]}\n'
-    "Only use exact item names from the provided menu list. "
-    'If nothing matches, return {"items": []}.'
+    "Rules:\n"
+    "- Only use exact item names from the provided menu list\n"
+    "- qty must be a positive integer\n"
+    "- If an item cannot be matched to any menu item, omit it\n"
+    'If nothing matches, return {"items": []}'
 )
 
 _B2B_IMAGE_CLASSIFY_SYSTEM = (
@@ -165,8 +169,8 @@ async def read_payment_amount(image_bytes: bytes) -> dict:
         return {"amount": None, "currency": None, "notes": "API error"}
 
 
-async def interpret_unmatched_b2b_order(raw_text: str, menu_items: list[str]) -> list[dict]:
-    """Haiku fallback for text the rule-based parser couldn't match. Returns [{item, qty}]."""
+async def parse_b2b_order_text(raw_text: str, menu_items: list[str]) -> list[dict]:
+    """AI-first B2B order parser using Haiku. Returns [{item, qty}] with exact canonical menu names."""
     if not config.ANTHROPIC_API_KEY:
         return []
     menu_str = "\n".join(f"- {m}" for m in sorted(menu_items))
@@ -174,13 +178,18 @@ async def interpret_unmatched_b2b_order(raw_text: str, menu_items: list[str]) ->
         resp = await _get_client().messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=300,
-            system=_B2B_ORDER_TEXT_SYSTEM,
-            messages=[{"role": "user", "content": f"Menu:\n{menu_str}\n\nCustomer typed: {raw_text}"}],
+            system=[{"type": "text", "text": _B2B_ORDER_TEXT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": f"Menu:\n{menu_str}\n\nCustomer message: {raw_text}"}],
         )
         return _parse_json(resp.content[0].text).get("items", [])
     except Exception as exc:
-        logger.error("B2B order text interpretation failed: %s", exc)
+        logger.error("B2B order text parsing failed: %s", exc)
         return []
+
+
+async def interpret_unmatched_b2b_order(raw_text: str, menu_items: list[str]) -> list[dict]:
+    """Kept for backwards compatibility. Calls parse_b2b_order_text."""
+    return await parse_b2b_order_text(raw_text, menu_items)
 
 
 async def classify_b2b_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:

@@ -13,7 +13,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 import config
 from b2b_bot.menu import B2B_MENU, ALIAS_MAP, INSTANT_BREAD_ITEMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU, CAKE_ALIAS_MAP
-from shared.ai_client import extract_b2b_order_from_image
+from shared.ai_client import extract_b2b_order_from_image, parse_b2b_order_text
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price, order_total, price_summary
 from shared.database import (
@@ -334,6 +334,18 @@ def _log_unmatched(text: str) -> None:
     os.makedirs("logs", exist_ok=True)
     with open(config.UNMATCHED_LOG, "a", encoding="utf-8") as f:
         f.write(f"[B2B] {text}\n")
+
+
+_ALL_MENU_ITEMS: list[str] = list(B2B_MENU.keys()) + list(B2B_CAKE_MENU.keys())
+
+
+async def _parse_order_ai(text: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """AI-first order parser. Falls back to rule-based if API not configured or AI returns nothing."""
+    if config.ANTHROPIC_API_KEY:
+        ai_items = await parse_b2b_order_text(text, _ALL_MENU_ITEMS)
+        if ai_items:
+            return _ai_items_to_orders(ai_items)
+    return _parse_order(text)
 
 
 # ─── History resolution ───────────────────────────────────────────────────────
@@ -657,7 +669,7 @@ async def handle_group_message(update: Update, context) -> None:
         if not pending:
             _state.pop(chat_id, None)
         else:
-            new_bread, new_cake, new_unmatched = _parse_order(text)
+            new_bread, new_cake, new_unmatched = await _parse_order_ai(text)
             new_bread = _resolve_bread_history(chat_id, new_bread)
             new_cake, new_needs_spec = _resolve_cake_history(chat_id, new_cake)
 
@@ -732,9 +744,9 @@ async def handle_group_message(update: Update, context) -> None:
             return
 
     # ── Parse new order ───────────────────────────────────────────────────────
-    bread_items, cake_items, unmatched = _parse_order(text)
+    bread_items, cake_items, unmatched = await _parse_order_ai(text)
 
-    ai_unmatched = unmatched  # surface unmatched parts in confirmation, no AI needed
+    ai_unmatched = unmatched
 
     if not bread_items and not cake_items and not ai_unmatched:
         return
