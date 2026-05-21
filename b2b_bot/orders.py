@@ -136,7 +136,7 @@ def _parse_order(raw: str) -> tuple[list[dict], list[dict], list[dict]]:
     cake_items:  list[dict] = []
     unmatched:   list[dict] = []
 
-    for part in re.split(r",|\band\b", text):
+    for part in re.split(r",|\band\b|\n", text):
         part = part.strip()
         if not part:
             continue
@@ -259,21 +259,25 @@ def _merge_edit_cake(existing: list[dict], new_items: list[dict]) -> list[dict]:
 
 
 def _split_mini_items(bread_items: list[dict], delivery_date: str) -> tuple[list[dict], list[dict]]:
-    """Return (valid_bread, rejected_minis). Minis rejected if qty<100 or delivery<48h away."""
+    """Return (valid_bread, rejected). Items rejected if qty < min_quantity or < advance_hours away."""
     valid, rejected = [], []
     try:
-        too_soon = date.fromisoformat(delivery_date) < date.today() + timedelta(days=2)
+        days_ahead = (date.fromisoformat(delivery_date) - date.today()).days
     except (ValueError, TypeError):
-        too_soon = False
+        days_ahead = 1
     for it in bread_items:
-        if it["item"] not in MINI_ITEMS:
+        item_def = B2B_MENU.get(it["item"], {})
+        min_qty     = item_def.get("min_quantity")
+        advance_h   = item_def.get("advance_hours")
+        if not min_qty and not advance_h:
             valid.append(it)
             continue
         reasons = []
-        if it["qty"] < 100:
-            reasons.append(f"only {it['qty']}pc — minimum 100pc")
-        if too_soon:
-            reasons.append("less than 48h notice")
+        if min_qty and it["qty"] < min_qty:
+            reasons.append(f"only {it['qty']} {it['item']}")
+            reasons.append(f"minimum is {min_qty} pieces")
+        if advance_h and days_ahead * 24 < advance_h:
+            reasons.append(f"{advance_h} hours ahead orders")
         if reasons:
             rejected.append({**it, "_reasons": reasons})
         else:
@@ -282,13 +286,18 @@ def _split_mini_items(bread_items: list[dict], delivery_date: str) -> tuple[list
 
 
 def _mini_rejection_note(rejected_minis: list[dict]) -> str:
+    """Return a formatted rejection block (no leading newlines — callers add separator)."""
     if not rejected_minis:
         return ""
-    lines = ["\n\nCannot accept:"]
+    parts = ["Our apologies, we cannot accept:"]
     for it in rejected_minis:
-        reasons = ", ".join(it.get("_reasons", []))
-        lines.append(f"  ✗ {it['qty']}x {it['item']} — {reasons}")
-    return "\n".join(lines)
+        parts.append(f"  ✗ {it['qty']}x {it['item']}")
+        reasons = it.get("_reasons", [])
+        if reasons:
+            parts.append("\nREASON:")
+            for r in reasons:
+                parts.append(f"- {r}")
+    return "\n".join(parts)
 
 
 def _ai_items_to_orders(ai_items: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
@@ -682,7 +691,8 @@ async def handle_group_message(update: Update, context) -> None:
             if new_unmatched:
                 unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
                 msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
-            msg += _mini_rejection_note(edit_rejected)
+            if edit_rejected:
+                msg += "\n\n" + _mini_rejection_note(edit_rejected)
             await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
             return
 
@@ -714,6 +724,17 @@ async def handle_group_message(update: Update, context) -> None:
     existing_cake  = get_b2b_cake_orders_for_date(chat_id, delivery_date)
 
     if existing_bread or existing_cake:
+        # Nothing valid to add — only rejected minis or unmatched items
+        if not bread_items and not cake_items:
+            parts = []
+            if rejected_minis:
+                parts.append(_mini_rejection_note(rejected_minis))
+            if ai_unmatched:
+                unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in ai_unmatched)
+                parts.append(f"Not recognised:\n{unknown_lines}")
+            await update.message.reply_text("\n\n".join(parts) if parts else "Nothing new to add to your order.")
+            return
+
         existing_items = [dict(r) for r in existing_bread]
         for ei in existing_items:
             ei["qty"] = ei.pop("quantity", 1)
@@ -733,6 +754,7 @@ async def handle_group_message(update: Update, context) -> None:
             "delivery_time": time_str,
             "location": location,
             "delivery_date": delivery_date,
+            "rejected_minis": rejected_minis,
         }
 
         existing_lines = "\n".join(
@@ -785,7 +807,8 @@ async def handle_group_message(update: Update, context) -> None:
     if ai_unmatched:
         unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in ai_unmatched)
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
-    msg += _mini_rejection_note(rejected_minis)
+    if rejected_minis:
+        msg += "\n\n" + _mini_rejection_note(rejected_minis)
     await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
 
 
@@ -807,8 +830,10 @@ async def handle_callback(update: Update, context) -> None:
                 it["order_type"] = "full"
                 it["order_type_source"] = "default"
         bread_items, extra_rejected = _split_mini_items(bread_items, pending.get("delivery_date", ""))
-        pending["bread_items"] = bread_items
-        pending["cake_items"]  = cake_items
+        all_rejected = pending.get("rejected_minis", []) + extra_rejected
+        pending["bread_items"]   = bread_items
+        pending["cake_items"]    = cake_items
+        pending["rejected_minis"] = all_rejected
         _pending[chat_id] = pending
 
         existing_bread = pending.get("existing_bread", [])
@@ -832,7 +857,8 @@ async def handle_callback(update: Update, context) -> None:
         if dl:
             body += f"\n\n{dl}"
         body += "\n\nConfirm full order?"
-        body += _mini_rejection_note(extra_rejected)
+        if all_rejected:
+            body += "\n\n" + _mini_rejection_note(all_rejected)
         await query.edit_message_text(body, reply_markup=_confirm_keyboard())
 
     elif query.data == "b2b_confirm":
@@ -978,6 +1004,7 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
     if unmatched:
         unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in unmatched)
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
-    msg += _mini_rejection_note(photo_rejected)
+    if photo_rejected:
+        msg += "\n\n" + _mini_rejection_note(photo_rejected)
 
     await bot.send_message(chat_id, msg, reply_markup=_confirm_keyboard())

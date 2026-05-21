@@ -81,7 +81,15 @@ async def cmd_balance(update: Update, context) -> None:
 def main() -> None:
     database.init_db()
 
-    app = Application.builder().token(config.B2B_BOT_TOKEN).build()
+    app = (
+        Application.builder()
+        .token(config.B2B_BOT_TOKEN)
+        .connect_timeout(20.0)
+        .read_timeout(20.0)
+        .write_timeout(20.0)
+        .pool_timeout(20.0)
+        .build()
+    )
 
     # Text messages in groups → order handler
     app.add_handler(MessageHandler(
