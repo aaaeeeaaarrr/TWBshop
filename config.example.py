@@ -44,3 +44,13 @@ REMINDER_MINUTE = 0
 PHOTO_STORAGE_DIR = "photos"
 LOG_DIR = "logs"
 UNMATCHED_LOG = "logs/unmatched.log"
+
+# ─── B2B Bot ──────────────────────────────────────────────────────────────────
+# Separate bot token — create a second bot via @BotFather
+B2B_BOT_TOKEN = "YOUR_B2B_BOT_TOKEN_HERE"
+
+# Staff group where nightly B2B summaries are posted (can be the same as STAFF_GROUP_ID)
+B2B_STAFF_GROUP_ID = -100000000002
+
+# Staff user IDs allowed to trigger /summary manually. Leave [] to allow anyone.
+B2B_STAFF_USER_IDS: list[int] = []

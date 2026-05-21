@@ -1,0 +1,194 @@
+"""B2B menu — edit this file to add/remove items, change grams, or update attributes.
+
+To add a new item:
+  1. Add a new key to B2B_MENU with aliases, gram settings, and any attributes
+  2. Restart the bot — no other changes needed
+
+Fields:
+  requires_grams  — True if customer must/can specify grams (pulled from history or standard)
+  standard_grams  — default gram size when customer doesn't specify
+  unit            — display label when sold in fixed units (e.g. "2pc", "200g")
+  order_note      — shown in confirmation when special conditions apply
+  attributes      — dict of customisable options (e.g. sesame type)
+"""
+
+B2B_MENU: dict[str, dict] = {
+
+    # ── Breads ────────────────────────────────────────────────────────────────
+    "french baguette": {
+        "aliases": [
+            "french baguette", "french baguettes", "baguette", "baguettes",
+            "french bread", "french stick", "french sticks",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+    "multigrain baguette": {
+        "aliases": [
+            "multigrain baguette", "multigrain baguettes",
+            "multi grain baguette", "multigrain", "multi baguette",
+            "wholegrain baguette",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+    "focaccia": {
+        "aliases": ["focaccia", "focaccias", "focacia", "foccacia", "foccacias"],
+        "requires_grams": False,
+        "standard_grams": None,
+        "unit": "2pc",
+        "attributes": {},
+    },
+    "multigrain loaf": {
+        "aliases": [
+            "multigrain loaf", "multigrain loafs", "multigrain bread",
+            "multi grain loaf", "loaf", "loafs",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+    "bagel": {
+        "aliases": ["bagel", "bagels"],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+
+    # ── By weight (sold per 200g bag) ─────────────────────────────────────────
+    "croutons": {
+        "aliases": ["crouton", "croutons"],
+        "requires_grams": False,
+        "standard_grams": None,
+        "unit": "200g",
+        "attributes": {},
+    },
+    "rusk": {
+        "aliases": ["rusk", "rusks"],
+        "requires_grams": False,
+        "standard_grams": None,
+        "unit": "200g",
+        "attributes": {},
+    },
+
+    # ── Pastries ──────────────────────────────────────────────────────────────
+    "croissant": {
+        "aliases": [
+            "croissant", "croissants", "crossant", "crossants", "croissan",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+    "pain au chocolat": {
+        "aliases": [
+            "pain au chocolat", "pain au chocolats",
+            "chocolatin", "chocolatine", "chocolatins",
+            "chocolate croissant", "chocolate croissants",
+            "choc croissant", "choc croissants",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "attributes": {},
+    },
+
+    # ── Mini pastries (min. 100pc, 48h advance order) ─────────────────────────
+    "mini croissant": {
+        "aliases": ["mini croissant", "mini croissants"],
+        "requires_grams": False,
+        "standard_grams": None,
+        "order_note": "min. 100pc — order 48h in advance",
+        "attributes": {},
+    },
+    "mini chocolatin": {
+        "aliases": [
+            "mini chocolatin", "mini chocolatins",
+            "mini pain au chocolat", "mini chocolate croissant",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "order_note": "min. 100pc — order 48h in advance",
+        "attributes": {},
+    },
+    "mini almond croissant": {
+        "aliases": [
+            "mini almond croissant", "mini almond croissants",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "order_note": "min. 100pc — order 48h in advance",
+        "attributes": {},
+    },
+    "mini almond chocolatin": {
+        "aliases": [
+            "mini almond chocolatin", "mini almond chocolatins",
+            "mini almond chocolate croissant",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "order_note": "min. 100pc — order 48h in advance",
+        "attributes": {},
+    },
+    "mini ham cheese croissant": {
+        "aliases": [
+            "mini ham cheese croissant", "mini ham cheese croissants",
+            "mini ham croissant", "mini cheese croissant",
+        ],
+        "requires_grams": False,
+        "standard_grams": None,
+        "order_note": "min. 100pc — order 48h in advance",
+        "attributes": {},
+    },
+
+    # ── Brioche buns & rolls (customers can specify grams) ────────────────────
+    "burger bun": {
+        "aliases": [
+            "burger bun", "burger buns", "brioche bun", "brioche buns",
+            "hamburger bun", "hamburger buns", "brioche burger bun",
+        ],
+        "requires_grams": True,
+        "standard_grams": 70,
+        "attributes": {},
+    },
+    "slider bun": {
+        "aliases": [
+            "slider bun", "slider buns", "slider", "sliders",
+            "brioche slider",
+        ],
+        "requires_grams": True,
+        "standard_grams": 40,
+        "attributes": {},
+    },
+    "hotdog roll": {
+        "aliases": [
+            "hotdog roll", "hotdog rolls", "hot dog roll", "hot dog rolls",
+            "soft roll", "soft rolls", "hotdog bun", "hotdog buns",
+            "hot dog bun",
+        ],
+        "requires_grams": True,
+        "standard_grams": 55,
+        "attributes": {},
+    },
+}
+
+# Flat lookup: alias → canonical name (built automatically — do not edit)
+ALIAS_MAP: dict[str, str] = {}
+for _canonical, _data in B2B_MENU.items():
+    for _alias in _data["aliases"]:
+        ALIAS_MAP[_alias] = _canonical
+
+
+def menu_list_text() -> str:
+    lines = []
+    for name, data in B2B_MENU.items():
+        if data.get("requires_grams"):
+            detail = f" — specify grams (standard {data['standard_grams']}g)"
+        elif data.get("unit"):
+            detail = f" — per {data['unit']}"
+        else:
+            detail = ""
+        note = f"  [{data['order_note']}]" if data.get("order_note") else ""
+        lines.append(f"  • {name}{detail}{note}")
+    return "\n".join(lines)

@@ -35,7 +35,37 @@ def init_db() -> None:
                 file_path    TEXT    NOT NULL,
                 submitted_at TEXT    NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS b2b_customers (
+                group_chat_id   INTEGER PRIMARY KEY,
+                business_name   TEXT    NOT NULL,
+                delivery_method TEXT,
+                delivery_time   TEXT,
+                location        TEXT,
+                updated_at      TEXT    NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS b2b_orders (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_chat_id INTEGER NOT NULL,
+                business_name TEXT    NOT NULL,
+                item          TEXT    NOT NULL,
+                quantity      INTEGER NOT NULL DEFAULT 1,
+                grams         INTEGER,
+                notes         TEXT,
+                delivery_date TEXT    NOT NULL DEFAULT '',
+                status        TEXT    NOT NULL DEFAULT 'confirmed',
+                created_at    TEXT    NOT NULL
+            );
         """)
+        # Migration: add delivery_date to b2b_orders for databases created before this change
+        try:
+            conn.execute("ALTER TABLE b2b_orders ADD COLUMN delivery_date TEXT NOT NULL DEFAULT ''")
+            conn.commit()
+            logger.info("Migrated b2b_orders table: added delivery_date column")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         # Migration: add customer_name to databases created before Phase 3
         try:
             conn.execute(
@@ -104,3 +134,95 @@ def get_orders_by_user(date: str) -> list[sqlite3.Row]:
               AND status = 'confirmed'
             ORDER BY customer_name, item
         """, (date,)).fetchall()
+
+
+# ─── B2B ─────────────────────────────────────────────────────────────────────
+
+def upsert_b2b_customer(
+    group_chat_id: int,
+    business_name: str,
+    delivery_method: str | None = None,
+    delivery_time: str | None = None,
+    location: str | None = None,
+) -> None:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        conn.execute("""
+            INSERT INTO b2b_customers (group_chat_id, business_name, delivery_method, delivery_time, location, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(group_chat_id) DO UPDATE SET
+                business_name   = excluded.business_name,
+                delivery_method = COALESCE(excluded.delivery_method, delivery_method),
+                delivery_time   = COALESCE(excluded.delivery_time,   delivery_time),
+                location        = COALESCE(excluded.location,        location),
+                updated_at      = excluded.updated_at
+        """, (group_chat_id, business_name, delivery_method, delivery_time, location, now))
+
+
+def get_b2b_customer(group_chat_id: int) -> sqlite3.Row | None:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM b2b_customers WHERE group_chat_id = ?", (group_chat_id,)
+        ).fetchone()
+
+
+def save_b2b_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str) -> None:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        conn.executemany(
+            "INSERT INTO b2b_orders "
+            "(group_chat_id, business_name, item, quantity, grams, notes, delivery_date, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (group_chat_id, business_name, i["item"], i["qty"],
+                 i.get("grams"), i.get("notes"), delivery_date, now)
+                for i in items
+            ],
+        )
+    logger.info("Saved B2B order for %s (%s) delivery %s: %s", business_name, group_chat_id, delivery_date, items)
+
+
+def get_b2b_orders_for_date(group_chat_id: int, delivery_date: str) -> list[sqlite3.Row]:
+    """Return confirmed orders for a group on a given delivery date."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT item, quantity, grams, notes
+            FROM b2b_orders
+            WHERE group_chat_id = ? AND delivery_date = ? AND status = 'confirmed'
+            ORDER BY created_at
+        """, (group_chat_id, delivery_date)).fetchall()
+
+
+def get_b2b_last_order_item(group_chat_id: int, item: str) -> sqlite3.Row | None:
+    """Return grams and notes from the most recent confirmed order of this item for the group."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT grams, notes
+            FROM b2b_orders
+            WHERE group_chat_id = ? AND item = ? AND status = 'confirmed'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (group_chat_id, item)).fetchone()
+
+
+def get_b2b_daily_totals(delivery_date: str) -> list[sqlite3.Row]:
+    """Return aggregated production totals for a given delivery date."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT item, SUM(quantity) AS total
+            FROM b2b_orders
+            WHERE delivery_date = ? AND status = 'confirmed'
+            GROUP BY item
+            ORDER BY item
+        """, (delivery_date,)).fetchall()
+
+
+def get_b2b_orders_by_group(delivery_date: str) -> list[sqlite3.Row]:
+    """Return all confirmed orders for a delivery date, grouped by business."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT group_chat_id, business_name, item, quantity, grams, notes
+            FROM b2b_orders
+            WHERE delivery_date = ? AND status = 'confirmed'
+            ORDER BY business_name, item
+        """, (delivery_date,)).fetchall()
