@@ -9,34 +9,88 @@ from datetime import date, timedelta
 from telegram import Bot
 
 import config
-from shared.database import get_b2b_daily_totals, get_b2b_orders_by_group, get_b2b_customer
+from shared.database import (
+    get_b2b_daily_totals,
+    get_b2b_cake_daily_totals,
+    get_b2b_orders_by_group,
+    get_b2b_cake_orders_by_group,
+    get_b2b_customer,
+)
 
 logger = logging.getLogger(__name__)
 
 
-async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
-    # Default: show what needs to be baked tonight = delivery_date tomorrow
-    day = target_date or (date.today() + timedelta(days=1)).isoformat()
-    totals = get_b2b_daily_totals(day)
+def _cake_total_label(row) -> str:
+    order_type = row["order_type"]
+    slices = row["slices"]
+    if order_type == "full":
+        return f"{row['item']} (full)"
+    if order_type == "sliced":
+        s = f"{slices}-slice" if slices else "sliced"
+        return f"{row['item']} ({s})"
+    if order_type == "tray":
+        return f"{row['item']} (tray)"
+    return f"{row['item']} (piece)"
 
-    if not totals:
+
+def _cake_order_label(row) -> str:
+    order_type = row["order_type"]
+    slices = row["slices"]
+    qty = row["quantity"]
+    if order_type == "full":
+        return f"  • {qty}x {row['item']} — full"
+    if order_type == "sliced":
+        s = f"{slices}-slice" if slices else "sliced"
+        return f"  • {qty}x {row['item']} — {s}"
+    if order_type == "tray":
+        return f"  • {qty}x {row['item']} — tray"
+    return f"  • {qty}x {row['item']} — piece"
+
+
+async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
+    day = target_date or (date.today() + timedelta(days=1)).isoformat()
+
+    bread_totals = get_b2b_daily_totals(day)
+    cake_totals = get_b2b_cake_daily_totals(day)
+
+    if not bread_totals and not cake_totals:
         await bot.send_message(config.B2B_STAFF_GROUP_ID, f"No B2B orders for {day}.")
         return
 
     lines = [f"B2B PRODUCTION — {day}", ""]
-    for row in totals:
-        lines.append(f"  {row['item']}: {row['total']}")
 
-    lines += ["", "─" * 28, ""]
+    if bread_totals:
+        lines.append("BREADS:")
+        for row in bread_totals:
+            lines.append(f"  {row['item']}: {row['total']}")
+        lines.append("")
 
-    rows = get_b2b_orders_by_group(day)
-    by_group: dict[str, list] = defaultdict(list)
-    for row in rows:
-        by_group[row["business_name"]].append(row)
+    if cake_totals:
+        lines.append("CAKES:")
+        for row in cake_totals:
+            lines.append(f"  {_cake_total_label(row)}: {row['total']}")
+        lines.append("")
 
-    for business_name, orders in sorted(by_group.items()):
+    lines += ["─" * 28, ""]
+
+    # Per-customer breakdown — merge bread and cake rows by business
+    bread_rows = get_b2b_orders_by_group(day)
+    cake_rows = get_b2b_cake_orders_by_group(day)
+
+    bread_by_group: dict[str, list] = defaultdict(list)
+    for row in bread_rows:
+        bread_by_group[row["business_name"]].append(row)
+
+    cake_by_group: dict[str, list] = defaultdict(list)
+    for row in cake_rows:
+        cake_by_group[row["business_name"]].append(row)
+
+    all_businesses = sorted(set(bread_by_group) | set(cake_by_group))
+
+    for business_name in all_businesses:
         lines.append(f"{business_name}:")
-        for o in orders:
+
+        for o in bread_by_group.get(business_name, []):
             line = f"  • {o['quantity']}x {o['item']}"
             if o["grams"]:
                 line += f" — {o['grams']}g"
@@ -44,7 +98,14 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
                 line += f" ({o['notes']})"
             lines.append(line)
 
-        customer = get_b2b_customer(orders[0]["group_chat_id"])
+        for o in cake_by_group.get(business_name, []):
+            lines.append(_cake_order_label(o))
+
+        # Delivery / pickup info
+        bread_list = bread_by_group.get(business_name, [])
+        cake_list = cake_by_group.get(business_name, [])
+        group_chat_id = (bread_list or cake_list)[0]["group_chat_id"]
+        customer = get_b2b_customer(group_chat_id)
         if customer and customer["delivery_method"]:
             if customer["delivery_method"] == "delivery":
                 loc = f" — {customer['location']}" if customer["location"] else ""

@@ -36,6 +36,20 @@ def init_db() -> None:
                 submitted_at TEXT    NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS b2b_cake_orders (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_chat_id INTEGER NOT NULL,
+                business_name TEXT    NOT NULL,
+                item          TEXT    NOT NULL,
+                cake_category TEXT    NOT NULL,
+                order_type    TEXT    NOT NULL,
+                quantity      INTEGER NOT NULL DEFAULT 1,
+                slices        INTEGER,
+                delivery_date TEXT    NOT NULL,
+                status        TEXT    NOT NULL DEFAULT 'confirmed',
+                created_at    TEXT    NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS b2b_customers (
                 group_chat_id   INTEGER PRIMARY KEY,
                 business_name   TEXT    NOT NULL,
@@ -217,6 +231,53 @@ def get_b2b_daily_totals(delivery_date: str) -> list[sqlite3.Row]:
         """, (delivery_date,)).fetchall()
 
 
+def save_b2b_cake_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str) -> None:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        conn.executemany(
+            "INSERT INTO b2b_cake_orders "
+            "(group_chat_id, business_name, item, cake_category, order_type, quantity, slices, delivery_date, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (group_chat_id, business_name, i["item"], i["cake_category"],
+                 i["order_type"], i["qty"], i.get("slices"), delivery_date, now)
+                for i in items
+            ],
+        )
+    logger.info("Saved B2B cake order for %s (%s) delivery %s: %s", business_name, group_chat_id, delivery_date, items)
+
+
+def get_b2b_cake_orders_for_date(group_chat_id: int, delivery_date: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT item, cake_category, order_type, quantity, slices
+            FROM b2b_cake_orders
+            WHERE group_chat_id = ? AND delivery_date = ? AND status = 'confirmed'
+            ORDER BY created_at
+        """, (group_chat_id, delivery_date)).fetchall()
+
+
+def get_b2b_cake_last_order_item(group_chat_id: int, item: str) -> sqlite3.Row | None:
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT order_type, slices
+            FROM b2b_cake_orders
+            WHERE group_chat_id = ? AND item = ? AND status = 'confirmed'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (group_chat_id, item)).fetchone()
+
+
+def get_b2b_cake_orders_by_group(delivery_date: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT group_chat_id, business_name, item, cake_category, order_type, quantity, slices
+            FROM b2b_cake_orders
+            WHERE delivery_date = ? AND status = 'confirmed'
+            ORDER BY business_name, item
+        """, (delivery_date,)).fetchall()
+
+
 def get_b2b_orders_by_group(delivery_date: str) -> list[sqlite3.Row]:
     """Return all confirmed orders for a delivery date, grouped by business."""
     with get_connection() as conn:
@@ -225,4 +286,16 @@ def get_b2b_orders_by_group(delivery_date: str) -> list[sqlite3.Row]:
             FROM b2b_orders
             WHERE delivery_date = ? AND status = 'confirmed'
             ORDER BY business_name, item
+        """, (delivery_date,)).fetchall()
+
+
+def get_b2b_cake_daily_totals(delivery_date: str) -> list[sqlite3.Row]:
+    """Return aggregated cake production totals for a given delivery date."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT item, cake_category, order_type, SUM(quantity) AS total, slices
+            FROM b2b_cake_orders
+            WHERE delivery_date = ? AND status = 'confirmed'
+            GROUP BY item, order_type, slices
+            ORDER BY item, order_type
         """, (delivery_date,)).fetchall()

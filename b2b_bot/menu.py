@@ -1,16 +1,22 @@
-"""B2B menu — edit this file to add/remove items, change grams, or update attributes.
-
-To add a new item:
-  1. Add a new key to B2B_MENU with aliases, gram settings, and any attributes
-  2. Restart the bot — no other changes needed
+"""B2B bread menu — edit this file to add/remove items, change grams, prices, or attributes.
 
 Fields:
-  requires_grams  — True if customer must/can specify grams (pulled from history or standard)
+  price           — B2B price per unit (or per standard gram size for buns)
+  price_by_grams  — gram → price lookup for items sold in custom gram sizes
+  requires_grams  — True if customer can specify grams (pulled from history or standard)
   standard_grams  — default gram size when customer doesn't specify
   unit            — display label when sold in fixed units (e.g. "2pc", "200g")
   order_note      — shown in confirmation when special conditions apply
   attributes      — dict of customisable options (e.g. sesame type)
 """
+
+# Gram → price lookup shared by all brioche bun/roll items
+_BUN_PRICE_BY_GRAMS: dict[int, float] = {
+    30: 0.15, 35: 0.15, 40: 0.17, 45: 0.19,
+    50: 0.20, 55: 0.23, 60: 0.25, 65: 0.27,
+    70: 0.28, 75: 0.31, 80: 0.33, 90: 0.38,
+    100: 0.43, 110: 0.48, 120: 0.53,
+}
 
 B2B_MENU: dict[str, dict] = {
 
@@ -20,6 +26,7 @@ B2B_MENU: dict[str, dict] = {
             "french baguette", "french baguettes", "baguette", "baguettes",
             "french bread", "french stick", "french sticks",
         ],
+        "price": 0.65,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
@@ -30,12 +37,14 @@ B2B_MENU: dict[str, dict] = {
             "multi grain baguette", "multigrain", "multi baguette",
             "wholegrain baguette",
         ],
+        "price": 0.85,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
     },
     "focaccia": {
         "aliases": ["focaccia", "focaccias", "focacia", "foccacia", "foccacias"],
+        "price": 0.80,
         "requires_grams": False,
         "standard_grams": None,
         "unit": "2pc",
@@ -46,12 +55,14 @@ B2B_MENU: dict[str, dict] = {
             "multigrain loaf", "multigrain loafs", "multigrain bread",
             "multi grain loaf", "loaf", "loafs",
         ],
+        "price": 1.10,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
     },
     "bagel": {
         "aliases": ["bagel", "bagels"],
+        "price": 1.25,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
@@ -60,6 +71,7 @@ B2B_MENU: dict[str, dict] = {
     # ── By weight (sold per 200g bag) ─────────────────────────────────────────
     "croutons": {
         "aliases": ["crouton", "croutons"],
+        "price": 1.00,
         "requires_grams": False,
         "standard_grams": None,
         "unit": "200g",
@@ -67,6 +79,7 @@ B2B_MENU: dict[str, dict] = {
     },
     "rusk": {
         "aliases": ["rusk", "rusks"],
+        "price": 1.00,
         "requires_grams": False,
         "standard_grams": None,
         "unit": "200g",
@@ -78,6 +91,7 @@ B2B_MENU: dict[str, dict] = {
         "aliases": [
             "croissant", "croissants", "crossant", "crossants", "croissan",
         ],
+        "price": 0.66,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
@@ -89,6 +103,7 @@ B2B_MENU: dict[str, dict] = {
             "chocolate croissant", "chocolate croissants",
             "choc croissant", "choc croissants",
         ],
+        "price": 0.77,
         "requires_grams": False,
         "standard_grams": None,
         "attributes": {},
@@ -97,6 +112,7 @@ B2B_MENU: dict[str, dict] = {
     # ── Mini pastries (min. 100pc, 48h advance order) ─────────────────────────
     "mini croissant": {
         "aliases": ["mini croissant", "mini croissants"],
+        "price": 0.49,
         "requires_grams": False,
         "standard_grams": None,
         "order_note": "min. 100pc — order 48h in advance",
@@ -107,6 +123,7 @@ B2B_MENU: dict[str, dict] = {
             "mini chocolatin", "mini chocolatins",
             "mini pain au chocolat", "mini chocolate croissant",
         ],
+        "price": 0.59,
         "requires_grams": False,
         "standard_grams": None,
         "order_note": "min. 100pc — order 48h in advance",
@@ -116,6 +133,7 @@ B2B_MENU: dict[str, dict] = {
         "aliases": [
             "mini almond croissant", "mini almond croissants",
         ],
+        "price": 0.90,
         "requires_grams": False,
         "standard_grams": None,
         "order_note": "min. 100pc — order 48h in advance",
@@ -126,6 +144,7 @@ B2B_MENU: dict[str, dict] = {
             "mini almond chocolatin", "mini almond chocolatins",
             "mini almond chocolate croissant",
         ],
+        "price": 0.96,
         "requires_grams": False,
         "standard_grams": None,
         "order_note": "min. 100pc — order 48h in advance",
@@ -136,6 +155,7 @@ B2B_MENU: dict[str, dict] = {
             "mini ham cheese croissant", "mini ham cheese croissants",
             "mini ham croissant", "mini cheese croissant",
         ],
+        "price": 1.00,
         "requires_grams": False,
         "standard_grams": None,
         "order_note": "min. 100pc — order 48h in advance",
@@ -148,6 +168,8 @@ B2B_MENU: dict[str, dict] = {
             "burger bun", "burger buns", "brioche bun", "brioche buns",
             "hamburger bun", "hamburger buns", "brioche burger bun",
         ],
+        "price": 0.28,
+        "price_by_grams": _BUN_PRICE_BY_GRAMS,
         "requires_grams": True,
         "standard_grams": 70,
         "attributes": {},
@@ -157,6 +179,8 @@ B2B_MENU: dict[str, dict] = {
             "slider bun", "slider buns", "slider", "sliders",
             "brioche slider",
         ],
+        "price": 0.19,
+        "price_by_grams": _BUN_PRICE_BY_GRAMS,
         "requires_grams": True,
         "standard_grams": 40,
         "attributes": {},
@@ -167,6 +191,8 @@ B2B_MENU: dict[str, dict] = {
             "soft roll", "soft rolls", "hotdog bun", "hotdog buns",
             "hot dog bun",
         ],
+        "price": 0.23,
+        "price_by_grams": _BUN_PRICE_BY_GRAMS,
         "requires_grams": True,
         "standard_grams": 55,
         "attributes": {},
@@ -184,11 +210,11 @@ def menu_list_text() -> str:
     lines = []
     for name, data in B2B_MENU.items():
         if data.get("requires_grams"):
-            detail = f" — specify grams (standard {data['standard_grams']}g)"
+            detail = f" — specify grams (standard {data['standard_grams']}g, ${data['price']:.2f})"
         elif data.get("unit"):
-            detail = f" — per {data['unit']}"
+            detail = f" — per {data['unit']} (${data['price']:.2f})"
         else:
-            detail = ""
+            detail = f" — ${data['price']:.2f} each"
         note = f"  [{data['order_note']}]" if data.get("order_note") else ""
         lines.append(f"  • {name}{detail}{note}")
     return "\n".join(lines)
