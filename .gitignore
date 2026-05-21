@@ -16,8 +16,8 @@ venv/
 env/
 .env
 
-# Secrets / config with tokens
-config.py
+# Secrets
+secrets.py
 *.env
 .env.*
 
