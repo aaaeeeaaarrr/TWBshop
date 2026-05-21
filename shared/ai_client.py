@@ -55,6 +55,14 @@ _COMPLIANCE_SYSTEM = (
     "Be practical — minor imperfections are fine; flag genuine hygiene or display problems."
 )
 
+_PAYMENT_SYSTEM = (
+    "You are a payment verification assistant. Read a bank transfer or payment screenshot "
+    "and extract the total amount transferred. Return only valid JSON:\n"
+    '{"amount": number_or_null, "currency": "string_or_null", "notes": "any observations or null"}\n'
+    "If no clear transfer amount is visible, return amount as null. "
+    "amount must be a plain number (e.g. 42.50), not a string."
+)
+
 _STAFF_MSG_SYSTEM = (
     "You monitor bakery staff communications for issues needing management attention. "
     "Flag: safety concerns, customer complaints, conflicts, significant frustration, policy violations. "
@@ -114,6 +122,27 @@ async def analyze_compliance_photo(image_bytes: bytes, photo_type: str) -> dict:
     except Exception as exc:
         logger.error("Compliance photo analysis failed: %s", exc)
         return {"passed": None, "issues": [], "notes": "API error — manual review required"}
+
+
+async def read_payment_amount(image_bytes: bytes) -> dict:
+    """Read the transfer amount from a bank payment screenshot."""
+    try:
+        resp = await _get_client().messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=256,
+            system=[{"type": "text", "text": _PAYMENT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _encode(image_bytes)}},
+                    {"type": "text", "text": "Extract the transfer amount from this payment screenshot."},
+                ],
+            }],
+        )
+        return _parse_json(resp.content[0].text) or {"amount": None, "currency": None, "notes": "Could not parse"}
+    except Exception as exc:
+        logger.error("Payment amount reading failed: %s", exc)
+        return {"amount": None, "currency": None, "notes": "API error"}
 
 
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:

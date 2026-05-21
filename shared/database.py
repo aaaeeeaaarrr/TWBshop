@@ -60,16 +60,28 @@ def init_db() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS b2b_orders (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                group_chat_id INTEGER NOT NULL,
-                business_name TEXT    NOT NULL,
-                item          TEXT    NOT NULL,
-                quantity      INTEGER NOT NULL DEFAULT 1,
-                grams         INTEGER,
-                notes         TEXT,
-                delivery_date TEXT    NOT NULL DEFAULT '',
-                status        TEXT    NOT NULL DEFAULT 'confirmed',
-                created_at    TEXT    NOT NULL
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_chat_id  INTEGER NOT NULL,
+                business_name  TEXT    NOT NULL,
+                item           TEXT    NOT NULL,
+                quantity       INTEGER NOT NULL DEFAULT 1,
+                grams          INTEGER,
+                notes          TEXT,
+                delivery_date  TEXT    NOT NULL DEFAULT '',
+                status         TEXT    NOT NULL DEFAULT 'confirmed',
+                payment_status TEXT    NOT NULL DEFAULT 'unpaid',
+                created_at     TEXT    NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS b2b_payments (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_chat_id   INTEGER NOT NULL,
+                business_name   TEXT    NOT NULL,
+                amount          REAL    NOT NULL DEFAULT 0,
+                screenshot_path TEXT,
+                status          TEXT    NOT NULL DEFAULT 'pending',
+                applied_at      TEXT,
+                created_at      TEXT    NOT NULL
             );
         """)
         # Migration: add delivery_date to b2b_orders for databases created before this change
@@ -89,6 +101,20 @@ def init_db() -> None:
             logger.info("Migrated orders table: added customer_name column")
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+        for _migration_sql, _migration_label in [
+            ("ALTER TABLE b2b_orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'",
+             "b2b_orders.payment_status"),
+            ("ALTER TABLE b2b_cake_orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'",
+             "b2b_cake_orders.payment_status"),
+        ]:
+            try:
+                conn.execute(_migration_sql)
+                conn.commit()
+                logger.info("Migrated: added %s column", _migration_label)
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     logger.info("Database ready at %s", DB_PATH)
 
 
@@ -312,3 +338,96 @@ def get_b2b_cake_daily_totals(delivery_date: str) -> list[sqlite3.Row]:
             GROUP BY item, order_type, slices
             ORDER BY item, order_type
         """, (delivery_date,)).fetchall()
+
+
+# ─── Billing ──────────────────────────────────────────────────────────────────
+
+def get_unpaid_b2b_orders(group_chat_id: int) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT id, item, quantity, grams, notes, delivery_date, created_at
+            FROM b2b_orders
+            WHERE group_chat_id = ? AND status = 'confirmed' AND payment_status = 'unpaid'
+            ORDER BY delivery_date, created_at
+        """, (group_chat_id,)).fetchall()
+
+
+def get_unpaid_b2b_cake_orders(group_chat_id: int) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT id, item, cake_category, order_type, quantity, slices, delivery_date, created_at
+            FROM b2b_cake_orders
+            WHERE group_chat_id = ? AND status = 'confirmed' AND payment_status = 'unpaid'
+            ORDER BY delivery_date, created_at
+        """, (group_chat_id,)).fetchall()
+
+
+def get_groups_with_unpaid_orders() -> list[sqlite3.Row]:
+    """All groups that have any unpaid confirmed orders (bread or cake)."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT DISTINCT group_chat_id, business_name FROM b2b_orders
+            WHERE status = 'confirmed' AND payment_status = 'unpaid'
+            UNION
+            SELECT DISTINCT group_chat_id, business_name FROM b2b_cake_orders
+            WHERE status = 'confirmed' AND payment_status = 'unpaid'
+            ORDER BY business_name
+        """).fetchall()
+
+
+def get_groups_with_unpaid_on_date(delivery_date: str) -> list[sqlite3.Row]:
+    """Groups with unpaid orders for a specific delivery date."""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT DISTINCT group_chat_id, business_name FROM b2b_orders
+            WHERE delivery_date = ? AND status = 'confirmed' AND payment_status = 'unpaid'
+            UNION
+            SELECT DISTINCT group_chat_id, business_name FROM b2b_cake_orders
+            WHERE delivery_date = ? AND status = 'confirmed' AND payment_status = 'unpaid'
+            ORDER BY business_name
+        """, (delivery_date, delivery_date)).fetchall()
+
+
+def mark_b2b_orders_paid(order_ids: list[int]) -> None:
+    placeholders = ",".join("?" * len(order_ids))
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE b2b_orders SET payment_status = 'paid' WHERE id IN ({placeholders})",
+            order_ids,
+        )
+
+
+def mark_b2b_cake_orders_paid(order_ids: list[int]) -> None:
+    placeholders = ",".join("?" * len(order_ids))
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE b2b_cake_orders SET payment_status = 'paid' WHERE id IN ({placeholders})",
+            order_ids,
+        )
+
+
+def save_b2b_payment(group_chat_id: int, business_name: str, amount: float, screenshot_path: str | None) -> int:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO b2b_payments (group_chat_id, business_name, amount, screenshot_path, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (group_chat_id, business_name, amount, screenshot_path, now),
+        )
+        return cursor.lastrowid
+
+
+def get_b2b_payment(payment_id: int) -> sqlite3.Row | None:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM b2b_payments WHERE id = ?", (payment_id,)
+        ).fetchone()
+
+
+def update_b2b_payment_status(payment_id: int, status: str) -> None:
+    now = datetime.utcnow().isoformat()
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE b2b_payments SET status = ?, applied_at = ? WHERE id = ?",
+            (status, now, payment_id),
+        )
