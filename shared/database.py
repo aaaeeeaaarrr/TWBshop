@@ -107,6 +107,8 @@ def init_db() -> None:
              "b2b_orders.payment_status"),
             ("ALTER TABLE b2b_cake_orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'",
              "b2b_cake_orders.payment_status"),
+            ("ALTER TABLE b2b_payments ADD COLUMN group_message_id INTEGER",
+             "b2b_payments.group_message_id"),
         ]:
             try:
                 conn.execute(_migration_sql)
@@ -406,13 +408,13 @@ def mark_b2b_cake_orders_paid(order_ids: list[int]) -> None:
         )
 
 
-def save_b2b_payment(group_chat_id: int, business_name: str, amount: float, screenshot_path: str | None) -> int:
+def save_b2b_payment(group_chat_id: int, business_name: str, amount: float, screenshot_path: str | None, group_message_id: int | None = None) -> int:
     now = datetime.utcnow().isoformat()
     with get_connection() as conn:
         cursor = conn.execute(
-            "INSERT INTO b2b_payments (group_chat_id, business_name, amount, screenshot_path, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (group_chat_id, business_name, amount, screenshot_path, now),
+            "INSERT INTO b2b_payments (group_chat_id, business_name, amount, screenshot_path, group_message_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (group_chat_id, business_name, amount, screenshot_path, group_message_id, now),
         )
         return cursor.lastrowid
 

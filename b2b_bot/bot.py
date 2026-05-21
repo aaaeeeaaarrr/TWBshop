@@ -16,6 +16,7 @@ import config
 from shared import database
 from b2b_bot.billing import (
     handle_payment_photo,
+    handle_payment_document,
     handle_payment_callback,
     send_daily_reminders,
     send_weekly_reminders,
@@ -88,13 +89,19 @@ def main() -> None:
         handle_group_message,
     ))
 
-    # Photos in groups → payment receipt detection
+    # Photos in groups → payment or order photo detection
     app.add_handler(MessageHandler(
         filters.PHOTO & filters.ChatType.GROUPS,
         handle_payment_photo,
     ))
 
-    # Payment callbacks (owner approve/reject + customer yes/no)
+    # PDF and image documents in groups → payment or order detection (uncompressed)
+    app.add_handler(MessageHandler(
+        (filters.Document.PDF | filters.Document.IMAGE) & filters.ChatType.GROUPS,
+        handle_payment_document,
+    ))
+
+    # Payment callbacks (owner approve/reject + customer yes/no/order)
     app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern=r"^b2b_pay_"))
 
     # Order callbacks (confirm, edit, cancel, extra, mini)

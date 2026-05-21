@@ -70,6 +70,26 @@ _STAFF_MSG_SYSTEM = (
     'Return only valid JSON: {"action": "none/alert/urgent", "flag": true/false, "reason": "brief reason or empty string"}'
 )
 
+_B2B_ORDER_TEXT_SYSTEM = (
+    "You are a B2B bakery order parser. The customer typed something our bot couldn't fully understand. "
+    "Match it to items from the provided menu list. Return only valid JSON:\n"
+    '{"items": [{"item": "<exact menu name from list>", "qty": <integer>}]}\n'
+    "Only use exact item names from the provided menu list. "
+    'If nothing matches, return {"items": []}.'
+)
+
+_B2B_IMAGE_CLASSIFY_SYSTEM = (
+    "You analyze images sent to a bakery B2B ordering system. "
+    "Decide if the image is: a payment receipt/bank transfer, a bakery order, or something else. "
+    "Return only valid JSON with one of these shapes:\n"
+    '  Payment: {"type": "payment", "amount": <number or null>, "currency": "<string or null>"}\n'
+    '  Order:   {"type": "order", "items": [{"item": "<product name>", "qty": <integer>}]}\n'
+    '  Other:   {"type": "other"}\n'
+    "For orders: extract readable product names only — ignore item codes like PP-FOOD-BK-2503. "
+    "If a row has a code column and a description column, use the description. "
+    "Look for quantities in columns named Qty, Quantity, Pcs, or similar."
+)
+
 
 # ---------------------------------------------------------------------------
 # Public analysis functions
@@ -142,6 +162,106 @@ async def read_payment_amount(image_bytes: bytes) -> dict:
         return _parse_json(resp.content[0].text) or {"amount": None, "currency": None, "notes": "Could not parse"}
     except Exception as exc:
         logger.error("Payment amount reading failed: %s", exc)
+        return {"amount": None, "currency": None, "notes": "API error"}
+
+
+async def interpret_unmatched_b2b_order(raw_text: str, menu_items: list[str]) -> list[dict]:
+    """Haiku fallback for text the rule-based parser couldn't match. Returns [{item, qty}]."""
+    if not config.ANTHROPIC_API_KEY:
+        return []
+    menu_str = "\n".join(f"- {m}" for m in sorted(menu_items))
+    try:
+        resp = await _get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=_B2B_ORDER_TEXT_SYSTEM,
+            messages=[{"role": "user", "content": f"Menu:\n{menu_str}\n\nCustomer typed: {raw_text}"}],
+        )
+        return _parse_json(resp.content[0].text).get("items", [])
+    except Exception as exc:
+        logger.error("B2B order text interpretation failed: %s", exc)
+        return []
+
+
+async def classify_b2b_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
+    """Classify a B2B group image as payment, order, or other — and extract details in one call.
+
+    Returns one of:
+      {"type": "payment", "amount": float|None, "currency": str|None}
+      {"type": "order",   "items": [{"item": str, "qty": int}]}
+      {"type": "other"}
+    """
+    if not config.ANTHROPIC_API_KEY:
+        return {"type": "other"}
+    try:
+        resp = await _get_client().messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=400,
+            system=_B2B_IMAGE_CLASSIFY_SYSTEM,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": _encode(image_bytes)}},
+                    {"type": "text", "text": "What is this image? Extract the relevant details."},
+                ],
+            }],
+        )
+        raw = resp.content[0].text
+        logger.info("B2B image classify response: %s", raw)
+        result = _parse_json(raw)
+        return result if result.get("type") in ("payment", "order", "other") else {"type": "other"}
+    except Exception as exc:
+        logger.error("B2B image classification failed: %s", exc)
+        return {"type": "other"}
+
+
+async def extract_b2b_order_from_image(image_bytes: bytes, menu_items: list[str] = None, mime_type: str = "image/jpeg") -> list[dict]:
+    """Extract item names and quantities from an order photo/document. Returns [{item, qty}]."""
+    if not config.ANTHROPIC_API_KEY:
+        return []
+    try:
+        resp = await _get_client().messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=300,
+            system=_B2B_ORDER_IMAGE_SYSTEM,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": _encode(image_bytes)}},
+                    {"type": "text", "text": "Extract all items and quantities from this document."},
+                ],
+            }],
+        )
+        raw = resp.content[0].text
+        logger.info("B2B order image raw response: %s", raw)
+        result = _parse_json(raw).get("items", [])
+        logger.info("B2B order image parsed items: %s", result)
+        return result
+    except Exception as exc:
+        logger.error("B2B order image extraction failed: %s", exc)
+        return []
+
+
+async def read_payment_amount_pdf(pdf_bytes: bytes) -> dict:
+    """Read payment amount from a PDF bank document."""
+    if not config.ANTHROPIC_API_KEY:
+        return {"amount": None, "currency": None, "notes": "API not configured"}
+    try:
+        resp = await _get_client().messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=256,
+            system=[{"type": "text", "text": _PAYMENT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": _encode(pdf_bytes)}},
+                    {"type": "text", "text": "Extract the transfer amount from this payment document."},
+                ],
+            }],
+        )
+        return _parse_json(resp.content[0].text) or {"amount": None, "currency": None, "notes": "Could not parse"}
+    except Exception as exc:
+        logger.error("PDF payment reading failed: %s", exc)
         return {"amount": None, "currency": None, "notes": "API error"}
 
 

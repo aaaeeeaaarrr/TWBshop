@@ -64,13 +64,13 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
     lines = [f"B2B PRODUCTION — {day}", ""]
 
     if bread_totals:
-        lines.append("BREADS:")
+        lines.append("TOTAL BREADS:")
         for row in bread_totals:
             lines.append(f"  {row['item']}: {row['total']}")
         lines.append("")
 
     if cake_totals:
-        lines.append("CAKES:")
+        lines.append("TOTAL CAKES:")
         for row in cake_totals:
             lines.append(f"  {_cake_total_label(row)}: {row['total']}")
         lines.append("")
@@ -91,10 +91,24 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
 
     all_businesses = sorted(set(bread_by_group) | set(cake_by_group))
 
-    for business_name in all_businesses:
+    for i, business_name in enumerate(all_businesses):
+        if i > 0:
+            lines += ["─" * 28, ""]
+
         lines.append(f"{business_name}:")
 
+        # Combine duplicate bread rows (same item+grams+notes)
+        combined_bread: dict[tuple, dict] = {}
+        order: list[tuple] = []
         for o in bread_by_group.get(business_name, []):
+            key = (o["item"], o["grams"], o["notes"])
+            if key in combined_bread:
+                combined_bread[key]["quantity"] += o["quantity"]
+            else:
+                combined_bread[key] = dict(o)
+                order.append(key)
+        for key in order:
+            o = combined_bread[key]
             line = f"  • {o['quantity']}x {o['item']}"
             if o["grams"]:
                 line += f" — {o['grams']}g"

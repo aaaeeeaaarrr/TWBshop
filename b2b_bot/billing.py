@@ -1,16 +1,16 @@
-"""B2B billing — payment tracking, reminders, and owner approval flow."""
+"""B2B billing — payment tracking and reminders."""
 
 import logging
 import os
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 
 import config
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price
-from shared.ai_client import read_payment_amount
+from shared.ai_client import read_payment_amount, read_payment_amount_pdf, classify_b2b_image
 from shared.database import (
     get_unpaid_b2b_orders,
     get_unpaid_b2b_cake_orders,
@@ -19,14 +19,9 @@ from shared.database import (
     mark_b2b_orders_paid,
     mark_b2b_cake_orders_paid,
     save_b2b_payment,
-    get_b2b_payment,
-    update_b2b_payment_status,
 )
 
 logger = logging.getLogger(__name__)
-
-# Pending payment photos: {group_chat_id: {"file_id": str}}
-_pending_payment_photo: dict[int, dict] = {}
 
 
 # ─── Balance helpers ──────────────────────────────────────────────────────────
@@ -174,155 +169,91 @@ async def send_weekly_reminders(bot) -> None:
 
 # ─── Payment photo flow ───────────────────────────────────────────────────────
 
+async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, is_pdf: bool, mime_type: str) -> None:
+    """Download, classify, and route a B2B group image automatically."""
+    dl_file = await bot.get_file(file_id)
+    file_bytes = bytes(await dl_file.download_as_bytearray())
+
+    if is_pdf:
+        # PDFs are always payment receipts
+        result = {"type": "payment", "amount": None}
+        ai_pay = await read_payment_amount_pdf(file_bytes)
+        result["amount"] = ai_pay.get("amount") or 0.0
+    else:
+        result = await classify_b2b_image(file_bytes, mime_type)
+
+    if result["type"] == "order":
+        from b2b_bot.orders import handle_order_photo, _ai_items_to_orders
+        items = result.get("items", [])
+        await handle_order_photo(bot, chat_id, file_bytes, message_id, mime_type=mime_type, ai_items=items)
+
+    elif result["type"] == "payment":
+        amount = result.get("amount") or 0.0
+        if not amount and not is_pdf:
+            # Re-read for amount if classify didn't extract it
+            ai_pay = await read_payment_amount(file_bytes)
+            amount = ai_pay.get("amount") or 0.0
+
+        business = get_business_name(chat_id)
+        balance_before = get_unpaid_total(chat_id)
+
+        os.makedirs(config.PHOTO_STORAGE_DIR, exist_ok=True)
+        ext = "pdf" if is_pdf else "jpg"
+        filename = f"payment_{chat_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{ext}"
+        file_path = os.path.join(config.PHOTO_STORAGE_DIR, filename)
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+
+        save_b2b_payment(chat_id, business, amount, file_path, message_id)
+
+        if amount > 0:
+            res = apply_payment(chat_id, amount)
+            if res["remaining"] <= 0:
+                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. Your balance is now $0. ✓"
+            else:
+                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\nRemaining balance: ${res['remaining']:.2f}"
+            owner_detail = (f"Dates covered: {', '.join(res['paid_dates'])}\nRemaining: ${res['remaining']:.2f}"
+                            if res["paid_dates"] else f"Doesn't cover any full delivery date. Balance: ${res['remaining']:.2f}")
+            caption = f"Payment — {business}\n\nAmount: ${amount:.2f}\nBalance before: ${balance_before:.2f}\n{owner_detail}"
+        else:
+            cust_msg = "Thank you! Payment received — we'll update your balance shortly."
+            caption = f"Payment — {business}\n\nAmount: unclear — check manually\nOutstanding: ${balance_before:.2f}"
+
+        await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id)
+        if config.OWNER_TELEGRAM_ID:
+            send = bot.send_document if is_pdf else bot.send_photo
+            kwarg = "document" if is_pdf else "photo"
+            await send(chat_id=config.OWNER_TELEGRAM_ID, caption=caption, **{kwarg: file_id})
+    # type == "other": ignore silently
+
+
 async def handle_payment_photo(update: Update, context) -> None:
-    """Catch any photo in a B2B group and ask if it's a payment receipt."""
+    """Photo sent to a B2B group — AI classifies and routes automatically."""
+    chat_id = update.effective_chat.id
+    if not is_b2b_group(chat_id) or not update.message.photo:
+        return
+    msg = update.message
+    await _process_b2b_image(context.bot, chat_id, msg.photo[-1].file_id, msg.message_id, is_pdf=False, mime_type="image/jpeg")
+
+
+async def handle_payment_document(update: Update, context) -> None:
+    """Document (PDF or image file) sent to a B2B group — AI classifies and routes automatically."""
     chat_id = update.effective_chat.id
     if not is_b2b_group(chat_id):
         return
-
-    msg = update.message
-    if not msg.photo:
+    doc = update.message.document
+    if not doc:
         return
-
-    _pending_payment_photo[chat_id] = {"file_id": msg.photo[-1].file_id}
-
-    await msg.reply_text(
-        "Is this a payment receipt?",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Yes ✓", callback_data=f"b2b_pay_yes:{chat_id}"),
-            InlineKeyboardButton("No",    callback_data=f"b2b_pay_no:{chat_id}"),
-        ]]),
-    )
+    is_pdf = doc.mime_type == "application/pdf"
+    is_image = (doc.mime_type or "").startswith("image/")
+    if not is_pdf and not is_image:
+        return
+    mime = doc.mime_type if is_image else "image/jpeg"
+    await _process_b2b_image(context.bot, chat_id, doc.file_id, update.message.message_id, is_pdf=is_pdf, mime_type=mime)
 
 
 async def handle_payment_callback(update: Update, context) -> None:
-    query = update.callback_query
-    await query.answer()
-    data = query.data
+    """No payment buttons anymore — kept for any stale messages still in chat."""
+    await update.callback_query.answer("Already handled.")
 
-    # ── Customer group: Yes this is a payment receipt ─────────────────────────
-    if data.startswith("b2b_pay_yes:"):
-        group_chat_id = int(data.split(":", 1)[1])
-        pending = _pending_payment_photo.pop(group_chat_id, None)
-        if not pending:
-            await query.edit_message_text("Receipt already processed.")
-            return
 
-        await query.edit_message_text("Received — forwarding to the team for verification.")
-
-        photo_file = await context.bot.get_file(pending["file_id"])
-        image_bytes = bytes(await photo_file.download_as_bytearray())
-
-        os.makedirs(config.PHOTO_STORAGE_DIR, exist_ok=True)
-        filename = f"payment_{group_chat_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jpg"
-        file_path = os.path.join(config.PHOTO_STORAGE_DIR, filename)
-        with open(file_path, "wb") as f:
-            f.write(image_bytes)
-
-        ai_result  = await read_payment_amount(image_bytes)
-        amount     = ai_result.get("amount") or 0.0
-        balance    = get_unpaid_total(group_chat_id)
-        business   = get_business_name(group_chat_id)
-
-        payment_id = save_b2b_payment(group_chat_id, business, amount, file_path)
-
-        amount_str  = f"${amount:.2f}" if amount else "unclear — check screenshot"
-        balance_str = f"${balance:.2f}"
-        caption = (
-            f"Payment receipt — {business}\n\n"
-            f"Amount detected: {amount_str}\n"
-            f"Outstanding balance: {balance_str}"
-        )
-        if not amount:
-            caption += "\n\nAmount could not be read automatically. Verify against your bank before approving."
-
-        if not config.OWNER_TELEGRAM_ID:
-            logger.warning("OWNER_TELEGRAM_ID not set — payment receipt not forwarded")
-            return
-
-        await context.bot.send_photo(
-            chat_id=config.OWNER_TELEGRAM_ID,
-            photo=pending["file_id"],
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Approve ✓", callback_data=f"b2b_pay_approve:{payment_id}"),
-                InlineKeyboardButton("Reject ✗",  callback_data=f"b2b_pay_reject:{payment_id}"),
-            ]]),
-        )
-
-    # ── Customer group: No, not a payment receipt ─────────────────────────────
-    elif data.startswith("b2b_pay_no:"):
-        group_chat_id = int(data.split(":", 1)[1])
-        _pending_payment_photo.pop(group_chat_id, None)
-        await query.edit_message_text("Got it, ignored.")
-
-    # ── Owner private chat: Approve payment ───────────────────────────────────
-    elif data.startswith("b2b_pay_approve:"):
-        payment_id = int(data.split(":", 1)[1])
-        payment = get_b2b_payment(payment_id)
-
-        if not payment or payment["status"] != "pending":
-            await query.edit_message_caption(
-                caption=(query.message.caption or "") + "\n\nAlready processed."
-            )
-            return
-
-        group_chat_id = payment["group_chat_id"]
-        amount = payment["amount"]
-
-        if amount <= 0:
-            await query.edit_message_caption(
-                caption=(query.message.caption or "") + "\n\n✗ Cannot apply — amount was not detected. Handle manually."
-            )
-            update_b2b_payment_status(payment_id, "manual")
-            return
-
-        result = apply_payment(group_chat_id, amount)
-        update_b2b_payment_status(payment_id, "approved")
-
-        # Notify owner with breakdown
-        if result["paid_dates"]:
-            dates_str = ", ".join(result["paid_dates"])
-            owner_note = (
-                f"\n\n✓ APPROVED\n"
-                f"Applied: ${result['applied']:.2f} to {result['paid_count']} order row(s)\n"
-                f"Dates covered: {dates_str}\n"
-                f"Remaining balance: ${result['remaining']:.2f}"
-            )
-        else:
-            owner_note = (
-                f"\n\n✓ APPROVED — but payment of ${amount:.2f} doesn't cover "
-                f"any full delivery date (oldest date total exceeds this amount).\n"
-                f"Remaining balance: ${result['remaining']:.2f}\n"
-                "Check with customer."
-            )
-
-        await query.edit_message_caption(caption=(query.message.caption or "") + owner_note)
-
-        # Notify customer group
-        if result["remaining"] <= 0:
-            cust_msg = f"Payment of ${amount:.2f} confirmed. Your balance is now $0. Thank you!"
-        else:
-            cust_msg = (
-                f"Payment of ${amount:.2f} confirmed. Thank you!\n"
-                f"Remaining balance: ${result['remaining']:.2f}"
-            )
-        await context.bot.send_message(group_chat_id, cust_msg)
-
-    # ── Owner private chat: Reject payment ────────────────────────────────────
-    elif data.startswith("b2b_pay_reject:"):
-        payment_id = int(data.split(":", 1)[1])
-        payment = get_b2b_payment(payment_id)
-
-        if not payment or payment["status"] != "pending":
-            await query.edit_message_caption(
-                caption=(query.message.caption or "") + "\n\nAlready processed."
-            )
-            return
-
-        update_b2b_payment_status(payment_id, "rejected")
-        await query.edit_message_caption(caption=(query.message.caption or "") + "\n\n✗ REJECTED")
-        await context.bot.send_message(
-            payment["group_chat_id"],
-            "Payment receipt could not be verified. Please contact us directly.",
-        )
