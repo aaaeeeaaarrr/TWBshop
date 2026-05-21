@@ -11,8 +11,7 @@ The business name is used in confirmations, the nightly summary, and delivery la
 
 # group_chat_id (integer) → business name (string)
 B2B_CUSTOMERS: dict[int, str] = {
-    # -1001234567890: "Restaurant XYZ",
-    # -1009876543210: "Bar ABC",
+    -5252815001: "Test Customer",
 }
 
 

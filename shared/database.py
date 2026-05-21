@@ -285,6 +285,22 @@ def get_b2b_cake_orders_for_date(group_chat_id: int, delivery_date: str) -> list
         """, (group_chat_id, delivery_date)).fetchall()
 
 
+def delete_b2b_orders_for_date(group_chat_id: int, delivery_date: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM b2b_orders WHERE group_chat_id = ? AND delivery_date = ? AND status = 'confirmed'",
+            (group_chat_id, delivery_date),
+        )
+
+
+def delete_b2b_cake_orders_for_date(group_chat_id: int, delivery_date: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM b2b_cake_orders WHERE group_chat_id = ? AND delivery_date = ? AND status = 'confirmed'",
+            (group_chat_id, delivery_date),
+        )
+
+
 def get_b2b_cake_last_order_item(group_chat_id: int, item: str) -> sqlite3.Row | None:
     with get_connection() as conn:
         return conn.execute("""

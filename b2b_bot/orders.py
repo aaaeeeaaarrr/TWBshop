@@ -20,6 +20,7 @@ from shared.database import (
     get_b2b_customer, upsert_b2b_customer,
     save_b2b_order, get_b2b_orders_for_date, get_b2b_last_order_item,
     save_b2b_cake_order, get_b2b_cake_orders_for_date, get_b2b_cake_last_order_item,
+    delete_b2b_orders_for_date, delete_b2b_cake_orders_for_date,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ _WORD_NUMBERS = {
 }
 
 _NOISE = re.compile(
-    r"^(i('d)?\s+(want|like|would\s+like)|can\s+(i|we)\s+(get|have|order)|"
+    r"^(no[,.]?\s+)?(i('d)?\s+(want|like|would\s+like)|can\s+(i|we)\s+(get|have|order)|"
     r"please\s+(give\s+(me|us)|send\s+(me|us))?|i('ll\s+have)?|"
     r"we('d)?\s+(like|want|need)|i\s+need|give\s+(me|us)|order[:\s]+)\s*",
     re.IGNORECASE,
@@ -137,7 +138,7 @@ def _parse_order(raw: str) -> tuple[list[dict], list[dict], list[dict]]:
     unmatched:   list[dict] = []
 
     for part in re.split(r",|\band\b|\n", text):
-        part = part.strip()
+        part = _strip_noise(part.strip())
         if not part:
             continue
 
@@ -644,6 +645,12 @@ async def handle_group_message(update: Update, context) -> None:
             )
         return
 
+    # ── State: awaiting yes/cancel on "is this extra?" — customer typed instead ─
+    if state.get("mode") == "awaiting_extra_confirm":
+        _state.pop(chat_id, None)
+        _pending.pop(chat_id, None)
+        # fall through — re-parse the typed text as a fresh replacement order
+
     # ── State: awaiting edit corrections ─────────────────────────────────────
     if state.get("mode") == "awaiting_edit":
         pending = _pending.get(chat_id)
@@ -687,13 +694,41 @@ async def handle_group_message(update: Update, context) -> None:
                 )
                 return
 
-            msg = _build_confirmation(merged_bread, merged_cake, method, time_str, location, delivery_date)
-            if new_unmatched:
-                unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
-                msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
-            if edit_rejected:
-                msg += "\n\n" + _mini_rejection_note(edit_rejected)
-            await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
+            existing_bread = pending.get("existing_bread", [])
+            existing_cake  = pending.get("existing_cake", [])
+
+            if existing_bread or existing_cake:
+                # Came from "No, change it" — show full picture: existing + corrected new
+                ex_lines = [
+                    "  • {}x {}{}*(existing)*".format(
+                        ei.get("qty", 1), ei["item"],
+                        f" — {ei['grams']}g " if ei.get("grams") else " "
+                    )
+                    for ei in existing_bread + existing_cake
+                ]
+                new_lines = ([_bread_line(it) + " *(new)*" for it in merged_bread] +
+                             [_cake_line(it, show_edit_hint=True) + " *(new)*" for it in merged_cake])
+                total = order_total(existing_bread + merged_bread, existing_cake + merged_cake)
+                dl    = _delivery_line(method, time_str, location, delivery_date)
+                body  = "Full updated order:\n\n" + "\n".join(ex_lines + new_lines)
+                body += "\n\n" + price_summary(total).replace("Subtotal:", "New total:")
+                if dl:
+                    body += f"\n\n{dl}"
+                body += "\n\nConfirm full order?"
+                if new_unmatched:
+                    unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
+                    body = body.replace("Confirm full order?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nConfirm full order?")
+                if edit_rejected:
+                    body += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
+                await update.message.reply_text(body, reply_markup=_confirm_keyboard())
+            else:
+                msg = _build_confirmation(merged_bread, merged_cake, method, time_str, location, delivery_date)
+                if new_unmatched:
+                    unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
+                    msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
+                if edit_rejected:
+                    msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
+                await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
             return
 
     # ── Parse new order ───────────────────────────────────────────────────────
@@ -762,12 +797,22 @@ async def handle_group_message(update: Update, context) -> None:
             + (f" — {ei.get('grams')}g" if ei.get("grams") else "")
             for ei in existing_items + existing_cake_items
         )
-        await update.message.reply_text(
+        extra_msg = (
             f"You already have an order for {_date_label(delivery_date)}:\n{existing_lines}\n\n"
-            "Is this new order in addition to that?",
+            "Is this new order in addition to that?"
+        )
+        new_lines = [_bread_line(it) for it in bread_items] + [_cake_line(it) for it in cake_items]
+        if new_lines:
+            extra_msg += "\n" + "\n".join(new_lines)
+        if rejected_minis:
+            extra_msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected_minis)
+        _state[chat_id] = {"mode": "awaiting_extra_confirm"}
+        await update.message.reply_text(
+            extra_msg,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Yes, it's extra", callback_data="b2b_extra_yes"),
-                InlineKeyboardButton("Cancel",          callback_data="b2b_cancel"),
+                InlineKeyboardButton("Yes, it's extra",  callback_data="b2b_extra_yes"),
+                InlineKeyboardButton("No, change it",    callback_data="b2b_extra_no_change"),
+                InlineKeyboardButton("Cancel",           callback_data="b2b_cancel"),
             ]]),
         )
         return
@@ -808,7 +853,7 @@ async def handle_group_message(update: Update, context) -> None:
         unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in ai_unmatched)
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
     if rejected_minis:
-        msg += "\n\n" + _mini_rejection_note(rejected_minis)
+        msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected_minis)
     await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
 
 
@@ -823,6 +868,7 @@ async def handle_callback(update: Update, context) -> None:
             await query.edit_message_text("No pending order found. Please send your order again.")
             return
 
+        _state.pop(chat_id, None)
         bread_items = _resolve_bread_history(chat_id, pending["bread_items"])
         cake_items, _ = _resolve_cake_history(chat_id, pending["cake_items"])
         for it in cake_items:
@@ -858,7 +904,7 @@ async def handle_callback(update: Update, context) -> None:
             body += f"\n\n{dl}"
         body += "\n\nConfirm full order?"
         if all_rejected:
-            body += "\n\n" + _mini_rejection_note(all_rejected)
+            body += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(all_rejected)
         await query.edit_message_text(body, reply_markup=_confirm_keyboard())
 
     elif query.data == "b2b_confirm":
@@ -904,6 +950,35 @@ async def handle_callback(update: Update, context) -> None:
             .replace(" (edit if need sliced)", ""))
         await query.edit_message_text(confirmed_text, reply_markup=None)
 
+    elif query.data == "b2b_extra_no_change":
+        pending = _pending.get(chat_id)
+        if not pending:
+            _state.pop(chat_id, None)
+            await query.edit_message_text("No pending order found. Please send your order again.")
+            return
+
+        _state[chat_id] = {"mode": "awaiting_edit"}
+
+        bread_items  = pending.get("bread_items", [])
+        cake_items   = pending.get("cake_items", [])
+        ai_unmatched = pending.get("ai_unmatched", [])
+
+        if bread_items or cake_items:
+            understood = "\n".join(
+                [_bread_line(it) for it in bread_items] +
+                [_cake_line(it) for it in cake_items]
+            )
+            understood_block = f"We have:\n{understood}\n\n"
+        else:
+            understood_block = ""
+
+        not_found = ("Not recognised: " + ", ".join(f"{u['qty']}x {u['item']}" for u in ai_unmatched) + "\n\n") if ai_unmatched else ""
+
+        await query.edit_message_text(
+            f"{understood_block}{not_found}"
+            "Just type the items to add or correct — no need to resend your photo or document."
+        )
+
     elif query.data == "b2b_edit":
         pending = _pending.get(chat_id)
         if not pending:
@@ -937,9 +1012,62 @@ async def handle_callback(update: Update, context) -> None:
         )
 
     elif query.data == "b2b_cancel":
+        pending        = _pending.get(chat_id, {})
+        existing_bread = pending.get("existing_bread", [])
+        existing_cake  = pending.get("existing_cake", [])
+
+        if existing_bread or existing_cake:
+            cancelled_bread = pending.get("bread_items", [])
+            cancelled_cake  = pending.get("cake_items", [])
+            delivery_date   = pending.get("delivery_date", "")
+
+            lines = ["Cancelled:"]
+            for it in cancelled_bread:
+                line = f"  ✗ {it['qty']}x {it['item']}"
+                if it.get("grams"):
+                    line += f" — {it['grams']}g"
+                lines.append(line)
+            for it in cancelled_cake:
+                lines.append(f"  ✗ {it['qty']}x {it['item']}")
+
+            lines.append("")
+            lines.append("─" * 32)
+            lines.append("")
+            lines.append(f"Your existing order for {_date_label(delivery_date)} is still active:")
+            for ei in existing_bread + existing_cake:
+                ei_line = f"  • {ei['qty']}x {ei['item']}"
+                if ei.get("grams"):
+                    ei_line += f" — {ei['grams']}g"
+                lines.append(ei_line)
+            lines.append("")
+            lines.append("Would you like to keep it or cancel everything?")
+
+            await query.edit_message_text(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("Confirm ✓",    callback_data="b2b_keep_existing"),
+                    InlineKeyboardButton("Cancel all ✗", callback_data="b2b_cancel_all"),
+                ]]),
+            )
+        else:
+            _pending.pop(chat_id, None)
+            _state.pop(chat_id, None)
+            await query.edit_message_text("Order cancelled.")
+
+    elif query.data == "b2b_keep_existing":
         _pending.pop(chat_id, None)
         _state.pop(chat_id, None)
-        await query.edit_message_text("Order cancelled.")
+        await query.edit_message_text("Your existing order remains active. ✓")
+
+    elif query.data == "b2b_cancel_all":
+        pending       = _pending.pop(chat_id, {})
+        _state.pop(chat_id, None)
+        delivery_date = pending.get("delivery_date")
+        if delivery_date:
+            delete_b2b_orders_for_date(chat_id, delivery_date)
+            delete_b2b_cake_orders_for_date(chat_id, delivery_date)
+        label = _date_label(delivery_date) if delivery_date else "this delivery"
+        await query.edit_message_text(f"All orders for {label} have been cancelled.")
 
 
 async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: int, mime_type: str = "image/jpeg", ai_items: list = None) -> None:
@@ -1005,6 +1133,6 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
         unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in unmatched)
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
     if photo_rejected:
-        msg += "\n\n" + _mini_rejection_note(photo_rejected)
+        msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(photo_rejected)
 
     await bot.send_message(chat_id, msg, reply_markup=_confirm_keyboard())
