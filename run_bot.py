@@ -3,6 +3,7 @@
 Usage:
     python run_bot.py
 """
+import asyncio
 import sys
 from pathlib import Path
 
@@ -14,4 +15,5 @@ sys.path.insert(0, str(_root / "telegram_bot"))
 from bot import main  # noqa: E402 — import after path setup
 
 if __name__ == "__main__":
+    asyncio.set_event_loop(asyncio.new_event_loop())
     main()
