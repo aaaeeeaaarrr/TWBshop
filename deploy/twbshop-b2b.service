@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=twbshop
-WorkingDirectory=/home/twbshop/TWBshop
-ExecStart=/usr/bin/python3 run_b2b_bot.py
+User=root
+WorkingDirectory=/root/TWBshop
+ExecStart=/root/venv/bin/python3 run_b2b_bot.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
