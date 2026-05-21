@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
 import config
-from b2b_bot.menu import B2B_MENU, ALIAS_MAP
+from b2b_bot.menu import B2B_MENU, ALIAS_MAP, INSTANT_BREAD_ITEMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU, CAKE_ALIAS_MAP
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price, order_total, price_summary
@@ -386,6 +386,34 @@ async def _notify_cake_order(bot, business_name: str, cake_items: list[dict], me
     await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines))
 
 
+async def _notify_urgent_bread_order(bot, business_name: str, bread_items: list[dict], method: str | None, time_str: str | None, location: str | None, delivery_date: str) -> None:
+    """Instant alert for croissant / pain au chocolat orders."""
+    urgent = [it for it in bread_items if it["item"] in INSTANT_BREAD_ITEMS]
+    if not urgent:
+        return
+    lines = [f"CROISSANT / CHOCOLATIN ORDER — {business_name}", ""]
+    for it in urgent:
+        lines.append(_bread_line(it))
+    dl = _delivery_line(method, time_str, location, delivery_date)
+    if dl:
+        lines += ["", dl]
+    await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines))
+
+
+async def _notify_mini_order(bot, business_name: str, bread_items: list[dict], method: str | None, time_str: str | None, location: str | None, delivery_date: str) -> None:
+    """Instant alert for mini pastry orders (100pc min, 48h advance)."""
+    minis = [it for it in bread_items if it["item"] in MINI_ITEMS]
+    if not minis:
+        return
+    lines = [f"MINI ORDER — {business_name}", ""]
+    for it in minis:
+        lines.append(_bread_line(it))
+    dl = _delivery_line(method, time_str, location, delivery_date)
+    if dl:
+        lines += ["", dl]
+    await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines))
+
+
 # ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async def handle_group_message(update: Update, context) -> None:
@@ -471,6 +499,20 @@ async def handle_group_message(update: Update, context) -> None:
     # ── Parse new order ───────────────────────────────────────────────────────
     bread_items, cake_items = _parse_order(text)
     if not bread_items and not cake_items:
+        return
+
+    # Validate mini items: 100pc minimum per item (not combined)
+    mini_errors = [
+        f"{it['item']}: you ordered {it['qty']}pc (min. 100pc per item)"
+        for it in bread_items
+        if it["item"] in MINI_ITEMS and it["qty"] < 100
+    ]
+    if mini_errors:
+        await update.message.reply_text(
+            "Mini items require a minimum of 100pc per item — quantities cannot be combined:\n"
+            + "\n".join(f"  • {e}" for e in mini_errors)
+            + "\n\nPlease update your order."
+        )
         return
 
     is_today = bool(_TODAY_RE.search(text))
@@ -610,14 +652,27 @@ async def handle_callback(update: Update, context) -> None:
         bread_items   = pending.get("bread_items", [])
         cake_items    = pending.get("cake_items", [])
 
+        method_   = pending.get("delivery_method")
+        time_str_ = pending.get("delivery_time")
+        location_ = pending.get("location")
+
         if bread_items:
             save_b2b_order(chat_id, business_name, bread_items, delivery_date)
+            if any(it["item"] in INSTANT_BREAD_ITEMS for it in bread_items):
+                await _notify_urgent_bread_order(
+                    context.bot, business_name, bread_items,
+                    method_, time_str_, location_, delivery_date,
+                )
+            if any(it["item"] in MINI_ITEMS for it in bread_items):
+                await _notify_mini_order(
+                    context.bot, business_name, bread_items,
+                    method_, time_str_, location_, delivery_date,
+                )
         if cake_items:
             save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date)
             await _notify_cake_order(
                 context.bot, business_name, cake_items,
-                pending.get("delivery_method"), pending.get("delivery_time"),
-                pending.get("location"), delivery_date,
+                method_, time_str_, location_, delivery_date,
             )
 
         logger.info("B2B order confirmed for %s (%s) delivery %s", business_name, chat_id, delivery_date)

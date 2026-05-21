@@ -14,7 +14,7 @@ from telegram.ext import (
 import config
 from shared import database
 from b2b_bot.orders import handle_group_message, handle_callback
-from b2b_bot.summaries import send_b2b_summary
+from b2b_bot.summaries import send_b2b_summary, send_b2b_mini_reminder
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -26,9 +26,17 @@ logger = logging.getLogger(__name__)
 _SUMMARY_HOUR_UTC   = 14
 _SUMMARY_MINUTE_UTC = 0
 
+# 9am Phnom Penh (UTC+7) = 02:00 UTC — mini order 48h-before reminder
+_REMINDER_HOUR_UTC   = 2
+_REMINDER_MINUTE_UTC = 0
+
 
 async def _job_b2b_summary(context) -> None:
     await send_b2b_summary(context.bot)
+
+
+async def _job_mini_reminder(context) -> None:
+    await send_b2b_mini_reminder(context.bot)
 
 
 async def cmd_summary(update: Update, context) -> None:
@@ -66,6 +74,18 @@ def main() -> None:
     logger.info(
         "B2B nightly summary scheduled at %02d:%02d UTC (21:00 Phnom Penh)",
         _SUMMARY_HOUR_UTC, _SUMMARY_MINUTE_UTC,
+    )
+
+    # Mini order reminder at 9am Phnom Penh — fires 48h before delivery date
+    reminder_time = datetime.time(
+        hour=_REMINDER_HOUR_UTC,
+        minute=_REMINDER_MINUTE_UTC,
+        tzinfo=datetime.timezone.utc,
+    )
+    app.job_queue.run_daily(_job_mini_reminder, time=reminder_time)
+    logger.info(
+        "B2B mini reminder scheduled at %02d:%02d UTC (09:00 Phnom Penh)",
+        _REMINDER_HOUR_UTC, _REMINDER_MINUTE_UTC,
     )
 
     logger.info("B2B bot started.")

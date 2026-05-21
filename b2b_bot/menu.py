@@ -115,7 +115,7 @@ B2B_MENU: dict[str, dict] = {
         "price": 0.49,
         "requires_grams": False,
         "standard_grams": None,
-        "order_note": "min. 100pc — order 48h in advance",
+        "order_note": "min. 100pc per item (not combined) — order 48h in advance",
         "attributes": {},
     },
     "mini chocolatin": {
@@ -126,7 +126,7 @@ B2B_MENU: dict[str, dict] = {
         "price": 0.59,
         "requires_grams": False,
         "standard_grams": None,
-        "order_note": "min. 100pc — order 48h in advance",
+        "order_note": "min. 100pc per item (not combined) — order 48h in advance",
         "attributes": {},
     },
     "mini almond croissant": {
@@ -136,7 +136,7 @@ B2B_MENU: dict[str, dict] = {
         "price": 0.90,
         "requires_grams": False,
         "standard_grams": None,
-        "order_note": "min. 100pc — order 48h in advance",
+        "order_note": "min. 100pc per item (not combined) — order 48h in advance",
         "attributes": {},
     },
     "mini almond chocolatin": {
@@ -147,7 +147,7 @@ B2B_MENU: dict[str, dict] = {
         "price": 0.96,
         "requires_grams": False,
         "standard_grams": None,
-        "order_note": "min. 100pc — order 48h in advance",
+        "order_note": "min. 100pc per item (not combined) — order 48h in advance",
         "attributes": {},
     },
     "mini ham cheese croissant": {
@@ -158,7 +158,7 @@ B2B_MENU: dict[str, dict] = {
         "price": 1.00,
         "requires_grams": False,
         "standard_grams": None,
-        "order_note": "min. 100pc — order 48h in advance",
+        "order_note": "min. 100pc per item (not combined) — order 48h in advance",
         "attributes": {},
     },
 
@@ -198,6 +198,16 @@ B2B_MENU: dict[str, dict] = {
         "attributes": {},
     },
 }
+
+# Items that get an instant bakery-group notification when ordered (in addition to 9pm summary)
+INSTANT_BREAD_ITEMS: frozenset[str] = frozenset({"croissant", "pain au chocolat"})
+
+# Mini items — 100pc minimum per item, 48h advance notice required
+MINI_ITEMS: frozenset[str] = frozenset({
+    "mini croissant", "mini chocolatin",
+    "mini almond croissant", "mini almond chocolatin",
+    "mini ham cheese croissant",
+})
 
 # Flat lookup: alias → canonical name (built automatically — do not edit)
 ALIAS_MAP: dict[str, str] = {}

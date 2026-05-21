@@ -289,6 +289,19 @@ def get_b2b_orders_by_group(delivery_date: str) -> list[sqlite3.Row]:
         """, (delivery_date,)).fetchall()
 
 
+def get_b2b_mini_orders_for_reminder(delivery_date: str, mini_items: tuple[str, ...]) -> list[sqlite3.Row]:
+    """Return confirmed mini-item orders for a given delivery date (for 48h-before reminder)."""
+    placeholders = ",".join("?" * len(mini_items))
+    with get_connection() as conn:
+        return conn.execute(f"""
+            SELECT group_chat_id, business_name, item, quantity
+            FROM b2b_orders
+            WHERE delivery_date = ? AND status = 'confirmed'
+              AND item IN ({placeholders})
+            ORDER BY business_name, item
+        """, (delivery_date, *mini_items)).fetchall()
+
+
 def get_b2b_cake_daily_totals(delivery_date: str) -> list[sqlite3.Row]:
     """Return aggregated cake production totals for a given delivery date."""
     with get_connection() as conn:
