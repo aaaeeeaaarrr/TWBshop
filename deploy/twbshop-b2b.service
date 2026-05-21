@@ -1,0 +1,16 @@
+[Unit]
+Description=TWBshop B2B Bot
+After=network.target
+
+[Service]
+Type=simple
+User=twbshop
+WorkingDirectory=/home/twbshop/TWBshop
+ExecStart=/usr/bin/python3 run_b2b_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
