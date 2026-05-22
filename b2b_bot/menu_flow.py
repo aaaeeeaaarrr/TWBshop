@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters as _filters
 
 import config
-from b2b_bot.menu import B2B_MENU
+from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price, order_total
@@ -67,13 +67,13 @@ _BUNS: dict[str, dict] = {
         "item": "hotdog roll",
         "sizes": [
             {"grams": 55, "label": "55g — Small"},
-            {"grams": 70, "label": "70g — Large"},
+            {"grams": 75, "label": "75g — Large"},
         ],
     },
 }
 
 def _bun_price(grams: int) -> float:
-    return B2B_MENU["burger bun"]["price_by_grams"].get(grams, round(grams * 0.004, 2))
+    return _BUN_PRICE_BY_GRAMS.get(grams, round(grams * 0.004, 2))
 
 
 # ── Filter: only activate qty handler when a qty prompt is pending ─────────────
@@ -192,8 +192,8 @@ def _bun_size_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         cart_key = f"{bun['item']}|{size['grams']}"
         qty      = cart.get(cart_key, 0)
         price    = _bun_price(size["grams"])
-        suffix   = f"  ✓ ×{qty}" if qty else ""
-        label    = f"{size['label']}  ${price:.2f}/pc{suffix}"
+        suffix   = f" ✓×{qty}" if qty else ""
+        label    = f"{size['label']}\n${price:.2f}{suffix}"
         rows.append([InlineKeyboardButton(
             label,
             callback_data=f"bm_bun_size_{bun_key}_{size['grams']}",
@@ -203,6 +203,31 @@ def _bun_size_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         callback_data=f"bm_bun_other_{bun_key}",
     )])
     nav = [InlineKeyboardButton("← Buns", callback_data="bm_buns")]
+    if cart:
+        nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
+    rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
+def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
+    bun  = _BUNS[bun_key]
+    cart = _cart.get(chat_id, {})
+    rows = []
+    row  = []
+    for grams, price in sorted(_BUN_PRICE_BY_GRAMS.items()):
+        cart_key = f"{bun['item']}|{grams}"
+        qty      = cart.get(cart_key, 0)
+        label    = f"{grams}g\n${price:.2f}" + (f" ✓×{qty}" if qty else "")
+        row.append(InlineKeyboardButton(
+            label,
+            callback_data=f"bm_bun_size_{bun_key}_{grams}",
+        ))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    nav = [InlineKeyboardButton(f"← {bun['label']}", callback_data=f"bm_bun_{bun_key}")]
     if cart:
         nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
@@ -266,42 +291,6 @@ async def handle_qty_input(update: Update, context) -> None:
     if not state:
         return
     text = update.message.text.strip()
-
-    # ── Bun: waiting for gram weight first ────────────────────────────────────
-    if state.get("waiting_for") == "grams":
-        try:
-            grams = int(text.lower().replace("g", "").replace("rams", "").strip())
-            if grams < 30 or grams > 200:
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text("Please send a gram weight between 30 and 200, e.g. 65")
-            return
-        bun_key   = state["bun_key"]
-        new_state = {
-            "bun_key": bun_key,
-            "item": _BUNS[bun_key]["item"],
-            "grams": grams,
-            "message_id": state["message_id"],
-        }
-        _qty_pending[chat_id] = new_state
-        set_qty_pending(chat_id, new_state)
-        bun_label = _BUNS[bun_key]["label"]
-        try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=state["message_id"],
-                text=f"How many {grams}g {bun_label}?\nType a number (0 to remove):",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_{bun_key}"),
-                ]]),
-            )
-        except Exception:
-            pass
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
-        return
 
     # ── Quantity input ─────────────────────────────────────────────────────────
     try:
@@ -413,20 +402,10 @@ async def handle_menu_callback(update: Update, context) -> None:
             bun_key = data[13:]
             if bun_key not in _BUNS:
                 return
-            bun   = _BUNS[bun_key]
-            state = {
-                "bun_key": bun_key,
-                "item": bun["item"],
-                "waiting_for": "grams",
-                "message_id": query.message.message_id,
-            }
-            _qty_pending[chat_id] = state
-            set_qty_pending(chat_id, state)
+            bun = _BUNS[bun_key]
             await query.edit_message_text(
-                f"{bun['label']} — custom size\nHow many grams? (e.g. 65)",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_{bun_key}"),
-                ]]),
+                f"{bun['emoji']} {bun['label']} — select grams:\n\n{_cart_block(chat_id)}",
+                reply_markup=_bun_gram_grid_keyboard(bun_key, chat_id),
             )
 
         elif data.startswith("bm_bun_"):
