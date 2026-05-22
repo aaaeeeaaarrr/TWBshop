@@ -644,6 +644,14 @@ async def handle_group_message(update: Update, context) -> None:
     if not text:
         return
 
+    # If the button menu is waiting for a qty and the filter missed (e.g. after restart),
+    # route here instead of parsing as an order.
+    from shared.database import get_qty_pending as _get_qty_pending
+    if _get_qty_pending(chat_id):
+        from b2b_bot.menu_flow import handle_qty_input
+        await handle_qty_input(update, context)
+        return
+
     business_name = get_business_name(chat_id)
     state = _state.get(chat_id, {})
 

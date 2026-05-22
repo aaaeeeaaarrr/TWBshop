@@ -77,6 +77,10 @@ def init_db() -> None:
                 ADD COLUMN IF NOT EXISTS menu_message_id BIGINT
             """)
             cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS menu_qty_pending TEXT
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_orders (
                     id             SERIAL  PRIMARY KEY,
                     group_chat_id  BIGINT  NOT NULL,
@@ -240,6 +244,33 @@ def set_menu_message_id(group_chat_id: int, message_id: int | None) -> None:
                     menu_message_id = EXCLUDED.menu_message_id,
                     updated_at      = EXCLUDED.updated_at
             """, (group_chat_id, message_id, datetime.utcnow().isoformat()))
+
+
+def get_qty_pending(group_chat_id: int) -> dict | None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT menu_qty_pending FROM b2b_customers WHERE group_chat_id = %s",
+                (group_chat_id,),
+            )
+            row = cur.fetchone()
+            if row and row["menu_qty_pending"]:
+                return json.loads(row["menu_qty_pending"])
+            return None
+
+
+def set_qty_pending(group_chat_id: int, state: dict | None) -> None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, menu_qty_pending, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    menu_qty_pending = EXCLUDED.menu_qty_pending,
+                    updated_at       = EXCLUDED.updated_at
+            """, (group_chat_id, json.dumps(state) if state else None, datetime.utcnow().isoformat()))
 
 
 # ─── B2B bread orders ─────────────────────────────────────────────────────────

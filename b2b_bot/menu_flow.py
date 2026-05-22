@@ -10,7 +10,10 @@ from b2b_bot.menu import B2B_MENU
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price, order_total
-from shared.database import get_menu_message_id, set_menu_message_id
+from shared.database import (
+    get_menu_message_id, set_menu_message_id,
+    get_qty_pending, set_qty_pending,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +186,7 @@ async def handle_welcome(update: Update, context) -> None:
 async def handle_qty_input(update: Update, context) -> None:
     """Intercepts a typed number when a qty prompt is pending for this chat."""
     chat_id = update.effective_chat.id
-    state = _qty_pending.get(chat_id)
+    state = _qty_pending.get(chat_id) or get_qty_pending(chat_id)
     if not state:
         return
     text = update.message.text.strip()
@@ -196,6 +199,7 @@ async def handle_qty_input(update: Update, context) -> None:
         return
 
     _qty_pending.pop(chat_id, None)
+    set_qty_pending(chat_id, None)
     cart = _cart.setdefault(chat_id, {})
     if qty == 0:
         cart.pop(state["name"], None)
@@ -244,6 +248,7 @@ async def handle_menu_callback(update: Update, context) -> None:
     try:
         if data == "bm_back":
             _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -251,6 +256,7 @@ async def handle_menu_callback(update: Update, context) -> None:
 
         elif data.startswith("bm_cat_"):
             _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
             cat_key = data[7:]
             cat = _CATEGORIES.get(cat_key, {})
             note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
@@ -268,11 +274,13 @@ async def handle_menu_callback(update: Update, context) -> None:
             name = _NAME.get(slug)
             if not name:
                 return
-            _qty_pending[chat_id] = {
+            state = {
                 "name": name,
                 "cat_key": cat_key,
                 "message_id": query.message.message_id,
             }
+            _qty_pending[chat_id] = state
+            set_qty_pending(chat_id, state)
             cancel_kb = InlineKeyboardMarkup([[
                 InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"),
             ]])
