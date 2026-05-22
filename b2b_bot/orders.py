@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 _pending: dict[int, dict] = {}
 # Conversation state: {group_chat_id: "awaiting_delivery" | "awaiting_cake_spec"}
 _state:   dict[int, dict] = {}  # {group_chat_id: {"mode": str, ...}}
+# Last confirmation message ID per chat (to remove buttons when superseded)
+_last_confirmation: dict[int, int] = {}  # {group_chat_id: message_id}
 
 _WORD_NUMBERS = {
     "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4,
@@ -527,6 +529,22 @@ def _confirm_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+async def _send_confirmation(update_or_bot, chat_id: int, text: str) -> None:
+    """Send a confirmation with buttons, removing buttons from the previous one."""
+    bot = update_or_bot if not hasattr(update_or_bot, "message") else update_or_bot.message._bot
+    old_msg_id = _last_confirmation.get(chat_id)
+    if old_msg_id:
+        try:
+            await bot.edit_message_reply_markup(chat_id=chat_id, message_id=old_msg_id, reply_markup=None)
+        except Exception:
+            pass
+    if hasattr(update_or_bot, "message"):
+        sent = await update_or_bot.message.reply_text(text, reply_markup=_confirm_keyboard())
+    else:
+        sent = await bot.send_message(chat_id, text, reply_markup=_confirm_keyboard())
+    _last_confirmation[chat_id] = sent.message_id
+
+
 def _parse_delivery_text(text: str) -> tuple[str | None, str | None]:
     lower = text.lower()
     method = None
@@ -644,9 +662,9 @@ async def handle_group_message(update: Update, context) -> None:
         pending = _pending.get(chat_id, {})
         pending.update(delivery_method=method, delivery_time=time_str, location=location)
         _pending[chat_id] = pending
-        await update.message.reply_text(
+        await _send_confirmation(
+            update, chat_id,
             _build_confirmation(pending.get("bread_items", []), pending.get("cake_items", []), method, time_str, location, pending.get("delivery_date")),
-            reply_markup=_confirm_keyboard(),
         )
         return
 
@@ -691,9 +709,9 @@ async def handle_group_message(update: Update, context) -> None:
                 "Example: Delivery at 8am  |  Pickup at 7am"
             )
         else:
-            await update.message.reply_text(
+            await _send_confirmation(
+                update, chat_id,
                 _build_confirmation(pending.get("bread_items", []), cake_items, m_, t_, l_, dd),
-                reply_markup=_confirm_keyboard(),
             )
         return
 
@@ -772,7 +790,7 @@ async def handle_group_message(update: Update, context) -> None:
                     body = body.replace("Confirm full order?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nConfirm full order?")
                 if edit_rejected:
                     body += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
-                await update.message.reply_text(body, reply_markup=_confirm_keyboard())
+                await _send_confirmation(update, chat_id, body)
             else:
                 msg = _build_confirmation(merged_bread, merged_cake, method, time_str, location, delivery_date)
                 if new_unmatched:
@@ -780,7 +798,7 @@ async def handle_group_message(update: Update, context) -> None:
                     msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
                 if edit_rejected:
                     msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
-                await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
+                await _send_confirmation(update, chat_id, msg)
             return
 
     # ── Pending confirmation: accept typed yes/no/edit/delivery change ───────
@@ -791,12 +809,14 @@ async def handle_group_message(update: Update, context) -> None:
         if lower_text in _CONFIRM_WORDS:
             _pending.pop(chat_id, None)
             _state.pop(chat_id, None)
+            _last_confirmation.pop(chat_id, None)
             await _do_confirm_order(chat_id, pending, context, update.message.reply_text)
             return
 
         if lower_text in _CANCEL_WORDS:
             _pending.pop(chat_id, None)
             _state.pop(chat_id, None)
+            _last_confirmation.pop(chat_id, None)
             await update.message.reply_text("Order cancelled.")
             return
 
@@ -823,7 +843,7 @@ async def handle_group_message(update: Update, context) -> None:
             if pending.get("ai_unmatched"):
                 unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in pending["ai_unmatched"])
                 msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
-            await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
+            await _send_confirmation(update, chat_id, msg)
             return
 
     # ── Parse new order ───────────────────────────────────────────────────────
@@ -961,7 +981,7 @@ async def handle_group_message(update: Update, context) -> None:
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
     if rejected_minis:
         msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected_minis)
-    await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
+    await _send_confirmation(update, chat_id, msg)
 
 
 async def handle_callback(update: Update, context) -> None:
@@ -1017,6 +1037,7 @@ async def handle_callback(update: Update, context) -> None:
     elif query.data == "b2b_confirm":
         pending = _pending.pop(chat_id, None)
         _state.pop(chat_id, None)
+        _last_confirmation.pop(chat_id, None)
         if not pending:
             await query.edit_message_text("No pending order. Please send your order again.")
             return
@@ -1211,4 +1232,4 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
     if photo_rejected:
         msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(photo_rejected)
 
-    await bot.send_message(chat_id, msg, reply_markup=_confirm_keyboard())
+    await _send_confirmation(bot, chat_id, msg)
