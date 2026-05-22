@@ -723,7 +723,93 @@ async def handle_group_message(update: Update, context) -> None:
             )
         return
 
-    # ── Pending confirmation: accept typed yes/no/cancel ─────────────────────
+    # ── State: awaiting yes/cancel on "is this extra?" — customer typed instead ─
+    if state.get("mode") == "awaiting_extra_confirm":
+        _state.pop(chat_id, None)
+        _pending.pop(chat_id, None)
+        # fall through — re-parse the typed text as a fresh replacement order
+
+    # ── State: awaiting edit corrections ─────────────────────────────────────
+    if state.get("mode") == "awaiting_edit":
+        pending = _pending.get(chat_id)
+        if not pending:
+            _state.pop(chat_id, None)
+        else:
+            new_bread, new_cake, new_unmatched = await _parse_order_ai(text)
+            new_bread = _resolve_bread_history(chat_id, new_bread)
+            new_cake, new_needs_spec = _resolve_cake_history(chat_id, new_cake)
+
+            merged_bread = _merge_edit_bread(pending.get("bread_items", []), new_bread)
+            merged_cake  = _merge_edit_cake(pending.get("cake_items", []), new_cake)
+
+            delivery_date = pending.get("delivery_date")
+            merged_bread, edit_rejected = _split_mini_items(merged_bread, delivery_date)
+
+            pending["bread_items"]  = merged_bread
+            pending["cake_items"]   = merged_cake
+            pending["ai_unmatched"] = new_unmatched
+            _pending[chat_id] = pending
+            _state.pop(chat_id, None)
+
+            if new_needs_spec:
+                _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": new_needs_spec}
+                await update.message.reply_text(
+                    f"For the {', '.join(new_needs_spec)} — sliced or whole?\n"
+                    "(If sliced, you can also tell me how many slices, e.g. 'sliced 10')"
+                )
+                return
+
+            method   = pending.get("delivery_method")
+            time_str = pending.get("delivery_time")
+            location = pending.get("location")
+
+            if not method:
+                _state[chat_id] = {"mode": "awaiting_delivery"}
+                upsert_b2b_customer(chat_id, business_name)
+                await update.message.reply_text(
+                    "Got it! One quick question — pickup or delivery, and what time?\n"
+                    "Example: Delivery at 8am  |  Pickup at 7am"
+                )
+                return
+
+            existing_bread = pending.get("existing_bread", [])
+            existing_cake  = pending.get("existing_cake", [])
+
+            if existing_bread or existing_cake:
+                # Came from "No, change it" — show full picture: existing + corrected new
+                ex_lines = [
+                    "  • {}x {}{}*(existing)*".format(
+                        ei.get("qty", 1), ei["item"],
+                        f" — {ei['grams']}g " if ei.get("grams") else " "
+                    )
+                    for ei in existing_bread + existing_cake
+                ]
+                new_lines = ([_bread_line(it) + " *(new)*" for it in merged_bread] +
+                             [_cake_line(it, show_edit_hint=True) + " *(new)*" for it in merged_cake])
+                total = order_total(existing_bread + merged_bread, existing_cake + merged_cake)
+                dl    = _delivery_line(method, time_str, location, delivery_date)
+                body  = "Full updated order:\n\n" + "\n".join(ex_lines + new_lines)
+                body += "\n\n" + price_summary(total).replace("Subtotal:", "New total:")
+                if dl:
+                    body += f"\n\n{dl}"
+                body += "\n\nConfirm full order?"
+                if new_unmatched:
+                    unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
+                    body = body.replace("Confirm full order?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nConfirm full order?")
+                if edit_rejected:
+                    body += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
+                await _send_confirmation(update, chat_id, body)
+            else:
+                msg = _build_confirmation(merged_bread, merged_cake, method, time_str, location, delivery_date)
+                if new_unmatched:
+                    unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in new_unmatched)
+                    msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
+                if edit_rejected:
+                    msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
+                await _send_confirmation(update, chat_id, msg)
+            return
+
+    # ── Pending confirmation: accept typed yes/no/edit/delivery change ───────
     if _pending.get(chat_id) and not state:
         lower_text = text.lower().strip()
         pending = _pending[chat_id]
@@ -742,7 +828,168 @@ async def handle_group_message(update: Update, context) -> None:
             await update.message.reply_text("Order cancelled.")
             return
 
-    # Text order parsing removed — button menu only (see archive/b2b_text_ordering_archived.py)
+        if lower_text in _EDIT_WORDS:
+            _state[chat_id] = {"mode": "awaiting_edit"}
+            bread_items_ = pending.get("bread_items", [])
+            cake_items_  = pending.get("cake_items", [])
+            understood = "\n".join([_bread_line(it) for it in bread_items_] + [_cake_line(it) for it in cake_items_])
+            await update.message.reply_text(
+                f"We have:\n{understood}\n\nJust type what you'd like to change."
+            )
+            return
+
+        method_t, time_str_t = _parse_delivery_text(text)
+        if method_t and time_str_t:
+            location_t = business_name if method_t == "delivery" else None
+            upsert_b2b_customer(chat_id, business_name, method_t, time_str_t, location_t)
+            pending.update(delivery_method=method_t, delivery_time=time_str_t, location=location_t)
+            _pending[chat_id] = pending
+            msg = _build_confirmation(
+                pending.get("bread_items", []), pending.get("cake_items", []),
+                method_t, time_str_t, location_t, pending.get("delivery_date"),
+            )
+            if pending.get("ai_unmatched"):
+                unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in pending["ai_unmatched"])
+                msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
+            await _send_confirmation(update, chat_id, msg)
+            return
+
+    # ── Parse new order ───────────────────────────────────────────────────────
+    _RESPONSE_WORDS = frozenset({
+        "sliced", "slice", "whole", "yes", "no", "ok", "okay",
+        "full", "piece", "tray", "confirm", "cancel",
+    })
+
+    bread_items, cake_items, unmatched = await _parse_order_ai(text)
+
+    ai_unmatched = unmatched
+
+    if not bread_items and not cake_items and not ai_unmatched:
+        return
+
+    if not bread_items and not cake_items and ai_unmatched:
+        if all(u["item"].lower() in _RESPONSE_WORDS for u in ai_unmatched):
+            await update.message.reply_text(
+                "I don't have any order in memory — please resend your order from the beginning."
+            )
+            return
+
+    is_today = bool(_TODAY_RE.search(text))
+    delivery_date = date.today().isoformat() if is_today and not bread_items else (date.today() + timedelta(days=1)).isoformat()
+
+    bread_items = _resolve_bread_history(chat_id, bread_items)
+    cake_items, needs_spec = _resolve_cake_history(chat_id, cake_items)
+    bread_items, rejected_minis = _split_mini_items(bread_items, delivery_date)
+
+    if not bread_items and not cake_items and not ai_unmatched and not rejected_minis:
+        return
+
+    customer = get_b2b_customer(chat_id)
+    method   = customer["delivery_method"] if customer else None
+    time_str = customer["delivery_time"]   if customer else None
+    location = customer["location"]        if customer else None
+
+    # ── Re-order check ────────────────────────────────────────────────────────
+    existing_bread = get_b2b_orders_for_date(chat_id, delivery_date)
+    existing_cake  = get_b2b_cake_orders_for_date(chat_id, delivery_date)
+
+    if existing_bread or existing_cake:
+        # Nothing valid to add — only rejected minis or unmatched items
+        if not bread_items and not cake_items:
+            parts = []
+            if rejected_minis:
+                parts.append(_mini_rejection_note(rejected_minis))
+            if ai_unmatched:
+                unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in ai_unmatched)
+                parts.append(f"Not recognised:\n{unknown_lines}")
+            await update.message.reply_text("\n\n".join(parts) if parts else "Nothing new to add to your order.")
+            return
+
+        existing_items = [dict(r) for r in existing_bread]
+        for ei in existing_items:
+            ei["qty"] = ei.pop("quantity", 1)
+        existing_items = _combine_bread(existing_items)
+
+        existing_cake_items = [dict(r) for r in existing_cake]
+        for ei in existing_cake_items:
+            ei["qty"] = ei.pop("quantity", 1)
+        existing_cake_items = _combine_cake(existing_cake_items)
+
+        _pending[chat_id] = {
+            "bread_items": bread_items,
+            "cake_items": cake_items,
+            "existing_bread": existing_items,
+            "existing_cake": existing_cake_items,
+            "delivery_method": method,
+            "delivery_time": time_str,
+            "location": location,
+            "delivery_date": delivery_date,
+            "rejected_minis": rejected_minis,
+        }
+
+        existing_lines = "\n".join(
+            f"  • {ei['qty']}x {ei['item']}"
+            + (f" — {ei.get('grams')}g" if ei.get("grams") else "")
+            for ei in existing_items + existing_cake_items
+        )
+        extra_msg = (
+            f"You already have an order for {_date_label(delivery_date)}:\n{existing_lines}\n\n"
+            "Is this new order in addition to that?"
+        )
+        new_lines = [_bread_line(it) for it in bread_items] + [_cake_line(it) for it in cake_items]
+        if new_lines:
+            extra_msg += "\n" + "\n".join(new_lines)
+        if rejected_minis:
+            extra_msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected_minis)
+        _state[chat_id] = {"mode": "awaiting_extra_confirm"}
+        await update.message.reply_text(
+            extra_msg,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("Yes, it's extra",  callback_data="b2b_extra_yes"),
+                InlineKeyboardButton("No, change it",    callback_data="b2b_extra_no_change"),
+                InlineKeyboardButton("Cancel",           callback_data="b2b_cancel"),
+            ]]),
+        )
+        return
+
+    # ── Store pending ─────────────────────────────────────────────────────────
+    _pending[chat_id] = {
+        "bread_items": bread_items,
+        "cake_items": cake_items,
+        "delivery_method": method,
+        "delivery_time": time_str,
+        "location": location,
+        "delivery_date": delivery_date,
+        "ai_unmatched": ai_unmatched,
+    }
+
+    # ── Ask for cake spec if any Category A cakes are unspecified ─────────────
+    if needs_spec:
+        _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}
+        names = ", ".join(needs_spec)
+        await update.message.reply_text(
+            f"For the {names} — sliced or whole?\n"
+            "(If sliced, you can also tell me how many slices, e.g. 'sliced 10')"
+        )
+        return
+
+    # ── Ask for delivery if new customer ──────────────────────────────────────
+    if not method:
+        _state[chat_id] = {"mode": "awaiting_delivery"}
+        upsert_b2b_customer(chat_id, business_name)
+        await update.message.reply_text(
+            "Got it! One quick question — pickup or delivery, and what time?\n"
+            "Example: Delivery at 8am  |  Pickup at 7am"
+        )
+        return
+
+    msg = _build_confirmation(bread_items, cake_items, method, time_str, location, delivery_date)
+    if ai_unmatched:
+        unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in ai_unmatched)
+        msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
+    if rejected_minis:
+        msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected_minis)
+    await _send_confirmation(update, chat_id, msg)
 
 
 async def handle_callback(update: Update, context) -> None:
@@ -750,7 +997,52 @@ async def handle_callback(update: Update, context) -> None:
     await query.answer()
     chat_id = update.effective_chat.id
 
-    if query.data == "b2b_confirm":
+    if query.data == "b2b_extra_yes":
+        pending = _pending.get(chat_id)
+        if not pending:
+            await query.edit_message_text("No pending order found. Please send your order again.")
+            return
+
+        _state.pop(chat_id, None)
+        bread_items = _resolve_bread_history(chat_id, pending["bread_items"])
+        cake_items, _ = _resolve_cake_history(chat_id, pending["cake_items"])
+        for it in cake_items:
+            if it.get("order_type") is None:
+                it["order_type"] = "full"
+                it["order_type_source"] = "default"
+        bread_items, extra_rejected = _split_mini_items(bread_items, pending.get("delivery_date", ""))
+        all_rejected = pending.get("rejected_minis", []) + extra_rejected
+        pending["bread_items"]   = bread_items
+        pending["cake_items"]    = cake_items
+        pending["rejected_minis"] = all_rejected
+        _pending[chat_id] = pending
+
+        existing_bread = pending.get("existing_bread", [])
+        existing_cake  = pending.get("existing_cake", [])
+
+        def _existing_line(ei):
+            line = f"  • {ei.get('qty',1)}x {ei['item']}"
+            if ei.get("grams"):
+                line += f" — {ei['grams']}g"
+            return line + " *(existing)*"
+
+        ex_lines  = [_existing_line(ei) for ei in existing_bread + existing_cake]
+        new_lines = [_bread_line(it) + " *(new)*" for it in bread_items] + \
+                    [_cake_line(it, show_edit_hint=True) + " *(new)*" for it in cake_items]
+
+        total = order_total(existing_bread + bread_items, existing_cake + cake_items)
+        dl    = _delivery_line(pending.get("delivery_method"), pending.get("delivery_time"), pending.get("location"), pending.get("delivery_date"))
+
+        body = "Full updated order:\n\n" + "\n".join(ex_lines + new_lines)
+        body += "\n\n" + price_summary(total).replace("Subtotal:", "New total:")
+        if dl:
+            body += f"\n\n{dl}"
+        body += "\n\nConfirm full order?"
+        if all_rejected:
+            body += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(all_rejected)
+        await query.edit_message_text(body, reply_markup=_confirm_keyboard())
+
+    elif query.data == "b2b_confirm":
         pending = _pending.pop(chat_id, None)
         _state.pop(chat_id, None)
         _last_confirmation.pop(chat_id, None)
@@ -763,14 +1055,65 @@ async def handle_callback(update: Update, context) -> None:
             lambda txt: query.edit_message_text(txt, reply_markup=None),
         )
 
-    elif query.data == "b2b_edit":
-        # Text editing removed — redirect to button menu
-        _pending.pop(chat_id, None)
-        _state.pop(chat_id, None)
-        from b2b_bot.menu_flow import _cart, _category_keyboard, _cart_block
+    elif query.data == "b2b_extra_no_change":
+        pending = _pending.get(chat_id)
+        if not pending:
+            _state.pop(chat_id, None)
+            await query.edit_message_text("No pending order found. Please send your order again.")
+            return
+
+        _state[chat_id] = {"mode": "awaiting_edit"}
+
+        bread_items  = pending.get("bread_items", [])
+        cake_items   = pending.get("cake_items", [])
+        ai_unmatched = pending.get("ai_unmatched", [])
+
+        if bread_items or cake_items:
+            understood = "\n".join(
+                [_bread_line(it) for it in bread_items] +
+                [_cake_line(it) for it in cake_items]
+            )
+            understood_block = f"We have:\n{understood}\n\n"
+        else:
+            understood_block = ""
+
+        not_found = ("Not recognised: " + ", ".join(f"{u['qty']}x {u['item']}" for u in ai_unmatched) + "\n\n") if ai_unmatched else ""
+
         await query.edit_message_text(
-            f"Order cleared — use the menu to rebuild your order.\n\n{_cart_block(chat_id)}",
-            reply_markup=_category_keyboard(chat_id),
+            f"{understood_block}{not_found}"
+            "Just type the items to add or correct — no need to resend your photo or document."
+        )
+
+    elif query.data == "b2b_edit":
+        pending = _pending.get(chat_id)
+        if not pending:
+            _state.pop(chat_id, None)
+            await query.edit_message_text("No pending order found. Please send your order again.")
+            return
+
+        _state[chat_id] = {"mode": "awaiting_edit"}
+
+        bread_items    = pending.get("bread_items", [])
+        cake_items     = pending.get("cake_items", [])
+        ai_unmatched   = pending.get("ai_unmatched", [])
+
+        if bread_items or cake_items:
+            understood = "\n".join(
+                [_bread_line(it) for it in bread_items] +
+                [_cake_line(it) for it in cake_items]
+            )
+            understood_block = f"We have:\n{understood}\n\n"
+        else:
+            understood_block = ""
+
+        if ai_unmatched:
+            not_found = "Not recognised: " + ", ".join(f"{u['qty']}x {u['item']}" for u in ai_unmatched) + "\n\n"
+        else:
+            not_found = ""
+
+        await query.edit_message_text(
+            f"{understood_block}{not_found}"
+            "Just type the items to add or correct — no need to resend your photo or document."
         )
 
     elif query.data == "b2b_cancel":
