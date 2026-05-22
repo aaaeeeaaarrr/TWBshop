@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    ChatMemberHandler,
     CommandHandler,
     MessageHandler,
     filters,
@@ -22,6 +23,7 @@ from b2b_bot.billing import (
     send_weekly_reminders,
     get_all_outstanding_summary,
 )
+from b2b_bot.menu_flow import handle_menu_command, handle_menu_callback, handle_welcome
 from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_mini_reminder
 
@@ -90,6 +92,16 @@ def main() -> None:
         .pool_timeout(20.0)
         .build()
     )
+
+    # Bot added to a group → auto-welcome with menu
+    app.add_handler(ChatMemberHandler(handle_welcome, ChatMemberHandler.MY_CHAT_MEMBER))
+
+    # /menu and /B2Bmenu commands
+    app.add_handler(CommandHandler("menu", handle_menu_command))
+    app.add_handler(CommandHandler("B2Bmenu", handle_menu_command))
+
+    # Interactive menu callbacks (bm_*)
+    app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern=r"^bm_"))
 
     # Text messages in groups → order handler
     app.add_handler(MessageHandler(
