@@ -218,22 +218,11 @@ async def handle_qty_input(update: Update, context) -> None:
 
 
 async def handle_menu_callback(update: Update, context) -> None:
-    query = update.callback_query
-    await query.answer()
+    query   = update.callback_query
     chat_id = update.effective_chat.id
     data    = query.data
 
-    if data == "bm_noop":
-        return
-
-    if data == "bm_back":
-        _qty_pending.pop(chat_id, None)
-        await query.edit_message_text(
-            f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-            reply_markup=_category_keyboard(chat_id),
-        )
-        return
-
+    # bm_buns needs show_alert on the FIRST (and only) answer call
     if data == "bm_buns":
         await query.answer(
             "Type bun orders with grams directly:\n\n"
@@ -244,42 +233,59 @@ async def handle_menu_callback(update: Update, context) -> None:
         )
         return
 
-    if data.startswith("bm_cat_"):
-        _qty_pending.pop(chat_id, None)
-        cat_key = data[7:]
-        cat = _CATEGORIES.get(cat_key, {})
-        note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
-        await query.edit_message_text(
-            f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
-            reply_markup=_item_keyboard(cat_key, chat_id),
-        )
+    await query.answer()
+
+    if data == "bm_noop":
         return
 
-    if data.startswith("bm_qty_"):
-        rest    = data[7:]
-        cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
-        if not cat_key:
-            return
-        slug = rest[:-(len(cat_key) + 1)]
-        name = _NAME.get(slug)
-        if not name:
-            return
-        _qty_pending[chat_id] = {
-            "name": name,
-            "cat_key": cat_key,
-            "message_id": query.message.message_id,
-        }
-        cancel_kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"),
-        ]])
-        await query.edit_message_text(
-            f"How many {name}?\nType a number (0 to remove):",
-            reply_markup=cancel_kb,
-        )
-        return
+    try:
+        if data == "bm_back":
+            _qty_pending.pop(chat_id, None)
+            await query.edit_message_text(
+                f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
+            )
 
-    if data == "bm_confirm":
-        await _do_confirm(query, chat_id, context)
+        elif data.startswith("bm_cat_"):
+            _qty_pending.pop(chat_id, None)
+            cat_key = data[7:]
+            cat = _CATEGORIES.get(cat_key, {})
+            note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            await query.edit_message_text(
+                f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
+                reply_markup=_item_keyboard(cat_key, chat_id),
+            )
+
+        elif data.startswith("bm_qty_"):
+            rest    = data[7:]
+            cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
+            if not cat_key:
+                return
+            slug = rest[:-(len(cat_key) + 1)]
+            name = _NAME.get(slug)
+            if not name:
+                return
+            _qty_pending[chat_id] = {
+                "name": name,
+                "cat_key": cat_key,
+                "message_id": query.message.message_id,
+            }
+            cancel_kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"),
+            ]])
+            await query.edit_message_text(
+                f"How many {name}?\nType a number (0 to remove):",
+                reply_markup=cancel_kb,
+            )
+
+        elif data == "bm_confirm":
+            await _do_confirm(query, chat_id, context)
+
+    except Exception as e:
+        if "message is not modified" in str(e).lower():
+            pass  # tapped same button twice — no-op
+        else:
+            logger.warning("menu callback error data=%s: %s", data, e)
 
 
 async def _do_confirm(query, chat_id: int, context) -> None:
