@@ -578,6 +578,43 @@ async def _notify_mini_order(bot, business_name: str, bread_items: list[dict], m
     await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines))
 
 
+# ─── Confirm helper (shared by button callback and typed "yes") ───────────────
+
+_CONFIRM_WORDS = frozenset({"yes", "confirm", "confirmed", "ok", "okay", "yep", "yeah", "correct", "good", "fine"})
+_CANCEL_WORDS  = frozenset({"no", "cancel", "nope", "nah", "nevermind", "stop"})
+_EDIT_WORDS    = frozenset({"edit", "change", "modify", "wrong", "incorrect", "fix"})
+
+
+async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn) -> None:
+    """Save and confirm a pending order. reply_fn(text) sends the confirmation message."""
+    business_name = get_business_name(chat_id)
+    delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
+    bread_items, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
+    cake_items    = pending.get("cake_items", [])
+    method_   = pending.get("delivery_method")
+    time_str_ = pending.get("delivery_time")
+    location_ = pending.get("location")
+
+    if bread_items:
+        save_b2b_order(chat_id, business_name, bread_items, delivery_date)
+        if any(it["item"] in INSTANT_BREAD_ITEMS for it in bread_items):
+            await _notify_urgent_bread_order(
+                context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
+            )
+        if any(it["item"] in MINI_ITEMS for it in bread_items):
+            await _notify_mini_order(
+                context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
+            )
+    if cake_items:
+        save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date)
+        await _notify_cake_order(
+            context.bot, business_name, cake_items, method_, time_str_, location_, delivery_date,
+        )
+
+    logger.info("B2B order confirmed for %s (%s) delivery %s", business_name, chat_id, delivery_date)
+    await reply_fn("✓ Order confirmed.")
+
+
 # ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async def handle_group_message(update: Update, context) -> None:
@@ -744,6 +781,49 @@ async def handle_group_message(update: Update, context) -> None:
                 if edit_rejected:
                     msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(edit_rejected)
                 await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
+            return
+
+    # ── Pending confirmation: accept typed yes/no/edit/delivery change ───────
+    if _pending.get(chat_id) and not state:
+        lower_text = text.lower().strip()
+        pending = _pending[chat_id]
+
+        if lower_text in _CONFIRM_WORDS:
+            _pending.pop(chat_id, None)
+            _state.pop(chat_id, None)
+            await _do_confirm_order(chat_id, pending, context, update.message.reply_text)
+            return
+
+        if lower_text in _CANCEL_WORDS:
+            _pending.pop(chat_id, None)
+            _state.pop(chat_id, None)
+            await update.message.reply_text("Order cancelled.")
+            return
+
+        if lower_text in _EDIT_WORDS:
+            _state[chat_id] = {"mode": "awaiting_edit"}
+            bread_items_ = pending.get("bread_items", [])
+            cake_items_  = pending.get("cake_items", [])
+            understood = "\n".join([_bread_line(it) for it in bread_items_] + [_cake_line(it) for it in cake_items_])
+            await update.message.reply_text(
+                f"We have:\n{understood}\n\nJust type what you'd like to change."
+            )
+            return
+
+        method_t, time_str_t = _parse_delivery_text(text)
+        if method_t and time_str_t:
+            location_t = business_name if method_t == "delivery" else None
+            upsert_b2b_customer(chat_id, business_name, method_t, time_str_t, location_t)
+            pending.update(delivery_method=method_t, delivery_time=time_str_t, location=location_t)
+            _pending[chat_id] = pending
+            msg = _build_confirmation(
+                pending.get("bread_items", []), pending.get("cake_items", []),
+                method_t, time_str_t, location_t, pending.get("delivery_date"),
+            )
+            if pending.get("ai_unmatched"):
+                unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in pending["ai_unmatched"])
+                msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")
+            await update.message.reply_text(msg, reply_markup=_confirm_keyboard())
             return
 
     # ── Parse new order ───────────────────────────────────────────────────────
@@ -941,41 +1021,10 @@ async def handle_callback(update: Update, context) -> None:
             await query.edit_message_text("No pending order. Please send your order again.")
             return
 
-        business_name = get_business_name(chat_id)
-        delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
-        bread_items, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
-        cake_items    = pending.get("cake_items", [])
-
-        method_   = pending.get("delivery_method")
-        time_str_ = pending.get("delivery_time")
-        location_ = pending.get("location")
-
-        if bread_items:
-            save_b2b_order(chat_id, business_name, bread_items, delivery_date)
-            if any(it["item"] in INSTANT_BREAD_ITEMS for it in bread_items):
-                await _notify_urgent_bread_order(
-                    context.bot, business_name, bread_items,
-                    method_, time_str_, location_, delivery_date,
-                )
-            if any(it["item"] in MINI_ITEMS for it in bread_items):
-                await _notify_mini_order(
-                    context.bot, business_name, bread_items,
-                    method_, time_str_, location_, delivery_date,
-                )
-        if cake_items:
-            save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date)
-            await _notify_cake_order(
-                context.bot, business_name, cake_items,
-                method_, time_str_, location_, delivery_date,
-            )
-
-        logger.info("B2B order confirmed for %s (%s) delivery %s", business_name, chat_id, delivery_date)
-        original = query.message.text or ""
-        confirmed_text = (original
-            .replace("Is this correct?", "✓ Order confirmed.")
-            .replace("Confirm full order?", "✓ Order confirmed.")
-            .replace(" (edit if need sliced)", ""))
-        await query.edit_message_text(confirmed_text, reply_markup=None)
+        await _do_confirm_order(
+            chat_id, pending, context,
+            lambda txt: query.edit_message_text(txt, reply_markup=None),
+        )
 
     elif query.data == "b2b_extra_no_change":
         pending = _pending.get(chat_id)
