@@ -23,7 +23,10 @@ from b2b_bot.billing import (
     send_weekly_reminders,
     get_all_outstanding_summary,
 )
-from b2b_bot.menu_flow import handle_menu_command, handle_menu_callback, handle_welcome
+from b2b_bot.menu_flow import (
+    handle_menu_command, handle_menu_callback, handle_welcome,
+    handle_qty_input, qty_pending_filter,
+)
 from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_mini_reminder
 
@@ -102,6 +105,12 @@ def main() -> None:
 
     # Interactive menu callbacks (bm_*)
     app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern=r"^bm_"))
+
+    # Typed quantity when a qty prompt is pending (must be before order handler)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS & qty_pending_filter,
+        handle_qty_input,
+    ))
 
     # Text messages in groups → order handler
     app.add_handler(MessageHandler(

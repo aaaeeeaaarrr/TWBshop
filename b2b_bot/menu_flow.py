@@ -3,6 +3,7 @@
 import logging
 from datetime import date, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import filters as _filters
 
 import config
 from b2b_bot.menu import B2B_MENU
@@ -12,8 +13,9 @@ from b2b_bot.pricing import item_price, order_total
 
 logger = logging.getLogger(__name__)
 
-# ── In-memory cart ────────────────────────────────────────────────────────────
+# ── In-memory state ───────────────────────────────────────────────────────────
 _cart: dict[int, dict[str, int]] = {}  # {chat_id: {item_name: qty}}
+_qty_pending: dict[int, dict] = {}     # {chat_id: {name, cat_key, message_id}}
 
 # ── Category layout ───────────────────────────────────────────────────────────
 _CATEGORIES: dict[str, dict] = {
@@ -43,6 +45,14 @@ _CATEGORIES: dict[str, dict] = {
 _ALL_ITEMS = {item for cat in _CATEGORIES.values() for item in cat["items"]}
 _SLUG      = {name: name.replace(" ", "_") for name in _ALL_ITEMS}
 _NAME      = {v: k for k, v in _SLUG.items()}
+
+
+# ── Filter: only activate qty handler when a qty prompt is pending ─────────────
+class _QtyPendingFilter(_filters.MessageFilter):
+    def filter(self, message):
+        return bool(message.chat and message.chat.id in _qty_pending)
+
+qty_pending_filter = _QtyPendingFilter()
 
 
 # ── Display helpers ───────────────────────────────────────────────────────────
@@ -105,15 +115,16 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
         qty  = cart.get(name, 0)
         slug = _SLUG[name]
         label = f"{name} — {_price_label(name)}"
+        qty_cb = f"bm_qty_{slug}_{cat_key}"
         if qty:
             rows.append([
-                InlineKeyboardButton(f"{label}  ×{qty}", callback_data="bm_noop"),
+                InlineKeyboardButton(f"{label}  ×{qty}", callback_data=qty_cb),
                 InlineKeyboardButton("−", callback_data=f"bm_sub_{slug}_{cat_key}"),
                 InlineKeyboardButton("+", callback_data=f"bm_add_{slug}_{cat_key}"),
             ])
         else:
             rows.append([
-                InlineKeyboardButton(label, callback_data="bm_noop"),
+                InlineKeyboardButton(label, callback_data=qty_cb),
                 InlineKeyboardButton("+ Add", callback_data=f"bm_add_{slug}_{cat_key}"),
             ])
     nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
@@ -130,6 +141,7 @@ async def handle_menu_command(update: Update, context) -> None:
     if not is_b2b_group(chat_id):
         return
     _cart.pop(chat_id, None)
+    _qty_pending.pop(chat_id, None)
     await update.message.reply_text(
         f"📋 Select a category:\n\n{_cart_block(chat_id)}",
         reply_markup=_category_keyboard(chat_id),
@@ -147,6 +159,7 @@ async def handle_welcome(update: Update, context) -> None:
     if member.new_chat_member.status not in ("member", "administrator"):
         return
     _cart.pop(chat_id, None)
+    _qty_pending.pop(chat_id, None)
     business = get_business_name(chat_id)
     name_str = f" {business}" if business else ""
     await context.bot.send_message(
@@ -155,6 +168,46 @@ async def handle_welcome(update: Update, context) -> None:
         "Type your order anytime, or browse the menu below:",
         reply_markup=_category_keyboard(chat_id),
     )
+
+
+async def handle_qty_input(update: Update, context) -> None:
+    """Intercepts a typed number when a qty prompt is pending for this chat."""
+    chat_id = update.effective_chat.id
+    state = _qty_pending.get(chat_id)
+    if not state:
+        return
+    text = update.message.text.strip()
+    try:
+        qty = int(text)
+        if qty < 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Please send a whole number, e.g. 40  (or 0 to remove)")
+        return
+
+    _qty_pending.pop(chat_id, None)
+    cart = _cart.setdefault(chat_id, {})
+    if qty == 0:
+        cart.pop(state["name"], None)
+    else:
+        cart[state["name"]] = qty
+
+    cat_key = state["cat_key"]
+    cat = _CATEGORIES[cat_key]
+    note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=state["message_id"],
+            text=f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
+            reply_markup=_item_keyboard(cat_key, chat_id),
+        )
+    except Exception:
+        pass
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
 
 
 async def handle_menu_callback(update: Update, context) -> None:
@@ -167,6 +220,7 @@ async def handle_menu_callback(update: Update, context) -> None:
         return
 
     if data == "bm_back":
+        _qty_pending.pop(chat_id, None)
         await query.edit_message_text(
             f"📋 Select a category:\n\n{_cart_block(chat_id)}",
             reply_markup=_category_keyboard(chat_id),
@@ -184,6 +238,7 @@ async def handle_menu_callback(update: Update, context) -> None:
         return
 
     if data.startswith("bm_cat_"):
+        _qty_pending.pop(chat_id, None)
         cat_key = data[7:]
         cat = _CATEGORIES.get(cat_key, {})
         note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
@@ -193,9 +248,32 @@ async def handle_menu_callback(update: Update, context) -> None:
         )
         return
 
+    if data.startswith("bm_qty_"):
+        rest    = data[7:]
+        cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
+        if not cat_key:
+            return
+        slug = rest[:-(len(cat_key) + 1)]
+        name = _NAME.get(slug)
+        if not name:
+            return
+        _qty_pending[chat_id] = {
+            "name": name,
+            "cat_key": cat_key,
+            "message_id": query.message.message_id,
+        }
+        cancel_kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"),
+        ]])
+        await query.edit_message_text(
+            f"How many {name}?\nType a number (0 to remove):",
+            reply_markup=cancel_kb,
+        )
+        return
+
     if data.startswith(("bm_add_", "bm_sub_")):
-        action = "add" if data.startswith("bm_add_") else "sub"
-        rest   = data[7:]
+        action  = "add" if data.startswith("bm_add_") else "sub"
+        rest    = data[7:]
         cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
         if not cat_key:
             return
@@ -210,10 +288,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             cart[name] = max(0, cart.get(name, 0) - 1)
             if cart[name] == 0:
                 del cart[name]
-        cat = _CATEGORIES[cat_key]
-        note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
-        await query.edit_message_text(
-            f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
+        # Only update the keyboard — faster than re-rendering the full message
+        await query.edit_message_reply_markup(
             reply_markup=_item_keyboard(cat_key, chat_id),
         )
         return
