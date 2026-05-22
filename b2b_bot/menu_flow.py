@@ -222,7 +222,7 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
             label,
             callback_data=f"bm_bun_size_{bun_key}_{grams}",
         ))
-        if len(row) == 3:
+        if len(row) == 2:
             rows.append(row)
             row = []
     if row:
