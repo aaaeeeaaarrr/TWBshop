@@ -112,21 +112,14 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
     for name in _CATEGORIES[cat_key]["items"]:
-        qty  = cart.get(name, 0)
-        slug = _SLUG[name]
+        qty   = cart.get(name, 0)
+        slug  = _SLUG[name]
         label = f"{name} — {_price_label(name)}"
-        qty_cb = f"bm_qty_{slug}_{cat_key}"
-        if qty:
-            rows.append([
-                InlineKeyboardButton(f"{label}  ×{qty}", callback_data=qty_cb),
-                InlineKeyboardButton("−", callback_data=f"bm_sub_{slug}_{cat_key}"),
-                InlineKeyboardButton("+", callback_data=f"bm_add_{slug}_{cat_key}"),
-            ])
-        else:
-            rows.append([
-                InlineKeyboardButton(label, callback_data=qty_cb),
-                InlineKeyboardButton("+ Add", callback_data=f"bm_add_{slug}_{cat_key}"),
-            ])
+        suffix = f"  ×{qty}" if qty else ""
+        rows.append([InlineKeyboardButton(
+            f"{label}{suffix}",
+            callback_data=f"bm_qty_{slug}_{cat_key}",
+        )])
     nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
     if cart:
         nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
@@ -268,29 +261,6 @@ async def handle_menu_callback(update: Update, context) -> None:
         await query.edit_message_text(
             f"How many {name}?\nType a number (0 to remove):",
             reply_markup=cancel_kb,
-        )
-        return
-
-    if data.startswith(("bm_add_", "bm_sub_")):
-        action  = "add" if data.startswith("bm_add_") else "sub"
-        rest    = data[7:]
-        cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
-        if not cat_key:
-            return
-        slug = rest[:-(len(cat_key) + 1)]
-        name = _NAME.get(slug)
-        if not name:
-            return
-        cart = _cart.setdefault(chat_id, {})
-        if action == "add":
-            cart[name] = cart.get(name, 0) + 1
-        else:
-            cart[name] = max(0, cart.get(name, 0) - 1)
-            if cart[name] == 0:
-                del cart[name]
-        # Only update the keyboard — faster than re-rendering the full message
-        await query.edit_message_reply_markup(
-            reply_markup=_item_keyboard(cat_key, chat_id),
         )
         return
 
