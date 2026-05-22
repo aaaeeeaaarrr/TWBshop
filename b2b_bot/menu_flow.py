@@ -112,12 +112,12 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
     for name in _CATEGORIES[cat_key]["items"]:
-        qty   = cart.get(name, 0)
-        slug  = _SLUG[name]
-        label = f"{name} — {_price_label(name)}"
-        suffix = f"  ×{qty}" if qty else ""
+        qty    = cart.get(name, 0)
+        slug   = _SLUG[name]
+        suffix = f"  ✓ ×{qty}" if qty else ""
+        label  = f"{name}{suffix}\n{_price_label(name)}"
         rows.append([InlineKeyboardButton(
-            f"{label}{suffix}",
+            label,
             callback_data=f"bm_qty_{slug}_{cat_key}",
         )])
     nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
