@@ -10,6 +10,7 @@ from b2b_bot.menu import B2B_MENU
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.customers import get_business_name, is_b2b_group
 from b2b_bot.pricing import item_price, order_total
+from shared.database import get_menu_message_id, set_menu_message_id
 
 logger = logging.getLogger(__name__)
 
@@ -131,19 +132,20 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 async def _delete_old_menu(chat_id: int, bot) -> None:
-    msg_id = _menu_msg.pop(chat_id, None)
+    # Check in-memory cache first, fall back to DB (survives restarts)
+    msg_id = _menu_msg.pop(chat_id, None) or get_menu_message_id(chat_id)
     if msg_id:
         try:
             await bot.delete_message(chat_id, msg_id)
         except Exception:
             pass
+    set_menu_message_id(chat_id, None)
 
 
 async def handle_menu_command(update: Update, context) -> None:
     chat_id = update.effective_chat.id
     if not is_b2b_group(chat_id):
         return
-    _cart.pop(chat_id, None)
     _qty_pending.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
     sent = await update.message.reply_text(
@@ -151,6 +153,7 @@ async def handle_menu_command(update: Update, context) -> None:
         reply_markup=_category_keyboard(chat_id),
     )
     _menu_msg[chat_id] = sent.message_id
+    set_menu_message_id(chat_id, sent.message_id)
 
 
 async def handle_welcome(update: Update, context) -> None:
@@ -163,7 +166,6 @@ async def handle_welcome(update: Update, context) -> None:
         return
     if member.new_chat_member.status not in ("member", "administrator"):
         return
-    _cart.pop(chat_id, None)
     _qty_pending.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
     business = get_business_name(chat_id)
@@ -175,6 +177,7 @@ async def handle_welcome(update: Update, context) -> None:
         reply_markup=_category_keyboard(chat_id),
     )
     _menu_msg[chat_id] = sent.message_id
+    set_menu_message_id(chat_id, sent.message_id)
 
 
 async def handle_qty_input(update: Update, context) -> None:

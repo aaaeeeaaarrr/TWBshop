@@ -68,8 +68,13 @@ def init_db() -> None:
                     delivery_method TEXT,
                     delivery_time   TEXT,
                     location        TEXT,
+                    menu_message_id BIGINT,
                     updated_at      TEXT   NOT NULL
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS menu_message_id BIGINT
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_orders (
@@ -212,6 +217,29 @@ def get_b2b_customer(group_chat_id: int) -> dict | None:
                 "SELECT * FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,)
             )
             return cur.fetchone()
+
+
+def get_menu_message_id(group_chat_id: int) -> int | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT menu_message_id FROM b2b_customers WHERE group_chat_id = %s",
+                (group_chat_id,),
+            )
+            row = cur.fetchone()
+            return row["menu_message_id"] if row else None
+
+
+def set_menu_message_id(group_chat_id: int, message_id: int | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, menu_message_id, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    menu_message_id = EXCLUDED.menu_message_id,
+                    updated_at      = EXCLUDED.updated_at
+            """, (group_chat_id, message_id, datetime.utcnow().isoformat()))
 
 
 # ─── B2B bread orders ─────────────────────────────────────────────────────────
