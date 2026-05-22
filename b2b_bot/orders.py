@@ -385,16 +385,19 @@ def _resolve_cake_history(group_chat_id: int, items: list[dict]) -> tuple[list[d
         it = dict(it)
         cake_def = B2B_CAKE_MENU[it["item"]]
 
-        if it.get("order_type") is None and cake_def["cake_category"] == "A":
-            last = get_b2b_cake_last_order_item(group_chat_id, it["item"])
-            if last:
-                it["order_type"] = last["order_type"]
-                it["order_type_source"] = "history"
-                if last["order_type"] == "sliced":
-                    it["slices"] = last["slices"] or cake_def["standard_slices"]
-                    it["slices_source"] = "history"
+        if it.get("order_type") is None:
+            if cake_def["cake_category"] == "A":
+                last = get_b2b_cake_last_order_item(group_chat_id, it["item"])
+                if last:
+                    it["order_type"] = last["order_type"]
+                    it["order_type_source"] = "history"
+                    if last["order_type"] == "sliced":
+                        it["slices"] = last["slices"] or cake_def["standard_slices"]
+                        it["slices_source"] = "history"
+                else:
+                    needs_spec.append(it["item"])
             else:
-                needs_spec.append(it["item"])
+                it["order_type"] = "piece"
 
         if it.get("order_type") == "sliced" and it.get("slices") is None:
             last = get_b2b_cake_last_order_item(group_chat_id, it["item"])
@@ -744,12 +747,24 @@ async def handle_group_message(update: Update, context) -> None:
             return
 
     # ── Parse new order ───────────────────────────────────────────────────────
+    _RESPONSE_WORDS = frozenset({
+        "sliced", "slice", "whole", "yes", "no", "ok", "okay",
+        "full", "piece", "tray", "confirm", "cancel",
+    })
+
     bread_items, cake_items, unmatched = await _parse_order_ai(text)
 
     ai_unmatched = unmatched
 
     if not bread_items and not cake_items and not ai_unmatched:
         return
+
+    if not bread_items and not cake_items and ai_unmatched:
+        if all(u["item"].lower() in _RESPONSE_WORDS for u in ai_unmatched):
+            await update.message.reply_text(
+                "I don't have any order in memory — please resend your order from the beginning."
+            )
+            return
 
     is_today = bool(_TODAY_RE.search(text))
     delivery_date = date.today().isoformat() if is_today and not bread_items else (date.today() + timedelta(days=1)).isoformat()
