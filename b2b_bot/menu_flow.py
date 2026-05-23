@@ -144,7 +144,10 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         callback_data="bm_buns",
     )])
     if cart:
-        rows.append([InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm")])
+        rows.append([
+            InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"),
+            InlineKeyboardButton("🗑 Empty Cart",    callback_data="bm_empty_cart"),
+        ])
     return InlineKeyboardMarkup(rows)
 
 
@@ -364,6 +367,15 @@ async def handle_menu_callback(update: Update, context) -> None:
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
+            )
+
+        elif data == "bm_empty_cart":
+            _cart.pop(chat_id, None)
+            _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
+            await query.edit_message_text(
+                f"🗑 Cart cleared.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
             )
 
