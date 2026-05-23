@@ -219,6 +219,7 @@ The token is saved to `.bootstrap_token` (gitignored) so you only type it once p
 
 ## Workflow Rules (Apply on Every Machine)
 - **Always commit before pushing.** The user works across multiple machines. If you push without committing first, the other machine sees nothing when it pulls. When the user says "push", always: check for uncommitted changes → commit → pull --rebase → push.
+- **Smart pull.** When the user says "pull", always: run `git pull --rebase`, then check if `secrets.py` exists. If it does not exist, automatically run `python bootstrap.py` without asking — the user should never have to type that themselves.
 
 ---
 
