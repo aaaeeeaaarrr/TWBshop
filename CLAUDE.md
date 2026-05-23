@@ -12,7 +12,7 @@
 | 4 | DO Droplet | `curl -s -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/droplets \| python3 -c "import sys,json;d=json.load(sys.stdin);print(d['droplets'][0]['status'])"` | `active` |
 | 5 | DO Database | same but `/v2/databases` | `online` |
 | 6 | Anthropic API | `curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models` | `200` |
-| 7 | Telegram retail | `curl -s "https://api.telegram.org/bot$BOT_TOKEN/getMe"` → `.result.username` | `WineB_bot` |
+| 7 | Telegram retail | `curl -s "https://api.telegram.org/bot$BOT_TOKEN/getMe"` -> `.result.username` | `WineB_bot` |
 | 8 | Telegram B2B | same with `$B2B_BOT_TOKEN` | `twb_b2b_bot` |
 
 ---
@@ -65,17 +65,19 @@ relevant in future sessions without hitting context limits.
 One repo, one business. Each system gets its own folder. Shared infrastructure lives in `shared/`.
 
 ```
-TWBshop/                        ← one GitHub repo for the whole business
+TWBshop/
 ├── CLAUDE.md                   ← project-wide rules and status
-├── config.example.py           ← all settings for all systems (copy → config.py)
-├── requirements.txt            ← combined dependencies
-├── run_bot.py                  ← entry point: python run_bot.py
+├── config.py                   ← tracked in git; imports secrets from secrets.py
+├── config.example.py           ← reference template
+├── requirements.txt
+├── run_bot.py                  ← retail entry point
+├── run_b2b_bot.py              ← B2B entry point
 │
-├── shared/                     ← imported by any system
+├── shared/
 │   ├── database.py             ← PostgreSQL: all tables and queries
 │   └── ai_client.py            ← Anthropic client (vision + text)
 │
-├── telegram_bot/               ← Telegram bakery bot (current system)
+├── telegram_bot/               ← retail bot
 │   ├── bot.py                  ← handler registration and scheduled jobs
 │   ├── orders.py               ← order intake, menu matching, confirmation flow
 │   ├── menu.py                 ← menu items, aliases, synonym tables
@@ -84,17 +86,12 @@ TWBshop/                        ← one GitHub repo for the whole business
 │   ├── staff_monitor.py        ← staff message logging and AI monitoring
 │   └── reminders.py            ← missing photo deadline checks
 │
+├── b2b_bot/                    ← B2B wholesale bot (see section below)
+├── deploy/                     ← systemd service files + server setup script
+├── archive/                    ← removed code kept for reference
 ├── photos/                     ← shared photo storage (gitignored)
 └── logs/                       ← shared logs (gitignored)
-    └── unmatched.log           ← text patterns the bot couldn't match
 ```
-
-### Adding a new system
-1. Create a new folder at the root (e.g. `web_dashboard/`)
-2. Import shared code with `from shared.database import ...`
-3. Add a launcher at root if needed (e.g. `run_dashboard.py`)
-4. Add its dependencies to `requirements.txt`
-5. Document its phases in this CLAUDE.md under a new section
 
 ---
 
@@ -134,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Full cleanup: removed dead push_file(), deleted dead post-merge hook, removed duplicate Workflow Rules section, compressed completed retail phases, updated B2B repo structure to show module split, fixed SQLite→PostgreSQL label, SSH check now uses `ssh twbshop` alias.
+**Last completed:** Cleanup: deleted SETUP.md (superseded by bootstrap), updated repo structure in CLAUDE.md to match filesystem, removed "Adding a new system" scaffolding, fixed misleading gitignore comment in config.example.py, fixed Unicode arrows.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**

@@ -1,5 +1,4 @@
-# Copy this file to config.py and fill in your values.
-# config.py is gitignored — never commit it.
+# Reference template — actual config.py is tracked in git and imports secrets from secrets.py.
 
 # Anthropic API — required for Phase 6 features (photo analysis, stock sheet OCR,
 # staff message monitoring). Leave empty to run in manual-review-only mode.
