@@ -7,6 +7,11 @@ import asyncio
 import sys
 from pathlib import Path
 
+if not Path("secrets.py").exists():
+    print("\n  NEW MACHINE detected — secrets.py is missing.")
+    print("  Run: python bootstrap.py\n")
+    sys.exit(1)
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 from b2b_bot.bot import main

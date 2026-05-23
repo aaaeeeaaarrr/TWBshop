@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs automatically after every git pull.
+# If secrets.py is missing, remind the user to run bootstrap.
+if [ ! -f "secrets.py" ]; then
+    echo ""
+    echo "┌─────────────────────────────────────────────┐"
+    echo "│  NEW MACHINE or secrets missing!            │"
+    echo "│                                             │"
+    echo "│  Run this to finish setup:                  │"
+    echo "│                                             │"
+    echo "│    python bootstrap.py                      │"
+    echo "│                                             │"
+    echo "└─────────────────────────────────────────────┘"
+    echo ""
+fi

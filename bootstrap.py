@@ -104,11 +104,18 @@ def main():
     for d in ["logs", "photos"]:
         os.makedirs(os.path.join(PROJECT_DIR, d), exist_ok=True)
 
+    # 4. Activate git hook so future pulls remind you if secrets go missing
+    subprocess.call(
+        ["git", "config", "core.hooksPath", ".githooks"],
+        cwd=PROJECT_DIR
+    )
+
     print("\n" + "=" * 55)
     print("  Bootstrap complete!")
     print("=" * 55)
     print("\nAll secrets and SSH key are in place.")
-    print("Next steps:")
+    print("Git hook activated — future pulls will remind you automatically.")
+    print("\nNext steps:")
     print("  Retail bot : python run_bot.py")
     print("  B2B bot    : python run_b2b_bot.py")
     print()
