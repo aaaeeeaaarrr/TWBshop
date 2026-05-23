@@ -484,7 +484,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         _split_mini_items, _mini_rejection_note,
         _build_confirmation, _confirm_keyboard,
     )
-    from b2b_bot.customers import get_b2b_customer, upsert_b2b_customer
+    from shared.database import get_b2b_customer, upsert_b2b_customer
 
     cart = _cart.pop(chat_id, {})
     if not cart:
