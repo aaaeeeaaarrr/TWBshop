@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(ssh *)",
+      "Bash(ssh-keygen *)",
+      "Bash(scp *)",
+      "Bash(curl *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(systemctl *)",
+      "Bash(journalctl *)",
+      "Bash(Copy-Item *)",
+      "Bash(Get-Process *)",
+      "Bash(Stop-Process *)",
+      "Bash(Remove-Item *)",
+      "Bash(New-Item *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Remove-Item *)"
+    ]
+  }
+}
