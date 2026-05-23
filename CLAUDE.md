@@ -188,7 +188,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Fixed all cross-machine friction: SSH config auto-deploys via bootstrap, post-rewrite hook now actually fires on pull --rebase, push is one commit + one push, global CLAUDE.md syncs via API (no cloning), removed unnecessary .pub from sync.
+**Last completed:** Fixed all cross-machine friction: SSH config auto-deploys via bootstrap, post-rewrite hook fires on pull --rebase, push is one commit + one push, global CLAUDE.md syncs via gh API (no cloning), removed .pub from sync.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**

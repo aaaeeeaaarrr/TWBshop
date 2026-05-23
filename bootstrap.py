@@ -172,11 +172,22 @@ if __name__ == "__main__":
     if "--sync" in sys.argv:
         sync(silent=True)
     elif "--push-global" in sys.argv:
-        token = get_token()
         claude_md = os.path.join(CLAUDE_DIR, "CLAUDE.md")
         with open(claude_md, "rb") as f:
-            content = f.read()
-        push_file(token, "global_claude.md", content, "sync global CLAUDE.md")
+            content = base64.b64encode(f.read()).decode()
+        # Get current SHA (required by GitHub API for updates)
+        sha_result = subprocess.run(
+            ["gh", "api", f"/repos/{SECRETS_REPO}/contents/global_claude.md", "--jq", ".sha"],
+            capture_output=True, text=True,
+        )
+        sha = sha_result.stdout.strip()
+        args = ["gh", "api", "--method", "PUT",
+                f"/repos/{SECRETS_REPO}/contents/global_claude.md",
+                "-f", "message=sync global CLAUDE.md",
+                "-f", f"content={content}"]
+        if sha:
+            args += ["-f", f"sha={sha}"]
+        subprocess.check_call(args, stdout=subprocess.DEVNULL)
         print("global_claude.md updated in secrets repo.")
     else:
         full_setup()
