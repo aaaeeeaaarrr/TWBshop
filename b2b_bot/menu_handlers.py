@@ -229,7 +229,7 @@ async def handle_menu_callback(update: Update, context) -> None:
 
         elif data.startswith("bm_edit_session_"):
             if _orders_locked():
-                await query.answer("Orders are locked after 9pm. Contact us directly.", show_alert=True)
+                await query.answer("Orders are locked after 10pm. Contact us directly.", show_alert=True)
                 return
             idx = int(data[16:])
             delivery_date = (date.today() + timedelta(days=1)).isoformat()
@@ -275,7 +275,7 @@ async def handle_menu_callback(update: Update, context) -> None:
 
         elif data == "bm_date_tmrw":
             if _orders_locked():
-                await query.answer("Orders are locked after 9pm — bakery is producing.", show_alert=True)
+                await query.answer("Orders are locked after 10pm — bakery is producing.", show_alert=True)
                 return
             tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
             tomorrow_d   = date.today() + timedelta(days=1)

@@ -207,7 +207,7 @@ B2B_MENU: dict[str, dict] = {
     },
 }
 
-# Items that get an instant bakery-group notification when ordered (in addition to 9pm summary)
+# Items that get an instant bakery-group notification when ordered (in addition to 10pm summary)
 INSTANT_BREAD_ITEMS: frozenset[str] = frozenset({"croissant", "pain au chocolat"})
 
 # Items with ordering restrictions (min_quantity / advance_hours) — derived automatically

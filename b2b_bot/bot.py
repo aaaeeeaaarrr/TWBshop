@@ -36,8 +36,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 9pm Phnom Penh (UTC+7) = 14:00 UTC
-_SUMMARY_HOUR_UTC   = 14
+# 10pm Phnom Penh (UTC+7) = 15:00 UTC
+_SUMMARY_HOUR_UTC   = 15
 _SUMMARY_MINUTE_UTC = 0
 
 # 9am Phnom Penh (UTC+7) = 02:00 UTC — mini order 48h-before reminder
@@ -140,7 +140,7 @@ def main() -> None:
     app.add_handler(CommandHandler("summary", cmd_summary))
     app.add_handler(CommandHandler("balance", cmd_balance))
 
-    # Nightly summary at 9pm Phnom Penh time
+    # Nightly summary at 10pm Phnom Penh time
     summary_time = datetime.time(
         hour=_SUMMARY_HOUR_UTC,
         minute=_SUMMARY_MINUTE_UTC,

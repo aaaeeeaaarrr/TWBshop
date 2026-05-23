@@ -151,13 +151,13 @@ Handles wholesale orders from restaurant and bar customers via their own Telegra
 - Gram-required items: pulls from history first, falls back to standard grams (shown in confirmation).
 - Attributes (e.g. sesame type): pulls from history first, falls back to menu standard.
 - Delivery/pickup: stored per group. New group asked once on first order.
-- 9pm Phnom Penh (UTC+7 = 14:00 UTC): nightly summary to B2B staff group.
+- 10pm Phnom Penh (UTC+7 = 15:00 UTC): nightly summary to B2B staff group.
 - No AI in Phase 1 — rule-based matching only.
 
 ### B2B Repo Structure
 ```
 b2b_bot/
-├── bot.py              ← handler registration and 9pm scheduled job
+├── bot.py              ← handler registration and 10pm scheduled job
 ├── menu.py             ← B2B menu items, grams, attributes, aliases
 ├── menu_keyboards.py   ← cart state dicts, all keyboard builders
 ├── menu_handlers.py    ← menu command + callback handlers, _do_confirm
@@ -174,10 +174,10 @@ run_b2b_bot.py          ← entry point: python run_b2b_bot.py
 ```
 
 ### B2B Build Phases
-- [x] Phase 1 — Foundation + full order flow (menu, customers, history, confirmation, delivery, 9pm summary)
-- [ ] Phase 2 — Recurring weekly orders (standing orders with 7am/1pm/6pm confirmations, 9pm cutoff)
+- [x] Phase 1 — Foundation + full order flow (menu, customers, history, confirmation, delivery, 10pm summary)
+- [ ] Phase 2 — Recurring weekly orders (standing orders with 7am/1pm/6pm confirmations, 10pm cutoff)
   - DB table: b2b_recurring_orders (group_chat_id, items_json, day_of_week, status: active/paused/cancelled)
-  - Saturday bot sends at 7am, reminds at 1pm if no reply, reminds again at 6pm, drops at 9pm if still no reply
+  - Saturday bot sends at 7am, reminds at 1pm if no reply, reminds again at 6pm, drops at 10pm if still no reply
   - Customer presses [Confirm] or [Skip this week] — silence = no order, nothing baked
   - Cancelled permanently: status = 'cancelled', record kept for history, bot never sends again
 - [ ] Phase 3 — Claude API for smarter matching and future AI features

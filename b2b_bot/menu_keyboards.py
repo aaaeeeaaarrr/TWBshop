@@ -21,8 +21,8 @@ _cart_date: dict[int, str] = {}           # {chat_id: delivery date  e.g. "2026-
 _cart_method: dict[int, str] = {}         # {chat_id: "pickup" | "delivery"}
 _last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
 
-# 9pm Phnom Penh = 14:00 UTC — orders locked after this hour
-_LOCK_HOUR_UTC = 14
+# 10pm Phnom Penh = 15:00 UTC — orders locked after this hour
+_LOCK_HOUR_UTC = 15
 
 # How long (seconds) before the menu nudge fires again for the same chat
 _MENU_PROMPT_COOLDOWN_SEC = 6 * 3600
