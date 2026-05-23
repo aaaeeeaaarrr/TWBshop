@@ -239,7 +239,7 @@ The token is saved to `.bootstrap_token` (gitignored) so you only type it once p
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Full cross-machine sync system — bootstrap.py, private secrets repo, git hooks, global CLAUDE.md, log rotation, smart push/pull rules
+**Last completed:** Full automation system — automatic signals (push→status, pip→requirements, orphan detection, schema migration flags, new token detection, server detection), global checklist in ~/.claude/CLAUDE.md, bootstrap downloads checklist to new machines
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
