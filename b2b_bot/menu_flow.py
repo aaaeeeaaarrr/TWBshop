@@ -725,6 +725,11 @@ async def handle_menu_callback(update: Update, context) -> None:
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             _editing_session.pop(chat_id, None)
+            # Remove the button from the nudge so it can't be clicked again, but keep the message text
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
             await _delete_old_menu(chat_id, context.bot)
             delivery_date = (date.today() + timedelta(days=1)).isoformat()
             sessions = get_b2b_order_sessions(chat_id, delivery_date)
@@ -739,17 +744,19 @@ async def handle_menu_callback(update: Update, context) -> None:
                     lines.append("For changes, please contact us directly.")
                 else:
                     lines.append("\nWhat would you like to do?")
-                await query.edit_message_text(
+                sent = await context.bot.send_message(
+                    chat_id,
                     "\n".join(lines),
                     reply_markup=_existing_orders_keyboard(sessions, locked),
                 )
             else:
-                await query.edit_message_text(
+                sent = await context.bot.send_message(
+                    chat_id,
                     f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                     reply_markup=_category_keyboard(chat_id),
                 )
-            _menu_msg[chat_id] = query.message.message_id
-            set_menu_message_id(chat_id, query.message.message_id)
+            _menu_msg[chat_id] = sent.message_id
+            set_menu_message_id(chat_id, sent.message_id)
 
         elif data == "bm_buns":
             _qty_pending.pop(chat_id, None)
