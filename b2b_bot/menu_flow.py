@@ -1,7 +1,7 @@
 """Interactive /menu command and welcome flow for B2B groups."""
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters as _filters
 
@@ -13,14 +13,19 @@ from b2b_bot.pricing import item_price, order_total
 from shared.database import (
     get_menu_message_id, set_menu_message_id,
     get_qty_pending, set_qty_pending,
+    get_b2b_order_sessions,
 )
 
 logger = logging.getLogger(__name__)
 
 # ── In-memory state ───────────────────────────────────────────────────────────
-_cart: dict[int, dict[str, int]] = {}  # {chat_id: {item_key: qty}}
-_qty_pending: dict[int, dict] = {}     # {chat_id: state dict}
-_menu_msg: dict[int, int] = {}         # {chat_id: message_id of active menu}
+_cart: dict[int, dict[str, int]] = {}     # {chat_id: {item_key: qty}}
+_qty_pending: dict[int, dict] = {}        # {chat_id: state dict}
+_menu_msg: dict[int, int] = {}            # {chat_id: message_id of active menu}
+_editing_session: dict[int, str] = {}     # {chat_id: session_key being replaced}
+
+# 9pm Phnom Penh = 14:00 UTC — orders locked after this hour
+_LOCK_HOUR_UTC = 14
 
 # ── Category layout ───────────────────────────────────────────────────────────
 _CATEGORIES: dict[str, dict] = {
@@ -239,6 +244,39 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
+def _orders_locked() -> bool:
+    return datetime.now(timezone.utc).hour >= _LOCK_HOUR_UTC
+
+
+def _session_summary(session: dict) -> str:
+    lines = []
+    for it in session["bread"]:
+        line = f"  • {it['qty']}× {it['item']}"
+        if it.get("grams"):
+            line += f" — {it['grams']}g"
+        lines.append(line)
+    for it in session["cake"]:
+        line = f"  • {it['qty']}× {it['item']}"
+        ot = it.get("order_type")
+        if ot == "sliced":
+            line += f" — sliced {it.get('slices','?')}pc"
+        elif ot == "full":
+            line += " — whole"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _existing_orders_keyboard(sessions: list[dict], locked: bool) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("➕ New Order", callback_data="bm_new_order")]]
+    if not locked:
+        for i, s in enumerate(sessions):
+            rows.append([InlineKeyboardButton(
+                f"✏️ Edit Order #{i + 1}",
+                callback_data=f"bm_edit_session_{i}",
+            )])
+    return InlineKeyboardMarkup(rows)
+
+
 async def _delete_old_menu(chat_id: int, bot) -> None:
     msg_id = _menu_msg.pop(chat_id, None) or get_menu_message_id(chat_id)
     if msg_id:
@@ -254,11 +292,32 @@ async def handle_menu_command(update: Update, context) -> None:
     if not is_b2b_group(chat_id):
         return
     _qty_pending.pop(chat_id, None)
+    _editing_session.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
-    sent = await update.message.reply_text(
-        f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-        reply_markup=_category_keyboard(chat_id),
-    )
+
+    delivery_date = (date.today() + timedelta(days=1)).isoformat()
+    sessions = get_b2b_order_sessions(chat_id, delivery_date)
+
+    if sessions:
+        locked = _orders_locked()
+        n = len(sessions)
+        lines = [f"You already have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n"]
+        for i, s in enumerate(sessions, 1):
+            lines.append(f"Order #{i}:\n{_session_summary(s)}")
+        if locked:
+            lines.append("\n🔒 Orders are locked — bakery has been notified.")
+            lines.append("For changes, please contact us directly.")
+        else:
+            lines.append("\nWhat would you like to do?")
+        sent = await update.message.reply_text(
+            "\n".join(lines),
+            reply_markup=_existing_orders_keyboard(sessions, locked),
+        )
+    else:
+        sent = await update.message.reply_text(
+            f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+            reply_markup=_category_keyboard(chat_id),
+        )
     _menu_msg[chat_id] = sent.message_id
     set_menu_message_id(chat_id, sent.message_id)
 
@@ -367,6 +426,44 @@ async def handle_menu_callback(update: Update, context) -> None:
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
+            )
+
+        elif data == "bm_new_order":
+            _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
+            _editing_session.pop(chat_id, None)
+            _cart.pop(chat_id, None)
+            await query.edit_message_text(
+                f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
+            )
+
+        elif data.startswith("bm_edit_session_"):
+            if _orders_locked():
+                await query.answer("Orders are locked after 9pm. Contact us directly.", show_alert=True)
+                return
+            idx = int(data[16:])
+            delivery_date = (date.today() + timedelta(days=1)).isoformat()
+            sessions = get_b2b_order_sessions(chat_id, delivery_date)
+            if idx >= len(sessions):
+                await query.answer("Order not found.", show_alert=True)
+                return
+            session = sessions[idx]
+            # Load session items into cart
+            cart = _cart.setdefault(chat_id, {})
+            cart.clear()
+            for it in session["bread"]:
+                key = f"{it['item']}|{it['grams']}" if it.get("grams") else it["item"]
+                cart[key] = it["qty"]
+            for it in session["cake"]:
+                cart[it["item"]] = it["qty"]
+            # Remember which session we're replacing
+            _editing_session[chat_id] = session["session_key"]
+            _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
+            await query.edit_message_text(
+                f"✏️ Editing Order #{idx + 1} — make your changes:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
             )
 
@@ -520,6 +617,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         "delivery_method": method, "delivery_time": time_str,
         "location": location, "delivery_date": delivery_date,
         "ai_unmatched": [],
+        "editing_session_key": _editing_session.pop(chat_id, None),
     }
 
     if needs_spec:

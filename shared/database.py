@@ -96,6 +96,10 @@ def init_db() -> None:
                 )
             """)
             cur.execute("""
+                ALTER TABLE b2b_orders
+                ADD COLUMN IF NOT EXISTS batch_id TEXT NOT NULL DEFAULT ''
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_cake_orders (
                     id            SERIAL  PRIMARY KEY,
                     group_chat_id BIGINT  NOT NULL,
@@ -110,6 +114,10 @@ def init_db() -> None:
                     payment_status TEXT   NOT NULL DEFAULT 'unpaid',
                     created_at    TEXT    NOT NULL
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_cake_orders
+                ADD COLUMN IF NOT EXISTS batch_id TEXT NOT NULL DEFAULT ''
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_payments (
@@ -275,17 +283,17 @@ def set_qty_pending(group_chat_id: int, state: dict | None) -> None:
 
 # ─── B2B bread orders ─────────────────────────────────────────────────────────
 
-def save_b2b_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str) -> None:
+def save_b2b_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str, batch_id: str = "") -> None:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO b2b_orders "
-                "(group_chat_id, business_name, item, quantity, grams, notes, delivery_date, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "(group_chat_id, business_name, item, quantity, grams, notes, delivery_date, batch_id, created_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 [
                     (group_chat_id, business_name, i["item"], i["qty"],
-                     i.get("grams"), i.get("notes"), delivery_date, now)
+                     i.get("grams"), i.get("notes"), delivery_date, batch_id, now)
                     for i in items
                 ],
             )
@@ -365,19 +373,81 @@ def delete_b2b_orders_for_date(group_chat_id: int, delivery_date: str) -> None:
             )
 
 
+def get_b2b_order_sessions(group_chat_id: int, delivery_date: str) -> list[dict]:
+    """Return confirmed orders grouped by batch session (batch_id or created_at for old rows).
+    Each entry: {session_key, bread: [{item,qty,grams,notes}], cake: [{item,qty,cake_category,order_type,slices}]}
+    """
+    sid_key = "CASE WHEN batch_id != '' THEN batch_id ELSE created_at END"
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT {sid_key} AS sid, item, quantity, grams, notes, created_at
+                FROM b2b_orders
+                WHERE group_chat_id = %s AND delivery_date = %s AND status = 'confirmed'
+                ORDER BY created_at, item
+            """, (group_chat_id, delivery_date))
+            bread_rows = cur.fetchall()
+            cur.execute(f"""
+                SELECT {sid_key} AS sid, item, cake_category, order_type, quantity, slices, created_at
+                FROM b2b_cake_orders
+                WHERE group_chat_id = %s AND delivery_date = %s AND status = 'confirmed'
+                ORDER BY created_at, item
+            """, (group_chat_id, delivery_date))
+            cake_rows = cur.fetchall()
+
+    sessions: dict[str, dict] = {}
+    order: list[str] = []
+    for row in bread_rows:
+        sid = row["sid"]
+        if sid not in sessions:
+            sessions[sid] = {"session_key": sid, "bread": [], "cake": []}
+            order.append(sid)
+        sessions[sid]["bread"].append({
+            "item": row["item"], "qty": row["quantity"],
+            "grams": row["grams"], "notes": row["notes"],
+        })
+    for row in cake_rows:
+        sid = row["sid"]
+        if sid not in sessions:
+            sessions[sid] = {"session_key": sid, "bread": [], "cake": []}
+            order.append(sid)
+        sessions[sid]["cake"].append({
+            "item": row["item"], "qty": row["quantity"],
+            "cake_category": row["cake_category"],
+            "order_type": row["order_type"],
+            "slices": row["slices"],
+        })
+    return [sessions[sid] for sid in order]
+
+
+def delete_b2b_order_session(group_chat_id: int, delivery_date: str, session_key: str) -> None:
+    """Delete all rows belonging to one order session (identified by batch_id or created_at)."""
+    sid_expr = "CASE WHEN batch_id != '' THEN batch_id ELSE created_at END"
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"DELETE FROM b2b_orders WHERE group_chat_id = %s AND delivery_date = %s AND {sid_expr} = %s",
+                (group_chat_id, delivery_date, session_key),
+            )
+            cur.execute(
+                f"DELETE FROM b2b_cake_orders WHERE group_chat_id = %s AND delivery_date = %s AND {sid_expr} = %s",
+                (group_chat_id, delivery_date, session_key),
+            )
+
+
 # ─── B2B cake orders ──────────────────────────────────────────────────────────
 
-def save_b2b_cake_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str) -> None:
+def save_b2b_cake_order(group_chat_id: int, business_name: str, items: list[dict], delivery_date: str, batch_id: str = "") -> None:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO b2b_cake_orders "
-                "(group_chat_id, business_name, item, cake_category, order_type, quantity, slices, delivery_date, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "(group_chat_id, business_name, item, cake_category, order_type, quantity, slices, delivery_date, batch_id, created_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 [
                     (group_chat_id, business_name, i["item"], i["cake_category"],
-                     i["order_type"], i["qty"], i.get("slices"), delivery_date, now)
+                     i["order_type"], i["qty"], i.get("slices"), delivery_date, batch_id, now)
                     for i in items
                 ],
             )

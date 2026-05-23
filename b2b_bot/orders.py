@@ -5,6 +5,7 @@ Cake items trigger an instant notification to the bakery staff group on confirma
 """
 
 import re
+import uuid
 import difflib
 import logging
 from datetime import date, timedelta
@@ -21,6 +22,7 @@ from shared.database import (
     save_b2b_order, get_b2b_orders_for_date, get_b2b_last_order_item,
     save_b2b_cake_order, get_b2b_cake_orders_for_date, get_b2b_cake_last_order_item,
     delete_b2b_orders_for_date, delete_b2b_cake_orders_for_date,
+    delete_b2b_order_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -613,8 +615,15 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn) -> N
     time_str_ = pending.get("delivery_time")
     location_ = pending.get("location")
 
+    # If editing an existing session, remove the old rows first
+    editing_session_key = pending.get("editing_session_key")
+    if editing_session_key:
+        delete_b2b_order_session(chat_id, delivery_date, editing_session_key)
+
+    batch_id = str(uuid.uuid4())
+
     if bread_items:
-        save_b2b_order(chat_id, business_name, bread_items, delivery_date)
+        save_b2b_order(chat_id, business_name, bread_items, delivery_date, batch_id=batch_id)
         if any(it["item"] in INSTANT_BREAD_ITEMS for it in bread_items):
             await _notify_urgent_bread_order(
                 context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
@@ -624,7 +633,7 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn) -> N
                 context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
             )
     if cake_items:
-        save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date)
+        save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date, batch_id=batch_id)
         await _notify_cake_order(
             context.bot, business_name, cake_items, method_, time_str_, location_, delivery_date,
         )
