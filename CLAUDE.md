@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Global checklist fully hardened — sync notices now use serious warning boxes: Type 1 (won't sync but safely stored elsewhere — informational) and Type 2 (won't sync and has NO backup — action required with options). Fires after every push so user always knows exactly what did and didn't travel to other machines.
+**Last completed:** Type 2 sync notice improved — now auto-handles obvious cases (credentials → secrets repo, auto-generated → gitignore, bootstrap-recreatable → bootstrap.py) and only asks when the file's purpose is genuinely ambiguous. No unnecessary questions.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
