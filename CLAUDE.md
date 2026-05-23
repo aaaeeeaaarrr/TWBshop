@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Cross-machine workflow fully sealed — "push" and "pull" are the only words needed on any machine. Global CLAUDE.md in ~/.claude/ + secrets repo covers all signals, secrets, permissions, setup. New machine: install Git/Python/gh + gh auth login once, then only "pull" forever.
+**Last completed:** Global checklist fully hardened — auto-installs missing tools on first pull (winget/brew/apt, latest stable, no pinned versions), surfaces human-required steps upfront with verified links, "Fetch Don't Hardcode" principle (all packages/links/endpoints verified live), full failure protocol (nothing silently skipped — every failure shows what/why/solution/links/what to do next).
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
