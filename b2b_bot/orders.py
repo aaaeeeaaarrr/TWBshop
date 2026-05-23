@@ -808,12 +808,34 @@ async def handle_callback(update: Update, context) -> None:
         await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
 
     elif query.data == "b2b_edit":
-        # Text editing removed — redirect to button menu
-        _pending.pop(chat_id, None)
+        pending = _pending.pop(chat_id, {})
         _state.pop(chat_id, None)
-        from b2b_bot.menu_flow import _cart, _category_keyboard, _cart_block
+        from b2b_bot.menu_flow import (
+            _cart, _cart_time, _cart_date, _cart_method, _editing_session,
+            _category_keyboard, _cart_block,
+        )
+        from b2b_bot.menu import B2B_MENU as _BM
+        # Restore cart from pending so the customer can tweak, not start over
+        cart = {}
+        for it in pending.get("bread_items", []):
+            if _BM.get(it["item"], {}).get("requires_grams") and it.get("grams"):
+                cart[f"{it['item']}|{it['grams']}"] = it["qty"]
+            else:
+                cart[it["item"]] = it["qty"]
+        for it in pending.get("cake_items", []):
+            cart[it["item"]] = it["qty"]
+        _cart[chat_id] = cart
+        # Restore delivery info
+        if pending.get("delivery_time"):
+            _cart_time[chat_id] = pending["delivery_time"]
+        if pending.get("delivery_date"):
+            _cart_date[chat_id] = pending["delivery_date"]
+        if pending.get("delivery_method"):
+            _cart_method[chat_id] = pending["delivery_method"]
+        if pending.get("editing_session_key"):
+            _editing_session[chat_id] = pending["editing_session_key"]
         await query.edit_message_text(
-            f"Order cleared — use the menu to rebuild your order.\n\n{_cart_block(chat_id)}",
+            f"✏️ Edit your order:\n\n{_cart_block(chat_id)}",
             reply_markup=_category_keyboard(chat_id),
         )
 
