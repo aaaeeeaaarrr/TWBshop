@@ -21,8 +21,18 @@ import urllib.request
 SECRETS_REPO = "aaaeeeaaarrr/twbshop-secrets"
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), ".bootstrap_token")
 SSH_DIR = os.path.expanduser("~/.ssh")
+SSH_CONFIG = os.path.expanduser("~/.ssh/config")
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_DIR = os.path.expanduser("~/.claude")
+
+SSH_CONFIG_ENTRY = """
+Host twbshop
+    HostName 129.212.228.102
+    User root
+    IdentityFile ~/.ssh/twbshop_server
+    AddKeysToAgent yes
+    StrictHostKeyChecking no
+"""
 
 # Files always synced on every pull (--sync mode)
 SYNC_FILES = [
@@ -76,6 +86,17 @@ def set_permissions(path, mode):
         os.chmod(path, mode)
 
 
+def _write_ssh_config():
+    """Add twbshop SSH alias to ~/.ssh/config if not already there."""
+    existing = ""
+    if os.path.exists(SSH_CONFIG):
+        with open(SSH_CONFIG, encoding="utf-8") as f:
+            existing = f.read()
+    if "Host twbshop" not in existing:
+        with open(SSH_CONFIG, "a", encoding="utf-8") as f:
+            f.write(SSH_CONFIG_ENTRY)
+
+
 def sync(silent=False):
     """Download latest secrets, SSH key, and global CLAUDE.md. Fast and always safe to run."""
     token = get_token()
@@ -91,6 +112,7 @@ def sync(silent=False):
             set_permissions(dest, stat.S_IRUSR | stat.S_IWUSR)
         if not silent:
             print("done")
+    _write_ssh_config()
 
 
 def full_setup():
