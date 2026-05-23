@@ -2,11 +2,11 @@
 bootstrap.py — run on any new machine, or to sync latest secrets after a pull.
 
 Modes:
-  python bootstrap.py          — full setup (first time on a new machine)
-  python bootstrap.py --sync   — just refresh secrets + SSH key + global CLAUDE.md (fast, silent)
+  python bootstrap.py               — full setup (first time on a new machine)
+  python bootstrap.py --sync        — refresh secrets + SSH key + global CLAUDE.md (silent)
+  python bootstrap.py --push-global — push ~/.claude/CLAUDE.md to secrets repo via API (no cloning)
 
-The --sync mode is called automatically by "pull" so secrets always stay up to date
-across all machines without you having to do anything.
+--sync runs automatically on every pull via the post-rewrite git hook.
 """
 
 import base64
@@ -34,12 +34,11 @@ Host twbshop
     StrictHostKeyChecking no
 """
 
-# Files always synced on every pull (--sync mode)
+# Files synced on every pull (--sync mode). .pub not needed — key is on the server already.
 SYNC_FILES = [
-    ("secrets.py",        os.path.join(PROJECT_DIR, "secrets.py")),
-    ("twbshop_server",    os.path.join(SSH_DIR, "twbshop_server")),
-    ("twbshop_server.pub",os.path.join(SSH_DIR, "twbshop_server.pub")),
-    ("global_claude.md",  os.path.join(CLAUDE_DIR, "CLAUDE.md")),
+    ("secrets.py",       os.path.join(PROJECT_DIR, "secrets.py")),
+    ("twbshop_server",   os.path.join(SSH_DIR, "twbshop_server")),
+    ("global_claude.md", os.path.join(CLAUDE_DIR, "CLAUDE.md")),
 ]
 
 
@@ -79,6 +78,29 @@ def fetch_file(token, filename):
             sys.exit(f"File '{filename}' not found in {SECRETS_REPO}.")
         sys.exit(f"GitHub API error {e.code}: {e.reason}")
     return base64.b64decode(data["content"])
+
+
+def push_file(token, filename, content_bytes, message="sync"):
+    """Update or create a file in the secrets repo via GitHub API. No cloning needed."""
+    url = f"https://api.github.com/repos/{SECRETS_REPO}/contents/{filename}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+    }
+    sha = None
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as r:
+            sha = json.loads(r.read()).get("sha")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            sys.exit(f"GitHub API error {e.code}: {e.reason}")
+    body = {"message": message, "content": base64.b64encode(content_bytes).decode()}
+    if sha:
+        body["sha"] = sha
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="PUT")
+    with urllib.request.urlopen(req):
+        pass
 
 
 def set_permissions(path, mode):
@@ -149,5 +171,12 @@ def full_setup():
 if __name__ == "__main__":
     if "--sync" in sys.argv:
         sync(silent=True)
+    elif "--push-global" in sys.argv:
+        token = get_token()
+        claude_md = os.path.join(CLAUDE_DIR, "CLAUDE.md")
+        with open(claude_md, "rb") as f:
+            content = f.read()
+        push_file(token, "global_claude.md", content, "sync global CLAUDE.md")
+        print("global_claude.md updated in secrets repo.")
     else:
         full_setup()

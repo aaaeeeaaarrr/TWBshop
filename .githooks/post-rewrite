@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs automatically after git pull --rebase.
+# Syncs secrets, SSH key, and global CLAUDE.md silently.
+if [ ! -f "secrets.py" ]; then
+    echo ""
+    echo "Secrets missing — say 'pull' in Claude Code"
+    echo ""
+else
+    python bootstrap.py --sync
+fi
