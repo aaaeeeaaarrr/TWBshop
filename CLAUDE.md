@@ -189,6 +189,11 @@ TWBshop/                        ← one GitHub repo for the whole business
 
 ---
 
+## Workflow Rules (Apply on Every Machine)
+- **Always commit before pushing.** The user works across multiple machines. If you push without committing first, the other machine sees nothing when it pulls. When the user says "push", always: check for uncommitted changes → commit → pull --rebase → push.
+
+---
+
 ## Key Decisions (Do Not Revisit Without Good Reason)
 - **SQLite not PostgreSQL** — single server, simple bakery operation, no need for
   managed database at this stage. Can migrate later if needed.
