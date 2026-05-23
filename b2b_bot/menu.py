@@ -14,6 +14,7 @@ Fields:
 
 # Gram → price lookup shared by all brioche bun/roll items
 _BUN_PRICE_BY_GRAMS: dict[int, float] = {
+    10: 0.15, 15: 0.15, 20: 0.15, 25: 0.15,
     30: 0.15, 35: 0.15, 40: 0.17, 45: 0.19,
     50: 0.20, 55: 0.23, 60: 0.25, 65: 0.27,
     70: 0.28, 75: 0.31, 80: 0.33, 90: 0.38,
