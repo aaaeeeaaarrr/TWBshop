@@ -1,15 +1,12 @@
 """
-bootstrap.py — run this once on any new machine to set up TWBshop.
+bootstrap.py — run on any new machine, or to sync latest secrets after a pull.
 
-What it does:
-  1. Downloads secrets.py (API keys, tokens) → project root
-  2. Downloads SSH private key → ~/.ssh/twbshop_server  (chmod 600)
-  3. Installs pip requirements
-  4. Creates required directories (logs/, photos/)
+Modes:
+  python bootstrap.py          — full setup (first time on a new machine)
+  python bootstrap.py --sync   — just refresh secrets + SSH key + global CLAUDE.md (fast, silent)
 
-You need ONE thing: a GitHub Personal Access Token (PAT) with 'repo' scope.
-Create one at: https://github.com/settings/tokens
-The token is stored locally in .bootstrap_token (gitignored) so you only type it once per machine.
+The --sync mode is called automatically by "pull" so secrets always stay up to date
+across all machines without you having to do anything.
 """
 
 import base64
@@ -25,11 +22,10 @@ SECRETS_REPO = "aaaeeeaaarrr/twbshop-secrets"
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), ".bootstrap_token")
 SSH_DIR = os.path.expanduser("~/.ssh")
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 CLAUDE_DIR = os.path.expanduser("~/.claude")
 
-FILES = [
-    # (filename in secrets repo, destination path)
+# Files always synced on every pull (--sync mode)
+SYNC_FILES = [
     ("secrets.py",        os.path.join(PROJECT_DIR, "secrets.py")),
     ("twbshop_server",    os.path.join(SSH_DIR, "twbshop_server")),
     ("twbshop_server.pub",os.path.join(SSH_DIR, "twbshop_server.pub")),
@@ -66,9 +62,9 @@ def fetch_file(token, filename):
     except urllib.error.HTTPError as e:
         if e.code == 401:
             os.remove(TOKEN_FILE)
-            sys.exit("GitHub token rejected (401). Deleted cached token — run bootstrap.py again with a valid token.")
+            sys.exit("GitHub token rejected (401). Deleted cached token — run bootstrap.py again.")
         if e.code == 404:
-            sys.exit(f"File '{filename}' not found in {SECRETS_REPO}. Check the secrets repo.")
+            sys.exit(f"File '{filename}' not found in {SECRETS_REPO}.")
         sys.exit(f"GitHub API error {e.code}: {e.reason}")
     return base64.b64decode(data["content"])
 
@@ -78,41 +74,42 @@ def set_permissions(path, mode):
         os.chmod(path, mode)
 
 
-def main():
-    print("=" * 55)
-    print("  TWBshop Bootstrap")
-    print("=" * 55)
-
+def sync(silent=False):
+    """Download latest secrets, SSH key, and global CLAUDE.md. Fast and always safe to run."""
     token = get_token()
-
-    # 1. Download files
     os.makedirs(SSH_DIR, exist_ok=True)
     os.makedirs(CLAUDE_DIR, exist_ok=True)
-    for filename, dest in FILES:
-        print(f"Downloading {filename} ...", end=" ", flush=True)
+    for filename, dest in SYNC_FILES:
+        if not silent:
+            print(f"  Syncing {filename} ...", end=" ", flush=True)
         content = fetch_file(token, filename)
         with open(dest, "wb") as f:
             f.write(content)
         if "twbshop_server" in filename and ".pub" not in filename:
-            set_permissions(dest, stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
-        print("done")
+            set_permissions(dest, stat.S_IRUSR | stat.S_IWUSR)
+        if not silent:
+            print("done")
 
-    # 2. Install requirements
+
+def full_setup():
+    """Full first-time machine setup."""
+    print("=" * 55)
+    print("  TWBshop Bootstrap")
+    print("=" * 55)
+
+    print("\nDownloading secrets and keys...")
+    sync(silent=False)
+
     req_file = os.path.join(PROJECT_DIR, "requirements.txt")
     if os.path.exists(req_file):
         print("\nInstalling pip requirements ...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file, "-q"])
         print("done")
 
-    # 3. Create required directories
     for d in ["logs", "photos"]:
         os.makedirs(os.path.join(PROJECT_DIR, d), exist_ok=True)
 
-    # 4. Activate git hook so future pulls remind you if secrets go missing
-    subprocess.call(
-        ["git", "config", "core.hooksPath", ".githooks"],
-        cwd=PROJECT_DIR
-    )
+    subprocess.call(["git", "config", "core.hooksPath", ".githooks"], cwd=PROJECT_DIR)
 
     print("\n" + "=" * 55)
     print("  Bootstrap complete!")
@@ -126,4 +123,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--sync" in sys.argv:
+        sync(silent=True)
+    else:
+        full_setup()
