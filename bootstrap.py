@@ -50,7 +50,7 @@ def get_token():
             return token
     print("\nA GitHub Personal Access Token (PAT) is required.")
     print("Create one here (repo scope pre-checked, just click Generate Token):")
-    print("→ https://github.com/settings/tokens/new?scopes=repo&description=bootstrap")
+    print("-> https://github.com/settings/tokens/new?scopes=repo&description=bootstrap")
     print("  Set expiry to: No expiration\n")
     token = input("Paste your GitHub PAT here: ").strip()
     if not token:
