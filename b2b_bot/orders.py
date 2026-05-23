@@ -664,6 +664,9 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from
             context.bot, business_name, cake_items, method_, time_str_, location_, delivery_date,
         )
 
+    # Persist the confirmed delivery time so future carts default to it
+    upsert_b2b_customer(chat_id, business_name, method_, time_str_, location_)
+
     confirmed_text = _build_confirmed_text(
         bread_items, cake_items, method_, time_str_, location_, delivery_date, from_user,
     )
@@ -781,6 +784,10 @@ async def handle_group_message(update: Update, context) -> None:
             return
 
     # Text order parsing removed — button menu only (see archive/b2b_text_ordering_archived.py)
+
+    # Nudge: show "Open Menu" button once per 6 hours
+    from b2b_bot.menu_flow import maybe_send_menu_prompt
+    await maybe_send_menu_prompt(chat_id, context.bot)
 
 
 async def handle_callback(update: Update, context) -> None:

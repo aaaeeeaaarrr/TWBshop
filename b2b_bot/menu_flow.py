@@ -1,6 +1,7 @@
 """Interactive /menu command and welcome flow for B2B groups."""
 
 import logging
+import time
 from datetime import date, datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters as _filters
@@ -14,6 +15,7 @@ from shared.database import (
     get_menu_message_id, set_menu_message_id,
     get_qty_pending, set_qty_pending,
     get_b2b_order_sessions,
+    get_b2b_customer,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,9 +25,22 @@ _cart: dict[int, dict[str, int]] = {}     # {chat_id: {item_key: qty}}
 _qty_pending: dict[int, dict] = {}        # {chat_id: state dict}
 _menu_msg: dict[int, int] = {}            # {chat_id: message_id of active menu}
 _editing_session: dict[int, str] = {}     # {chat_id: session_key being replaced}
+_cart_time: dict[int, str] = {}           # {chat_id: delivery time for current cart}
+_last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
 
 # 9pm Phnom Penh = 14:00 UTC — orders locked after this hour
 _LOCK_HOUR_UTC = 14
+
+# How long (seconds) before the menu nudge fires again for the same chat
+_MENU_PROMPT_COOLDOWN_SEC = 6 * 3600
+
+# Delivery time options shown on the time picker
+_DELIVERY_TIMES = [
+    "6:00am", "6:30am", "7:00am", "7:30am",
+    "8:00am", "8:30am", "9:00am", "9:30am",
+    "10:00am", "10:30am", "11:00am", "11:30am",
+    "12:00pm",
+]
 
 # ── Category layout ───────────────────────────────────────────────────────────
 _CATEGORIES: dict[str, dict] = {
@@ -81,6 +96,17 @@ def _bun_price(grams: int) -> float:
     return _BUN_PRICE_BY_GRAMS.get(grams, round(grams * 0.004, 2))
 
 
+def _get_cart_time(chat_id: int) -> str:
+    """Delivery time for the current cart: explicit pick → customer history → 8:00am default."""
+    t = _cart_time.get(chat_id)
+    if t:
+        return t
+    customer = get_b2b_customer(chat_id)
+    if customer and customer.get("delivery_time"):
+        return customer["delivery_time"]
+    return "8:00am"
+
+
 # ── Filter: only activate qty handler when a qty prompt is pending ─────────────
 class _QtyPendingFilter(_filters.MessageFilter):
     def filter(self, message):
@@ -128,7 +154,8 @@ def _cart_block(chat_id: int) -> str:
             cake.append(it)
             lines.append(f"  {qty}× {key} — ${item_price(it):.2f}")
     total = order_total(bread, cake)
-    return "🛒 Cart:\n" + "\n".join(lines) + f"\n  Total: ${total:.2f}"
+    time_str = _get_cart_time(chat_id)
+    return "🛒 Cart:\n" + "\n".join(lines) + f"\n  Total: ${total:.2f}\n  🕐 Delivery: {time_str}"
 
 
 def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
@@ -149,6 +176,11 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         callback_data="bm_buns",
     )])
     if cart:
+        time_str = _get_cart_time(chat_id)
+        rows.append([InlineKeyboardButton(
+            f"🕐 Delivery time: {time_str}",
+            callback_data="bm_time_select",
+        )])
         rows.append([
             InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"),
             InlineKeyboardButton("🗑 Empty Cart",    callback_data="bm_empty_cart"),
@@ -240,6 +272,35 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
+
+
+def _time_keyboard() -> InlineKeyboardMarkup:
+    rows = []
+    row = []
+    for i, t in enumerate(_DELIVERY_TIMES):
+        row.append(InlineKeyboardButton(t, callback_data=f"bm_time_set_{i}"))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton("← Back", callback_data="bm_back")])
+    return InlineKeyboardMarkup(rows)
+
+
+async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
+    """Send a one-button menu nudge if 6+ hours have passed since the last one."""
+    now = time.monotonic()
+    if now - _last_menu_prompt.get(chat_id, 0) < _MENU_PROMPT_COOLDOWN_SEC:
+        return
+    _last_menu_prompt[chat_id] = now
+    await bot.send_message(
+        chat_id,
+        "Ready to order?",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("📋 Open Menu", callback_data="bm_menu_prompt"),
+        ]]),
+    )
 
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
@@ -434,6 +495,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             set_qty_pending(chat_id, None)
             _editing_session.pop(chat_id, None)
             _cart.pop(chat_id, None)
+            _cart_time.pop(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -469,12 +531,59 @@ async def handle_menu_callback(update: Update, context) -> None:
 
         elif data == "bm_empty_cart":
             _cart.pop(chat_id, None)
+            _cart_time.pop(chat_id, None)
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
                 f"🗑 Cart cleared.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
             )
+
+        elif data == "bm_time_select":
+            time_str = _get_cart_time(chat_id)
+            await query.edit_message_text(
+                f"🕐 Select delivery time:\n\nCurrent: {time_str}",
+                reply_markup=_time_keyboard(),
+            )
+
+        elif data.startswith("bm_time_set_"):
+            idx = int(data[12:])
+            if 0 <= idx < len(_DELIVERY_TIMES):
+                _cart_time[chat_id] = _DELIVERY_TIMES[idx]
+            await query.edit_message_text(
+                f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
+            )
+
+        elif data == "bm_menu_prompt":
+            _qty_pending.pop(chat_id, None)
+            set_qty_pending(chat_id, None)
+            _editing_session.pop(chat_id, None)
+            await _delete_old_menu(chat_id, context.bot)
+            delivery_date = (date.today() + timedelta(days=1)).isoformat()
+            sessions = get_b2b_order_sessions(chat_id, delivery_date)
+            if sessions:
+                locked = _orders_locked()
+                n = len(sessions)
+                lines = [f"You already have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n"]
+                for i, s in enumerate(sessions, 1):
+                    lines.append(f"Order #{i}:\n{_session_summary(s)}")
+                if locked:
+                    lines.append("\n🔒 Orders are locked — bakery has been notified.")
+                    lines.append("For changes, please contact us directly.")
+                else:
+                    lines.append("\nWhat would you like to do?")
+                await query.edit_message_text(
+                    "\n".join(lines),
+                    reply_markup=_existing_orders_keyboard(sessions, locked),
+                )
+            else:
+                await query.edit_message_text(
+                    f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                    reply_markup=_category_keyboard(chat_id),
+                )
+            _menu_msg[chat_id] = query.message.message_id
+            set_menu_message_id(chat_id, query.message.message_id)
 
         elif data == "bm_buns":
             _qty_pending.pop(chat_id, None)
@@ -608,9 +717,10 @@ async def _do_confirm(query, chat_id: int, context) -> None:
 
     customer = get_b2b_customer(chat_id)
     method   = customer["delivery_method"] if customer else None
-    time_str = customer["delivery_time"]   if customer else None
+    time_str = _get_cart_time(chat_id)
     location = customer["location"]        if customer else None
     business = get_business_name(chat_id)
+    _cart_time.pop(chat_id, None)
 
     _pending[chat_id] = {
         "bread_items": bread_items, "cake_items": cake_items,
