@@ -865,7 +865,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     )
     from shared.database import get_b2b_customer, upsert_b2b_customer
 
-    cart = _cart.pop(chat_id, {})
+    cart = dict(_cart.get(chat_id, {}))  # copy — don't pop until we're committed
     if not cart:
         await query.answer("Cart is empty — add items first.", show_alert=True)
         return
@@ -893,9 +893,6 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     time_str = _get_cart_time(chat_id)
     location = customer["location"] if customer else None
     business = get_business_name(chat_id)
-    _cart_time.pop(chat_id, None)
-    _cart_date.pop(chat_id, None)
-    _cart_method.pop(chat_id, None)
 
     _pending[chat_id] = {
         "bread_items": bread_items, "cake_items": cake_items,
@@ -904,6 +901,12 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         "ai_unmatched": [],
         "editing_session_key": _editing_session.pop(chat_id, None),
     }
+
+    # Committed — clear cart state now
+    _cart.pop(chat_id, None)
+    _cart_time.pop(chat_id, None)
+    _cart_date.pop(chat_id, None)
+    _cart_method.pop(chat_id, None)
 
     if needs_spec:
         _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}
@@ -929,4 +932,9 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected)
 
     _last_confirmation[chat_id] = query.message.message_id
-    await query.edit_message_text(msg, reply_markup=_confirm_keyboard())
+    try:
+        await query.edit_message_text(msg, reply_markup=_confirm_keyboard())
+    except Exception:
+        # Edit failed (message too old, deleted, etc.) — send as new message so confirmation always reaches the user
+        sent = await context.bot.send_message(chat_id, msg, reply_markup=_confirm_keyboard())
+        _last_confirmation[chat_id] = sent.message_id
