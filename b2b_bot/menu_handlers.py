@@ -93,8 +93,8 @@ async def handle_menu_command(update: Update, context) -> None:
         for i, s in enumerate(sessions, 1):
             lines.append(f"Order #{i}:\n{_session_summary(s)}")
         if locked:
-            lines.append("\n🔒 Orders are locked — bakery has been notified.")
-            lines.append("For changes, please contact us directly.")
+            lines.append("\n🔒 Orders are locked — bakery is producing.")
+            lines.append("Anything urgent, chat with our staff here, no private chats please")
         else:
             lines.append("\nWhat would you like to do?")
         sent = await update.message.reply_text(
