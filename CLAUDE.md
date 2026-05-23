@@ -2,53 +2,18 @@
 
 ---
 
-## Session Start — Run These Checks Automatically
+## Connectivity Reference (run only when something seems broken)
 
-At the start of every session in this folder, immediately run ALL checks below
-and report results before doing anything else. Run connectivity checks and
-expiry checks in parallel for speed.
-
-### Connectivity checks
-
-| # | What | How to check | Good result |
-|---|------|-------------|-------------|
-| 1 | **SSH — server** `129.212.228.102` | `ssh -i ~/.ssh/twbshop_server -o StrictHostKeyChecking=no -o ConnectTimeout=6 root@129.212.228.102 "echo ok"` | `ok` |
-| 2 | **GitHub** push access | `git ls-remote origin` | lists refs without error |
-| 3 | **DigitalOcean API** | `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $(python3 -c 'import sys; sys.path.insert(0,\".\"); import secrets; print(secrets.DO_API_TOKEN)')" https://api.digitalocean.com/v2/account` | `200` |
-| 4 | **DigitalOcean — droplet** | `curl -s -H "Authorization: Bearer $(python3 -c 'import sys; sys.path.insert(0,\".\"); import secrets; print(secrets.DO_API_TOKEN)')" https://api.digitalocean.com/v2/droplets \| python3 -c "import sys,json; d=json.load(sys.stdin); print(d['droplets'][0]['status'])"` | `active` |
-| 5 | **DigitalOcean — database** | `curl -s -H "Authorization: Bearer $(python3 -c 'import sys; sys.path.insert(0,\".\"); import secrets; print(secrets.DO_API_TOKEN)')" https://api.digitalocean.com/v2/databases \| python3 -c "import sys,json; d=json.load(sys.stdin); print(d['databases'][0]['status'])"` | `online` |
-| 6 | **Anthropic API** | `curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: $(python3 -c 'import sys; sys.path.insert(0,\".\"); import secrets; print(secrets.ANTHROPIC_API_KEY)')" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models` | `200` |
-| 7 | **Telegram — retail bot** | `curl -s "https://api.telegram.org/bot$(python3 -c 'import sys; sys.path.insert(0,\".\"); import secrets; print(secrets.BOT_TOKEN)')/getMe" \| python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['username'] if d.get('ok') else 'FAIL')"` | bot username |
-| 8 | **Telegram — B2B bot** | same but with `secrets.B2B_BOT_TOKEN` | bot username |
-
-### Expiry dates — warn if ≤ 30 days away
-
-| Service | Expiry | How to check days left |
-|---------|--------|----------------------|
-| DO API Token | never expires | — |
-| Telegram bot tokens | never expire | — |
-| Anthropic API key | no expiry (usage-based billing) | — |
-| DO Droplet (`twbshop`) | monthly billing — no fixed expiry | check DO account is active |
-| DO Database (`twbshop-db`) | monthly billing — no fixed expiry | check status = online |
-
-### Report format
-
-Print this table every session start:
-```
-── Connectivity ──────────────────────────
-SSH server            ✓ connected
-GitHub                ✓ reachable
-DigitalOcean API      ✓ active
-DO Droplet            ✓ active
-DO Database           ✓ online
-Anthropic API         ✓ ok
-Telegram retail       ✓ @WineB_bot
-Telegram B2B          ✓ @twb_b2b_bot
-
-── Expiry ────────────────────────────────
-DO API Token          ✓ no expiry
-```
-If anything is ✗ or ≤ 30 days from expiry, flag it clearly and say what to do.
+| # | What | Check command | Good result |
+|---|------|--------------|-------------|
+| 1 | SSH — server | `ssh -i ~/.ssh/twbshop_server -o StrictHostKeyChecking=no -o ConnectTimeout=6 root@129.212.228.102 "echo ok"` | `ok` |
+| 2 | GitHub push access | `git ls-remote origin` | lists refs |
+| 3 | DigitalOcean API | `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/account` | `200` |
+| 4 | DO Droplet | `curl -s -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/droplets \| python3 -c "import sys,json;d=json.load(sys.stdin);print(d['droplets'][0]['status'])"` | `active` |
+| 5 | DO Database | same but `/v2/databases` | `online` |
+| 6 | Anthropic API | `curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models` | `200` |
+| 7 | Telegram retail | `curl -s "https://api.telegram.org/bot$BOT_TOKEN/getMe"` → `.result.username` | `WineB_bot` |
+| 8 | Telegram B2B | same with `$B2B_BOT_TOKEN` | `twb_b2b_bot` |
 
 ---
 
@@ -223,7 +188,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** B2B menu labels updated ("Full Cakes", "Desserts / Cake Slices"); fixed `_do_confirm` bug — cart was destructively popped before confirmation shown; cart now copied, cleared only after `_pending` is set; added try/except fallback so confirmation always reaches user even if message edit fails.
+**Last completed:** Removed automatic session-start connectivity checks from both global and project CLAUDE.md — checks now run only when something is broken. Sessions now start immediately without pre-flight tool calls.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
