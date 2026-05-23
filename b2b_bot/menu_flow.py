@@ -1,5 +1,6 @@
 """Interactive /menu command and welcome flow for B2B groups."""
 
+import calendar
 import logging
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -10,7 +11,7 @@ import config
 from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.customers import get_business_name, is_b2b_group
-from b2b_bot.pricing import item_price, order_total
+from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
 from shared.database import (
     get_menu_message_id, set_menu_message_id,
     get_qty_pending, set_qty_pending,
@@ -25,7 +26,9 @@ _cart: dict[int, dict[str, int]] = {}     # {chat_id: {item_key: qty}}
 _qty_pending: dict[int, dict] = {}        # {chat_id: state dict}
 _menu_msg: dict[int, int] = {}            # {chat_id: message_id of active menu}
 _editing_session: dict[int, str] = {}     # {chat_id: session_key being replaced}
-_cart_time: dict[int, str] = {}           # {chat_id: delivery time for current cart}
+_cart_time: dict[int, str] = {}           # {chat_id: delivery time  e.g. "8:00am"}
+_cart_date: dict[int, str] = {}           # {chat_id: delivery date  e.g. "2026-05-25"}
+_cart_method: dict[int, str] = {}         # {chat_id: "pickup" | "delivery"}
 _last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
 
 # 9pm Phnom Penh = 14:00 UTC — orders locked after this hour
@@ -34,13 +37,23 @@ _LOCK_HOUR_UTC = 14
 # How long (seconds) before the menu nudge fires again for the same chat
 _MENU_PROMPT_COOLDOWN_SEC = 6 * 3600
 
-# Delivery time options shown on the time picker
-_DELIVERY_TIMES = [
-    "6:00am", "6:30am", "7:00am", "7:30am",
-    "8:00am", "8:30am", "9:00am", "9:30am",
-    "10:00am", "10:30am", "11:00am", "11:30am",
-    "12:00pm",
+# 6:00am–6:00pm in 15-minute steps, stored as "HHMM" for compact callback data
+_DELIVERY_TIME_CODES: list[str] = [
+    f"{h:02d}{m:02d}"
+    for h in range(6, 19)
+    for m in (0, 15, 30, 45)
+    if not (h == 18 and m > 0)
 ]
+
+
+def _format_time(hhmm: str) -> str:
+    """Convert "HHMM" (24h) → "H:MMam/pm" display label."""
+    h, m = int(hhmm[:2]), int(hhmm[2:])
+    if h < 12:
+        return f"{h}:{m:02d}am"
+    if h == 12:
+        return f"12:{m:02d}pm"
+    return f"{h - 12}:{m:02d}pm"
 
 # ── Category layout ───────────────────────────────────────────────────────────
 _CATEGORIES: dict[str, dict] = {
@@ -107,6 +120,32 @@ def _get_cart_time(chat_id: int) -> str:
     return "8:00am"
 
 
+def _get_cart_date(chat_id: int) -> str:
+    """Delivery date (ISO) for the current cart. Defaults to tomorrow."""
+    d = _cart_date.get(chat_id)
+    if d:
+        return d
+    return (date.today() + timedelta(days=1)).isoformat()
+
+
+def _get_cart_method(chat_id: int) -> str | None:
+    """Delivery method for the current cart: explicit pick → customer history → None."""
+    m = _cart_method.get(chat_id)
+    if m:
+        return m
+    customer = get_b2b_customer(chat_id)
+    if customer and customer.get("delivery_method"):
+        return customer["delivery_method"]
+    return None
+
+
+def _delivery_date_label(iso_date: str) -> str:
+    d = date.fromisoformat(iso_date)
+    if d == date.today() + timedelta(days=1):
+        return "Tomorrow"
+    return d.strftime("%a %d %b")
+
+
 # ── Filter: only activate qty handler when a qty prompt is pending ─────────────
 class _QtyPendingFilter(_filters.MessageFilter):
     def filter(self, message):
@@ -153,9 +192,12 @@ def _cart_block(chat_id: int) -> str:
             it = {"item": key, "qty": qty, "order_type": ot}
             cake.append(it)
             lines.append(f"  {qty}× {key} — ${item_price(it):.2f}")
-    total = order_total(bread, cake)
-    time_str = _get_cart_time(chat_id)
-    return "🛒 Cart:\n" + "\n".join(lines) + f"\n  Total: ${total:.2f}\n  🕐 Delivery: {time_str}"
+    total      = order_total(bread, cake)
+    time_str   = _get_cart_time(chat_id)
+    date_label = _delivery_date_label(_get_cart_date(chat_id))
+    method     = _get_cart_method(chat_id)
+    method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else "?"
+    return "🛒 Cart:\n" + "\n".join(lines) + f"\n  Total: ${total:.2f}\n  🕐 {method_label} · {date_label} at {time_str}"
 
 
 def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
@@ -176,9 +218,12 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         callback_data="bm_buns",
     )])
     if cart:
-        time_str = _get_cart_time(chat_id)
+        time_str     = _get_cart_time(chat_id)
+        date_label   = _delivery_date_label(_get_cart_date(chat_id))
+        method       = _get_cart_method(chat_id)
+        method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else "Set delivery"
         rows.append([InlineKeyboardButton(
-            f"🕐 Delivery time: {time_str}",
+            f"🕐 {method_label} · {date_label} at {time_str}",
             callback_data="bm_time_select",
         )])
         rows.append([
@@ -274,18 +319,80 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def _time_keyboard() -> InlineKeyboardMarkup:
+def _date_picker_keyboard() -> InlineKeyboardMarkup:
+    today      = date.today()
+    tomorrow   = today + timedelta(days=1)
+    curr_month = today.replace(day=1)
+    next_month = (curr_month.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            f"Tomorrow ({tomorrow.strftime('%a %d %b')})",
+            callback_data="bm_date_tmrw",
+        )],
+        [
+            InlineKeyboardButton(
+                curr_month.strftime("%B"),
+                callback_data=f"bm_date_m_{curr_month.strftime('%Y%m')}",
+            ),
+            InlineKeyboardButton(
+                next_month.strftime("%B"),
+                callback_data=f"bm_date_m_{next_month.strftime('%Y%m')}",
+            ),
+        ],
+        [InlineKeyboardButton("← Back to Menu", callback_data="bm_back")],
+    ])
+
+
+def _day_picker_keyboard(yyyymm: str) -> InlineKeyboardMarkup:
+    year, month = int(yyyymm[:4]), int(yyyymm[4:])
+    tomorrow = date.today() + timedelta(days=1)
+    _, days_in_month = calendar.monthrange(year, month)
     rows = []
-    row = []
-    for i, t in enumerate(_DELIVERY_TIMES):
-        row.append(InlineKeyboardButton(t, callback_data=f"bm_time_set_{i}"))
+    row  = []
+    for d in range(1, days_in_month + 1):
+        day_date = date(year, month, d)
+        if day_date < tomorrow:
+            continue
+        row.append(InlineKeyboardButton(
+            str(d),
+            callback_data=f"bm_date_d_{day_date.strftime('%Y%m%d')}",
+        ))
+        if len(row) == 5:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton("← Back", callback_data="bm_time_select")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _time_picker_keyboard(date_str: str) -> InlineKeyboardMarkup:
+    rows = []
+    row  = []
+    for code in _DELIVERY_TIME_CODES:
+        row.append(InlineKeyboardButton(
+            _format_time(code),
+            callback_data=f"bm_dt_{date_str}_{code}",
+        ))
         if len(row) == 3:
             rows.append(row)
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("← Back", callback_data="bm_back")])
+    tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+    back_cb = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
+    rows.append([InlineKeyboardButton("← Back", callback_data=back_cb)])
     return InlineKeyboardMarkup(rows)
+
+
+def _method_picker_keyboard(date_str: str, time_code: str, cart_total: float) -> InlineKeyboardMarkup:
+    free = cart_total >= FREE_DELIVERY_THRESHOLD
+    delivery_label = "🚛 Delivery (free)" if free else f"🚛 Delivery (fee on orders under ${FREE_DELIVERY_THRESHOLD:.0f})"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏪 Pickup (free)", callback_data=f"bm_method_{date_str}_{time_code}_pickup")],
+        [InlineKeyboardButton(delivery_label,      callback_data=f"bm_method_{date_str}_{time_code}_delivery")],
+        [InlineKeyboardButton("← Back",            callback_data=f"bm_date_d_{date_str}")],
+    ])
 
 
 async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
@@ -356,7 +463,7 @@ async def handle_menu_command(update: Update, context) -> None:
     _editing_session.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
 
-    delivery_date = (date.today() + timedelta(days=1)).isoformat()
+    delivery_date = _get_cart_date(chat_id)
     sessions = get_b2b_order_sessions(chat_id, delivery_date)
 
     if sessions:
@@ -496,6 +603,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             _editing_session.pop(chat_id, None)
             _cart.pop(chat_id, None)
             _cart_time.pop(chat_id, None)
+            _cart_date.pop(chat_id, None)
+            _cart_method.pop(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -532,6 +641,8 @@ async def handle_menu_callback(update: Update, context) -> None:
         elif data == "bm_empty_cart":
             _cart.pop(chat_id, None)
             _cart_time.pop(chat_id, None)
+            _cart_date.pop(chat_id, None)
+            _cart_method.pop(chat_id, None)
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
@@ -540,16 +651,71 @@ async def handle_menu_callback(update: Update, context) -> None:
             )
 
         elif data == "bm_time_select":
-            time_str = _get_cart_time(chat_id)
+            time_str   = _get_cart_time(chat_id)
+            date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
-                f"🕐 Select delivery time:\n\nCurrent: {time_str}",
-                reply_markup=_time_keyboard(),
+                f"🕐 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
+                reply_markup=_date_picker_keyboard(),
             )
 
-        elif data.startswith("bm_time_set_"):
-            idx = int(data[12:])
-            if 0 <= idx < len(_DELIVERY_TIMES):
-                _cart_time[chat_id] = _DELIVERY_TIMES[idx]
+        elif data == "bm_date_tmrw":
+            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+            tomorrow_d   = date.today() + timedelta(days=1)
+            await query.edit_message_text(
+                f"🕐 Select time — tomorrow ({tomorrow_d.strftime('%a %d %b')}):",
+                reply_markup=_time_picker_keyboard(tomorrow_str),
+            )
+
+        elif data.startswith("bm_date_m_"):
+            yyyymm     = data[10:]
+            year, month = int(yyyymm[:4]), int(yyyymm[4:])
+            month_name = calendar.month_name[month]
+            await query.edit_message_text(
+                f"📅 Select day — {month_name} {year}:",
+                reply_markup=_day_picker_keyboard(yyyymm),
+            )
+
+        elif data.startswith("bm_date_d_"):
+            date_str = data[10:]
+            d = datetime.strptime(date_str, "%Y%m%d").date()
+            await query.edit_message_text(
+                f"🕐 Select time — {d.strftime('%A %d %B')}:",
+                reply_markup=_time_picker_keyboard(date_str),
+            )
+
+        elif data.startswith("bm_dt_"):
+            # bm_dt_{YYYYMMDD}_{HHMM}
+            rest      = data[6:]
+            date_str  = rest[:8]
+            time_code = rest[9:]
+            cart = _cart.get(chat_id, {})
+            bread_tmp, cake_tmp = [], []
+            for k, q in cart.items():
+                if "|" in k:
+                    nm, gs = k.split("|", 1)
+                    bread_tmp.append({"item": nm, "qty": q, "grams": int(gs), "notes": None})
+                elif k in B2B_MENU:
+                    bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
+                else:
+                    ck_def = B2B_CAKE_MENU[k]
+                    ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
+                    cake_tmp.append({"item": k, "qty": q, "order_type": ot})
+            total = order_total(bread_tmp, cake_tmp)
+            d = datetime.strptime(date_str, "%Y%m%d").date()
+            await query.edit_message_text(
+                f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
+                reply_markup=_method_picker_keyboard(date_str, time_code, total),
+            )
+
+        elif data.startswith("bm_method_"):
+            # bm_method_{YYYYMMDD}_{HHMM}_{pickup|delivery}
+            rest     = data[10:]
+            date_str = rest[:8]
+            rest2    = rest[9:]
+            time_code, method = rest2.rsplit("_", 1)
+            _cart_date[chat_id]   = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
+            _cart_time[chat_id]   = _format_time(time_code)
+            _cart_method[chat_id] = method
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -697,7 +863,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         await query.answer("Cart is empty — add items first.", show_alert=True)
         return
 
-    delivery_date = (date.today() + timedelta(days=1)).isoformat()
+    delivery_date = _get_cart_date(chat_id)
     bread_items, cake_items = [], []
 
     for key, qty in cart.items():
@@ -716,11 +882,13 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     bread_items, rejected  = _split_mini_items(bread_items, delivery_date)
 
     customer = get_b2b_customer(chat_id)
-    method   = customer["delivery_method"] if customer else None
+    method   = _get_cart_method(chat_id)
     time_str = _get_cart_time(chat_id)
-    location = customer["location"]        if customer else None
+    location = customer["location"] if customer else None
     business = get_business_name(chat_id)
     _cart_time.pop(chat_id, None)
+    _cart_date.pop(chat_id, None)
+    _cart_method.pop(chat_id, None)
 
     _pending[chat_id] = {
         "bread_items": bread_items, "cake_items": cake_items,
