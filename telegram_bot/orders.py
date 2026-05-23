@@ -81,11 +81,7 @@ def _parse_items(text: str) -> list[tuple[str, int]]:
 
 
 def _log_unmatched(text: str) -> None:
-    import config
-    import os
-    os.makedirs("logs", exist_ok=True)
-    with open(config.UNMATCHED_LOG, "a", encoding="utf-8") as f:
-        f.write(text + "\n")
+    logging.getLogger("unmatched").info(text)
 
 
 def _format_order(items: list[tuple[str, int]]) -> str:

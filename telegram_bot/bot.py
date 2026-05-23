@@ -2,6 +2,8 @@
 
 import datetime
 import logging
+import os
+from logging.handlers import RotatingFileHandler
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -25,6 +27,17 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+# Rotating file handler for unmatched orders — max 5 MB, keep 3 old files
+os.makedirs("logs", exist_ok=True)
+_unmatched_handler = RotatingFileHandler(
+    config.UNMATCHED_LOG, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+)
+_unmatched_handler.setFormatter(logging.Formatter("%(message)s"))
+unmatched_logger = logging.getLogger("unmatched")
+unmatched_logger.addHandler(_unmatched_handler)
+unmatched_logger.setLevel(logging.INFO)
+unmatched_logger.propagate = False
 
 
 # ---------------------------------------------------------------------------
