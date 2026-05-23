@@ -227,8 +227,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
-- Retail bot: `python run_bot.py`
-- B2B bot: `python run_b2b_bot.py`
+- Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
+- B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
 
 ---
