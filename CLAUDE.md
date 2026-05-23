@@ -189,6 +189,34 @@ TWBshop/                        ← one GitHub repo for the whole business
 
 ---
 
+## New Machine Setup
+
+Run this once on any new machine — it downloads all secrets and SSH key automatically:
+
+```
+python bootstrap.py
+```
+
+You will be asked for a **GitHub Personal Access Token (PAT)** with `repo` scope.
+Create one at: https://github.com/settings/tokens
+The token is saved to `.bootstrap_token` (gitignored) so you only type it once per machine.
+
+**What bootstrap.py does automatically:**
+1. Downloads `secrets.py` (all API keys/tokens) → project root
+2. Downloads SSH private key `twbshop_server` → `~/.ssh/` with correct permissions
+3. Installs all pip requirements
+4. Creates `logs/` and `photos/` directories
+
+**Secrets are stored in:** `github.com/aaaeeeaaarrr/twbshop-secrets` (private repo)
+
+**After bootstrap, start the bots:**
+- Retail bot: `python run_bot.py`
+- B2B bot: `python run_b2b_bot.py`
+
+**Claude Code permissions** are in `.claude/settings.json` (committed, syncs automatically via git pull).
+
+---
+
 ## Workflow Rules (Apply on Every Machine)
 - **Always commit before pushing.** The user works across multiple machines. If you push without committing first, the other machine sees nothing when it pulls. When the user says "push", always: check for uncommitted changes → commit → pull --rebase → push.
 

@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(git *)",
+      "Bash(gh *)",
       "Bash(ssh *)",
       "Bash(ssh-keygen *)",
       "Bash(scp *)",
@@ -12,6 +13,10 @@
       "Bash(pip3 *)",
       "Bash(systemctl *)",
       "Bash(journalctl *)",
+      "Bash(cp *)",
+      "Bash(mkdir *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
       "Bash(Copy-Item *)",
       "Bash(Get-Process *)",
       "Bash(Stop-Process *)",

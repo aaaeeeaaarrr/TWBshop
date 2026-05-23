@@ -36,3 +36,9 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Bootstrap token (machine-local, never commit)
+.bootstrap_token
+
+# Claude Code local settings (machine-specific, not for sharing)
+.claude/settings.local.json
