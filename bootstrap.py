@@ -26,11 +26,14 @@ TOKEN_FILE = os.path.join(os.path.dirname(__file__), ".bootstrap_token")
 SSH_DIR = os.path.expanduser("~/.ssh")
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+CLAUDE_DIR = os.path.expanduser("~/.claude")
+
 FILES = [
     # (filename in secrets repo, destination path)
     ("secrets.py",        os.path.join(PROJECT_DIR, "secrets.py")),
     ("twbshop_server",    os.path.join(SSH_DIR, "twbshop_server")),
     ("twbshop_server.pub",os.path.join(SSH_DIR, "twbshop_server.pub")),
+    ("global_claude.md",  os.path.join(CLAUDE_DIR, "CLAUDE.md")),
 ]
 
 
@@ -84,6 +87,7 @@ def main():
 
     # 1. Download files
     os.makedirs(SSH_DIR, exist_ok=True)
+    os.makedirs(CLAUDE_DIR, exist_ok=True)
     for filename, dest in FILES:
         print(f"Downloading {filename} ...", end=" ", flush=True)
         content = fetch_file(token, filename)
