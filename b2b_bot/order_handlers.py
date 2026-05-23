@@ -23,7 +23,7 @@ from shared.database import (
     get_b2b_customer, upsert_b2b_customer,
     save_b2b_order, save_b2b_cake_order,
     delete_b2b_orders_for_date, delete_b2b_cake_orders_for_date,
-    delete_b2b_order_session,
+    delete_b2b_order_session, get_b2b_order_sessions,
 )
 from shared.ai_client import extract_b2b_order_from_image
 
@@ -83,8 +83,8 @@ async def _notify_mini_order(bot, business_name: str, bread_items: list[dict], m
 async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from_user=None) -> None:
     business_name = get_business_name(chat_id)
     delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
-    bread_items, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
-    cake_items    = pending.get("cake_items", [])
+    new_bread, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
+    new_cake     = pending.get("cake_items", [])
     method_   = pending.get("delivery_method")
     time_str_ = pending.get("delivery_time")
     location_ = pending.get("location")
@@ -93,23 +93,46 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from
     if editing_session_key:
         delete_b2b_order_session(chat_id, delivery_date, editing_session_key)
 
+    # Merge all existing sessions for this date into the new order
+    bread_items = list(new_bread)
+    cake_items  = list(new_cake)
+    for session in get_b2b_order_sessions(chat_id, delivery_date):
+        for it in session["bread"]:
+            key = (it["item"], it.get("grams"), it.get("notes"))
+            for m in bread_items:
+                if (m["item"], m.get("grams"), m.get("notes")) == key:
+                    m["qty"] += it["qty"]
+                    break
+            else:
+                bread_items.append(dict(it))
+        for it in session["cake"]:
+            key = (it["item"], it.get("order_type"), it.get("slices"))
+            for m in cake_items:
+                if (m["item"], m.get("order_type"), m.get("slices")) == key:
+                    m["qty"] += it["qty"]
+                    break
+            else:
+                cake_items.append(dict(it))
+        delete_b2b_order_session(chat_id, delivery_date, session["session_key"])
+
     batch_id = str(uuid.uuid4())
 
     if bread_items:
         save_b2b_order(chat_id, business_name, bread_items, delivery_date, batch_id=batch_id)
-        if any(it["item"] in INSTANT_BREAD_ITEMS for it in bread_items):
+        if any(it["item"] in INSTANT_BREAD_ITEMS for it in new_bread):
             await _notify_urgent_bread_order(
-                context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
+                context.bot, business_name, new_bread, method_, time_str_, location_, delivery_date,
             )
-        if any(it["item"] in MINI_ITEMS for it in bread_items):
+        if any(it["item"] in MINI_ITEMS for it in new_bread):
             await _notify_mini_order(
-                context.bot, business_name, bread_items, method_, time_str_, location_, delivery_date,
+                context.bot, business_name, new_bread, method_, time_str_, location_, delivery_date,
             )
     if cake_items:
         save_b2b_cake_order(chat_id, business_name, cake_items, delivery_date, batch_id=batch_id)
-        await _notify_cake_order(
-            context.bot, business_name, cake_items, method_, time_str_, location_, delivery_date,
-        )
+        if new_cake:
+            await _notify_cake_order(
+                context.bot, business_name, new_cake, method_, time_str_, location_, delivery_date,
+            )
 
     upsert_b2b_customer(chat_id, business_name, method_, time_str_, location_)
 
