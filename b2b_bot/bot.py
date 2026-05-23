@@ -36,9 +36,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 10pm Phnom Penh (UTC+7) = 15:00 UTC
+# 10:10pm Phnom Penh (UTC+7) = 15:10 UTC
 _SUMMARY_HOUR_UTC   = 15
-_SUMMARY_MINUTE_UTC = 0
+_SUMMARY_MINUTE_UTC = 10
 
 # 9am Phnom Penh (UTC+7) = 02:00 UTC — mini order 48h-before reminder
 _REMINDER_HOUR_UTC   = 2

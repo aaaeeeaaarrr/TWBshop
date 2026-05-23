@@ -1,6 +1,6 @@
 """B2B nightly summary — production totals and per-customer breakdown.
 
-Sent at 10pm Phnom Penh time (15:00 UTC) to the B2B staff group.
+Sent at 10:10pm Phnom Penh time (15:10 UTC) to the B2B staff group.
 """
 
 import logging

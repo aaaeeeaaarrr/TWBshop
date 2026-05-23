@@ -21,8 +21,9 @@ _cart_date: dict[int, str] = {}           # {chat_id: delivery date  e.g. "2026-
 _cart_method: dict[int, str] = {}         # {chat_id: "pickup" | "delivery"}
 _last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
 
-# 10pm Phnom Penh = 15:00 UTC — orders locked after this hour
-_LOCK_HOUR_UTC = 15
+# 10:10pm Phnom Penh = 15:10 UTC — orders locked after this time
+_LOCK_HOUR_UTC    = 15
+_LOCK_MINUTE_UTC  = 10
 
 # How long (seconds) before the menu nudge fires again for the same chat
 _MENU_PROMPT_COOLDOWN_SEC = 6 * 3600
@@ -47,7 +48,8 @@ def _format_time(hhmm: str) -> str:
 
 
 def _orders_locked() -> bool:
-    return datetime.now(timezone.utc).hour >= _LOCK_HOUR_UTC
+    now = datetime.now(timezone.utc)
+    return now.hour > _LOCK_HOUR_UTC or (now.hour == _LOCK_HOUR_UTC and now.minute >= _LOCK_MINUTE_UTC)
 
 
 # ── Cart accessors ────────────────────────────────────────────────────────────
