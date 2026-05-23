@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Type 2 sync notice improved — now auto-handles obvious cases (credentials → secrets repo, auto-generated → gitignore, bootstrap-recreatable → bootstrap.py) and only asks when the file's purpose is genuinely ambiguous. No unnecessary questions.
+**Last completed:** All warning boxes now follow the same principle — auto-resolve obvious cases silently, only ask when genuinely ambiguous. Applies to large files (compiled → gitignore, photos+server → SSH, etc.), unsynced files, and any situation with multiple options. No unnecessary questions anywhere in the checklist.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
