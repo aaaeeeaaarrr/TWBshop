@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** All warning boxes now follow the same principle — auto-resolve obvious cases silently, only ask when genuinely ambiguous. Applies to large files (compiled → gitignore, photos+server → SSH, etc.), unsynced files, and any situation with multiple options. No unnecessary questions anywhere in the checklist.
+**Last completed:** Checklist fully future-proofed — every auto-resolution action now fetches before executing: package installs use manager search, cloud storage WebSearches current options, Git LFS WebFetches setup, Linux init system detected before using systemctl/journalctl, Linux distro detected before choosing package manager, gitignore patterns WebSearched for unfamiliar stacks. Nothing hardcoded that could become stale.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
