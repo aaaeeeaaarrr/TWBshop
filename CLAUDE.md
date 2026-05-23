@@ -224,8 +224,7 @@ The token is saved to `.bootstrap_token` (gitignored) so you only type it once p
 ---
 
 ## Key Decisions (Do Not Revisit Without Good Reason)
-- **SQLite not PostgreSQL** — single server, simple bakery operation, no need for
-  managed database at this stage. Can migrate later if needed.
+- **PostgreSQL on DigitalOcean** — migrated from SQLite. All data lives in the managed DO database. No local .db file.
 - **Free-first architecture** — API features are additions, not the foundation.
   The bot must work fully without any API calls before any API calls are added.
 - **No silent AI guessing** — every ambiguous input goes to a human confirmation step.
@@ -238,10 +237,10 @@ The token is saved to `.bootstrap_token` (gitignored) so you only type it once p
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-21
-**Phase:** Retail bot complete. B2B bot Phase 1 built.
-**Last completed:** B2B bot scaffolded — b2b_bot/ folder, menu, customers registry, full order flow, nightly summary, run_b2b_bot.py entry point
-**Next task:** Add B2B bot token to config.py, add first customer group to b2b_bot/customers.py, test
+**Last updated:** 2026-05-23
+**Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
+**Last completed:** Full cross-machine sync system — bootstrap.py, private secrets repo, git hooks, global CLAUDE.md, log rotation, smart push/pull rules
+**Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py`
