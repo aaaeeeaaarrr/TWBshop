@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Global checklist made truly universal — "push" now handles everything (project + checklist) safely. Checklist restructured so it can never interfere with other projects: no hardcoded SSH keys, no hardcoded timezones, clear separation rule (project rules stay in project CLAUDE.md, global checklist is framework only), auto-signal if project-specific content accidentally lands in the global file.
+**Last completed:** GitHub PAT prompt now shows a 1-click link with repo scope pre-checked — in bootstrap.py, in all warning boxes, and in the checklist. User just opens the link, clicks Generate Token, pastes it once per machine.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**

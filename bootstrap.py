@@ -39,8 +39,10 @@ def get_token():
             token = f.read().strip()
         if token:
             return token
-    print("\nA GitHub Personal Access Token (PAT) with 'repo' scope is required.")
-    print("Create one at: https://github.com/settings/tokens\n")
+    print("\nA GitHub Personal Access Token (PAT) is required.")
+    print("Create one here (repo scope pre-checked, just click Generate Token):")
+    print("→ https://github.com/settings/tokens/new?scopes=repo&description=bootstrap")
+    print("  Set expiry to: No expiration\n")
     token = input("Paste your GitHub PAT here: ").strip()
     if not token:
         sys.exit("No token provided. Aborting.")
