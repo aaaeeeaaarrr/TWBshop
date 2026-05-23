@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** "push" now automatically syncs global CLAUDE.md to secrets repo if it was changed this session — no separate command needed for the checklist ever again.
+**Last completed:** Push commands clarified — "push" = project only (safe, predictable). "push checklist" = sync global rules to all machines (intentional, explicit). Checklist sessions end with a reminder to say "push checklist" if rules were changed.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
