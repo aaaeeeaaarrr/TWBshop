@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Checklist fully future-proofed — every auto-resolution action now fetches before executing: package installs use manager search, cloud storage WebSearches current options, Git LFS WebFetches setup, Linux init system detected before using systemctl/journalctl, Linux distro detected before choosing package manager, gitignore patterns WebSearched for unfamiliar stacks. Nothing hardcoded that could become stale.
+**Last completed:** "push" now automatically syncs global CLAUDE.md to secrets repo if it was changed this session — no separate command needed for the checklist ever again.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
