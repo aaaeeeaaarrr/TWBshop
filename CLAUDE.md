@@ -6,7 +6,7 @@
 
 | # | What | Check command | Good result |
 |---|------|--------------|-------------|
-| 1 | SSH — server | `ssh -i ~/.ssh/twbshop_server -o StrictHostKeyChecking=no -o ConnectTimeout=6 root@129.212.228.102 "echo ok"` | `ok` |
+| 1 | SSH — server | `ssh twbshop "echo ok"` | `ok` |
 | 2 | GitHub push access | `git ls-remote origin` | lists refs |
 | 3 | DigitalOcean API | `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/account` | `200` |
 | 4 | DO Droplet | `curl -s -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/droplets \| python3 -c "import sys,json;d=json.load(sys.stdin);print(d['droplets'][0]['status'])"` | `active` |
@@ -37,20 +37,7 @@ difflib) — AI is used only for photo analysis and staff message monitoring.
 When ANTHROPIC_API_KEY is empty the system falls back to manual-review mode automatically.
 
 ### 2. Always Build the Interface First
-For every future AI-powered feature, create the function stub now with a placeholder return.
-Do not leave these out — they are the connection points for the API layer later.
-
-Stubs to include from the start:
-```python
-def analyze_photo(image_bytes: bytes, photo_type: str) -> dict:
-    # Placeholder: will connect to Claude API later
-    # photo_type: "workstation" | "fridge" | "stock_sheet"
-    return {"status": "pending", "notes": "manual review required"}
-
-def check_staff_message(text: str, context: list) -> dict:
-    # Placeholder: will connect to Claude API later
-    return {"action": "none", "flag": False}
-```
+For every future AI-powered feature, create the function stub now with a placeholder return before wiring up the API. The stub is the contract — build around it first.
 
 ### 3. Confirmation Gate Is Mandatory
 The bot must ALWAYS restate an interpreted order and ask for explicit confirmation
@@ -85,7 +72,7 @@ TWBshop/                        ← one GitHub repo for the whole business
 ├── run_bot.py                  ← entry point: python run_bot.py
 │
 ├── shared/                     ← imported by any system
-│   ├── database.py             ← SQLite: all tables and queries
+│   ├── database.py             ← PostgreSQL: all tables and queries
 │   └── ai_client.py            ← Anthropic client (vision + text)
 │
 ├── telegram_bot/               ← Telegram bakery bot (current system)
@@ -111,45 +98,10 @@ TWBshop/                        ← one GitHub repo for the whole business
 
 ---
 
-## Build Phases — Do These In Order
+## Build Phases
 
-### Phase 1 — Foundation (Current Phase)
-- [x] Telegram bot connects and receives messages (bot.py)
-- [x] Bot can reply and send buttons (orders.py — InlineKeyboardMarkup)
-- [x] SQLite database initialised with orders table (database.py)
-- [x] Config file set up (token, chat IDs) — config.example.py; copy to config.py
-- [x] Basic logging working (all modules use logging)
-
-### Phase 2 — Customer Ordering
-- [x] Menu defined in menu.py with aliases (plurals, misspellings, short forms)
-- [x] Fuzzy text matching against menu items (difflib, noise stripping, word-numbers)
-- [x] Confirmation flow with Telegram inline buttons (Confirm / Edit / Cancel)
-- [x] Confirmed orders saved to database
-- [x] Order rejection shows full menu; /menu command added
-
-### Phase 3 — Production Summaries
-- [x] Aggregate confirmed orders into production totals
-- [x] Bot posts daily summary to bakery staff group (scheduled via JobQueue, SUMMARY_HOUR/MINUTE in config)
-- [x] Per-customer fulfillment list (name + items, sorted alphabetically, sent to staff group)
-- [x] /summary staff command for manual trigger; STAFF_USER_IDS access control
-
-### Phase 4 — Photo Flow
-- [x] Staff can submit workstation cleaning photos
-- [x] Staff can submit fridge display photos
-- [x] Photos stored locally with timestamp and staff ID; recorded in photo_submissions table
-- [x] analyze_photo() stub in place — stores photo, flags for manual review
-- [x] Missing photo deadline reminders (scheduled check via JobQueue at REMINDER_HOUR:MINUTE)
-
-### Phase 5 — Stock Sheets
-- [x] Staff can submit stock sheet photos (added to type-button menu)
-- [x] Photos stored, analyze_photo() stub handles them
-- [x] Manual review fallback: staff group notified immediately on receipt; not in REQUIRED_PHOTO_TYPES (on-demand, not daily)
-
-### Phase 6 — API Layer
-- [x] Stock sheet OCR via Claude API — items extracted, formatted, posted to staff group
-- [x] Workstation/fridge photo analysis — issues posted to staff group; pass logged silently
-- [x] Staff message monitoring — flags posted to staff group with ALERT/URGENT prefix
-- [x] Graceful fallback to manual-review mode when ANTHROPIC_API_KEY is not set
+### Retail Bot — Complete
+Phases 1–6 done: foundation, menu + ordering, production summaries, photo flow, stock sheets, Claude API layer (OCR, photo analysis, staff monitoring, fallback mode).
 
 ---
 
@@ -163,12 +115,6 @@ You will be asked for your GitHub PAT (`repo` scope) once — everything else is
 PAT creation: https://github.com/settings/tokens
 Secrets live in: `github.com/aaaeeeaaarrr/twbshop-secrets` (private)
 Claude Code permissions sync automatically via `.claude/settings.json` in this repo.
-
----
-
-## Workflow Rules (Apply on Every Machine)
-- **Always commit before pushing.** The user works across multiple machines. If you push without committing first, the other machine sees nothing when it pulls. When the user says "push", always: check for uncommitted changes → commit → pull --rebase → push.
-- **Smart pull.** When the user says "pull", always: run `git pull --rebase`, then check if `secrets.py` exists. If it does not exist, automatically run `python bootstrap.py` without asking — the user should never have to type that themselves.
 
 ---
 
@@ -188,7 +134,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Fixed all cross-machine friction: SSH config auto-deploys via bootstrap, post-rewrite hook fires on pull --rebase, push is one commit + one push, global CLAUDE.md syncs via gh API (no cloning), removed .pub from sync.
+**Last completed:** Full cleanup: removed dead push_file(), deleted dead post-merge hook, removed duplicate Workflow Rules section, compressed completed retail phases, updated B2B repo structure to show module split, fixed SQLite→PostgreSQL label, SSH check now uses `ssh twbshop` alias.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
@@ -214,12 +160,20 @@ Handles wholesale orders from restaurant and bar customers via their own Telegra
 ### B2B Repo Structure
 ```
 b2b_bot/
-├── bot.py         ← handler registration and 9pm scheduled job
-├── menu.py        ← B2B menu items, grams, attributes, aliases (edit to add items)
-├── customers.py   ← group chat ID → business name registry (edit to add customers)
-├── orders.py      ← parsing, history resolution, confirmation flow
-└── summaries.py   ← nightly production total + per-customer breakdown
-run_b2b_bot.py     ← entry point: python run_b2b_bot.py
+├── bot.py              ← handler registration and 9pm scheduled job
+├── menu.py             ← B2B menu items, grams, attributes, aliases
+├── menu_keyboards.py   ← cart state dicts, all keyboard builders
+├── menu_handlers.py    ← menu command + callback handlers, _do_confirm
+├── menu_flow.py        ← facade (re-exports menu_keyboards + menu_handlers)
+├── order_parsing.py    ← parsing, history resolution, confirmation formatting
+├── order_handlers.py   ← state dicts, notifications, order save + callbacks
+├── orders.py           ← facade (re-exports order_parsing + order_handlers)
+├── customers.py        ← group chat ID → business name registry
+├── summaries.py        ← nightly production total + per-customer breakdown
+├── cake_menu.py        ← cake menu data
+├── pricing.py          ← pricing helpers
+└── billing.py          ← billing functions
+run_b2b_bot.py          ← entry point: python run_b2b_bot.py
 ```
 
 ### B2B Build Phases

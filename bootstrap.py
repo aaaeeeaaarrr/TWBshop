@@ -80,29 +80,6 @@ def fetch_file(token, filename):
     return base64.b64decode(data["content"])
 
 
-def push_file(token, filename, content_bytes, message="sync"):
-    """Update or create a file in the secrets repo via GitHub API. No cloning needed."""
-    url = f"https://api.github.com/repos/{SECRETS_REPO}/contents/{filename}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
-        "Content-Type": "application/json",
-    }
-    sha = None
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as r:
-            sha = json.loads(r.read()).get("sha")
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            sys.exit(f"GitHub API error {e.code}: {e.reason}")
-    body = {"message": message, "content": base64.b64encode(content_bytes).decode()}
-    if sha:
-        body["sha"] = sha
-    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="PUT")
-    with urllib.request.urlopen(req):
-        pass
-
-
 def set_permissions(path, mode):
     if platform.system() != "Windows":
         os.chmod(path, mode)
