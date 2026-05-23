@@ -103,10 +103,9 @@ relevant in future sessions without hitting context limits.
 ## Tech Stack
 - **Language:** Python 3.11+
 - **Telegram:** `python-telegram-bot` library
-- **Database:** SQLite (local, simple, no server needed to start)
-- **Fuzzy Matching:** `difflib` (standard library, no install needed)
-- **Logging:** Python's built-in `logging` module — log ALL unmatched text patterns
-  to a file so we can study them and improve matching rules over time
+- **Database:** PostgreSQL on DigitalOcean (managed) — `psycopg2`, connection via `DATABASE_URL` in secrets.py
+- **Fuzzy Matching:** `difflib` (standard library)
+- **Logging:** `RotatingFileHandler` — 5MB cap, 3 backups. Unmatched orders log to `logs/unmatched.log`
 
 ---
 
@@ -191,29 +190,14 @@ TWBshop/                        ← one GitHub repo for the whole business
 
 ## New Machine Setup
 
-Run this once on any new machine — it downloads all secrets and SSH key automatically:
+Just say: **pull**
 
-```
-python bootstrap.py
-```
+Claude Code clones the repo, syncs all secrets and SSH keys, and runs bootstrap automatically.
+You will be asked for your GitHub PAT (`repo` scope) once — everything else is handled.
 
-You will be asked for a **GitHub Personal Access Token (PAT)** with `repo` scope.
-Create one at: https://github.com/settings/tokens
-The token is saved to `.bootstrap_token` (gitignored) so you only type it once per machine.
-
-**What bootstrap.py does automatically:**
-1. Downloads `secrets.py` (all API keys/tokens) → project root
-2. Downloads SSH private key `twbshop_server` → `~/.ssh/` with correct permissions
-3. Installs all pip requirements
-4. Creates `logs/` and `photos/` directories
-
-**Secrets are stored in:** `github.com/aaaeeeaaarrr/twbshop-secrets` (private repo)
-
-**After bootstrap, start the bots:**
-- Retail bot: `python run_bot.py`
-- B2B bot: `python run_b2b_bot.py`
-
-**Claude Code permissions** are in `.claude/settings.json` (committed, syncs automatically via git pull).
+PAT creation: https://github.com/settings/tokens
+Secrets live in: `github.com/aaaeeeaaarrr/twbshop-secrets` (private)
+Claude Code permissions sync automatically via `.claude/settings.json` in this repo.
 
 ---
 
