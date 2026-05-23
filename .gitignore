@@ -28,6 +28,9 @@ secrets.py
 # Logs
 logs/
 
+# Photos (stored on server / recreated by bootstrap)
+photos/
+
 # IDE
 .vscode/
 .idea/

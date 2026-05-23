@@ -223,7 +223,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** GitHub PAT prompt now shows a 1-click link with repo scope pre-checked — in bootstrap.py, in all warning boxes, and in the checklist. User just opens the link, clicks Generate Token, pastes it once per machine.
+**Last completed:** Global checklist improvements — stash handling on pull (no more hard errors on unstaged changes), SSH key guard (skip ssh-add if key doesn't exist yet), connectivity check guard (skip if secrets.py missing), accurate 3-pull new machine description. Also added `photos/` to .gitignore (bootstrap already creates it).
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**

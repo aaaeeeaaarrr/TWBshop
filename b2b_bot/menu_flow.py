@@ -71,7 +71,7 @@ _CATEGORIES: dict[str, dict] = {
         "note": "Min. 100pc · 48h advance order",
     },
     "cakes": {
-        "emoji": "🎂", "label": "Cakes",
+        "emoji": "🎂", "label": "Full Cakes",
         "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] == "A"],
     },
     "desserts": {
