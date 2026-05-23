@@ -10,6 +10,7 @@ import difflib
 import logging
 from datetime import date, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 
 import config
 from b2b_bot.menu import B2B_MENU, ALIAS_MAP, INSTANT_BREAD_ITEMS, MINI_ITEMS
@@ -523,6 +524,31 @@ def _build_confirmation(
     return "\n".join(parts)
 
 
+def _build_confirmed_text(
+    bread_items: list[dict],
+    cake_items:  list[dict],
+    method:        str | None,
+    time_str:      str | None,
+    location:      str | None,
+    delivery_date: str | None,
+    from_user=None,
+) -> str:
+    mention = from_user.mention_html() if from_user else "someone"
+    parts = [f"✓ Order confirmed by {mention}", ""]
+    if bread_items:
+        parts += [_bread_line(it) for it in bread_items]
+    if cake_items:
+        if bread_items:
+            parts.append("")
+        parts += [_cake_line(it) for it in cake_items]
+    total = order_total(bread_items, cake_items)
+    dl    = _delivery_line(method, time_str, location, delivery_date)
+    parts += ["", price_summary(total)]
+    if dl:
+        parts += ["", dl]
+    return "\n".join(parts)
+
+
 def _confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("Confirm ✓", callback_data="b2b_confirm"),
@@ -605,8 +631,8 @@ _CANCEL_WORDS  = frozenset({"no", "cancel", "nope", "nah", "nevermind", "stop"})
 _EDIT_WORDS    = frozenset({"edit", "change", "modify", "wrong", "incorrect", "fix"})
 
 
-async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn) -> None:
-    """Save and confirm a pending order. reply_fn(text) sends the confirmation message."""
+async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from_user=None) -> None:
+    """Save and confirm a pending order. reply_fn(text, **kwargs) sends the confirmation message."""
     business_name = get_business_name(chat_id)
     delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
     bread_items, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
@@ -638,8 +664,11 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn) -> N
             context.bot, business_name, cake_items, method_, time_str_, location_, delivery_date,
         )
 
+    confirmed_text = _build_confirmed_text(
+        bread_items, cake_items, method_, time_str_, location_, delivery_date, from_user,
+    )
     logger.info("B2B order confirmed for %s (%s) delivery %s", business_name, chat_id, delivery_date)
-    await reply_fn("✓ Order confirmed.")
+    await reply_fn(confirmed_text, parse_mode=ParseMode.HTML)
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -741,7 +770,7 @@ async def handle_group_message(update: Update, context) -> None:
             _pending.pop(chat_id, None)
             _state.pop(chat_id, None)
             _last_confirmation.pop(chat_id, None)
-            await _do_confirm_order(chat_id, pending, context, update.message.reply_text)
+            await _do_confirm_order(chat_id, pending, context, update.message.reply_text, from_user=update.effective_user)
             return
 
         if lower_text in _CANCEL_WORDS:
@@ -767,10 +796,9 @@ async def handle_callback(update: Update, context) -> None:
             await query.edit_message_text("No pending order. Please send your order again.")
             return
 
-        await _do_confirm_order(
-            chat_id, pending, context,
-            lambda txt: query.edit_message_text(txt, reply_markup=None),
-        )
+        async def _reply(txt, parse_mode=None):
+            await query.edit_message_text(txt, reply_markup=None, parse_mode=parse_mode)
+        await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
 
     elif query.data == "b2b_edit":
         # Text editing removed — redirect to button menu
