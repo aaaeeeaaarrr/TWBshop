@@ -188,7 +188,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-23
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Removed automatic session-start connectivity checks from both global and project CLAUDE.md — checks now run only when something is broken. Sessions now start immediately without pre-flight tool calls.
+**Last completed:** Stripped global CLAUDE.md from 38k to 4.4k chars. Removed all automatic session-start checks. Created `~/.ssh/config` with `twbshop` alias — SSH now works every session without re-adding keys.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
