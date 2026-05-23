@@ -223,7 +223,7 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         method       = _get_cart_method(chat_id)
         method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else "Set delivery"
         rows.append([InlineKeyboardButton(
-            f"🕐 {method_label} · {date_label} at {time_str}",
+            f"🟡 {method_label} · {date_label} at {time_str}",
             callback_data="bm_time_select",
         )])
         rows.append([
