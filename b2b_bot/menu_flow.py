@@ -227,7 +227,7 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
             callback_data="bm_time_select",
         )])
         rows.append([
-            InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"),
+            InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"),
             InlineKeyboardButton("🗑 Empty Cart",    callback_data="bm_empty_cart"),
         ])
     return InlineKeyboardMarkup(rows)
@@ -247,7 +247,7 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
         )])
     nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
     if cart:
-        nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
+        nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
@@ -264,7 +264,7 @@ def _bun_page_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         )])
     nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
     if cart:
-        nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
+        nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
@@ -289,7 +289,7 @@ def _bun_size_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
     )])
     nav = [InlineKeyboardButton("← Buns", callback_data="bm_buns")]
     if cart:
-        nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
+        nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
@@ -314,7 +314,7 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         rows.append(row)
     nav = [InlineKeyboardButton(f"← {bun['label']}", callback_data=f"bm_bun_{bun_key}")]
     if cart:
-        nav.append(InlineKeyboardButton("✓ Confirm Order", callback_data="bm_confirm"))
+        nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
