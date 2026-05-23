@@ -317,11 +317,10 @@ def _date_picker_keyboard() -> InlineKeyboardMarkup:
     tomorrow   = today + timedelta(days=1)
     curr_month = today.replace(day=1)
     next_month = (curr_month.replace(day=28) + timedelta(days=4)).replace(day=1)
+    locked = _orders_locked()
+    tmrw_label = f"{'🔒 ' if locked else ''}Tomorrow ({tomorrow.strftime('%a %d %b')})"
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            f"Tomorrow ({tomorrow.strftime('%a %d %b')})",
-            callback_data="bm_date_tmrw",
-        )],
+        [InlineKeyboardButton(tmrw_label, callback_data="bm_date_tmrw")],
         [
             InlineKeyboardButton(
                 curr_month.strftime("%B"),
