@@ -75,7 +75,7 @@ _CATEGORIES: dict[str, dict] = {
         "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] == "A"],
     },
     "desserts": {
-        "emoji": "🍮", "label": "Desserts & Pieces",
+        "emoji": "🍮", "label": "Desserts / Cake Slices",
         "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] in ("B", "C")],
     },
 }
