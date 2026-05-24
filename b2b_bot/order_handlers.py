@@ -275,10 +275,9 @@ async def handle_callback(update: Update, context) -> None:
         async def _reply(txt, parse_mode=None):
             await query.edit_message_text(txt, reply_markup=None, parse_mode=parse_mode)
         await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
-        from b2b_bot.menu_keyboards import _menu_msg, _bun_sesame
+        from b2b_bot.menu_keyboards import _menu_msg
         _menu_msg.pop(chat_id, None)
         set_menu_message_id(chat_id, None)
-        _bun_sesame.pop(chat_id, None)
 
     elif query.data == "b2b_edit":
         pending = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
@@ -286,17 +285,15 @@ async def handle_callback(update: Update, context) -> None:
         set_pending_order(chat_id, None)
         from b2b_bot.menu_keyboards import (
             _cart, _cart_time, _cart_date, _cart_method, _editing_session,
-            _bun_sesame, _category_keyboard, _cart_block,
+            _SESAME_LABEL_CODE, _category_keyboard, _cart_block,
         )
         from b2b_bot.menu import B2B_MENU as _BM
         cart = {}
-        _bun_sesame.pop(chat_id, None)
         for it in pending.get("bread_items", []):
             if _BM.get(it["item"], {}).get("requires_grams") and it.get("grams"):
-                key = f"{it['item']}|{it['grams']}"
+                sc  = _SESAME_LABEL_CODE.get(it.get("notes", ""))
+                key = f"{it['item']}|{it['grams']}|{sc}" if sc else f"{it['item']}|{it['grams']}"
                 cart[key] = it["qty"]
-                if it.get("notes"):
-                    _bun_sesame.setdefault(chat_id, {})[key] = it["notes"]
             else:
                 cart[it["item"]] = it["qty"]
         for it in pending.get("cake_items", []):
