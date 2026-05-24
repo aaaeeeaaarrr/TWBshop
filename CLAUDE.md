@@ -131,13 +131,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-24
 **Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
-**Last completed:** B2B recurring (Daily/Weekly) orders — intermediate confirm screen after "Confirm Order" (default method/time, Change Delivery/Pickup, Change Date+Time, Daily/Weekly), multi-select weekday picker, time+method setup, pre-confirmation gate, standing orders shown in main menu as "Edit Mon/Wed/Fri" buttons, 7am/1pm/6pm reminders the day before each fulfillment, grace period for newly created orders, auto-skip at 10:10pm, confirmed instances written to b2b_orders so 9pm pre-summary and 10:10pm full summary include them automatically.
+**Last completed:** UX + code standardisation pass — unified one-time and recurring confirmation messages into `_build_confirmed_text` (shared header ✅ CONFIRMED, shared `_bread_line` items, pricing always shown, delivery line vs recurring footer controlled by `days_list` param); extracted `_menu_state` helper deduplicating 25-line block in `handle_menu_command` / `bm_menu_prompt`; `_show_recurring_preconfirm` now uses `_bread_line`; removed business name from customer-facing delivery line (kept in staff summaries and notifications); "Change Delivery/Pickup" merged into linear "Change Date+Time+Delivery" flow; confirm screen is the hub (✅ default button, no confirm_flow_mode); unified time/method keyboard builders parameterised; "📋 New Order" button replaces "type /menu" text on cancellation.
 **Next task:** None defined
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
 - B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
+- Business names live in `b2b_bot/customers.py` — add group chat ID + name, restart bot to register new customer
 
 ---
 
