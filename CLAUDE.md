@@ -131,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
-**Last completed:** B2B dispatch reminders — 4:30am and 6:10am Phnom Penh, both reply to the 10:10pm summary for that delivery day. 4:30am sends first nudge and stores its msg_id in bot_meta; 6:10am deletes the 4:30am message then sends second nudge. Date-match guard (`last_summary_date == today_pnh`) prevents accidentally replying to an older summary. Silently skips if no orders (no summary was sent).
+**Last completed:** B2B dispatch reminders — 4:30am and 6:10am both send a detailed customer/time dispatch list (e.g. "5 CUSTOMERS — 2026-05-26 / 8:00am Delivery — Name") as a reply to the 10:10pm summary. 4:30am skips if no orders; 6:10am deletes the 4:30am message and sends a fresh list (or "No B2B orders today" if no orders). Both fall back to standalone if the summary was deleted. msg_ids stored in bot_meta with date guards to avoid stale deletes.
 **Next task:** None defined
 **Known issues:** None
 **Notes:**

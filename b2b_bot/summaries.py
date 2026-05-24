@@ -210,12 +210,51 @@ async def send_b2b_mini_reminder(bot: Bot, target_date: str | None = None) -> No
     logger.info("Sent B2B mini reminder for %s", day)
 
 
-async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
-    """Reply to tonight's 10:10pm summary with a dispatch nudge.
+def _sort_key(time_str: str) -> int:
+    """Convert '8:00am' / '12:30pm' to minutes since midnight for sorting."""
+    try:
+        t = datetime.strptime(time_str.upper().replace(" ", ""), "%I:%M%p")
+        return t.hour * 60 + t.minute
+    except ValueError:
+        return 9999
 
-    reminder_num=1: 4:30am PNH — first nudge.
-    reminder_num=2: 6:10am PNH — deletes the 4:30am message, sends a second nudge.
-    Skips silently if no summary was sent for today (no orders or summary missing).
+
+def _build_dispatch_list(day: str) -> str:
+    """Build the customer/time sorted dispatch list for a delivery day."""
+    bread_rows = get_b2b_orders_by_group(day)
+    cake_rows  = get_b2b_cake_orders_by_group(day)
+
+    seen: dict[int, str] = {}
+    for row in list(bread_rows) + list(cake_rows):
+        gid = row["group_chat_id"]
+        if gid not in seen:
+            seen[gid] = row["business_name"]
+
+    entries = []
+    for gid, biz_name in seen.items():
+        cust = get_b2b_customer(gid)
+        time_str = (cust["delivery_time"] or "?") if cust else "?"
+        method   = (cust["delivery_method"] or "?") if cust else "?"
+        entries.append((time_str, method, biz_name))
+
+    entries.sort(key=lambda x: _sort_key(x[0]))
+
+    n = len(entries)
+    lines = [f"{n} CUSTOMER{'S' if n != 1 else ''} — {day}", ""]
+    for time_str, method, biz_name in entries:
+        method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else method
+        lines.append(f"{time_str}  {method_label} — {biz_name}")
+
+    return "\n".join(lines)
+
+
+async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
+    """Reply to tonight's 10:10pm summary with the dispatch list.
+
+    reminder_num=1: 4:30am PNH — detailed list. Skips if no orders.
+    reminder_num=2: 6:10am PNH — deletes the 4:30am message, sends fresh list.
+                    If no orders: sends 'No B2B orders today' instead.
+    Skips silently if no summary was sent for today or msg_id not stored.
     """
     today_pnh = (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
 
@@ -235,19 +274,15 @@ async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
         return
 
     if reminder_num == 2:
-        dispatch_msg_id_str = get_bot_meta("last_dispatch_msg_id")
-        if dispatch_msg_id_str:
+        dispatch_msg_id_str  = get_bot_meta("last_dispatch_msg_id")
+        dispatch_msg_id_date = get_bot_meta("last_dispatch_msg_id_date")
+        if dispatch_msg_id_str and dispatch_msg_id_date == today_pnh:
             try:
                 await bot.delete_message(config.B2B_STAFF_GROUP_ID, int(dispatch_msg_id_str))
             except Exception:
                 pass
 
-    if reminder_num == 1:
-        text = "🌅 Dispatch reminder — orders above"
-    elif has_orders:
-        text = "🚛 Dispatch time — leaving soon"
-    else:
-        text = "No B2B orders today"
+    text = _build_dispatch_list(today_pnh) if has_orders else "No B2B orders today"
 
     try:
         msg = await bot.send_message(
@@ -258,6 +293,7 @@ async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
         )
         if reminder_num == 1:
             set_bot_meta("last_dispatch_msg_id", str(msg.message_id))
+            set_bot_meta("last_dispatch_msg_id_date", today_pnh)
         logger.info("Sent dispatch reminder %s for %s (msg_id=%s)", reminder_num, today_pnh, msg.message_id)
     except Exception as e:
         logger.error("Dispatch reminder %s failed: %s", reminder_num, e)
