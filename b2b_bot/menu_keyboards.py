@@ -495,7 +495,7 @@ def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     rows += [
         [InlineKeyboardButton("🚛🏪 Change Delivery/Pickup", callback_data="bm_cs_delivery")],
         [InlineKeyboardButton("📅 Change Date+Time",         callback_data="bm_cs_datetime")],
-        [InlineKeyboardButton("🔄 Daily/Weekly",             callback_data="bm_cs_recurring")],
+        [InlineKeyboardButton("🔄 Daily/Weekly Orders",       callback_data="bm_cs_recurring")],
         [InlineKeyboardButton("← Back to Menu",             callback_data="bm_back")],
     ]
     return InlineKeyboardMarkup(rows)
