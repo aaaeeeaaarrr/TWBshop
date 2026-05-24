@@ -129,9 +129,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-24
+**Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
-**Last completed:** UX + code standardisation pass — unified one-time and recurring confirmation messages into `_build_confirmed_text` (shared header ✅ CONFIRMED, shared `_bread_line` items, pricing always shown, delivery line vs recurring footer controlled by `days_list` param); extracted `_menu_state` helper deduplicating 25-line block in `handle_menu_command` / `bm_menu_prompt`; `_show_recurring_preconfirm` now uses `_bread_line`; removed business name from customer-facing delivery line (kept in staff summaries and notifications); "Change Delivery/Pickup" merged into linear "Change Date+Time+Delivery" flow; confirm screen is the hub (✅ default button, no confirm_flow_mode); unified time/method keyboard builders parameterised; "📋 New Order" button replaces "type /menu" text on cancellation.
+**Last completed:** B2B dispatch reminders — 4:30am and 6:10am Phnom Penh, both reply to the 10:10pm summary for that delivery day. 4:30am sends first nudge and stores its msg_id in bot_meta; 6:10am deletes the 4:30am message then sends second nudge. Date-match guard (`last_summary_date == today_pnh`) prevents accidentally replying to an older summary. Silently skips if no orders (no summary was sent).
 **Next task:** None defined
 **Known issues:** None
 **Notes:**

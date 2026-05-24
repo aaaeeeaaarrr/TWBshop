@@ -5,7 +5,7 @@ Sent at 10:10pm Phnom Penh time (15:10 UTC) to the B2B staff group.
 
 import logging
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from telegram import Bot
 
 import config
@@ -171,9 +171,10 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
                 lines.append(f"  Pickup at {customer['delivery_time']}")
         lines.append("")
 
-    await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
+    msg = await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
     set_bot_meta("last_summary_date", day)
-    logger.info("Sent B2B summary for %s", day)
+    set_bot_meta("last_summary_msg_id", str(msg.message_id))
+    logger.info("Sent B2B summary for %s (msg_id=%s)", day, msg.message_id)
 
 
 async def send_b2b_mini_reminder(bot: Bot, target_date: str | None = None) -> None:
@@ -203,3 +204,44 @@ async def send_b2b_mini_reminder(bot: Bot, target_date: str | None = None) -> No
 
     await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
     logger.info("Sent B2B mini reminder for %s", day)
+
+
+async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
+    """Reply to tonight's 10:10pm summary with a dispatch nudge.
+
+    reminder_num=1: 4:30am PNH — first nudge.
+    reminder_num=2: 6:10am PNH — deletes the 4:30am message, sends a second nudge.
+    Skips silently if no summary was sent for today (no orders or summary missing).
+    """
+    today_pnh = (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
+
+    if get_bot_meta("last_summary_date") != today_pnh:
+        logger.info("Dispatch reminder %s: no summary for %s — skipping", reminder_num, today_pnh)
+        return
+
+    summary_msg_id_str = get_bot_meta("last_summary_msg_id")
+    if not summary_msg_id_str:
+        logger.info("Dispatch reminder %s: summary_msg_id not stored — skipping", reminder_num)
+        return
+
+    if reminder_num == 2:
+        dispatch_msg_id_str = get_bot_meta("last_dispatch_msg_id")
+        if dispatch_msg_id_str:
+            try:
+                await bot.delete_message(config.B2B_STAFF_GROUP_ID, int(dispatch_msg_id_str))
+            except Exception:
+                pass
+
+    text = "🌅 Dispatch reminder — orders above" if reminder_num == 1 else "🚛 Dispatch time — leaving soon"
+
+    try:
+        msg = await bot.send_message(
+            config.B2B_STAFF_GROUP_ID,
+            text,
+            reply_to_message_id=int(summary_msg_id_str),
+        )
+        if reminder_num == 1:
+            set_bot_meta("last_dispatch_msg_id", str(msg.message_id))
+        logger.info("Sent dispatch reminder %s for %s (msg_id=%s)", reminder_num, today_pnh, msg.message_id)
+    except Exception as e:
+        logger.error("Dispatch reminder %s failed: %s", reminder_num, e)

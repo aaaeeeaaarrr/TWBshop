@@ -28,7 +28,7 @@ from b2b_bot.menu_flow import (
     handle_qty_input, qty_pending_filter,
 )
 from b2b_bot.orders import handle_group_message, handle_callback
-from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder
+from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder, send_b2b_dispatch_reminder
 from b2b_bot.recurring import send_recurring_reminders, auto_skip_unconfirmed
 
 logging.basicConfig(
@@ -57,6 +57,14 @@ _PAYMENT_REMINDER_MINUTE_UTC = 0
 _REC_REMINDER_1_HOUR_UTC = 0   # 7am PNH
 _REC_REMINDER_2_HOUR_UTC = 6   # 1pm PNH
 _REC_REMINDER_3_HOUR_UTC = 11  # 6pm PNH
+
+# Dispatch reminders — fired the morning of delivery day
+# 4:30am PNH = 21:30 UTC (previous calendar day in UTC)
+_DISPATCH_1_HOUR_UTC   = 21
+_DISPATCH_1_MINUTE_UTC = 30
+# 6:10am PNH = 23:10 UTC (previous calendar day in UTC)
+_DISPATCH_2_HOUR_UTC   = 23
+_DISPATCH_2_MINUTE_UTC = 10
 
 
 async def _startup_summary_check(app) -> None:
@@ -97,6 +105,14 @@ async def _job_recurring_reminder_3(context) -> None:
 
 async def _job_mini_reminder(context) -> None:
     await send_b2b_mini_reminder(context.bot)
+
+
+async def _job_dispatch_reminder_1(context) -> None:
+    await send_b2b_dispatch_reminder(context.bot, reminder_num=1)
+
+
+async def _job_dispatch_reminder_2(context) -> None:
+    await send_b2b_dispatch_reminder(context.bot, reminder_num=2)
 
 
 async def _job_daily_payment_reminder(context) -> None:
@@ -232,6 +248,23 @@ def main() -> None:
         days=(6,),  # Sunday UTC = Monday morning PNH
     )
     logger.info("B2B weekly payment reminder scheduled for Sunday 23:00 UTC (Monday 06:00 PNH)")
+
+    # Dispatch reminders — 4:30am and 6:10am Phnom Penh, replies to 10:10pm summary
+    for hour_utc, minute_utc, num in [
+        (_DISPATCH_1_HOUR_UTC, _DISPATCH_1_MINUTE_UTC, 1),
+        (_DISPATCH_2_HOUR_UTC, _DISPATCH_2_MINUTE_UTC, 2),
+    ]:
+        job_fn = [_job_dispatch_reminder_1, _job_dispatch_reminder_2][num - 1]
+        app.job_queue.run_daily(
+            job_fn,
+            time=datetime.time(hour=hour_utc, minute=minute_utc, tzinfo=datetime.timezone.utc),
+        )
+        pnh_hour   = 4 if num == 1 else 6
+        pnh_minute = 30 if num == 1 else 10
+        logger.info(
+            "Dispatch reminder %s scheduled at %02d:%02d UTC (%02d:%02d Phnom Penh)",
+            num, hour_utc, minute_utc, pnh_hour, pnh_minute,
+        )
 
     # Recurring order reminders — 7am, 1pm, 6pm Phnom Penh (the day before fulfillment)
     for hour_utc, num in [
