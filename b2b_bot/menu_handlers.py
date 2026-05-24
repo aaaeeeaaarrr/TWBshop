@@ -8,18 +8,20 @@ import config
 from b2b_bot.menu_keyboards import (
     _cart, _qty_pending, _menu_msg, _editing_session,
     _cart_time, _cart_date, _cart_method, _last_menu_prompt,
+    _bun_sesame, _SESAME_CODE_LABEL,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
     _orders_locked, _MENU_PROMPT_COOLDOWN_SEC,
     _CATEGORIES, _BUNS, _NAME,
     _category_keyboard, _item_keyboard, _cart_block,
     _bun_size_keyboard, _bun_page_keyboard, _bun_gram_grid_keyboard,
+    _bun_sesame_keyboard,
     _qty_button_keyboard, _bun_qty_keyboard,
     _date_picker_keyboard, _day_picker_keyboard, _time_picker_keyboard,
     _method_picker_keyboard, _existing_orders_keyboard,
     _format_time,
 )
 from b2b_bot.customers import get_business_name, is_b2b_group
-from b2b_bot.menu import B2B_MENU
+from b2b_bot.menu import B2B_MENU, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import order_total
 from shared.database import (
@@ -161,28 +163,52 @@ async def handle_qty_input(update: Update, context) -> None:
         cart_key = f"{state['item']}|{state['grams']}"
         if qty == 0:
             cart.pop(cart_key, None)
+            _bun_sesame.get(chat_id, {}).pop(cart_key, None)
         else:
             cart[cart_key] = qty
         bun_key = state["bun_key"]
         bun     = _BUNS[bun_key]
-        _bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
-        _bun_kb  = _bun_size_keyboard(bun_key, chat_id)
-        try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=state["message_id"],
-                text=_bun_txt,
-                reply_markup=_bun_kb,
-            )
-        except Exception:
-            sent = await context.bot.send_message(chat_id, _bun_txt, reply_markup=_bun_kb)
-            _menu_msg[chat_id] = sent.message_id
-            set_menu_message_id(chat_id, sent.message_id)
-    else:
-        if qty == 0:
-            cart.pop(state["name"], None)
+        if bun_key == "burger" and qty > 0:
+            _ses_txt = f"Sesame topping for {state['grams']}g Burger Bun?\n\n{_cart_block(chat_id)}"
+            _ses_kb  = _bun_sesame_keyboard(bun_key, state["grams"], chat_id)
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=state["message_id"],
+                    text=_ses_txt,
+                    reply_markup=_ses_kb,
+                )
+            except Exception:
+                sent = await context.bot.send_message(chat_id, _ses_txt, reply_markup=_ses_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
         else:
-            cart[state["name"]] = qty
+            _bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+            _bun_kb  = _bun_size_keyboard(bun_key, chat_id)
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=state["message_id"],
+                    text=_bun_txt,
+                    reply_markup=_bun_kb,
+                )
+            except Exception:
+                sent = await context.bot.send_message(chat_id, _bun_txt, reply_markup=_bun_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
+    else:
+        name = state["name"]
+        if name in MINI_ITEMS and qty > 0 and qty < 100:
+            await update.message.reply_text(
+                f"Minimum order for {name} is 100 pieces. Please send a number ≥ 100 (or 0 to remove):"
+            )
+            _qty_pending[chat_id] = state
+            set_qty_pending(chat_id, state)
+            return
+        if qty == 0:
+            cart.pop(name, None)
+        else:
+            cart[name] = qty
         cat_key   = state["cat_key"]
         cat       = _CATEGORIES[cat_key]
         note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
@@ -233,6 +259,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
+            _bun_sesame.pop(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -251,9 +278,12 @@ async def handle_menu_callback(update: Update, context) -> None:
             session = sessions[idx]
             cart = _cart.setdefault(chat_id, {})
             cart.clear()
+            _bun_sesame.pop(chat_id, None)
             for it in session["bread"]:
                 key = f"{it['item']}|{it['grams']}" if it.get("grams") else it["item"]
                 cart[key] = it["qty"]
+                if it.get("grams") and it.get("notes"):
+                    _bun_sesame.setdefault(chat_id, {})[key] = it["notes"]
             for it in session["cake"]:
                 cart[it["item"]] = it["qty"]
             _editing_session[chat_id] = session["session_key"]
@@ -270,6 +300,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
+            _bun_sesame.pop(chat_id, None)
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
@@ -419,16 +450,27 @@ async def handle_menu_callback(update: Update, context) -> None:
             cart_key = f"{bun['item']}|{grams}"
             if qty == 0:
                 cart.pop(cart_key, None)
+                _bun_sesame.get(chat_id, {}).pop(cart_key, None)
             else:
                 cart[cart_key] = qty
-            bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
-            bun_kb  = _bun_size_keyboard(bun_key, chat_id)
-            try:
-                await query.edit_message_text(bun_txt, reply_markup=bun_kb)
-            except Exception:
-                sent = await context.bot.send_message(chat_id, bun_txt, reply_markup=bun_kb)
-                _menu_msg[chat_id] = sent.message_id
-                set_menu_message_id(chat_id, sent.message_id)
+            if bun_key == "burger" and qty > 0:
+                ses_txt = f"Sesame topping for {grams}g Burger Bun?\n\n{_cart_block(chat_id)}"
+                ses_kb  = _bun_sesame_keyboard(bun_key, grams, chat_id)
+                try:
+                    await query.edit_message_text(ses_txt, reply_markup=ses_kb)
+                except Exception:
+                    sent = await context.bot.send_message(chat_id, ses_txt, reply_markup=ses_kb)
+                    _menu_msg[chat_id] = sent.message_id
+                    set_menu_message_id(chat_id, sent.message_id)
+            else:
+                bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+                bun_kb  = _bun_size_keyboard(bun_key, chat_id)
+                try:
+                    await query.edit_message_text(bun_txt, reply_markup=bun_kb)
+                except Exception:
+                    sent = await context.bot.send_message(chat_id, bun_txt, reply_markup=bun_kb)
+                    _menu_msg[chat_id] = sent.message_id
+                    set_menu_message_id(chat_id, sent.message_id)
 
         elif data.startswith("bm_bunqtytext_"):
             rest    = data[14:]
@@ -448,9 +490,29 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 f"How many {grams}g {bun['label']}?\nType a number (0 to remove):",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_size_{bun_key}_{grams}"),
+                    InlineKeyboardButton("← Menu", callback_data=f"bm_bun_size_{bun_key}_{grams}"),
                 ]]),
             )
+
+        elif data.startswith("bm_bunsesame_"):
+            rest    = data[13:]
+            bun_key = next((k for k in _BUNS if rest.startswith(f"{k}_")), None)
+            if not bun_key:
+                return
+            after_bun              = rest[len(bun_key) + 1:]
+            grams_str, sesame_code = after_bun.rsplit("_", 1)
+            grams     = int(grams_str)
+            bun       = _BUNS[bun_key]
+            cart_key  = f"{bun['item']}|{grams}"
+            _bun_sesame.setdefault(chat_id, {})[cart_key] = _SESAME_CODE_LABEL[sesame_code]
+            bun_txt   = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+            bun_kb    = _bun_size_keyboard(bun_key, chat_id)
+            try:
+                await query.edit_message_text(bun_txt, reply_markup=bun_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, bun_txt, reply_markup=bun_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
 
         elif data.startswith("bm_bun_other_"):
             bun_key = data[13:]
@@ -553,10 +615,14 @@ async def handle_menu_callback(update: Update, context) -> None:
             }
             _qty_pending[chat_id] = state
             set_qty_pending(chat_id, state)
+            if name in MINI_ITEMS:
+                prompt = f"How many {name}?\nMinimum 100 · multiples of 100 preferred\nType a number (0 to remove):"
+            else:
+                prompt = f"How many {name}?\nType a number (0 to remove):"
             await query.edit_message_text(
-                f"How many {name}?\nType a number (0 to remove):",
+                prompt,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_qty_{slug}_{cat_key}"),
+                    InlineKeyboardButton("← Menu", callback_data=f"bm_qty_{slug}_{cat_key}"),
                 ]]),
             )
 
@@ -589,7 +655,8 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     for key, qty in cart.items():
         if "|" in key:
             item_name, grams_str = key.split("|", 1)
-            bread_items.append({"item": item_name, "qty": qty, "grams": int(grams_str), "notes": None})
+            sesame = _bun_sesame.get(chat_id, {}).get(key) or None
+            bread_items.append({"item": item_name, "qty": qty, "grams": int(grams_str), "notes": sesame})
         elif key in B2B_MENU:
             bread_items.append({"item": key, "qty": qty, "grams": None, "notes": None})
         else:
@@ -623,6 +690,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     _cart_time.pop(chat_id, None)
     _cart_date.pop(chat_id, None)
     _cart_method.pop(chat_id, None)
+    _bun_sesame.pop(chat_id, None)
 
     if needs_spec:
         _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}

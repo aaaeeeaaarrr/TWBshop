@@ -20,6 +20,7 @@ _cart_time: dict[int, str] = {}           # {chat_id: delivery time  e.g. "8:00a
 _cart_date: dict[int, str] = {}           # {chat_id: delivery date  e.g. "2026-05-25"}
 _cart_method: dict[int, str] = {}         # {chat_id: "pickup" | "delivery"}
 _last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
+_bun_sesame: dict[int, dict[str, str]] = {}  # {chat_id: {cart_key: sesame_label}}
 
 # 10:10pm Phnom Penh = 15:10 UTC — orders locked after this time
 _LOCK_HOUR_UTC    = 15
@@ -149,6 +150,15 @@ def _bun_price(grams: int) -> float:
     return _BUN_PRICE_BY_GRAMS.get(grams, round(grams * 0.004, 2))
 
 
+_SESAME_OPTIONS: list[tuple[str, str]] = [
+    ("no",    "No Sesame"),
+    ("mix",   "Mix Sesame"),
+    ("black", "Black Sesame"),
+    ("white", "White Sesame"),
+]
+_SESAME_CODE_LABEL: dict[str, str] = {code: label for code, label in _SESAME_OPTIONS}
+
+
 # ── Display helpers ───────────────────────────────────────────────────────────
 
 def _price_label(name: str, in_desserts: bool = False) -> str:
@@ -175,7 +185,9 @@ def _cart_block(chat_id: int) -> str:
             grams = int(grams_str)
             it = {"item": item_name, "qty": qty, "grams": grams, "notes": None}
             bread.append(it)
-            lines.append(f"  {qty}× {item_name} {grams}g — ${_bun_price(grams) * qty:.2f}")
+            sesame = _bun_sesame.get(chat_id, {}).get(key, "")
+            sesame_label = f" · {sesame}" if sesame else ""
+            lines.append(f"  {qty}× {item_name} {grams}g{sesame_label} — ${_bun_price(grams) * qty:.2f}")
         elif key in B2B_MENU:
             it = {"item": key, "qty": qty, "grams": B2B_MENU[key].get("standard_grams"), "notes": None}
             bread.append(it)
@@ -331,7 +343,7 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
         nav = [InlineKeyboardButton(f"Other{other_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
-        nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"))
+        nav.append(InlineKeyboardButton("← Menu", callback_data=f"bm_cat_{cat_key}"))
         rows.append(nav)
     else:
         row = []
@@ -346,8 +358,22 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
         nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
-        nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"))
+        nav.append(InlineKeyboardButton("← Menu", callback_data=f"bm_cat_{cat_key}"))
         rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
+def _bun_sesame_keyboard(bun_key: str, grams: int, chat_id: int) -> InlineKeyboardMarkup:
+    cart_key = f"{_BUNS[bun_key]['item']}|{grams}"
+    current  = _bun_sesame.get(chat_id, {}).get(cart_key, "")
+    rows = []
+    for code, label in _SESAME_OPTIONS:
+        mark = " ✓" if current == label else ""
+        rows.append([InlineKeyboardButton(
+            f"{label}{mark}",
+            callback_data=f"bm_bunsesame_{bun_key}_{grams}_{code}",
+        )])
+    rows.append([InlineKeyboardButton("← Menu", callback_data=f"bm_bun_{bun_key}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -366,7 +392,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, current_qty: int) -> InlineKeybo
     nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_bunqtytext_{bun_key}_{grams}")]
     if current_qty > 0:
         nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_bunqtyval_{bun_key}_{grams}_0"))
-    nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_{bun_key}"))
+    nav.append(InlineKeyboardButton("← Menu", callback_data=f"bm_bun_{bun_key}"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
