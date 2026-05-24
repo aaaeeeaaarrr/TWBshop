@@ -385,11 +385,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_date[chat_id]   = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id]   = _format_time(time_code)
             _cart_method[chat_id] = method
-            # Save and return to confirm screen — ✅ button is the only confirmation trigger
-            await query.edit_message_text(
-                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
-                reply_markup=_confirm_screen_keyboard(chat_id),
-            )
+            await _do_confirm(query, chat_id, context)
 
         elif data == "bm_menu_prompt":
             _qty_pending.pop(chat_id, None)
