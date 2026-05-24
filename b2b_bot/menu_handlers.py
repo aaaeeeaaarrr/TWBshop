@@ -556,7 +556,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 return
             current_qty = _cart.get(chat_id, {}).get(name, 0)
             cat         = _CATEGORIES[cat_key]
-            note_line   = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            note_line   = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
             await query.edit_message_text(
                 f"{name} — how many?{note_line}\n\n{_cart_block(chat_id)}",
                 reply_markup=_qty_button_keyboard(name, slug, cat_key, current_qty),
