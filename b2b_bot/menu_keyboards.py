@@ -486,7 +486,7 @@ def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         emoji      = "🚛" if method == "delivery" else "🏪"
         method_lbl = "Delivery" if method == "delivery" else "Pickup"
         rows.append([InlineKeyboardButton(
-            f"{emoji} {method_lbl} · {date_label} at {time_str}",
+            f"✅ {method_lbl} · {date_label} at {time_str}",
             callback_data="bm_cs_default",
         )])
     rows += [
