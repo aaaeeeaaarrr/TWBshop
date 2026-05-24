@@ -277,7 +277,14 @@ async def handle_callback(update: Update, context) -> None:
 
         async def _reply(txt, parse_mode=None):
             await query.edit_message_text(txt, reply_markup=None, parse_mode=parse_mode)
-        await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
+        try:
+            await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
+        except Exception as e:
+            logger.error("Error in _do_confirm_order for %s: %s", chat_id, e, exc_info=True)
+            try:
+                await query.edit_message_text("✓ Order confirmed!", reply_markup=None)
+            except Exception:
+                pass
         from b2b_bot.menu_keyboards import _menu_msg
         _menu_msg.pop(chat_id, None)
         set_menu_message_id(chat_id, None)

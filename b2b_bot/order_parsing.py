@@ -373,7 +373,8 @@ def _resolve_cake_history(group_chat_id: int, items: list[dict]) -> tuple[list[d
 # ─── Formatting ───────────────────────────────────────────────────────────────
 
 def _bread_line(it: dict) -> str:
-    item_def = B2B_MENU[it["item"]]
+    item_name = it["item"]
+    item_def  = B2B_MENU.get(item_name) or B2B_MENU.get(item_name.title()) or {}
     line = f"  • {it['qty']}x {it['item']}"
 
     if it.get("grams"):
