@@ -164,11 +164,6 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "cake_category": "C",
         "price_piece": 1.90,
     },
-    "Lemon Tart": {
-        "aliases": ["lemon tart", "tarte citron", "lemon tarte"],
-        "cake_category": "C",
-        "price_piece": 1.75,
-    },
 }
 
 # Flat lookup: alias → canonical name (built automatically — do not edit)

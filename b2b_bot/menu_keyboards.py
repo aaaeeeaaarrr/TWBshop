@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters as _filters
 
-from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS
+from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
 from shared.database import get_b2b_customer
@@ -311,6 +311,62 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
     nav = [InlineKeyboardButton(f"← {bun['label']}", callback_data=f"bm_bun_{bun_key}")]
     if cart:
         nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
+    rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
+def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -> InlineKeyboardMarkup:
+    rows = []
+    if name in MINI_ITEMS:
+        vals = [100, 200, 300, 400, 500]
+        row = []
+        for v in vals:
+            mark = " ✓" if current_qty == v else ""
+            row.append(InlineKeyboardButton(f"{v}{mark}", callback_data=f"bm_qtyval_{slug}_{cat_key}_{v}"))
+            if len(row) == 3:
+                rows.append(row); row = []
+        if row:
+            rows.append(row)
+        other_mark = " ✓" if current_qty > 0 and current_qty not in vals else ""
+        nav = [InlineKeyboardButton(f"Other{other_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
+        if current_qty > 0:
+            nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
+        nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"))
+        rows.append(nav)
+    else:
+        row = []
+        for v in range(1, 10):
+            mark = " ✓" if current_qty == v else ""
+            row.append(InlineKeyboardButton(f"{v}{mark}", callback_data=f"bm_qtyval_{slug}_{cat_key}_{v}"))
+            if len(row) == 3:
+                rows.append(row); row = []
+        if row:
+            rows.append(row)
+        plus_mark = " ✓" if current_qty >= 10 else ""
+        nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
+        if current_qty > 0:
+            nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
+        nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"))
+        rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
+def _bun_qty_keyboard(bun_key: str, grams: int, current_qty: int) -> InlineKeyboardMarkup:
+    bun  = _BUNS[bun_key]
+    rows = []
+    row  = []
+    for v in range(1, 10):
+        mark = " ✓" if current_qty == v else ""
+        row.append(InlineKeyboardButton(f"{v}{mark}", callback_data=f"bm_bunqtyval_{bun_key}_{grams}_{v}"))
+        if len(row) == 3:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    plus_mark = " ✓" if current_qty >= 10 else ""
+    nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_bunqtytext_{bun_key}_{grams}")]
+    if current_qty > 0:
+        nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_bunqtyval_{bun_key}_{grams}_0"))
+    nav.append(InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_{bun_key}"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 

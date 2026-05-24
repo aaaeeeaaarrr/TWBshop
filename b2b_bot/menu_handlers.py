@@ -13,6 +13,7 @@ from b2b_bot.menu_keyboards import (
     _CATEGORIES, _BUNS, _NAME,
     _category_keyboard, _item_keyboard, _cart_block,
     _bun_size_keyboard, _bun_page_keyboard, _bun_gram_grid_keyboard,
+    _qty_button_keyboard, _bun_qty_keyboard,
     _date_picker_keyboard, _day_picker_keyboard, _time_picker_keyboard,
     _method_picker_keyboard, _existing_orders_keyboard,
     _format_time,
@@ -391,7 +392,46 @@ async def handle_menu_callback(update: Update, context) -> None:
             )
 
         elif data.startswith("bm_bun_size_"):
-            rest    = data[12:]
+            rest        = data[12:]
+            bun_key     = next((k for k in _BUNS if rest.startswith(f"{k}_")), None)
+            if not bun_key:
+                return
+            grams       = int(rest[len(bun_key) + 1:])
+            bun         = _BUNS[bun_key]
+            cart_key    = f"{bun['item']}|{grams}"
+            current_qty = _cart.get(chat_id, {}).get(cart_key, 0)
+            await query.edit_message_text(
+                f"{bun['label']} {grams}g — how many?\n\n{_cart_block(chat_id)}",
+                reply_markup=_bun_qty_keyboard(bun_key, grams, current_qty),
+            )
+
+        elif data.startswith("bm_bunqtyval_"):
+            rest    = data[13:]
+            bun_key = next((k for k in _BUNS if rest.startswith(f"{k}_")), None)
+            if not bun_key:
+                return
+            after_bun        = rest[len(bun_key) + 1:]
+            grams_str, qty_str = after_bun.rsplit("_", 1)
+            grams    = int(grams_str)
+            qty      = int(qty_str)
+            bun      = _BUNS[bun_key]
+            cart     = _cart.setdefault(chat_id, {})
+            cart_key = f"{bun['item']}|{grams}"
+            if qty == 0:
+                cart.pop(cart_key, None)
+            else:
+                cart[cart_key] = qty
+            bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+            bun_kb  = _bun_size_keyboard(bun_key, chat_id)
+            try:
+                await query.edit_message_text(bun_txt, reply_markup=bun_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, bun_txt, reply_markup=bun_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
+
+        elif data.startswith("bm_bunqtytext_"):
+            rest    = data[14:]
             bun_key = next((k for k in _BUNS if rest.startswith(f"{k}_")), None)
             if not bun_key:
                 return
@@ -408,7 +448,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 f"How many {grams}g {bun['label']}?\nType a number (0 to remove):",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_{bun_key}"),
+                    InlineKeyboardButton("← Cancel", callback_data=f"bm_bun_size_{bun_key}_{grams}"),
                 ]]),
             )
 
@@ -462,6 +502,50 @@ async def handle_menu_callback(update: Update, context) -> None:
             name = _NAME.get(slug)
             if not name:
                 return
+            current_qty = _cart.get(chat_id, {}).get(name, 0)
+            cat         = _CATEGORIES[cat_key]
+            note_line   = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            await query.edit_message_text(
+                f"{name} — how many?{note_line}\n\n{_cart_block(chat_id)}",
+                reply_markup=_qty_button_keyboard(name, slug, cat_key, current_qty),
+            )
+
+        elif data.startswith("bm_qtyval_"):
+            rest             = data[10:]
+            rest_no_qty, qty_str = rest.rsplit("_", 1)
+            cat_key = next((k for k in _CATEGORIES if rest_no_qty.endswith(f"_{k}")), None)
+            if not cat_key:
+                return
+            slug = rest_no_qty[:-(len(cat_key) + 1)]
+            name = _NAME.get(slug)
+            if not name:
+                return
+            qty  = int(qty_str)
+            cart = _cart.setdefault(chat_id, {})
+            if qty == 0:
+                cart.pop(name, None)
+            else:
+                cart[name] = qty
+            cat       = _CATEGORIES[cat_key]
+            note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
+            cat_kb    = _item_keyboard(cat_key, chat_id)
+            try:
+                await query.edit_message_text(cat_txt, reply_markup=cat_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, cat_txt, reply_markup=cat_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
+
+        elif data.startswith("bm_qtytext_"):
+            rest    = data[11:]
+            cat_key = next((k for k in _CATEGORIES if rest.endswith(f"_{k}")), None)
+            if not cat_key:
+                return
+            slug = rest[:-(len(cat_key) + 1)]
+            name = _NAME.get(slug)
+            if not name:
+                return
             state = {
                 "name": name,
                 "cat_key": cat_key,
@@ -472,7 +556,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 f"How many {name}?\nType a number (0 to remove):",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Cancel", callback_data=f"bm_cat_{cat_key}"),
+                    InlineKeyboardButton("← Cancel", callback_data=f"bm_qty_{slug}_{cat_key}"),
                 ]]),
             )
 
