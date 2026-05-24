@@ -569,8 +569,8 @@ def _existing_orders_keyboard(
                 callback_data=f"bm_edit_session_{i}",
             )])
     for rec in (recurring_orders or []):
-        days = json.loads(rec["days_of_week"])
-        label = days_label(days)
+        days  = json.loads(rec["days_of_week"])
+        label = f"{days_label(days)} {rec['delivery_time']}"
         rows.append([InlineKeyboardButton(
             f"🔄 Edit {label}",
             callback_data=f"bm_edit_rec_{rec['id']}",
