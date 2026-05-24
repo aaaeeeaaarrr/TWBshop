@@ -345,10 +345,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                pass
+            await query.answer()
             await _delete_old_menu(chat_id, context.bot)
             delivery_date = (date.today() + timedelta(days=1)).isoformat()
             sessions = get_b2b_order_sessions(chat_id, delivery_date)
