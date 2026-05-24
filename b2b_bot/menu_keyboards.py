@@ -20,7 +20,6 @@ _cart_time: dict[int, str] = {}               # {chat_id: delivery time  e.g. "8
 _cart_date: dict[int, str] = {}               # {chat_id: delivery date  e.g. "2026-05-25"}
 _cart_method: dict[int, str] = {}             # {chat_id: "pickup" | "delivery"}
 _last_menu_prompt: dict[int, float] = {}      # {chat_id: monotonic time of last nudge}
-_confirm_flow_mode: dict[int, bool] = {}      # {chat_id: True = after method pick, call _do_confirm}
 _recurring_days: dict[int, set] = {}          # {chat_id: set of selected day abbrevs}
 _recurring_pending: dict[int, dict] = {}      # {chat_id: pending recurring order config}
 

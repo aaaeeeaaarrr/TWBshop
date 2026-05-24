@@ -8,7 +8,7 @@ import config
 from b2b_bot.menu_keyboards import (
     _cart, _qty_pending, _menu_msg, _editing_session,
     _cart_time, _cart_date, _cart_method, _last_menu_prompt,
-    _confirm_flow_mode, _recurring_days, _recurring_pending,
+    _recurring_days, _recurring_pending,
     _SESAME_CODE_LABEL, _SESAME_LABEL_CODE,
     _DELIVERY_TIME_CODES,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
@@ -260,7 +260,6 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
-            _confirm_flow_mode.pop(chat_id, None)
             _recurring_days.pop(chat_id, None)
             _recurring_pending.pop(chat_id, None)
             await query.edit_message_text(
@@ -352,29 +351,39 @@ async def handle_menu_callback(update: Update, context) -> None:
             rest      = data[6:]
             date_str  = rest[:8]
             time_code = rest[9:]
-            cart = _cart.get(chat_id, {})
-            bread_tmp, cake_tmp = [], []
-            for k, q in cart.items():
-                if "|" in k:
-                    parts = k.split("|")
-                    nm, gs = parts[0], int(parts[1])
-                    bread_tmp.append({"item": nm, "qty": q, "grams": gs, "notes": None})
-                elif k in B2B_MENU:
-                    bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
-                else:
-                    ck_def = B2B_CAKE_MENU[k]
-                    ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
-                    cake_tmp.append({"item": k, "qty": q, "order_type": ot})
-            total     = order_total(bread_tmp, cake_tmp)
-            d         = datetime.strptime(date_str, "%Y%m%d").date()
-            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
-            back_cb   = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
-            await query.edit_message_text(
-                f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
-                reply_markup=_method_picker_keyboard(
-                    f"bm_method_{date_str}_{time_code}_", back_cb, total
-                ),
-            )
+            _cart_date[chat_id] = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
+            _cart_time[chat_id] = _format_time(time_code)
+            if _get_cart_method(chat_id):
+                # Method already set — just update date+time and return to confirm screen
+                await query.edit_message_text(
+                    f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                    reply_markup=_confirm_screen_keyboard(chat_id),
+                )
+            else:
+                # First order for this group — need to ask for method
+                cart = _cart.get(chat_id, {})
+                bread_tmp, cake_tmp = [], []
+                for k, q in cart.items():
+                    if "|" in k:
+                        parts = k.split("|")
+                        nm, gs = parts[0], int(parts[1])
+                        bread_tmp.append({"item": nm, "qty": q, "grams": gs, "notes": None})
+                    elif k in B2B_MENU:
+                        bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
+                    else:
+                        ck_def = B2B_CAKE_MENU[k]
+                        ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
+                        cake_tmp.append({"item": k, "qty": q, "order_type": ot})
+                total        = order_total(bread_tmp, cake_tmp)
+                d            = datetime.strptime(date_str, "%Y%m%d").date()
+                tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+                back_cb      = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
+                await query.edit_message_text(
+                    f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
+                    reply_markup=_method_picker_keyboard(
+                        f"bm_method_{date_str}_{time_code}_", back_cb, total
+                    ),
+                )
 
         elif data.startswith("bm_method_"):
             rest     = data[10:]
@@ -384,13 +393,11 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_date[chat_id]   = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id]   = _format_time(time_code)
             _cart_method[chat_id] = method
-            if _confirm_flow_mode.pop(chat_id, False):
-                await _do_confirm(query, chat_id, context)
-            else:
-                await query.edit_message_text(
-                    f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-                    reply_markup=_category_keyboard(chat_id),
-                )
+            # Save and return to confirm screen — ✅ button is the only confirmation trigger
+            await query.edit_message_text(
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                reply_markup=_confirm_screen_keyboard(chat_id),
+            )
 
         elif data == "bm_menu_prompt":
             _qty_pending.pop(chat_id, None)
@@ -682,7 +689,6 @@ async def handle_menu_callback(update: Update, context) -> None:
             if not _cart.get(chat_id):
                 await query.answer("Cart is empty.", show_alert=True)
                 return
-            _confirm_flow_mode[chat_id] = True
             from b2b_bot.pricing import order_total as _ot
             date_str  = datetime.strptime(_get_cart_date(chat_id), "%Y-%m-%d").strftime("%Y%m%d")
             curr_time = _get_cart_time(chat_id)
@@ -697,7 +703,6 @@ async def handle_menu_callback(update: Update, context) -> None:
             )
 
         elif data == "bm_cs_datetime":
-            _confirm_flow_mode[chat_id] = True
             time_str   = _get_cart_time(chat_id)
             date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
@@ -706,7 +711,6 @@ async def handle_menu_callback(update: Update, context) -> None:
             )
 
         elif data == "bm_cs_recurring":
-            _confirm_flow_mode.pop(chat_id, None)
             cart = _cart.get(chat_id, {})
             if not cart:
                 await query.answer("Cart is empty.", show_alert=True)
