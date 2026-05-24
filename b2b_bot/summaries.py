@@ -254,6 +254,7 @@ async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
             config.B2B_STAFF_GROUP_ID,
             text,
             reply_to_message_id=int(summary_msg_id_str),
+            allow_sending_without_reply=True,
         )
         if reminder_num == 1:
             set_bot_meta("last_dispatch_msg_id", str(msg.message_id))
