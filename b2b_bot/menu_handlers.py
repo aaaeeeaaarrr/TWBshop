@@ -20,8 +20,7 @@ from b2b_bot.menu_keyboards import (
     _qty_button_keyboard, _bun_qty_keyboard,
     _date_picker_keyboard, _day_picker_keyboard, _time_picker_keyboard,
     _method_picker_keyboard, _existing_orders_keyboard,
-    _confirm_screen_keyboard, _recurring_day_keyboard,
-    _recurring_time_keyboard, _recurring_method_keyboard,
+    _order_type_keyboard, _confirm_screen_keyboard, _recurring_day_keyboard,
     _format_time,
 )
 from b2b_bot.customers import get_business_name, is_b2b_group
@@ -317,7 +316,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
                 f"🕐 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
-                reply_markup=_date_picker_keyboard(),
+                reply_markup=_date_picker_keyboard(back_cb="bm_cs_once"),
             )
 
         elif data == "bm_date_tmrw":
@@ -328,7 +327,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             tomorrow_d   = date.today() + timedelta(days=1)
             await query.edit_message_text(
                 f"🕐 Select time — tomorrow ({tomorrow_d.strftime('%a %d %b')}):",
-                reply_markup=_time_picker_keyboard(tomorrow_str),
+                reply_markup=_time_picker_keyboard(f"bm_dt_{tomorrow_str}_", "bm_time_select"),
             )
 
         elif data.startswith("bm_date_m_"):
@@ -346,7 +345,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             d = datetime.strptime(date_str, "%Y%m%d").date()
             await query.edit_message_text(
                 f"🕐 Select time — {d.strftime('%A %d %B')}:",
-                reply_markup=_time_picker_keyboard(date_str),
+                reply_markup=_time_picker_keyboard(f"bm_dt_{date_str}_", f"bm_date_m_{date_str[:6]}"),
             )
 
         elif data.startswith("bm_dt_"):
@@ -366,11 +365,15 @@ async def handle_menu_callback(update: Update, context) -> None:
                     ck_def = B2B_CAKE_MENU[k]
                     ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
                     cake_tmp.append({"item": k, "qty": q, "order_type": ot})
-            total = order_total(bread_tmp, cake_tmp)
-            d = datetime.strptime(date_str, "%Y%m%d").date()
+            total     = order_total(bread_tmp, cake_tmp)
+            d         = datetime.strptime(date_str, "%Y%m%d").date()
+            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+            back_cb   = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
             await query.edit_message_text(
                 f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
-                reply_markup=_method_picker_keyboard(date_str, time_code, total),
+                reply_markup=_method_picker_keyboard(
+                    f"bm_method_{date_str}_{time_code}_", back_cb, total
+                ),
             )
 
         elif data.startswith("bm_method_"):
@@ -657,18 +660,29 @@ async def handle_menu_callback(update: Update, context) -> None:
                 await query.answer("Cart is empty — add items first.", show_alert=True)
                 return
             await query.edit_message_text(
-                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
-                reply_markup=_confirm_screen_keyboard(chat_id),
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nOne-time or recurring order?",
+                reply_markup=_order_type_keyboard(chat_id),
             )
 
-        # ── Confirm screen ────────────────────────────────────────────────────
+        # ── Order type branch ─────────────────────────────────────────────────
         elif data == "bm_cs_show":
             cart = _cart.get(chat_id, {})
             if not cart:
                 await query.answer("Cart is empty.", show_alert=True)
                 return
             await query.edit_message_text(
-                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nOne-time or recurring order?",
+                reply_markup=_order_type_keyboard(chat_id),
+            )
+
+        elif data == "bm_cs_once":
+            cart = _cart.get(chat_id, {})
+            if not cart:
+                await query.answer("Cart is empty.", show_alert=True)
+                return
+            _confirm_flow_mode[chat_id] = True
+            await query.edit_message_text(
+                f"📦 One-time order — when and how?\n\n{_cart_block(chat_id)}",
                 reply_markup=_confirm_screen_keyboard(chat_id),
             )
 
@@ -679,16 +693,18 @@ async def handle_menu_callback(update: Update, context) -> None:
             if not _cart.get(chat_id):
                 await query.answer("Cart is empty.", show_alert=True)
                 return
+            _confirm_flow_mode[chat_id] = True
             from b2b_bot.pricing import order_total as _ot
             date_str  = datetime.strptime(_get_cart_date(chat_id), "%Y-%m-%d").strftime("%Y%m%d")
             curr_time = _get_cart_time(chat_id)
             time_code = next((c for c in _DELIVERY_TIME_CODES if _format_time(c) == curr_time), "0800")
             bread_tmp, cake_tmp = _parse_cart_items(chat_id)
             total = _ot(bread_tmp, cake_tmp)
-            _confirm_flow_mode[chat_id] = True
             await query.edit_message_text(
                 "🚚 Pickup or delivery?",
-                reply_markup=_method_picker_keyboard(date_str, time_code, total),
+                reply_markup=_method_picker_keyboard(
+                    f"bm_method_{date_str}_{time_code}_", "bm_cs_once", total
+                ),
             )
 
         elif data == "bm_cs_datetime":
@@ -697,10 +713,11 @@ async def handle_menu_callback(update: Update, context) -> None:
             date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
                 f"📅 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
-                reply_markup=_date_picker_keyboard(),
+                reply_markup=_date_picker_keyboard(back_cb="bm_cs_once"),
             )
 
         elif data == "bm_cs_recurring":
+            _confirm_flow_mode.pop(chat_id, None)
             cart = _cart.get(chat_id, {})
             if not cart:
                 await query.answer("Cart is empty.", show_alert=True)
@@ -742,7 +759,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _recurring_pending.setdefault(chat_id, {})["days"] = sorted(sel)
             await query.edit_message_text(
                 f"🔄 {days_label(sorted(sel))} — what time?",
-                reply_markup=_recurring_time_keyboard(),
+                reply_markup=_time_picker_keyboard("bm_rt_", "bm_cs_recurring"),
             )
 
         elif data.startswith("bm_rt_"):
@@ -754,7 +771,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             days_lbl = days_label(pending.get("days", []))
             await query.edit_message_text(
                 f"🔄 {days_lbl} at {_format_time(time_code)} — pickup or delivery?",
-                reply_markup=_recurring_method_keyboard(),
+                reply_markup=_method_picker_keyboard("bm_rm_", "bm_cs_recurring"),
             )
 
         elif data.startswith("bm_rm_"):
@@ -838,8 +855,10 @@ async def handle_menu_callback(update: Update, context) -> None:
             from b2b_bot.recurring import days_label
             days = json.loads(rec["days_of_week"])
             await query.edit_message_text(
-                f"✕ Standing order ({days_label(days)}) cancelled.\n\nType /menu to start a new order.",
-                reply_markup=None,
+                f"✕ Standing order ({days_label(days)}) cancelled.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("📋 New Order", callback_data="bm_new_order"),
+                ]]),
             )
 
     except Exception as e:

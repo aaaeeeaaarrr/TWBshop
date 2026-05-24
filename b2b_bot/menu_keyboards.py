@@ -403,7 +403,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, sesame_code: str | None, current
     return InlineKeyboardMarkup(rows)
 
 
-def _date_picker_keyboard() -> InlineKeyboardMarkup:
+def _date_picker_keyboard(back_cb: str = "bm_back") -> InlineKeyboardMarkup:
     today      = date.today()
     tomorrow   = today + timedelta(days=1)
     curr_month = today.replace(day=1)
@@ -422,7 +422,7 @@ def _date_picker_keyboard() -> InlineKeyboardMarkup:
                 callback_data=f"bm_date_m_{next_month.strftime('%Y%m')}",
             ),
         ],
-        [InlineKeyboardButton("← Back to Menu", callback_data="bm_back")],
+        [InlineKeyboardButton("← Back", callback_data=back_cb)],
     ])
 
 
@@ -449,38 +449,35 @@ def _day_picker_keyboard(yyyymm: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def _time_picker_keyboard(date_str: str) -> InlineKeyboardMarkup:
+def _time_picker_keyboard(cb_prefix: str, back_cb: str) -> InlineKeyboardMarkup:
     rows = []
     row  = []
     for code in _DELIVERY_TIME_CODES:
         row.append(InlineKeyboardButton(
             _format_time(code),
-            callback_data=f"bm_dt_{date_str}_{code}",
+            callback_data=f"{cb_prefix}{code}",
         ))
         if len(row) == 3:
             rows.append(row)
             row = []
     if row:
         rows.append(row)
-    tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
-    back_cb = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
     rows.append([InlineKeyboardButton("← Back", callback_data=back_cb)])
     return InlineKeyboardMarkup(rows)
 
 
-def _method_picker_keyboard(date_str: str, time_code: str, cart_total: float) -> InlineKeyboardMarkup:
-    free = cart_total >= FREE_DELIVERY_THRESHOLD
+def _method_picker_keyboard(cb_prefix: str, back_cb: str, total: float = 0) -> InlineKeyboardMarkup:
+    free = total >= FREE_DELIVERY_THRESHOLD
     delivery_label = "🚛 Delivery (free)" if free else f"🚛 Delivery (fee on orders under ${FREE_DELIVERY_THRESHOLD:.0f})"
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏪 Pickup (free)", callback_data=f"bm_method_{date_str}_{time_code}_pickup")],
-        [InlineKeyboardButton(delivery_label,      callback_data=f"bm_method_{date_str}_{time_code}_delivery")],
-        [InlineKeyboardButton("← Back",            callback_data=f"bm_date_d_{date_str}")],
+        [InlineKeyboardButton("🏪 Pickup (free)", callback_data=f"{cb_prefix}pickup")],
+        [InlineKeyboardButton(delivery_label,      callback_data=f"{cb_prefix}delivery")],
+        [InlineKeyboardButton("← Back",            callback_data=back_cb)],
     ])
 
 
-def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
-    """Intermediate screen shown after tapping 'Confirm Order'."""
-    from b2b_bot.recurring import days_label
+def _order_type_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+    """Branch screen shown after tapping 'Confirm Order' — one-time or recurring."""
     rows = []
     method = _get_cart_method(chat_id)
     if method:
@@ -489,14 +486,34 @@ def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         emoji      = "🚛" if method == "delivery" else "🏪"
         method_lbl = "Delivery" if method == "delivery" else "Pickup"
         rows.append([InlineKeyboardButton(
-            f"{emoji} {method_lbl} · {date_label} at {time_str}",
+            f"✅ {emoji} {method_lbl} · {date_label} at {time_str}",
+            callback_data="bm_cs_default",
+        )])
+    rows += [
+        [InlineKeyboardButton("📦 One-time Order",  callback_data="bm_cs_once")],
+        [InlineKeyboardButton("🔄 Recurring Order", callback_data="bm_cs_recurring")],
+        [InlineKeyboardButton("← Back to Menu",    callback_data="bm_back")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+    """One-time order sub-screen — change delivery/time or confirm."""
+    rows = []
+    method = _get_cart_method(chat_id)
+    if method:
+        time_str   = _get_cart_time(chat_id)
+        date_label = _delivery_date_label(_get_cart_date(chat_id))
+        emoji      = "🚛" if method == "delivery" else "🏪"
+        method_lbl = "Delivery" if method == "delivery" else "Pickup"
+        rows.append([InlineKeyboardButton(
+            f"✅ Confirm: {emoji} {method_lbl} · {date_label} at {time_str}",
             callback_data="bm_cs_default",
         )])
     rows += [
         [InlineKeyboardButton("🚛🏪 Change Delivery/Pickup", callback_data="bm_cs_delivery")],
         [InlineKeyboardButton("📅 Change Date+Time",         callback_data="bm_cs_datetime")],
-        [InlineKeyboardButton("🔄 Daily/Weekly Orders",       callback_data="bm_cs_recurring")],
-        [InlineKeyboardButton("← Back to Menu",             callback_data="bm_back")],
+        [InlineKeyboardButton("← Back",                     callback_data="bm_confirm")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -522,36 +539,9 @@ def _recurring_day_keyboard(selected: set) -> InlineKeyboardMarkup:
     nav = []
     if selected:
         nav.append(InlineKeyboardButton("✅ Done", callback_data="bm_rd_done"))
-    nav.append(InlineKeyboardButton("← Back", callback_data="bm_cs_show"))
+    nav.append(InlineKeyboardButton("← Back", callback_data="bm_confirm"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
-
-
-def _recurring_time_keyboard() -> InlineKeyboardMarkup:
-    """Time picker for recurring order (same slots, different callback prefix)."""
-    rows = []
-    row  = []
-    for code in _DELIVERY_TIME_CODES:
-        row.append(InlineKeyboardButton(
-            _format_time(code),
-            callback_data=f"bm_rt_{code}",
-        ))
-        if len(row) == 3:
-            rows.append(row)
-            row = []
-    if row:
-        rows.append(row)
-    rows.append([InlineKeyboardButton("← Back", callback_data="bm_cs_recurring")])
-    return InlineKeyboardMarkup(rows)
-
-
-def _recurring_method_keyboard() -> InlineKeyboardMarkup:
-    """Simple pickup/delivery picker for recurring order method."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏪 Pickup",   callback_data="bm_rm_pickup")],
-        [InlineKeyboardButton("🚛 Delivery", callback_data="bm_rm_delivery")],
-        [InlineKeyboardButton("← Back",     callback_data="bm_cs_recurring")],
-    ])
 
 
 def _existing_orders_keyboard(
