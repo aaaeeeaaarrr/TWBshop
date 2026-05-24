@@ -20,7 +20,7 @@ from b2b_bot.menu_keyboards import (
     _qty_button_keyboard, _bun_qty_keyboard,
     _date_picker_keyboard, _day_picker_keyboard, _time_picker_keyboard,
     _method_picker_keyboard, _existing_orders_keyboard,
-    _order_type_keyboard, _confirm_screen_keyboard, _recurring_day_keyboard,
+    _confirm_screen_keyboard, _recurring_day_keyboard,
     _format_time,
 )
 from b2b_bot.customers import get_business_name, is_b2b_group
@@ -316,7 +316,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
                 f"🕐 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
-                reply_markup=_date_picker_keyboard(back_cb="bm_cs_once"),
+                reply_markup=_date_picker_keyboard(back_cb="bm_cs_show"),
             )
 
         elif data == "bm_date_tmrw":
@@ -660,29 +660,18 @@ async def handle_menu_callback(update: Update, context) -> None:
                 await query.answer("Cart is empty — add items first.", show_alert=True)
                 return
             await query.edit_message_text(
-                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nOne-time or recurring order?",
-                reply_markup=_order_type_keyboard(chat_id),
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                reply_markup=_confirm_screen_keyboard(chat_id),
             )
 
-        # ── Order type branch ─────────────────────────────────────────────────
+        # ── Confirm screen ────────────────────────────────────────────────────
         elif data == "bm_cs_show":
             cart = _cart.get(chat_id, {})
             if not cart:
                 await query.answer("Cart is empty.", show_alert=True)
                 return
             await query.edit_message_text(
-                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nOne-time or recurring order?",
-                reply_markup=_order_type_keyboard(chat_id),
-            )
-
-        elif data == "bm_cs_once":
-            cart = _cart.get(chat_id, {})
-            if not cart:
-                await query.answer("Cart is empty.", show_alert=True)
-                return
-            _confirm_flow_mode[chat_id] = True
-            await query.edit_message_text(
-                f"📦 One-time order — when and how?\n\n{_cart_block(chat_id)}",
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
                 reply_markup=_confirm_screen_keyboard(chat_id),
             )
 
@@ -703,7 +692,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 "🚚 Pickup or delivery?",
                 reply_markup=_method_picker_keyboard(
-                    f"bm_method_{date_str}_{time_code}_", "bm_cs_once", total
+                    f"bm_method_{date_str}_{time_code}_", "bm_cs_show", total
                 ),
             )
 
@@ -713,7 +702,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             date_label = _delivery_date_label(_get_cart_date(chat_id))
             await query.edit_message_text(
                 f"📅 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
-                reply_markup=_date_picker_keyboard(back_cb="bm_cs_once"),
+                reply_markup=_date_picker_keyboard(back_cb="bm_cs_show"),
             )
 
         elif data == "bm_cs_recurring":

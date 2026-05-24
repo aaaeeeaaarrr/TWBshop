@@ -476,29 +476,8 @@ def _method_picker_keyboard(cb_prefix: str, back_cb: str, total: float = 0) -> I
     ])
 
 
-def _order_type_keyboard(chat_id: int) -> InlineKeyboardMarkup:
-    """Branch screen shown after tapping 'Confirm Order' — one-time or recurring."""
-    rows = []
-    method = _get_cart_method(chat_id)
-    if method:
-        time_str   = _get_cart_time(chat_id)
-        date_label = _delivery_date_label(_get_cart_date(chat_id))
-        emoji      = "🚛" if method == "delivery" else "🏪"
-        method_lbl = "Delivery" if method == "delivery" else "Pickup"
-        rows.append([InlineKeyboardButton(
-            f"✅ {emoji} {method_lbl} · {date_label} at {time_str}",
-            callback_data="bm_cs_default",
-        )])
-    rows += [
-        [InlineKeyboardButton("📦 One-time Order",  callback_data="bm_cs_once")],
-        [InlineKeyboardButton("🔄 Recurring Order", callback_data="bm_cs_recurring")],
-        [InlineKeyboardButton("← Back to Menu",    callback_data="bm_back")],
-    ]
-    return InlineKeyboardMarkup(rows)
-
-
 def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
-    """One-time order sub-screen — change delivery/time or confirm."""
+    """Confirm screen — quick-confirm default, change options, or set up recurring."""
     rows = []
     method = _get_cart_method(chat_id)
     if method:
@@ -507,13 +486,14 @@ def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         emoji      = "🚛" if method == "delivery" else "🏪"
         method_lbl = "Delivery" if method == "delivery" else "Pickup"
         rows.append([InlineKeyboardButton(
-            f"✅ Confirm: {emoji} {method_lbl} · {date_label} at {time_str}",
+            f"{emoji} {method_lbl} · {date_label} at {time_str}",
             callback_data="bm_cs_default",
         )])
     rows += [
         [InlineKeyboardButton("🚛🏪 Change Delivery/Pickup", callback_data="bm_cs_delivery")],
         [InlineKeyboardButton("📅 Change Date+Time",         callback_data="bm_cs_datetime")],
-        [InlineKeyboardButton("← Back",                     callback_data="bm_confirm")],
+        [InlineKeyboardButton("🔄 Daily/Weekly Orders",      callback_data="bm_cs_recurring")],
+        [InlineKeyboardButton("← Back to Menu",             callback_data="bm_back")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -539,7 +519,7 @@ def _recurring_day_keyboard(selected: set) -> InlineKeyboardMarkup:
     nav = []
     if selected:
         nav.append(InlineKeyboardButton("✅ Done", callback_data="bm_rd_done"))
-    nav.append(InlineKeyboardButton("← Back", callback_data="bm_confirm"))
+    nav.append(InlineKeyboardButton("← Back", callback_data="bm_cs_show"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
