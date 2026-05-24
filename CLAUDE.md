@@ -130,9 +130,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-24
-**Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** B2B improvements — 10:10pm lock+summary (was 9pm), 9pm pre-summary (totals only, auto-deleted at 10:10pm), Tomorrow button locked after 10:10pm, same-date orders auto-merged into one session, in-memory state (pending/state/editing_session/last_confirmation) persisted to DB so bot restarts don't break mid-order flows, missed summaries auto-fired on startup if bot was down at scheduled time, Open Menu button stays intact after tap (cart opens as new message below).
-**Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
+**Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
+**Last completed:** B2B recurring (Daily/Weekly) orders — intermediate confirm screen after "Confirm Order" (default method/time, Change Delivery/Pickup, Change Date+Time, Daily/Weekly), multi-select weekday picker, time+method setup, pre-confirmation gate, standing orders shown in main menu as "Edit Mon/Wed/Fri" buttons, 7am/1pm/6pm reminders the day before each fulfillment, grace period for newly created orders, auto-skip at 10:10pm, confirmed instances written to b2b_orders so 9pm pre-summary and 10:10pm full summary include them automatically.
+**Next task:** None defined
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
