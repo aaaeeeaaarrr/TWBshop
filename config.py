@@ -41,5 +41,9 @@ B2B_STAFF_GROUP_ID = -1003457945308
 # Staff user IDs allowed to trigger /summary manually. Leave [] to allow anyone.
 B2B_STAFF_USER_IDS: list[int] = []
 
+# Telegram user IDs allowed to add the B2B bot to new customer groups.
+# Anyone else who adds the bot causes it to leave immediately.
+B2B_ADMIN_USER_IDS: list[int] = [1271537077]
+
 # Your personal Telegram user ID — payment screenshots are forwarded here for approval.
 OWNER_TELEGRAM_ID: int = 1313155971

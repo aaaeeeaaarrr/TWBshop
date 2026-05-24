@@ -23,7 +23,7 @@ from b2b_bot.menu_keyboards import (
     _confirm_screen_keyboard, _recurring_day_keyboard,
     _format_time,
 )
-from b2b_bot.customers import get_business_name, is_b2b_group
+from b2b_bot.customers import get_business_name, is_b2b_group, clean_group_title
 from b2b_bot.menu import B2B_MENU, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import order_total
@@ -129,24 +129,34 @@ async def handle_menu_command(update: Update, context) -> None:
 
 
 async def handle_welcome(update: Update, context) -> None:
-    """Fires when the bot is added to a B2B group."""
+    """Fires when the bot is added to a group.
+
+    Only trusted admins (config.B2B_ADMIN_USER_IDS) may add the bot.
+    Anyone else triggers an immediate leave. Trusted adds auto-register
+    the group using the cleaned Telegram group title as the business name.
+    """
     member = update.my_chat_member
     if not member:
         return
     chat_id = member.chat.id
     if member.new_chat_member.status not in ("member", "administrator"):
         return
-    if not is_b2b_group(chat_id):
+
+    inviter_id = member.from_user.id if member.from_user else None
+    if inviter_id not in config.B2B_ADMIN_USER_IDS:
         await context.bot.leave_chat(chat_id)
         return
+
+    group_title = member.chat.title or str(chat_id)
+    business_name = clean_group_title(group_title)
+    upsert_b2b_customer(chat_id, business_name)
+
     _qty_pending.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
-    business = get_business_name(chat_id)
-    name_str = f" {business}" if business else ""
     sent = await context.bot.send_message(
         chat_id,
-        f"👋 Hello{name_str}! I'm your TWB order bot.\n\n"
-        "Type your order anytime, or browse the menu below:",
+        f"👋 Hello {business_name}! I'm your TWB order bot.\n\n"
+        "Browse the menu below:",
         reply_markup=_category_keyboard(chat_id),
     )
     _menu_msg[chat_id] = sent.message_id

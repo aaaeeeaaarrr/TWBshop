@@ -144,6 +144,12 @@ async def cmd_balance(update: Update, context) -> None:
 def main() -> None:
     database.init_db()
 
+    from b2b_bot.customers import B2B_CUSTOMERS
+    from shared.database import get_b2b_customer, upsert_b2b_customer as _upsert
+    for gid, name in B2B_CUSTOMERS.items():
+        if not get_b2b_customer(gid):
+            _upsert(gid, name)
+
     app = (
         Application.builder()
         .token(config.B2B_BOT_TOKEN)
