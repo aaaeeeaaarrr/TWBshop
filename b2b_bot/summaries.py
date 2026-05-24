@@ -21,6 +21,8 @@ from shared.database import (
 
 logger = logging.getLogger(__name__)
 
+_pre_summary_msg_id: int | None = None
+
 
 def _cake_total_label(row) -> str:
     order_type = row["order_type"]
@@ -49,7 +51,42 @@ def _cake_order_label(row) -> str:
     return f"  • {qty}x {row['item']} — piece"
 
 
+async def send_b2b_pre_summary(bot: Bot, target_date: str | None = None) -> None:
+    global _pre_summary_msg_id
+    day = target_date or (date.today() + timedelta(days=1)).isoformat()
+    bread_totals = get_b2b_daily_totals(day)
+    cake_totals  = get_b2b_cake_daily_totals(day)
+
+    lines = ["⏳ Wait till 10:10pm for full order list", ""]
+    if not bread_totals and not cake_totals:
+        lines.append(f"No B2B orders yet for {day}.")
+    else:
+        lines.append(f"B2B TOTALS — {day}")
+        lines.append("")
+        if bread_totals:
+            lines.append("TOTAL BREADS:")
+            for row in bread_totals:
+                lines.append(f"  {row['item']}: {row['total']}")
+            lines.append("")
+        if cake_totals:
+            lines.append("TOTAL CAKES:")
+            for row in cake_totals:
+                lines.append(f"  {_cake_total_label(row)}: {row['total']}")
+
+    msg = await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
+    _pre_summary_msg_id = msg.message_id
+    logger.info("Sent B2B pre-summary for %s (msg_id=%s)", day, msg.message_id)
+
+
 async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
+    global _pre_summary_msg_id
+    if _pre_summary_msg_id:
+        try:
+            await bot.delete_message(config.B2B_STAFF_GROUP_ID, _pre_summary_msg_id)
+        except Exception:
+            pass
+        _pre_summary_msg_id = None
+
     # Default: tomorrow's orders only. Same-day cake orders (delivery_date = today)
     # are excluded here — they were already handled by the instant notification on confirm.
     day = target_date or (date.today() + timedelta(days=1)).isoformat()

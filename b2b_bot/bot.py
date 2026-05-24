@@ -28,7 +28,7 @@ from b2b_bot.menu_flow import (
     handle_qty_input, qty_pending_filter,
 )
 from b2b_bot.orders import handle_group_message, handle_callback
-from b2b_bot.summaries import send_b2b_summary, send_b2b_mini_reminder
+from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -36,7 +36,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 10:10pm Phnom Penh (UTC+7) = 15:10 UTC
+# 9pm Phnom Penh (UTC+7) = 14:00 UTC — pre-summary (totals only)
+_PRE_SUMMARY_HOUR_UTC   = 14
+_PRE_SUMMARY_MINUTE_UTC = 0
+
+# 10:10pm Phnom Penh (UTC+7) = 15:10 UTC — full summary
 _SUMMARY_HOUR_UTC   = 15
 _SUMMARY_MINUTE_UTC = 10
 
@@ -47,6 +51,10 @@ _REMINDER_MINUTE_UTC = 0
 # 6am Phnom Penh (UTC+7) = 23:00 UTC (previous calendar day)
 _PAYMENT_REMINDER_HOUR_UTC   = 23
 _PAYMENT_REMINDER_MINUTE_UTC = 0
+
+
+async def _job_b2b_pre_summary(context) -> None:
+    await send_b2b_pre_summary(context.bot)
 
 
 async def _job_b2b_summary(context) -> None:
@@ -140,17 +148,23 @@ def main() -> None:
     app.add_handler(CommandHandler("summary", cmd_summary))
     app.add_handler(CommandHandler("balance", cmd_balance))
 
-    # Nightly summary at 10pm Phnom Penh time
+    # Pre-summary at 9pm Phnom Penh — totals only, deleted when full summary fires
+    pre_summary_time = datetime.time(
+        hour=_PRE_SUMMARY_HOUR_UTC,
+        minute=_PRE_SUMMARY_MINUTE_UTC,
+        tzinfo=datetime.timezone.utc,
+    )
+    app.job_queue.run_daily(_job_b2b_pre_summary, time=pre_summary_time)
+    logger.info("B2B pre-summary scheduled at %02d:%02d UTC (21:00 Phnom Penh)", _PRE_SUMMARY_HOUR_UTC, _PRE_SUMMARY_MINUTE_UTC)
+
+    # Full summary at 10:10pm Phnom Penh
     summary_time = datetime.time(
         hour=_SUMMARY_HOUR_UTC,
         minute=_SUMMARY_MINUTE_UTC,
         tzinfo=datetime.timezone.utc,
     )
     app.job_queue.run_daily(_job_b2b_summary, time=summary_time)
-    logger.info(
-        "B2B nightly summary scheduled at %02d:%02d UTC (21:00 Phnom Penh)",
-        _SUMMARY_HOUR_UTC, _SUMMARY_MINUTE_UTC,
-    )
+    logger.info("B2B full summary scheduled at %02d:%02d UTC (22:10 Phnom Penh)", _SUMMARY_HOUR_UTC, _SUMMARY_MINUTE_UTC)
 
     # Mini order reminder at 9am Phnom Penh — fires 48h before delivery date
     reminder_time = datetime.time(
