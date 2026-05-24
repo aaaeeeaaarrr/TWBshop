@@ -117,7 +117,7 @@ _CATEGORIES: dict[str, dict] = {
     },
     "desserts": {
         "emoji": "🍮", "label": "Desserts / Cake Slices",
-        "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] in ("B", "C")],
+        "items": [k for k, v in B2B_CAKE_MENU.items()],
     },
 }
 
@@ -151,13 +151,13 @@ def _bun_price(grams: int) -> float:
 
 # ── Display helpers ───────────────────────────────────────────────────────────
 
-def _price_label(name: str) -> str:
+def _price_label(name: str, in_desserts: bool = False) -> str:
     if name in B2B_MENU:
         d = B2B_MENU[name]
         return f"${d['price']:.2f}/{d['unit']}" if d.get("unit") else f"${d['price']:.2f}"
     d = B2B_CAKE_MENU[name]
     if d["cake_category"] == "A":
-        return f"${d['price_full']:.2f}"
+        return f"${d['price_slice']:.2f}/slice" if in_desserts else f"${d['price_full']:.2f}"
     if d["cake_category"] == "B":
         return f"${d['price_piece']:.2f}/pc or ${d['price_tray']:.2f}/tray"
     return f"${d['price_piece']:.2f}/pc"
@@ -231,11 +231,12 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
 def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
+    in_desserts = (cat_key == "desserts")
     for name in _CATEGORIES[cat_key]["items"]:
         qty    = cart.get(name, 0)
         slug   = _SLUG[name]
         suffix = f"  ✓ ×{qty}" if qty else ""
-        label  = f"{name}{suffix}\n{_price_label(name)}"
+        label  = f"{name}{suffix}\n{_price_label(name, in_desserts=in_desserts)}"
         rows.append([InlineKeyboardButton(
             label,
             callback_data=f"bm_qty_{slug}_{cat_key}",
