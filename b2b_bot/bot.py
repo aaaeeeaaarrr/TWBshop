@@ -29,6 +29,7 @@ from b2b_bot.menu_flow import (
 )
 from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder
+from b2b_bot.recurring import send_recurring_reminders, auto_skip_unconfirmed
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -52,6 +53,11 @@ _REMINDER_MINUTE_UTC = 0
 _PAYMENT_REMINDER_HOUR_UTC   = 23
 _PAYMENT_REMINDER_MINUTE_UTC = 0
 
+# Recurring order reminders (1 day before fulfillment) — Phnom Penh → UTC
+_REC_REMINDER_1_HOUR_UTC = 0   # 7am PNH
+_REC_REMINDER_2_HOUR_UTC = 6   # 1pm PNH
+_REC_REMINDER_3_HOUR_UTC = 11  # 6pm PNH
+
 
 async def _startup_summary_check(app) -> None:
     from datetime import timezone, timedelta
@@ -73,7 +79,20 @@ async def _job_b2b_pre_summary(context) -> None:
 
 
 async def _job_b2b_summary(context) -> None:
+    await auto_skip_unconfirmed(context.bot)
     await send_b2b_summary(context.bot)
+
+
+async def _job_recurring_reminder_1(context) -> None:
+    await send_recurring_reminders(context.bot, reminder_num=1)
+
+
+async def _job_recurring_reminder_2(context) -> None:
+    await send_recurring_reminders(context.bot, reminder_num=2)
+
+
+async def _job_recurring_reminder_3(context) -> None:
+    await send_recurring_reminders(context.bot, reminder_num=3)
 
 
 async def _job_mini_reminder(context) -> None:
@@ -213,6 +232,19 @@ def main() -> None:
         days=(6,),  # Sunday UTC = Monday morning PNH
     )
     logger.info("B2B weekly payment reminder scheduled for Sunday 23:00 UTC (Monday 06:00 PNH)")
+
+    # Recurring order reminders — 7am, 1pm, 6pm Phnom Penh (the day before fulfillment)
+    for hour_utc, num in [
+        (_REC_REMINDER_1_HOUR_UTC, 1),
+        (_REC_REMINDER_2_HOUR_UTC, 2),
+        (_REC_REMINDER_3_HOUR_UTC, 3),
+    ]:
+        job_fn = [_job_recurring_reminder_1, _job_recurring_reminder_2, _job_recurring_reminder_3][num - 1]
+        app.job_queue.run_daily(
+            job_fn,
+            time=datetime.time(hour=hour_utc, minute=0, tzinfo=datetime.timezone.utc),
+        )
+        logger.info("Recurring reminder #%s scheduled at %02d:00 UTC", num, hour_utc)
 
     logger.info("B2B bot started.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

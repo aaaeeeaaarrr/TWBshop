@@ -12,14 +12,17 @@ from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
 from shared.database import get_b2b_customer
 
 # ── In-memory state ───────────────────────────────────────────────────────────
-_cart: dict[int, dict[str, int]] = {}     # {chat_id: {item_key: qty}}
-_qty_pending: dict[int, dict] = {}        # {chat_id: state dict}
-_menu_msg: dict[int, int] = {}            # {chat_id: message_id of active menu}
-_editing_session: dict[int, str] = {}     # {chat_id: session_key being replaced}
-_cart_time: dict[int, str] = {}           # {chat_id: delivery time  e.g. "8:00am"}
-_cart_date: dict[int, str] = {}           # {chat_id: delivery date  e.g. "2026-05-25"}
-_cart_method: dict[int, str] = {}         # {chat_id: "pickup" | "delivery"}
-_last_menu_prompt: dict[int, float] = {}  # {chat_id: monotonic time of last nudge}
+_cart: dict[int, dict[str, int]] = {}         # {chat_id: {item_key: qty}}
+_qty_pending: dict[int, dict] = {}            # {chat_id: state dict}
+_menu_msg: dict[int, int] = {}                # {chat_id: message_id of active menu}
+_editing_session: dict[int, str] = {}         # {chat_id: session_key being replaced}
+_cart_time: dict[int, str] = {}               # {chat_id: delivery time  e.g. "8:00am"}
+_cart_date: dict[int, str] = {}               # {chat_id: delivery date  e.g. "2026-05-25"}
+_cart_method: dict[int, str] = {}             # {chat_id: "pickup" | "delivery"}
+_last_menu_prompt: dict[int, float] = {}      # {chat_id: monotonic time of last nudge}
+_confirm_flow_mode: dict[int, bool] = {}      # {chat_id: True = after method pick, call _do_confirm}
+_recurring_days: dict[int, set] = {}          # {chat_id: set of selected day abbrevs}
+_recurring_pending: dict[int, dict] = {}      # {chat_id: pending recurring order config}
 
 # 10:10pm Phnom Penh = 15:10 UTC — orders locked after this time
 _LOCK_HOUR_UTC    = 15
@@ -227,14 +230,6 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
         callback_data="bm_buns",
     )])
     if cart:
-        time_str     = _get_cart_time(chat_id)
-        date_label   = _delivery_date_label(_get_cart_date(chat_id))
-        method       = _get_cart_method(chat_id)
-        method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else "Set delivery"
-        rows.append([InlineKeyboardButton(
-            f"🟡 {method_label} · {date_label} at {time_str}",
-            callback_data="bm_time_select",
-        )])
         rows.append([
             InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"),
             InlineKeyboardButton("🗑 Empty Cart",    callback_data="bm_empty_cart"),
@@ -483,7 +478,89 @@ def _method_picker_keyboard(date_str: str, time_code: str, cart_total: float) ->
     ])
 
 
-def _existing_orders_keyboard(sessions: list[dict], locked: bool) -> InlineKeyboardMarkup:
+def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+    """Intermediate screen shown after tapping 'Confirm Order'."""
+    from b2b_bot.recurring import days_label
+    rows = []
+    method = _get_cart_method(chat_id)
+    if method:
+        time_str   = _get_cart_time(chat_id)
+        date_label = _delivery_date_label(_get_cart_date(chat_id))
+        emoji      = "🚛" if method == "delivery" else "🏪"
+        method_lbl = "Delivery" if method == "delivery" else "Pickup"
+        rows.append([InlineKeyboardButton(
+            f"{emoji} {method_lbl} · {date_label} at {time_str}",
+            callback_data="bm_cs_default",
+        )])
+    rows += [
+        [InlineKeyboardButton("🚛🏪 Change Delivery/Pickup", callback_data="bm_cs_delivery")],
+        [InlineKeyboardButton("📅 Change Date+Time",         callback_data="bm_cs_datetime")],
+        [InlineKeyboardButton("🔄 Daily/Weekly",             callback_data="bm_cs_recurring")],
+        [InlineKeyboardButton("← Back to Menu",             callback_data="bm_back")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+_REC_DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+_REC_DAY_LABEL = {"mon": "Mon", "tue": "Tue", "wed": "Wed",
+                  "thu": "Thu", "fri": "Fri", "sat": "Sat", "sun": "Sun"}
+
+
+def _recurring_day_keyboard(selected: set) -> InlineKeyboardMarkup:
+    """Multi-select weekday picker for recurring order setup."""
+    rows = []
+    row  = []
+    for day in _REC_DAY_ORDER:
+        mark  = "✅ " if day in selected else ""
+        label = f"{mark}{_REC_DAY_LABEL[day]}"
+        row.append(InlineKeyboardButton(label, callback_data=f"bm_rd_{day}"))
+        if len(row) == 4:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    nav = []
+    if selected:
+        nav.append(InlineKeyboardButton("✅ Done", callback_data="bm_rd_done"))
+    nav.append(InlineKeyboardButton("← Back", callback_data="bm_cs_show"))
+    rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
+def _recurring_time_keyboard() -> InlineKeyboardMarkup:
+    """Time picker for recurring order (same slots, different callback prefix)."""
+    rows = []
+    row  = []
+    for code in _DELIVERY_TIME_CODES:
+        row.append(InlineKeyboardButton(
+            _format_time(code),
+            callback_data=f"bm_rt_{code}",
+        ))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton("← Back", callback_data="bm_cs_recurring")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _recurring_method_keyboard() -> InlineKeyboardMarkup:
+    """Simple pickup/delivery picker for recurring order method."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏪 Pickup",   callback_data="bm_rm_pickup")],
+        [InlineKeyboardButton("🚛 Delivery", callback_data="bm_rm_delivery")],
+        [InlineKeyboardButton("← Back",     callback_data="bm_cs_recurring")],
+    ])
+
+
+def _existing_orders_keyboard(
+    sessions: list[dict],
+    locked: bool,
+    recurring_orders: list[dict] | None = None,
+) -> InlineKeyboardMarkup:
+    from b2b_bot.recurring import days_label
+    import json
     rows = [[InlineKeyboardButton("➕ New Order", callback_data="bm_new_order")]]
     if not locked:
         for i, s in enumerate(sessions):
@@ -491,4 +568,11 @@ def _existing_orders_keyboard(sessions: list[dict], locked: bool) -> InlineKeybo
                 f"✏️ Edit Order #{i + 1}",
                 callback_data=f"bm_edit_session_{i}",
             )])
+    for rec in (recurring_orders or []):
+        days = json.loads(rec["days_of_week"])
+        label = days_label(days)
+        rows.append([InlineKeyboardButton(
+            f"🔄 Edit {label}",
+            callback_data=f"bm_edit_rec_{rec['id']}",
+        )])
     return InlineKeyboardMarkup(rows)

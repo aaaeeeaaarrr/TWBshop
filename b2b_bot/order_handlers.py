@@ -28,6 +28,9 @@ from shared.database import (
     get_order_state, set_order_state,
     get_last_confirmation_msg, set_last_confirmation_msg,
     set_menu_message_id,
+    save_b2b_recurring_order, get_recurring_order,
+    get_or_create_recurring_confirmation,
+    confirm_recurring_instance, skip_recurring_instance,
 )
 from shared.ai_client import extract_b2b_order_from_image
 
@@ -369,6 +372,99 @@ async def handle_callback(update: Update, context) -> None:
             delete_b2b_cake_orders_for_date(chat_id, delivery_date)
         label = _date_label(delivery_date) if delivery_date else "this delivery"
         await query.edit_message_text(f"All orders for {label} have been cancelled.")
+
+    elif query.data == "b2b_rec_setup_confirm":
+        from b2b_bot.menu_keyboards import _cart, _cart_time, _cart_date, _cart_method, _recurring_days, _recurring_pending
+        pending = _recurring_pending.pop(chat_id, None)
+        if not pending:
+            await query.edit_message_text("Setup session expired. Please start again via /menu.")
+            return
+        _recurring_days.pop(chat_id, None)
+        business_name = get_business_name(chat_id)
+        rec_id = save_b2b_recurring_order(
+            chat_id,
+            business_name,
+            pending["items"],
+            pending.get("days", []),
+            pending.get("time", ""),
+            pending.get("method", ""),
+        )
+        location = business_name if pending.get("method") == "delivery" else None
+        upsert_b2b_customer(chat_id, business_name, pending.get("method"), pending.get("time"), location)
+        _cart.pop(chat_id, None)
+        _cart_time.pop(chat_id, None)
+        _cart_date.pop(chat_id, None)
+        _cart_method.pop(chat_id, None)
+        from b2b_bot.recurring import days_label
+        days_lbl = days_label(pending.get("days", []))
+        await query.edit_message_text(
+            f"✅ Standing order confirmed — {days_lbl} at {pending.get('time', '')}!\n\n"
+            "We'll send you a reminder the day before each delivery. Just tap Confirm and it's done.",
+            reply_markup=None,
+        )
+        logger.info("Recurring order #%s saved for %s (%s)", rec_id, business_name, chat_id)
+
+    elif query.data == "b2b_rec_setup_cancel":
+        from b2b_bot.menu_keyboards import _cart, _recurring_days, _recurring_pending, _category_keyboard, _cart_block
+        _recurring_pending.pop(chat_id, None)
+        _recurring_days.pop(chat_id, None)
+        await query.edit_message_text(
+            f"Standing order cancelled.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
+            reply_markup=_category_keyboard(chat_id),
+        )
+
+    elif query.data.startswith("b2b_rec_confirm_"):
+        rest = query.data[16:]
+        rec_id_str, fulfillment_date = rest.rsplit("_", 1)
+        rec_id = int(rec_id_str)
+        rec = get_recurring_order(rec_id)
+        if not rec:
+            await query.edit_message_text("Standing order not found.")
+            return
+        conf = get_or_create_recurring_confirmation(rec_id, fulfillment_date)
+        if conf["status"] == "confirmed":
+            await query.answer("Already confirmed ✅", show_alert=True)
+            return
+        if conf["status"] == "skipped":
+            await query.answer("This order was already skipped.", show_alert=True)
+            return
+        changed = confirm_recurring_instance(rec_id, fulfillment_date)
+        if not changed:
+            await query.answer("Could not confirm — status may have changed.", show_alert=True)
+            return
+        import json
+        items = json.loads(rec["items_json"])
+        business_name = get_business_name(chat_id)
+        import uuid
+        batch_id = f"rec_{rec_id}_{fulfillment_date}"
+        if items.get("bread_items"):
+            save_b2b_order(chat_id, business_name, items["bread_items"], fulfillment_date, batch_id=batch_id)
+        upsert_b2b_customer(chat_id, business_name, rec["delivery_method"], rec["delivery_time"])
+        from b2b_bot.recurring import days_label
+        days_lbl = days_label(json.loads(rec["days_of_week"]))
+        await query.edit_message_text(
+            f"✅ Confirmed! Your {days_lbl} order is in for {fulfillment_date}.\n\nSee you tomorrow!",
+            reply_markup=None,
+        )
+        logger.info("Recurring order #%s confirmed for %s by %s", rec_id, fulfillment_date, chat_id)
+
+    elif query.data.startswith("b2b_rec_skip_"):
+        rest = query.data[13:]
+        rec_id_str, fulfillment_date = rest.rsplit("_", 1)
+        rec_id = int(rec_id_str)
+        conf = get_or_create_recurring_confirmation(rec_id, fulfillment_date)
+        if conf["status"] != "pending":
+            await query.answer(f"Already {conf['status']}.", show_alert=True)
+            return
+        skip_recurring_instance(rec_id, fulfillment_date)
+        rec = get_recurring_order(rec_id)
+        from b2b_bot.recurring import days_label
+        import json
+        days_lbl = days_label(json.loads(rec["days_of_week"])) if rec else "standing"
+        await query.edit_message_text(
+            f"⏭ Skipped for {fulfillment_date}. Your {days_lbl} order will resume next time.",
+            reply_markup=None,
+        )
 
 
 async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: int, mime_type: str = "image/jpeg", ai_items: list = None) -> None:

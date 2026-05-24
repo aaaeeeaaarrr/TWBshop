@@ -154,6 +154,30 @@ def init_db() -> None:
                     created_at       TEXT    NOT NULL
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_recurring_orders (
+                    id              SERIAL  PRIMARY KEY,
+                    group_chat_id   BIGINT  NOT NULL,
+                    business_name   TEXT    NOT NULL,
+                    items_json      TEXT    NOT NULL,
+                    days_of_week    TEXT    NOT NULL,
+                    delivery_time   TEXT    NOT NULL,
+                    delivery_method TEXT    NOT NULL,
+                    status          TEXT    NOT NULL DEFAULT 'active',
+                    created_at      TEXT    NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_recurring_confirmations (
+                    id                 SERIAL  PRIMARY KEY,
+                    recurring_order_id INTEGER NOT NULL REFERENCES b2b_recurring_orders(id),
+                    fulfillment_date   TEXT    NOT NULL,
+                    status             TEXT    NOT NULL DEFAULT 'pending',
+                    reminder_sent      INTEGER NOT NULL DEFAULT 0,
+                    created_at         TEXT    NOT NULL,
+                    UNIQUE(recurring_order_id, fulfillment_date)
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -732,3 +756,143 @@ def update_b2b_payment_status(payment_id: int, status: str) -> None:
                 "UPDATE b2b_payments SET status = %s, applied_at = %s WHERE id = %s",
                 (status, now, payment_id),
             )
+
+
+# ─── B2B recurring orders ─────────────────────────────────────────────────────
+
+_WEEKDAY_ABBREV = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def save_b2b_recurring_order(
+    group_chat_id: int,
+    business_name: str,
+    items: dict,
+    days_of_week: list[str],
+    delivery_time: str,
+    delivery_method: str,
+) -> int:
+    import json
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_recurring_orders
+                    (group_chat_id, business_name, items_json, days_of_week,
+                     delivery_time, delivery_method, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, 'active', %s)
+                RETURNING id
+            """, (group_chat_id, business_name, json.dumps(items),
+                  json.dumps(days_of_week), delivery_time, delivery_method, now))
+            return cur.fetchone()["id"]
+
+
+def get_b2b_recurring_orders(group_chat_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, group_chat_id, business_name, items_json, days_of_week,
+                       delivery_time, delivery_method, status, created_at
+                FROM b2b_recurring_orders
+                WHERE group_chat_id = %s AND status = 'active'
+                ORDER BY created_at
+            """, (group_chat_id,))
+            return cur.fetchall()
+
+
+def get_recurring_order(rec_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, group_chat_id, business_name, items_json, days_of_week,
+                       delivery_time, delivery_method, status, created_at
+                FROM b2b_recurring_orders WHERE id = %s
+            """, (rec_id,))
+            return cur.fetchone()
+
+
+def cancel_b2b_recurring_order(rec_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_recurring_orders SET status = 'cancelled' WHERE id = %s",
+                (rec_id,),
+            )
+
+
+def get_active_recurring_orders_for_date(target_date: str) -> list[dict]:
+    """Return all active recurring orders whose days include target_date's weekday."""
+    import json
+    from datetime import date as _date
+    day_abbrev = _WEEKDAY_ABBREV[_date.fromisoformat(target_date).weekday()]
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, group_chat_id, business_name, items_json, days_of_week,
+                       delivery_time, delivery_method, created_at
+                FROM b2b_recurring_orders WHERE status = 'active'
+            """)
+            rows = cur.fetchall()
+    return [r for r in rows if day_abbrev in json.loads(r["days_of_week"])]
+
+
+def get_or_create_recurring_confirmation(rec_id: int, fulfillment_date: str) -> dict:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_recurring_confirmations
+                    (recurring_order_id, fulfillment_date, status, reminder_sent, created_at)
+                VALUES (%s, %s, 'pending', 0, %s)
+                ON CONFLICT (recurring_order_id, fulfillment_date) DO NOTHING
+            """, (rec_id, fulfillment_date, now))
+            cur.execute("""
+                SELECT id, recurring_order_id, fulfillment_date, status, reminder_sent
+                FROM b2b_recurring_confirmations
+                WHERE recurring_order_id = %s AND fulfillment_date = %s
+            """, (rec_id, fulfillment_date))
+            return cur.fetchone()
+
+
+def update_recurring_reminder_count(rec_id: int, fulfillment_date: str, count: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_recurring_confirmations SET reminder_sent = %s
+                WHERE recurring_order_id = %s AND fulfillment_date = %s
+            """, (count, rec_id, fulfillment_date))
+
+
+def confirm_recurring_instance(rec_id: int, fulfillment_date: str) -> bool:
+    """Mark a recurring instance confirmed. Returns True if it was pending."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_recurring_confirmations SET status = 'confirmed'
+                WHERE recurring_order_id = %s AND fulfillment_date = %s AND status = 'pending'
+            """, (rec_id, fulfillment_date))
+            return cur.rowcount > 0
+
+
+def skip_recurring_instance(rec_id: int, fulfillment_date: str) -> bool:
+    """Mark a recurring instance skipped. Returns True if it was pending."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_recurring_confirmations SET status = 'skipped'
+                WHERE recurring_order_id = %s AND fulfillment_date = %s AND status = 'pending'
+            """, (rec_id, fulfillment_date))
+            return cur.rowcount > 0
+
+
+def get_pending_recurring_for_date(target_date: str) -> list[dict]:
+    """All pending (unconfirmed/unskipped) recurring confirmation rows for a date."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT rc.id, rc.recurring_order_id, rc.fulfillment_date, rc.reminder_sent,
+                       ro.group_chat_id
+                FROM b2b_recurring_confirmations rc
+                JOIN b2b_recurring_orders ro ON ro.id = rc.recurring_order_id
+                WHERE rc.fulfillment_date = %s AND rc.status = 'pending'
+            """, (target_date,))
+            return cur.fetchall()

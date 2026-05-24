@@ -8,7 +8,9 @@ import config
 from b2b_bot.menu_keyboards import (
     _cart, _qty_pending, _menu_msg, _editing_session,
     _cart_time, _cart_date, _cart_method, _last_menu_prompt,
+    _confirm_flow_mode, _recurring_days, _recurring_pending,
     _SESAME_CODE_LABEL, _SESAME_LABEL_CODE,
+    _DELIVERY_TIME_CODES,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
     _orders_locked, _MENU_PROMPT_COOLDOWN_SEC,
     _CATEGORIES, _BUNS, _NAME,
@@ -18,6 +20,8 @@ from b2b_bot.menu_keyboards import (
     _qty_button_keyboard, _bun_qty_keyboard,
     _date_picker_keyboard, _day_picker_keyboard, _time_picker_keyboard,
     _method_picker_keyboard, _existing_orders_keyboard,
+    _confirm_screen_keyboard, _recurring_day_keyboard,
+    _recurring_time_keyboard, _recurring_method_keyboard,
     _format_time,
 )
 from b2b_bot.customers import get_business_name, is_b2b_group
@@ -31,6 +35,7 @@ from shared.database import (
     upsert_b2b_customer,
     get_editing_session, set_editing_session,
     set_pending_order, set_order_state, set_last_confirmation_msg,
+    get_b2b_recurring_orders, get_recurring_order, cancel_b2b_recurring_order,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,15 +93,27 @@ async def handle_menu_command(update: Update, context) -> None:
     _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
 
-    delivery_date = _get_cart_date(chat_id)
-    sessions = get_b2b_order_sessions(chat_id, delivery_date)
+    delivery_date    = _get_cart_date(chat_id)
+    sessions         = get_b2b_order_sessions(chat_id, delivery_date)
+    recurring_orders = get_b2b_recurring_orders(chat_id)
 
-    if sessions:
+    if sessions or recurring_orders:
         locked = _orders_locked()
-        n = len(sessions)
-        lines = [f"You already have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n"]
-        for i, s in enumerate(sessions, 1):
-            lines.append(f"Order #{i}:\n{_session_summary(s)}")
+        lines = []
+        if sessions:
+            n = len(sessions)
+            lines.append(f"You have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n")
+            for i, s in enumerate(sessions, 1):
+                lines.append(f"Order #{i}:\n{_session_summary(s)}")
+        if recurring_orders:
+            from b2b_bot.recurring import days_label
+            import json
+            if lines:
+                lines.append("")
+            lines.append("Standing orders:")
+            for rec in recurring_orders:
+                days = json.loads(rec["days_of_week"])
+                lines.append(f"  🔄 {days_label(days)} at {rec['delivery_time']}")
         if locked:
             lines.append("\n🔒 Orders are locked — bakery is producing.")
             lines.append("Anything urgent, chat with our staff here, no private chats please")
@@ -104,7 +121,7 @@ async def handle_menu_command(update: Update, context) -> None:
             lines.append("\nWhat would you like to do?")
         sent = await update.message.reply_text(
             "\n".join(lines),
-            reply_markup=_existing_orders_keyboard(sessions, locked),
+            reply_markup=_existing_orders_keyboard(sessions, locked, recurring_orders),
         )
     else:
         sent = await update.message.reply_text(
@@ -244,6 +261,9 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
+            _confirm_flow_mode.pop(chat_id, None)
+            _recurring_days.pop(chat_id, None)
+            _recurring_pending.pop(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -361,10 +381,13 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_date[chat_id]   = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id]   = _format_time(time_code)
             _cart_method[chat_id] = method
-            await query.edit_message_text(
-                f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-                reply_markup=_category_keyboard(chat_id),
-            )
+            if _confirm_flow_mode.pop(chat_id, False):
+                await _do_confirm(query, chat_id, context)
+            else:
+                await query.edit_message_text(
+                    f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                    reply_markup=_category_keyboard(chat_id),
+                )
 
         elif data == "bm_menu_prompt":
             _qty_pending.pop(chat_id, None)
@@ -372,14 +395,26 @@ async def handle_menu_callback(update: Update, context) -> None:
             _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
             await query.answer()
             await _delete_old_menu(chat_id, context.bot)
-            delivery_date = (date.today() + timedelta(days=1)).isoformat()
-            sessions = get_b2b_order_sessions(chat_id, delivery_date)
-            if sessions:
+            delivery_date    = (date.today() + timedelta(days=1)).isoformat()
+            sessions         = get_b2b_order_sessions(chat_id, delivery_date)
+            recurring_orders = get_b2b_recurring_orders(chat_id)
+            if sessions or recurring_orders:
                 locked = _orders_locked()
-                n = len(sessions)
-                lines = [f"You already have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n"]
-                for i, s in enumerate(sessions, 1):
-                    lines.append(f"Order #{i}:\n{_session_summary(s)}")
+                lines = []
+                if sessions:
+                    n = len(sessions)
+                    lines.append(f"You have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n")
+                    for i, s in enumerate(sessions, 1):
+                        lines.append(f"Order #{i}:\n{_session_summary(s)}")
+                if recurring_orders:
+                    from b2b_bot.recurring import days_label
+                    import json
+                    if lines:
+                        lines.append("")
+                    lines.append("Standing orders:")
+                    for rec in recurring_orders:
+                        days = json.loads(rec["days_of_week"])
+                        lines.append(f"  🔄 {days_label(days)} at {rec['delivery_time']}")
                 if locked:
                     lines.append("\n🔒 Orders are locked — bakery has been notified.")
                     lines.append("For changes, please contact us directly.")
@@ -388,7 +423,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 sent = await context.bot.send_message(
                     chat_id,
                     "\n".join(lines),
-                    reply_markup=_existing_orders_keyboard(sessions, locked),
+                    reply_markup=_existing_orders_keyboard(sessions, locked, recurring_orders),
                 )
             else:
                 sent = await context.bot.send_message(
@@ -617,7 +652,161 @@ async def handle_menu_callback(update: Update, context) -> None:
             )
 
         elif data == "bm_confirm":
+            cart = _cart.get(chat_id, {})
+            if not cart:
+                await query.answer("Cart is empty — add items first.", show_alert=True)
+                return
+            await query.edit_message_text(
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                reply_markup=_confirm_screen_keyboard(chat_id),
+            )
+
+        # ── Confirm screen ────────────────────────────────────────────────────
+        elif data == "bm_cs_show":
+            cart = _cart.get(chat_id, {})
+            if not cart:
+                await query.answer("Cart is empty.", show_alert=True)
+                return
+            await query.edit_message_text(
+                f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
+                reply_markup=_confirm_screen_keyboard(chat_id),
+            )
+
+        elif data == "bm_cs_default":
             await _do_confirm(query, chat_id, context)
+
+        elif data == "bm_cs_delivery":
+            if not _cart.get(chat_id):
+                await query.answer("Cart is empty.", show_alert=True)
+                return
+            from b2b_bot.pricing import order_total as _ot
+            date_str  = datetime.strptime(_get_cart_date(chat_id), "%Y-%m-%d").strftime("%Y%m%d")
+            curr_time = _get_cart_time(chat_id)
+            time_code = next((c for c in _DELIVERY_TIME_CODES if _format_time(c) == curr_time), "0800")
+            bread_tmp, cake_tmp = _parse_cart_items(chat_id)
+            total = _ot(bread_tmp, cake_tmp)
+            _confirm_flow_mode[chat_id] = True
+            await query.edit_message_text(
+                "🚚 Pickup or delivery?",
+                reply_markup=_method_picker_keyboard(date_str, time_code, total),
+            )
+
+        elif data == "bm_cs_datetime":
+            _confirm_flow_mode[chat_id] = True
+            time_str   = _get_cart_time(chat_id)
+            date_label = _delivery_date_label(_get_cart_date(chat_id))
+            await query.edit_message_text(
+                f"📅 Select delivery date & time\n\nCurrent: {date_label} at {time_str}",
+                reply_markup=_date_picker_keyboard(),
+            )
+
+        elif data == "bm_cs_recurring":
+            cart = _cart.get(chat_id, {})
+            if not cart:
+                await query.answer("Cart is empty.", show_alert=True)
+                return
+            bread_items, cake_items = _parse_cart_items(chat_id)
+            if not bread_items:
+                await query.answer("No bread items in cart. Recurring orders need at least one bread item.", show_alert=True)
+                return
+            if cake_items:
+                await query.answer("Cakes are not supported in recurring orders — they'll be excluded.", show_alert=True)
+            _recurring_pending[chat_id] = {"items": {"bread_items": bread_items, "cake_items": []}}
+            selected = _recurring_days.get(chat_id, set())
+            await query.edit_message_text(
+                "🔄 Daily/Weekly order — pick which days:",
+                reply_markup=_recurring_day_keyboard(selected),
+            )
+
+        # ── Recurring day selection ───────────────────────────────────────────
+        elif data.startswith("bm_rd_") and data != "bm_rd_done":
+            day = data[6:]
+            if day not in ("mon", "tue", "wed", "thu", "fri", "sat", "sun"):
+                return
+            sel = _recurring_days.setdefault(chat_id, set())
+            if day in sel:
+                sel.discard(day)
+            else:
+                sel.add(day)
+            await query.edit_message_text(
+                "🔄 Daily/Weekly order — pick which days:",
+                reply_markup=_recurring_day_keyboard(sel),
+            )
+
+        elif data == "bm_rd_done":
+            sel = _recurring_days.get(chat_id, set())
+            if not sel:
+                await query.answer("Please select at least one day.", show_alert=True)
+                return
+            from b2b_bot.recurring import days_label
+            _recurring_pending.setdefault(chat_id, {})["days"] = sorted(sel)
+            await query.edit_message_text(
+                f"🔄 {days_label(sorted(sel))} — what time?",
+                reply_markup=_recurring_time_keyboard(),
+            )
+
+        elif data.startswith("bm_rt_"):
+            time_code = data[6:]
+            from b2b_bot.recurring import days_label
+            pending = _recurring_pending.get(chat_id, {})
+            pending["time"] = _format_time(time_code)
+            _recurring_pending[chat_id] = pending
+            days_lbl = days_label(pending.get("days", []))
+            await query.edit_message_text(
+                f"🔄 {days_lbl} at {_format_time(time_code)} — pickup or delivery?",
+                reply_markup=_recurring_method_keyboard(),
+            )
+
+        elif data.startswith("bm_rm_"):
+            method = data[6:]
+            if method not in ("pickup", "delivery"):
+                return
+            pending = _recurring_pending.get(chat_id, {})
+            pending["method"] = method
+            _recurring_pending[chat_id] = pending
+            await _show_recurring_preconfirm(query, chat_id, context)
+
+        # ── Edit / cancel a standing order ────────────────────────────────────
+        elif data.startswith("bm_edit_rec_"):
+            rec_id = int(data[12:])
+            rec = get_recurring_order(rec_id)
+            if not rec or rec["group_chat_id"] != chat_id:
+                await query.answer("Standing order not found.", show_alert=True)
+                return
+            import json
+            from b2b_bot.recurring import days_label
+            days   = json.loads(rec["days_of_week"])
+            items  = json.loads(rec["items_json"])
+            method = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
+            lines  = [f"🔄 Standing order — {days_label(days)}", f"🕐 {method} at {rec['delivery_time']}", ""]
+            for it in items.get("bread_items", []):
+                line = f"  • {it['qty']}× {it['item']}"
+                if it.get("grams"):
+                    line += f" — {it['grams']}g"
+                lines.append(line)
+            lines += ["", "Cancel this standing order?"]
+            await query.edit_message_text(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✕ Cancel Standing Order", callback_data=f"bm_cancel_rec_{rec_id}")],
+                    [InlineKeyboardButton("← Keep it",              callback_data="bm_back")],
+                ]),
+            )
+
+        elif data.startswith("bm_cancel_rec_"):
+            rec_id = int(data[14:])
+            rec = get_recurring_order(rec_id)
+            if not rec or rec["group_chat_id"] != chat_id:
+                await query.answer("Standing order not found.", show_alert=True)
+                return
+            cancel_b2b_recurring_order(rec_id)
+            import json
+            from b2b_bot.recurring import days_label
+            days = json.loads(rec["days_of_week"])
+            await query.edit_message_text(
+                f"✕ Standing order ({days_label(days)}) cancelled.\n\nType /menu to start a new order.",
+                reply_markup=None,
+            )
 
     except Exception as e:
         if "message is not modified" in str(e).lower():
@@ -626,22 +815,10 @@ async def handle_menu_callback(update: Update, context) -> None:
             logger.warning("menu callback error data=%s: %s", data, e)
 
 
-async def _do_confirm(query, chat_id: int, context) -> None:
-    from b2b_bot.order_handlers import _pending, _state, _last_confirmation
-    from b2b_bot.order_parsing import (
-        _resolve_bread_history, _resolve_cake_history,
-        _split_mini_items, _mini_rejection_note,
-        _build_confirmation, _confirm_keyboard,
-    )
-
-    cart = dict(_cart.get(chat_id, {}))  # copy — don't pop until we're committed
-    if not cart:
-        await query.answer("Cart is empty — add items first.", show_alert=True)
-        return
-
-    delivery_date = _get_cart_date(chat_id)
+def _parse_cart_items(chat_id: int):
+    """Convert cart dict → (bread_items, cake_items) lists."""
+    cart = _cart.get(chat_id, {})
     bread_items, cake_items = [], []
-
     for key, qty in cart.items():
         if "|" in key:
             parts       = key.split("|")
@@ -656,6 +833,73 @@ async def _do_confirm(query, chat_id: int, context) -> None:
             d  = B2B_CAKE_MENU[key]
             ot = "piece" if d["cake_category"] in ("B", "C") else None
             cake_items.append({"item": key, "qty": qty, "cake_category": d["cake_category"], "order_type": ot, "slices": None})
+    return bread_items, cake_items
+
+
+async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
+    from b2b_bot.recurring import days_label
+    pending = _recurring_pending.get(chat_id, {})
+    days    = pending.get("days", [])
+    time_s  = pending.get("time", "")
+    method  = pending.get("method", "")
+    items   = pending.get("items", {})
+    bread_items = items.get("bread_items", [])
+
+    method_lbl = "Delivery" if method == "delivery" else "Pickup"
+    lines = [
+        f"🔄 Standing order — {days_label(days)}",
+        f"🕐 {method_lbl} at {time_s}",
+        "",
+        "Items every order:",
+    ]
+    for it in bread_items:
+        line = f"  • {it['qty']}× {it['item']}"
+        if it.get("grams"):
+            line += f" — {it['grams']}g"
+        if it.get("notes"):
+            line += f" ({it['notes']})"
+        lines.append(line)
+    lines += [
+        "",
+        "We'll remind you the day before each delivery. Confirm once and it repeats every week.",
+        "",
+        "Is this correct?",
+    ]
+    try:
+        await query.edit_message_text(
+            "\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Confirm Standing Order", callback_data="b2b_rec_setup_confirm"),
+                InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
+            ]]),
+        )
+    except Exception:
+        sent = await context.bot.send_message(
+            chat_id,
+            "\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Confirm Standing Order", callback_data="b2b_rec_setup_confirm"),
+                InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
+            ]]),
+        )
+        _menu_msg[chat_id] = sent.message_id
+        set_menu_message_id(chat_id, sent.message_id)
+
+
+async def _do_confirm(query, chat_id: int, context) -> None:
+    from b2b_bot.order_handlers import _pending, _state, _last_confirmation
+    from b2b_bot.order_parsing import (
+        _resolve_bread_history, _resolve_cake_history,
+        _split_mini_items, _mini_rejection_note,
+        _build_confirmation, _confirm_keyboard,
+    )
+
+    if not _cart.get(chat_id):
+        await query.answer("Cart is empty — add items first.", show_alert=True)
+        return
+
+    delivery_date = _get_cart_date(chat_id)
+    bread_items, cake_items = _parse_cart_items(chat_id)
 
     bread_items            = _resolve_bread_history(chat_id, bread_items)
     cake_items, needs_spec = _resolve_cake_history(chat_id, cake_items)
