@@ -136,6 +136,12 @@ def init_db() -> None:
                 ADD COLUMN IF NOT EXISTS batch_id TEXT NOT NULL DEFAULT ''
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS bot_meta (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_payments (
                     id               SERIAL  PRIMARY KEY,
                     group_chat_id    BIGINT  NOT NULL,
@@ -368,6 +374,22 @@ def set_editing_session(group_chat_id: int, session_key: str | None) -> None:
                 ON CONFLICT (group_chat_id) DO UPDATE SET
                     bot_editing_session = EXCLUDED.bot_editing_session, updated_at = EXCLUDED.updated_at
             """, (group_chat_id, session_key, datetime.utcnow().isoformat()))
+
+
+def get_bot_meta(key: str) -> str | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM bot_meta WHERE key = %s", (key,))
+            row = cur.fetchone()
+            return row["value"] if row else None
+
+def set_bot_meta(key: str, value: str | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO bot_meta (key, value) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """, (key, value))
 
 
 # ─── B2B bread orders ─────────────────────────────────────────────────────────

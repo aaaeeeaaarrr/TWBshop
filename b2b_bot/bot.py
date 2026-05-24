@@ -53,6 +53,21 @@ _PAYMENT_REMINDER_HOUR_UTC   = 23
 _PAYMENT_REMINDER_MINUTE_UTC = 0
 
 
+async def _startup_summary_check(app) -> None:
+    from datetime import timezone, timedelta
+    from shared.database import get_bot_meta
+    now_utc  = datetime.datetime.now(timezone.utc)
+    today_pp = (now_utc + timedelta(hours=7)).date().isoformat()
+    past_full = now_utc.hour > _SUMMARY_HOUR_UTC or (now_utc.hour == _SUMMARY_HOUR_UTC and now_utc.minute >= _SUMMARY_MINUTE_UTC)
+    past_pre  = now_utc.hour >= _PRE_SUMMARY_HOUR_UTC
+    if past_full and get_bot_meta("last_summary_date") != today_pp:
+        logger.info("Startup: missed full summary — sending now")
+        await send_b2b_summary(app.bot)
+    elif past_pre and not past_full and get_bot_meta("last_pre_summary_date") != today_pp:
+        logger.info("Startup: missed pre-summary — sending now")
+        await send_b2b_pre_summary(app.bot)
+
+
 async def _job_b2b_pre_summary(context) -> None:
     await send_b2b_pre_summary(context.bot)
 
@@ -97,6 +112,7 @@ def main() -> None:
     app = (
         Application.builder()
         .token(config.B2B_BOT_TOKEN)
+        .post_init(_startup_summary_check)
         .connect_timeout(20.0)
         .read_timeout(20.0)
         .write_timeout(20.0)

@@ -17,6 +17,7 @@ from shared.database import (
     get_b2b_cake_orders_by_group,
     get_b2b_customer,
     get_b2b_mini_orders_for_reminder,
+    get_bot_meta, set_bot_meta,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ async def send_b2b_pre_summary(bot: Bot, target_date: str | None = None) -> None
 
     msg = await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
     _pre_summary_msg_id = msg.message_id
+    set_bot_meta("last_pre_summary_date", day)
     logger.info("Sent B2B pre-summary for %s (msg_id=%s)", day, msg.message_id)
 
 
@@ -170,6 +172,7 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
         lines.append("")
 
     await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
+    set_bot_meta("last_summary_date", day)
     logger.info("Sent B2B summary for %s", day)
 
 
