@@ -97,7 +97,10 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
     cake_totals = get_b2b_cake_daily_totals(day)
 
     if not bread_totals and not cake_totals:
-        await bot.send_message(config.B2B_STAFF_GROUP_ID, f"No B2B orders for {day}.")
+        msg = await bot.send_message(config.B2B_STAFF_GROUP_ID, f"No B2B orders for {day}.")
+        set_bot_meta("last_summary_date", day)
+        set_bot_meta("last_summary_msg_id", str(msg.message_id))
+        set_bot_meta("last_summary_has_orders", "0")
         return
 
     lines = [f"B2B PRODUCTION — {day}", ""]
@@ -174,6 +177,7 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
     msg = await bot.send_message(config.B2B_STAFF_GROUP_ID, "\n".join(lines).rstrip())
     set_bot_meta("last_summary_date", day)
     set_bot_meta("last_summary_msg_id", str(msg.message_id))
+    set_bot_meta("last_summary_has_orders", "1")
     logger.info("Sent B2B summary for %s (msg_id=%s)", day, msg.message_id)
 
 
@@ -224,6 +228,12 @@ async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
         logger.info("Dispatch reminder %s: summary_msg_id not stored — skipping", reminder_num)
         return
 
+    has_orders = get_bot_meta("last_summary_has_orders") == "1"
+
+    if reminder_num == 1 and not has_orders:
+        logger.info("Dispatch reminder 1: no orders for %s — skipping", today_pnh)
+        return
+
     if reminder_num == 2:
         dispatch_msg_id_str = get_bot_meta("last_dispatch_msg_id")
         if dispatch_msg_id_str:
@@ -232,7 +242,12 @@ async def send_b2b_dispatch_reminder(bot: Bot, reminder_num: int) -> None:
             except Exception:
                 pass
 
-    text = "🌅 Dispatch reminder — orders above" if reminder_num == 1 else "🚛 Dispatch time — leaving soon"
+    if reminder_num == 1:
+        text = "🌅 Dispatch reminder — orders above"
+    elif has_orders:
+        text = "🚛 Dispatch time — leaving soon"
+    else:
+        text = "No B2B orders today"
 
     try:
         msg = await bot.send_message(
