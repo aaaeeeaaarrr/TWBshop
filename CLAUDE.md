@@ -129,9 +129,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-23
+**Last updated:** 2026-05-24
 **Phase:** Retail bot complete. B2B bot Phase 1 complete. Infrastructure complete.
-**Last completed:** Cleanup: deleted SETUP.md (superseded by bootstrap), updated repo structure in CLAUDE.md to match filesystem, removed "Adding a new system" scaffolding, fixed misleading gitignore comment in config.example.py, fixed Unicode arrows.
+**Last completed:** B2B improvements — 10:10pm lock+summary (was 9pm), 9pm pre-summary (totals only, auto-deleted at 10:10pm), Tomorrow button locked after 10:10pm, same-date orders auto-merged into one session, in-memory state (pending/state/editing_session/last_confirmation) persisted to DB so bot restarts don't break mid-order flows.
 **Next task:** B2B Phase 2 — recurring weekly orders (standing orders with confirmation flow)
 **Known issues:** None
 **Notes:**
