@@ -405,32 +405,23 @@ async def handle_callback(update: Update, context) -> None:
         from b2b_bot.menu_keyboards import _menu_msg
         _menu_msg.pop(chat_id, None)
         set_menu_message_id(chat_id, None)
-        from b2b_bot.recurring import days_label
-        days_lbl   = days_label(pending.get("days", []))
-        method_lbl = "Delivery" if pending.get("method") == "delivery" else "Pickup"
         items      = pending.get("items", {})
         bread_list = items.get("bread_items", [])
-        mention = query.from_user.mention_html() if query.from_user else "someone"
-        lines = [
-            f"✅ CONFIRMED by {mention}",
-            f"   Every {days_lbl}",
-            f"🕐 {method_lbl} at {pending.get('time', '')}",
-            "",
-        ]
-        for it in bread_list:
-            line = f"  • {it['qty']}× {it['item']}"
-            if it.get("grams"):
-                line += f" — {it['grams']}g"
-            if it.get("notes"):
-                line += f" ({it['notes']})"
-            lines.append(line)
-        lines += ["", "We'll remind you the day before each delivery. Just tap Confirm and it's done."]
+        confirmed_text = _build_confirmed_text(
+            bread_list, [],
+            pending.get("method"),
+            pending.get("time", ""),
+            None,
+            None,
+            query.from_user,
+            days_list=pending.get("days", []),
+        )
         try:
             await query.edit_message_text("✅ Standing order saved.", reply_markup=None)
         except Exception:
             pass
         from telegram.constants import ParseMode
-        await context.bot.send_message(chat_id, "\n".join(lines), parse_mode=ParseMode.HTML)
+        await context.bot.send_message(chat_id, confirmed_text, parse_mode=ParseMode.HTML)
         logger.info("Recurring order #%s saved for %s (%s)", rec_id, business_name, chat_id)
 
     elif query.data == "b2b_rec_setup_cancel":

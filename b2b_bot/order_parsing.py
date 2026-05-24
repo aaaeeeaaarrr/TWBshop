@@ -485,9 +485,14 @@ def _build_confirmed_text(
     location:      str | None,
     delivery_date: str | None,
     from_user=None,
+    days_list:     list | None = None,
 ) -> str:
     mention = from_user.mention_html() if from_user else "someone"
-    parts = [f"✓ Order confirmed by {mention}", ""]
+    parts = [f"✅ CONFIRMED by {mention}", ""]
+    if days_list is not None:
+        from b2b_bot.recurring import days_label
+        method_lbl = "Delivery" if method == "delivery" else "Pickup"
+        parts += [f"   Every {days_label(days_list)}", f"🕐 {method_lbl} at {time_str}", ""]
     if bread_items:
         parts += [_bread_line(it) for it in bread_items]
     if cake_items:
@@ -495,10 +500,13 @@ def _build_confirmed_text(
             parts.append("")
         parts += [_cake_line(it) for it in cake_items]
     total = order_total(bread_items, cake_items)
-    dl    = _delivery_line(method, time_str, location, delivery_date)
     parts += ["", price_summary(total)]
-    if dl:
-        parts += ["", dl]
+    if days_list is None:
+        dl = _delivery_line(method, time_str, location, delivery_date)
+        if dl:
+            parts += ["", dl]
+    else:
+        parts += ["", "We'll remind you the day before each delivery. Just tap Confirm and it's done."]
     return "\n".join(parts)
 
 

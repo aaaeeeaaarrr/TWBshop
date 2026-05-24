@@ -84,18 +84,13 @@ async def _delete_old_menu(chat_id: int, bot) -> None:
     set_menu_message_id(chat_id, None)
 
 
-async def handle_menu_command(update: Update, context) -> None:
-    chat_id = update.effective_chat.id
-    if not is_b2b_group(chat_id):
-        return
-    _qty_pending.pop(chat_id, None)
-    _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
-    await _delete_old_menu(chat_id, context.bot)
-
+def _menu_state(chat_id: int):
+    """Returns (text, keyboard) for the current menu landing screen."""
+    from b2b_bot.recurring import days_label
+    import json
     delivery_date    = _get_cart_date(chat_id)
     sessions         = get_b2b_order_sessions(chat_id, delivery_date)
     recurring_orders = get_b2b_recurring_orders(chat_id)
-
     if sessions or recurring_orders:
         locked = _orders_locked()
         lines = []
@@ -105,8 +100,6 @@ async def handle_menu_command(update: Update, context) -> None:
             for i, s in enumerate(sessions, 1):
                 lines.append(f"Order #{i}:\n{_session_summary(s)}")
         if recurring_orders:
-            from b2b_bot.recurring import days_label
-            import json
             if lines:
                 lines.append("")
             lines.append("Standing orders:")
@@ -118,15 +111,19 @@ async def handle_menu_command(update: Update, context) -> None:
             lines.append("Anything urgent, chat with our staff here, no private chats please")
         else:
             lines.append("\nWhat would you like to do?")
-        sent = await update.message.reply_text(
-            "\n".join(lines),
-            reply_markup=_existing_orders_keyboard(sessions, locked, recurring_orders),
-        )
-    else:
-        sent = await update.message.reply_text(
-            f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-            reply_markup=_category_keyboard(chat_id),
-        )
+        return "\n".join(lines), _existing_orders_keyboard(sessions, locked, recurring_orders)
+    return f"📋 Select a category:\n\n{_cart_block(chat_id)}", _category_keyboard(chat_id)
+
+
+async def handle_menu_command(update: Update, context) -> None:
+    chat_id = update.effective_chat.id
+    if not is_b2b_group(chat_id):
+        return
+    _qty_pending.pop(chat_id, None)
+    _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
+    await _delete_old_menu(chat_id, context.bot)
+    text, keyboard = _menu_state(chat_id)
+    sent = await update.message.reply_text(text, reply_markup=keyboard)
     _menu_msg[chat_id] = sent.message_id
     set_menu_message_id(chat_id, sent.message_id)
 
@@ -393,42 +390,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
             await query.answer()
             await _delete_old_menu(chat_id, context.bot)
-            delivery_date    = (date.today() + timedelta(days=1)).isoformat()
-            sessions         = get_b2b_order_sessions(chat_id, delivery_date)
-            recurring_orders = get_b2b_recurring_orders(chat_id)
-            if sessions or recurring_orders:
-                locked = _orders_locked()
-                lines = []
-                if sessions:
-                    n = len(sessions)
-                    lines.append(f"You have {n} confirmed order{'s' if n > 1 else ''} for tomorrow:\n")
-                    for i, s in enumerate(sessions, 1):
-                        lines.append(f"Order #{i}:\n{_session_summary(s)}")
-                if recurring_orders:
-                    from b2b_bot.recurring import days_label
-                    import json
-                    if lines:
-                        lines.append("")
-                    lines.append("Standing orders:")
-                    for rec in recurring_orders:
-                        days = json.loads(rec["days_of_week"])
-                        lines.append(f"  🔄 {days_label(days)} at {rec['delivery_time']}")
-                if locked:
-                    lines.append("\n🔒 Orders are locked — bakery has been notified.")
-                    lines.append("For changes, please contact us directly.")
-                else:
-                    lines.append("\nWhat would you like to do?")
-                sent = await context.bot.send_message(
-                    chat_id,
-                    "\n".join(lines),
-                    reply_markup=_existing_orders_keyboard(sessions, locked, recurring_orders),
-                )
-            else:
-                sent = await context.bot.send_message(
-                    chat_id,
-                    f"📋 Select a category:\n\n{_cart_block(chat_id)}",
-                    reply_markup=_category_keyboard(chat_id),
-                )
+            text, keyboard = _menu_state(chat_id)
+            sent = await context.bot.send_message(chat_id, text, reply_markup=keyboard)
             _menu_msg[chat_id] = sent.message_id
             set_menu_message_id(chat_id, sent.message_id)
 
@@ -872,6 +835,7 @@ def _parse_cart_items(chat_id: int):
 
 async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
     from b2b_bot.recurring import days_label
+    from b2b_bot.order_parsing import _bread_line as _bl
     pending = _recurring_pending.get(chat_id, {})
     days    = pending.get("days", [])
     time_s  = pending.get("time", "")
@@ -886,13 +850,7 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
         "",
         "Items every order:",
     ]
-    for it in bread_items:
-        line = f"  • {it['qty']}× {it['item']}"
-        if it.get("grams"):
-            line += f" — {it['grams']}g"
-        if it.get("notes"):
-            line += f" ({it['notes']})"
-        lines.append(line)
+    lines += [_bl(it) for it in bread_items]
     lines += [
         "",
         "We'll remind you the day before each delivery. Confirm once and it repeats every week.",
