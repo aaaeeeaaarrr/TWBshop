@@ -469,7 +469,7 @@ def _build_confirmation(
             parts.append("")
         parts += [_cake_line(it, show_edit_hint=True) for it in cake_items]
     total = order_total(bread_items, cake_items)
-    dl    = _delivery_line(method, time_str, location, delivery_date)
+    dl    = _delivery_line(method, time_str, None, delivery_date)
     parts += ["", price_summary(total)]
     if dl:
         parts += ["", dl]
@@ -502,7 +502,7 @@ def _build_confirmed_text(
     total = order_total(bread_items, cake_items)
     parts += ["", price_summary(total)]
     if days_list is None:
-        dl = _delivery_line(method, time_str, location, delivery_date)
+        dl = _delivery_line(method, time_str, None, delivery_date)
         if dl:
             parts += ["", dl]
     else:
