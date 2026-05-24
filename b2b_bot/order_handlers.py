@@ -402,13 +402,32 @@ async def handle_callback(update: Update, context) -> None:
         _cart_time.pop(chat_id, None)
         _cart_date.pop(chat_id, None)
         _cart_method.pop(chat_id, None)
+        from b2b_bot.menu_keyboards import _menu_msg
+        _menu_msg.pop(chat_id, None)
+        set_menu_message_id(chat_id, None)
         from b2b_bot.recurring import days_label
-        days_lbl = days_label(pending.get("days", []))
-        await query.edit_message_text(
-            f"✅ Standing order confirmed — {days_lbl} at {pending.get('time', '')}!\n\n"
-            "We'll send you a reminder the day before each delivery. Just tap Confirm and it's done.",
-            reply_markup=None,
-        )
+        days_lbl   = days_label(pending.get("days", []))
+        method_lbl = "Delivery" if pending.get("method") == "delivery" else "Pickup"
+        items      = pending.get("items", {})
+        bread_list = items.get("bread_items", [])
+        lines = [
+            f"✅ Standing order confirmed — Every {days_lbl}",
+            f"🕐 {method_lbl} at {pending.get('time', '')}",
+            "",
+        ]
+        for it in bread_list:
+            line = f"  • {it['qty']}× {it['item']}"
+            if it.get("grams"):
+                line += f" — {it['grams']}g"
+            if it.get("notes"):
+                line += f" ({it['notes']})"
+            lines.append(line)
+        lines += ["", "We'll remind you the day before each delivery. Just tap Confirm and it's done."]
+        try:
+            await query.edit_message_text("✅ Standing order saved.", reply_markup=None)
+        except Exception:
+            pass
+        await context.bot.send_message(chat_id, "\n".join(lines))
         logger.info("Recurring order #%s saved for %s (%s)", rec_id, business_name, chat_id)
 
     elif query.data == "b2b_rec_setup_cancel":
