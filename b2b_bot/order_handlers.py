@@ -24,6 +24,9 @@ from shared.database import (
     save_b2b_order, save_b2b_cake_order,
     delete_b2b_orders_for_date, delete_b2b_cake_orders_for_date,
     delete_b2b_order_session, get_b2b_order_sessions,
+    get_pending_order, set_pending_order,
+    get_order_state, set_order_state,
+    get_last_confirmation_msg, set_last_confirmation_msg,
 )
 from shared.ai_client import extract_b2b_order_from_image
 
@@ -161,7 +164,7 @@ async def handle_group_message(update: Update, context) -> None:
         return
 
     business_name = get_business_name(chat_id)
-    state = _state.get(chat_id, {})
+    state = _state.get(chat_id) or get_order_state(chat_id) or {}
 
     if state.get("mode") == "awaiting_delivery":
         method, time_str = _parse_delivery_text(text)
@@ -173,10 +176,10 @@ async def handle_group_message(update: Update, context) -> None:
             return
         location = business_name if method == "delivery" else None
         upsert_b2b_customer(chat_id, business_name, method, time_str, location)
-        _state.pop(chat_id, None)
-        pending = _pending.get(chat_id, {})
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
+        pending = _pending.get(chat_id) or get_pending_order(chat_id) or {}
         pending.update(delivery_method=method, delivery_time=time_str, location=location)
-        _pending[chat_id] = pending
+        _pending[chat_id] = pending; set_pending_order(chat_id, pending)
         await _send_confirmation(
             update, chat_id,
             _build_confirmation(pending.get("bread_items", []), pending.get("cake_items", []), method, time_str, location, pending.get("delivery_date")),
@@ -185,7 +188,7 @@ async def handle_group_message(update: Update, context) -> None:
 
     if state.get("mode") == "awaiting_cake_spec":
         from b2b_bot.order_parsing import _WHOLE_RE, _SLICED_RE, _SLICE_COUNT_RE
-        pending = _pending.get(chat_id, {})
+        pending = _pending.get(chat_id) or get_pending_order(chat_id) or {}
         cake_items = pending.get("cake_items", [])
         needs_spec = state.get("needs_spec", [])
         lower = text.lower()
@@ -209,15 +212,15 @@ async def handle_group_message(update: Update, context) -> None:
             )
             return
 
-        _state.pop(chat_id, None)
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
         pending["cake_items"] = cake_items
-        _pending[chat_id] = pending
+        _pending[chat_id] = pending; set_pending_order(chat_id, pending)
         m_ = pending.get("delivery_method")
         t_ = pending.get("delivery_time")
         l_ = pending.get("location")
         dd = pending.get("delivery_date")
         if not m_:
-            _state[chat_id] = {"mode": "awaiting_delivery"}
+            _state[chat_id] = {"mode": "awaiting_delivery"}; set_order_state(chat_id, {"mode": "awaiting_delivery"})
             upsert_b2b_customer(chat_id, business_name)
             await update.message.reply_text(
                 "Got it! One quick question — pickup or delivery, and what time?\n"
@@ -230,21 +233,22 @@ async def handle_group_message(update: Update, context) -> None:
             )
         return
 
-    if _pending.get(chat_id) and not state:
+    pending = _pending.get(chat_id) or get_pending_order(chat_id)
+    if pending and not state:
+        _pending[chat_id] = pending
         lower_text = text.lower().strip()
-        pending = _pending[chat_id]
 
         if lower_text in _CONFIRM_WORDS:
-            _pending.pop(chat_id, None)
-            _state.pop(chat_id, None)
-            _last_confirmation.pop(chat_id, None)
+            _pending.pop(chat_id, None); set_pending_order(chat_id, None)
+            _state.pop(chat_id, None); set_order_state(chat_id, None)
+            _last_confirmation.pop(chat_id, None); set_last_confirmation_msg(chat_id, None)
             await _do_confirm_order(chat_id, pending, context, update.message.reply_text, from_user=update.effective_user)
             return
 
         if lower_text in _CANCEL_WORDS:
-            _pending.pop(chat_id, None)
-            _state.pop(chat_id, None)
-            _last_confirmation.pop(chat_id, None)
+            _pending.pop(chat_id, None); set_pending_order(chat_id, None)
+            _state.pop(chat_id, None); set_order_state(chat_id, None)
+            _last_confirmation.pop(chat_id, None); set_last_confirmation_msg(chat_id, None)
             await update.message.reply_text("Order cancelled.")
             return
 
@@ -259,9 +263,10 @@ async def handle_callback(update: Update, context) -> None:
     chat_id = update.effective_chat.id
 
     if query.data == "b2b_confirm":
-        pending = _pending.pop(chat_id, None)
-        _state.pop(chat_id, None)
-        _last_confirmation.pop(chat_id, None)
+        pending = _pending.pop(chat_id, None) or get_pending_order(chat_id)
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
+        _last_confirmation.pop(chat_id, None); set_last_confirmation_msg(chat_id, None)
+        set_pending_order(chat_id, None)
         if not pending:
             await query.edit_message_text("No pending order. Please send your order again.")
             return
@@ -271,8 +276,9 @@ async def handle_callback(update: Update, context) -> None:
         await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
 
     elif query.data == "b2b_edit":
-        pending = _pending.pop(chat_id, {})
-        _state.pop(chat_id, None)
+        pending = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
+        set_pending_order(chat_id, None)
         from b2b_bot.menu_keyboards import (
             _cart, _cart_time, _cart_date, _cart_method, _editing_session,
             _category_keyboard, _cart_block,
@@ -294,14 +300,16 @@ async def handle_callback(update: Update, context) -> None:
         if pending.get("delivery_method"):
             _cart_method[chat_id] = pending["delivery_method"]
         if pending.get("editing_session_key"):
+            from shared.database import set_editing_session
             _editing_session[chat_id] = pending["editing_session_key"]
+            set_editing_session(chat_id, pending["editing_session_key"])
         await query.edit_message_text(
             f"✏️ Edit your order:\n\n{_cart_block(chat_id)}",
             reply_markup=_category_keyboard(chat_id),
         )
 
     elif query.data == "b2b_cancel":
-        pending        = _pending.get(chat_id, {})
+        pending        = _pending.get(chat_id) or get_pending_order(chat_id) or {}
         existing_bread = pending.get("existing_bread", [])
         existing_cake  = pending.get("existing_cake", [])
 
@@ -336,18 +344,19 @@ async def handle_callback(update: Update, context) -> None:
                 ]]),
             )
         else:
-            _pending.pop(chat_id, None)
-            _state.pop(chat_id, None)
+            _pending.pop(chat_id, None); set_pending_order(chat_id, None)
+            _state.pop(chat_id, None); set_order_state(chat_id, None)
             await query.edit_message_text("Order cancelled.")
 
     elif query.data == "b2b_keep_existing":
-        _pending.pop(chat_id, None)
-        _state.pop(chat_id, None)
+        _pending.pop(chat_id, None); set_pending_order(chat_id, None)
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
         await query.edit_message_text("Your existing order remains active. ✓")
 
     elif query.data == "b2b_cancel_all":
-        pending       = _pending.pop(chat_id, {})
-        _state.pop(chat_id, None)
+        pending       = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
+        _state.pop(chat_id, None); set_order_state(chat_id, None)
+        set_pending_order(chat_id, None)
         delivery_date = pending.get("delivery_date")
         if delivery_date:
             delete_b2b_orders_for_date(chat_id, delivery_date)
@@ -391,9 +400,11 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
         "location": location, "delivery_date": delivery_date,
         "ai_unmatched": unmatched,
     }
+    set_pending_order(chat_id, _pending[chat_id])
 
     if needs_spec:
         _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}
+        set_order_state(chat_id, _state[chat_id])
         await bot.send_message(
             chat_id,
             f"Got the order from your photo! For the {', '.join(needs_spec)} — sliced or whole?",
@@ -403,6 +414,7 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
 
     if not method:
         _state[chat_id] = {"mode": "awaiting_delivery"}
+        set_order_state(chat_id, _state[chat_id])
         upsert_b2b_customer(chat_id, business_name)
         await bot.send_message(
             chat_id,

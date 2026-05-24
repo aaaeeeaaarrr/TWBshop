@@ -81,6 +81,22 @@ def init_db() -> None:
                 ADD COLUMN IF NOT EXISTS menu_qty_pending TEXT
             """)
             cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS bot_pending TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS bot_state TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS bot_last_confirmation BIGINT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS bot_editing_session TEXT
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_orders (
                     id             SERIAL  PRIMARY KEY,
                     group_chat_id  BIGINT  NOT NULL,
@@ -279,6 +295,79 @@ def set_qty_pending(group_chat_id: int, state: dict | None) -> None:
                     menu_qty_pending = EXCLUDED.menu_qty_pending,
                     updated_at       = EXCLUDED.updated_at
             """, (group_chat_id, json.dumps(state) if state else None, datetime.utcnow().isoformat()))
+
+
+def get_pending_order(group_chat_id: int) -> dict | None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot_pending FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return json.loads(row["bot_pending"]) if row and row["bot_pending"] else None
+
+def set_pending_order(group_chat_id: int, state: dict | None) -> None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, bot_pending, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    bot_pending = EXCLUDED.bot_pending, updated_at = EXCLUDED.updated_at
+            """, (group_chat_id, json.dumps(state) if state else None, datetime.utcnow().isoformat()))
+
+def get_order_state(group_chat_id: int) -> dict | None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot_state FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return json.loads(row["bot_state"]) if row and row["bot_state"] else None
+
+def set_order_state(group_chat_id: int, state: dict | None) -> None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, bot_state, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    bot_state = EXCLUDED.bot_state, updated_at = EXCLUDED.updated_at
+            """, (group_chat_id, json.dumps(state) if state else None, datetime.utcnow().isoformat()))
+
+def get_last_confirmation_msg(group_chat_id: int) -> int | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot_last_confirmation FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return row["bot_last_confirmation"] if row else None
+
+def set_last_confirmation_msg(group_chat_id: int, msg_id: int | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, bot_last_confirmation, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    bot_last_confirmation = EXCLUDED.bot_last_confirmation, updated_at = EXCLUDED.updated_at
+            """, (group_chat_id, msg_id, datetime.utcnow().isoformat()))
+
+def get_editing_session(group_chat_id: int) -> str | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot_editing_session FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return row["bot_editing_session"] if row else None
+
+def set_editing_session(group_chat_id: int, session_key: str | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, bot_editing_session, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    bot_editing_session = EXCLUDED.bot_editing_session, updated_at = EXCLUDED.updated_at
+            """, (group_chat_id, session_key, datetime.utcnow().isoformat()))
 
 
 # ─── B2B bread orders ─────────────────────────────────────────────────────────

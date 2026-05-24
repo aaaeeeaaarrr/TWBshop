@@ -26,6 +26,8 @@ from shared.database import (
     get_qty_pending, set_qty_pending,
     get_b2b_order_sessions, get_b2b_customer,
     upsert_b2b_customer,
+    get_editing_session, set_editing_session,
+    set_pending_order, set_order_state, set_last_confirmation_msg,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,7 +82,7 @@ async def handle_menu_command(update: Update, context) -> None:
     if not is_b2b_group(chat_id):
         return
     _qty_pending.pop(chat_id, None)
-    _editing_session.pop(chat_id, None)
+    _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
 
     delivery_date = _get_cart_date(chat_id)
@@ -217,7 +219,7 @@ async def handle_menu_callback(update: Update, context) -> None:
         elif data == "bm_new_order":
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
-            _editing_session.pop(chat_id, None)
+            _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
             _cart.pop(chat_id, None)
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
@@ -246,6 +248,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             for it in session["cake"]:
                 cart[it["item"]] = it["qty"]
             _editing_session[chat_id] = session["session_key"]
+            set_editing_session(chat_id, session["session_key"])
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             await query.edit_message_text(
@@ -341,7 +344,7 @@ async def handle_menu_callback(update: Update, context) -> None:
         elif data == "bm_menu_prompt":
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
-            _editing_session.pop(chat_id, None)
+            _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
             try:
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
@@ -507,13 +510,16 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     location = customer["location"] if customer else None
     business = get_business_name(chat_id)
 
+    editing_key = _editing_session.pop(chat_id, None) or get_editing_session(chat_id)
+    set_editing_session(chat_id, None)
     _pending[chat_id] = {
         "bread_items": bread_items, "cake_items": cake_items,
         "delivery_method": method, "delivery_time": time_str,
         "location": location, "delivery_date": delivery_date,
         "ai_unmatched": [],
-        "editing_session_key": _editing_session.pop(chat_id, None),
+        "editing_session_key": editing_key,
     }
+    set_pending_order(chat_id, _pending[chat_id])
 
     # Committed — clear cart state now
     _cart.pop(chat_id, None)
@@ -523,6 +529,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
 
     if needs_spec:
         _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}
+        set_order_state(chat_id, _state[chat_id])
         await query.edit_message_text(
             f"For the {', '.join(needs_spec)} — sliced or whole?\n"
             "(If sliced, tell me how many slices, e.g. 'sliced 10')",
@@ -532,6 +539,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
 
     if not method:
         _state[chat_id] = {"mode": "awaiting_delivery"}
+        set_order_state(chat_id, _state[chat_id])
         upsert_b2b_customer(chat_id, business)
         await query.edit_message_text(
             "Almost there! Pickup or delivery, and what time?\n"
@@ -545,9 +553,10 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected)
 
     _last_confirmation[chat_id] = query.message.message_id
+    set_last_confirmation_msg(chat_id, query.message.message_id)
     try:
         await query.edit_message_text(msg, reply_markup=_confirm_keyboard())
     except Exception:
-        # Edit failed (message too old, deleted, etc.) — send as new message
         sent = await context.bot.send_message(chat_id, msg, reply_markup=_confirm_keyboard())
         _last_confirmation[chat_id] = sent.message_id
+        set_last_confirmation_msg(chat_id, sent.message_id)

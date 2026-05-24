@@ -511,8 +511,9 @@ def _confirm_keyboard() -> InlineKeyboardMarkup:
 
 async def _send_confirmation(update_or_bot, chat_id: int, text: str) -> None:
     from b2b_bot.order_handlers import _last_confirmation
+    from shared.database import get_last_confirmation_msg, set_last_confirmation_msg
     bot = update_or_bot if not hasattr(update_or_bot, "message") else update_or_bot.message._bot
-    old_msg_id = _last_confirmation.get(chat_id)
+    old_msg_id = _last_confirmation.get(chat_id) or get_last_confirmation_msg(chat_id)
     if old_msg_id:
         try:
             await bot.edit_message_reply_markup(chat_id=chat_id, message_id=old_msg_id, reply_markup=None)
@@ -523,6 +524,7 @@ async def _send_confirmation(update_or_bot, chat_id: int, text: str) -> None:
     else:
         sent = await bot.send_message(chat_id, text, reply_markup=_confirm_keyboard())
     _last_confirmation[chat_id] = sent.message_id
+    set_last_confirmation_msg(chat_id, sent.message_id)
 
 
 def _parse_delivery_text(text: str) -> tuple[str | None, str | None]:
