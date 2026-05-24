@@ -27,6 +27,7 @@ from shared.database import (
     get_pending_order, set_pending_order,
     get_order_state, set_order_state,
     get_last_confirmation_msg, set_last_confirmation_msg,
+    set_menu_message_id,
 )
 from shared.ai_client import extract_b2b_order_from_image
 
@@ -274,6 +275,9 @@ async def handle_callback(update: Update, context) -> None:
         async def _reply(txt, parse_mode=None):
             await query.edit_message_text(txt, reply_markup=None, parse_mode=parse_mode)
         await _do_confirm_order(chat_id, pending, context, _reply, from_user=query.from_user)
+        from b2b_bot.menu_keyboards import _menu_msg
+        _menu_msg.pop(chat_id, None)
+        set_menu_message_id(chat_id, None)
 
     elif query.data == "b2b_edit":
         pending = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
