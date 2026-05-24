@@ -110,7 +110,7 @@ _CATEGORIES: dict[str, dict] = {
     "minis": {
         "emoji": "🥐", "label": "Mini Pastries",
         "items": ["Mini Croissant", "Mini Chocolatin", "Mini Almond Croissant", "Mini Almond Chocolatin", "Mini Ham Cheese Croissant"],
-        "note": "Min. 100pc · 48h advance order",
+        "note": [("📦", "Min. 100pc"), ("⏰", "48h Advance Order")],
     },
     "cakes": {
         "emoji": "🎂", "label": "Full Cakes",

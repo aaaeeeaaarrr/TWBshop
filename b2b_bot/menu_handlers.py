@@ -211,7 +211,7 @@ async def handle_qty_input(update: Update, context) -> None:
             cart[name] = qty
         cat_key   = state["cat_key"]
         cat       = _CATEGORIES[cat_key]
-        note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+        note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
         _cat_txt  = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
         _cat_kb   = _item_keyboard(cat_key, chat_id)
         try:
@@ -545,7 +545,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             set_qty_pending(chat_id, None)
             cat_key   = data[7:]
             cat       = _CATEGORIES.get(cat_key, {})
-            note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
             cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
             cat_kb    = _item_keyboard(cat_key, chat_id)
             try:
@@ -589,7 +589,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             else:
                 cart[name] = qty
             cat       = _CATEGORIES[cat_key]
-            note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+            note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
             cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
             cat_kb    = _item_keyboard(cat_key, chat_id)
             try:
@@ -616,7 +616,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _qty_pending[chat_id] = state
             set_qty_pending(chat_id, state)
             if name in MINI_ITEMS:
-                prompt = f"How many {name}?\nMinimum 100 · multiples of 100 preferred\nType a number (0 to remove):"
+                prompt = f"How many {name}?\n📦 Min. 100pc\n⏰ 48h Advance Order\nType a number (0 to remove):"
             else:
                 prompt = f"How many {name}?\nType a number (0 to remove):"
             await query.edit_message_text(
