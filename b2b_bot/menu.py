@@ -24,7 +24,7 @@ _BUN_PRICE_BY_GRAMS: dict[int, float] = {
 B2B_MENU: dict[str, dict] = {
 
     # ── Breads ────────────────────────────────────────────────────────────────
-    "french baguette": {
+    "French Baguette": {
         "aliases": [
             "french baguette", "french baguettes", "baguette", "baguettes",
             "french bread", "french stick", "french sticks",
@@ -34,7 +34,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": None,
         "attributes": {},
     },
-    "multigrain baguette": {
+    "Multigrain Baguette": {
         "aliases": [
             "multigrain baguette", "multigrain baguettes",
             "multi grain baguette", "multigrain", "multi baguette",
@@ -45,7 +45,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": None,
         "attributes": {},
     },
-    "focaccia": {
+    "Focaccia": {
         "aliases": ["focaccia", "focaccias", "focacia", "foccacia", "foccacias"],
         "price": 0.80,
         "requires_grams": False,
@@ -53,7 +53,7 @@ B2B_MENU: dict[str, dict] = {
         "unit": "2pc",
         "attributes": {},
     },
-    "multigrain loaf": {
+    "Multigrain Loaf": {
         "aliases": [
             "multigrain loaf", "multigrain loafs", "multigrain bread",
             "multi grain loaf", "loaf", "loafs",
@@ -63,7 +63,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": None,
         "attributes": {},
     },
-    "bagel": {
+    "Bagel": {
         "aliases": ["bagel", "bagels"],
         "price": 1.25,
         "requires_grams": False,
@@ -72,7 +72,7 @@ B2B_MENU: dict[str, dict] = {
     },
 
     # ── By weight (sold per 200g bag) ─────────────────────────────────────────
-    "croutons": {
+    "Croutons": {
         "aliases": ["crouton", "croutons"],
         "price": 1.00,
         "requires_grams": False,
@@ -80,7 +80,7 @@ B2B_MENU: dict[str, dict] = {
         "unit": "200g",
         "attributes": {},
     },
-    "rusk": {
+    "Rusk": {
         "aliases": ["rusk", "rusks"],
         "price": 1.00,
         "requires_grams": False,
@@ -90,7 +90,7 @@ B2B_MENU: dict[str, dict] = {
     },
 
     # ── Pastries ──────────────────────────────────────────────────────────────
-    "croissant": {
+    "Croissant": {
         "aliases": [
             "croissant", "croissants", "crossant", "crossants", "croissan",
         ],
@@ -99,7 +99,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": None,
         "attributes": {},
     },
-    "pain au chocolat": {
+    "Pain Au Chocolat": {
         "aliases": [
             "pain au chocolat", "pain au chocolats",
             "chocolatin", "chocolatine", "chocolatins",
@@ -113,7 +113,7 @@ B2B_MENU: dict[str, dict] = {
     },
 
     # ── Mini pastries (min. 100pc, 48h advance order) ─────────────────────────
-    "mini croissant": {
+    "Mini Croissant": {
         "aliases": ["mini croissant", "mini croissants"],
         "price": 0.49,
         "requires_grams": False,
@@ -122,7 +122,7 @@ B2B_MENU: dict[str, dict] = {
         "advance_hours": 48,
         "attributes": {},
     },
-    "mini chocolatin": {
+    "Mini Chocolatin": {
         "aliases": [
             "mini chocolatin", "mini chocolatins",
             "mini pain au chocolat", "mini chocolate croissant",
@@ -134,7 +134,7 @@ B2B_MENU: dict[str, dict] = {
         "advance_hours": 48,
         "attributes": {},
     },
-    "mini almond croissant": {
+    "Mini Almond Croissant": {
         "aliases": [
             "mini almond croissant", "mini almond croissants",
         ],
@@ -145,7 +145,7 @@ B2B_MENU: dict[str, dict] = {
         "advance_hours": 48,
         "attributes": {},
     },
-    "mini almond chocolatin": {
+    "Mini Almond Chocolatin": {
         "aliases": [
             "mini almond chocolatin", "mini almond chocolatins",
             "mini almond chocolate croissant",
@@ -157,7 +157,7 @@ B2B_MENU: dict[str, dict] = {
         "advance_hours": 48,
         "attributes": {},
     },
-    "mini ham cheese croissant": {
+    "Mini Ham Cheese Croissant": {
         "aliases": [
             "mini ham cheese croissant", "mini ham cheese croissants",
             "mini ham croissant", "mini cheese croissant",
@@ -171,7 +171,7 @@ B2B_MENU: dict[str, dict] = {
     },
 
     # ── Brioche buns & rolls (customers can specify grams) ────────────────────
-    "burger bun": {
+    "Burger Bun": {
         "aliases": [
             "burger bun", "burger buns", "brioche bun", "brioche buns",
             "hamburger bun", "hamburger buns", "brioche burger bun",
@@ -182,7 +182,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": 70,
         "attributes": {},
     },
-    "slider bun": {
+    "Slider Bun": {
         "aliases": [
             "slider bun", "slider buns", "slider", "sliders",
             "brioche slider",
@@ -193,7 +193,7 @@ B2B_MENU: dict[str, dict] = {
         "standard_grams": 40,
         "attributes": {},
     },
-    "hotdog roll": {
+    "Hotdog Roll": {
         "aliases": [
             "hotdog roll", "hotdog rolls", "hot dog roll", "hot dog rolls",
             "soft roll", "soft rolls", "hotdog bun", "hotdog buns",
@@ -208,7 +208,7 @@ B2B_MENU: dict[str, dict] = {
 }
 
 # Items that get an instant bakery-group notification when ordered (in addition to 10pm summary)
-INSTANT_BREAD_ITEMS: frozenset[str] = frozenset({"croissant", "pain au chocolat"})
+INSTANT_BREAD_ITEMS: frozenset[str] = frozenset({"Croissant", "Pain Au Chocolat"})
 
 # Items with ordering restrictions (min_quantity / advance_hours) — derived automatically
 MINI_ITEMS: frozenset[str] = frozenset(

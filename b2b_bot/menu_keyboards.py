@@ -100,15 +100,15 @@ qty_pending_filter = _QtyPendingFilter()
 _CATEGORIES: dict[str, dict] = {
     "breads": {
         "emoji": "🍞", "label": "Breads & Loaves",
-        "items": ["french baguette", "multigrain baguette", "focaccia", "multigrain loaf", "bagel", "croutons", "rusk"],
+        "items": ["French Baguette", "Multigrain Baguette", "Focaccia", "Multigrain Loaf", "Bagel", "Croutons", "Rusk"],
     },
     "pastries": {
         "emoji": "🥐", "label": "Pastries",
-        "items": ["croissant", "pain au chocolat"],
+        "items": ["Croissant", "Pain Au Chocolat"],
     },
     "minis": {
         "emoji": "🥐", "label": "Mini Pastries",
-        "items": ["mini croissant", "mini chocolatin", "mini almond croissant", "mini almond chocolatin", "mini ham cheese croissant"],
+        "items": ["Mini Croissant", "Mini Chocolatin", "Mini Almond Croissant", "Mini Almond Chocolatin", "Mini Ham Cheese Croissant"],
         "note": "Min. 100pc · 48h advance order",
     },
     "cakes": {
@@ -129,7 +129,7 @@ _NAME      = {v: k for k, v in _SLUG.items()}
 _BUNS: dict[str, dict] = {
     "burger": {
         "emoji": "🍔", "label": "Burger Buns",
-        "item": "burger bun",
+        "item": "Burger Bun",
         "sizes": [
             {"grams": 70, "label": "70g — Standard"},
             {"grams": 40, "label": "40g — Slider"},
@@ -137,7 +137,7 @@ _BUNS: dict[str, dict] = {
     },
     "roll": {
         "emoji": "🥖", "label": "Soft Rolls",
-        "item": "hotdog roll",
+        "item": "Hotdog Roll",
         "sizes": [
             {"grams": 55, "label": "55g — Small"},
             {"grams": 75, "label": "75g — Large"},
@@ -157,7 +157,7 @@ def _price_label(name: str) -> str:
         return f"${d['price']:.2f}/{d['unit']}" if d.get("unit") else f"${d['price']:.2f}"
     d = B2B_CAKE_MENU[name]
     if d["cake_category"] == "A":
-        return f"${d['price_full']:.2f}/cake"
+        return f"${d['price_full']:.2f}"
     if d["cake_category"] == "B":
         return f"${d['price_piece']:.2f}/pc or ${d['price_tray']:.2f}/tray"
     return f"${d['price_piece']:.2f}/pc"

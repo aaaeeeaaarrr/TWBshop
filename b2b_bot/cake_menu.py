@@ -15,14 +15,14 @@ standard_slices — default slices when customer orders sliced (Category A)
 B2B_CAKE_MENU: dict[str, dict] = {
 
     # ── Category A: full cake or sliced ───────────────────────────────────────
-    "flan": {
+    "Flan": {
         "aliases": ["flan", "flan vanilla", "vanilla flan"],
         "cake_category": "A",
         "standard_slices": 8,
         "price_full": 13.20,
         "price_slice": 1.65,
     },
-    "super chocolate cake": {
+    "Super Chocolate Cake": {
         "aliases": [
             "super chocolate cake", "chocolate cake", "choc cake",
             "super choc cake",
@@ -32,7 +32,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 18.00,
         "price_slice": 2.25,
     },
-    "blueberry cheesecake": {
+    "Blueberry Cheesecake": {
         "aliases": [
             "blueberry cheesecake", "blueberry cheese cake",
             "cheesecake blueberry",
@@ -42,7 +42,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 19.20,
         "price_slice": 2.40,
     },
-    "baked cheesecake": {
+    "Baked Cheesecake": {
         "aliases": [
             "baked cheesecake", "plain cheesecake", "cheesecake baked",
             "cheesecake",
@@ -52,7 +52,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "chocobite cheesecake": {
+    "Chocobite Cheesecake": {
         "aliases": [
             "chocobite cheesecake", "chocobite", "choco bite cheesecake",
             "chocolate bite cheesecake",
@@ -62,7 +62,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "passion cheesecake": {
+    "Passion Cheesecake": {
         "aliases": [
             "passion cheesecake", "cheesecake passion",
             "passion fruit cheesecake",
@@ -72,7 +72,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "strawberry cheesecake": {
+    "Strawberry Cheesecake": {
         "aliases": [
             "strawberry cheesecake", "cheesecake strawberry",
         ],
@@ -81,7 +81,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "peanut cheesecake": {
+    "Peanut Cheesecake": {
         "aliases": [
             "peanut cheesecake", "peanut butter cheesecake",
             "cheesecake peanut",
@@ -91,7 +91,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "tiramisu cake": {
+    "Tiramisu Cake": {
         "aliases": [
             "tiramisu cake", "tiramisu", "tiramisu amaretto",
             "tiramisu amaretto cake",
@@ -101,7 +101,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 16.80,
         "price_slice": 2.10,
     },
-    "almond caramel cheesecake": {
+    "Almond Caramel Cheesecake": {
         "aliases": [
             "almond caramel cheesecake", "almond cheesecake",
             "caramel almond cheesecake", "almond caramel cake",
@@ -111,7 +111,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "lemon cheesecake": {
+    "Lemon Cheesecake": {
         "aliases": [
             "lemon cheesecake", "cheesecake lemon", "lemon cheese cake",
         ],
@@ -120,7 +120,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "price_full": 15.20,
         "price_slice": 1.90,
     },
-    "chocolate tart": {
+    "Chocolate Tart": {
         "aliases": [
             "chocolate tart", "choc tart", "chocolate tarte",
             "tart chocolate",
@@ -132,7 +132,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
     },
 
     # ── Category B: full tray or by piece ─────────────────────────────────────
-    "brownie": {
+    "Brownie": {
         "aliases": ["brownie", "brownies", "brownie tray"],
         "cake_category": "B",
         "price_tray": 61.25,
@@ -140,7 +140,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
     },
 
     # ── Category C: single pieces only ────────────────────────────────────────
-    "eclair chocolat": {
+    "Eclair Chocolat": {
         "aliases": [
             "eclair chocolat", "eclair chocolate", "chocolate eclair",
             "eclair choc", "eclair", "eclairs",
@@ -148,7 +148,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "cake_category": "C",
         "price_piece": 1.75,
     },
-    "eclair caramel coffee": {
+    "Eclair Caramel Coffee": {
         "aliases": [
             "eclair caramel coffee", "caramel coffee eclair",
             "coffee eclair", "eclair caramel",
@@ -156,7 +156,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "cake_category": "C",
         "price_piece": 1.75,
     },
-    "chocolate caramel tart": {
+    "Chocolate Caramel Tart": {
         "aliases": [
             "chocolate caramel tart", "choc caramel tart",
             "caramel chocolate tart",
@@ -164,7 +164,7 @@ B2B_CAKE_MENU: dict[str, dict] = {
         "cake_category": "C",
         "price_piece": 1.90,
     },
-    "lemon tart": {
+    "Lemon Tart": {
         "aliases": ["lemon tart", "tarte citron", "lemon tarte"],
         "cake_category": "C",
         "price_piece": 1.75,
