@@ -164,15 +164,19 @@ async def handle_qty_input(update: Update, context) -> None:
             cart[cart_key] = qty
         bun_key = state["bun_key"]
         bun     = _BUNS[bun_key]
+        _bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+        _bun_kb  = _bun_size_keyboard(bun_key, chat_id)
         try:
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=state["message_id"],
-                text=f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}",
-                reply_markup=_bun_size_keyboard(bun_key, chat_id),
+                text=_bun_txt,
+                reply_markup=_bun_kb,
             )
         except Exception:
-            pass
+            sent = await context.bot.send_message(chat_id, _bun_txt, reply_markup=_bun_kb)
+            _menu_msg[chat_id] = sent.message_id
+            set_menu_message_id(chat_id, sent.message_id)
     else:
         if qty == 0:
             cart.pop(state["name"], None)
@@ -181,15 +185,19 @@ async def handle_qty_input(update: Update, context) -> None:
         cat_key   = state["cat_key"]
         cat       = _CATEGORIES[cat_key]
         note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
+        _cat_txt  = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
+        _cat_kb   = _item_keyboard(cat_key, chat_id)
         try:
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=state["message_id"],
-                text=f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
-                reply_markup=_item_keyboard(cat_key, chat_id),
+                text=_cat_txt,
+                reply_markup=_cat_kb,
             )
         except Exception:
-            pass
+            sent = await context.bot.send_message(chat_id, _cat_txt, reply_markup=_cat_kb)
+            _menu_msg[chat_id] = sent.message_id
+            set_menu_message_id(chat_id, sent.message_id)
 
     try:
         await update.message.delete()
@@ -420,22 +428,30 @@ async def handle_menu_callback(update: Update, context) -> None:
                 return
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
-            bun = _BUNS[bun_key]
-            await query.edit_message_text(
-                f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}",
-                reply_markup=_bun_size_keyboard(bun_key, chat_id),
-            )
+            bun     = _BUNS[bun_key]
+            bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
+            bun_kb  = _bun_size_keyboard(bun_key, chat_id)
+            try:
+                await query.edit_message_text(bun_txt, reply_markup=bun_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, bun_txt, reply_markup=bun_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
 
         elif data.startswith("bm_cat_"):
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
-            cat_key = data[7:]
-            cat = _CATEGORIES.get(cat_key, {})
+            cat_key   = data[7:]
+            cat       = _CATEGORIES.get(cat_key, {})
             note_line = f"\n⚠️ {cat['note']}" if cat.get("note") else ""
-            await query.edit_message_text(
-                f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}",
-                reply_markup=_item_keyboard(cat_key, chat_id),
-            )
+            cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
+            cat_kb    = _item_keyboard(cat_key, chat_id)
+            try:
+                await query.edit_message_text(cat_txt, reply_markup=cat_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, cat_txt, reply_markup=cat_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
 
         elif data.startswith("bm_qty_"):
             rest    = data[7:]
