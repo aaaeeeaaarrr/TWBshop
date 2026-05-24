@@ -847,7 +847,7 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
 
     method_lbl = "Delivery" if method == "delivery" else "Pickup"
     lines = [
-        f"🔄 Standing order — {days_label(days)}",
+        f"🔄 Every {days_label(days)}",
         f"🕐 {method_lbl} at {time_s}",
         "",
         "Items every order:",
