@@ -793,6 +793,40 @@ async def handle_menu_callback(update: Update, context) -> None:
                 ]),
             )
 
+        elif data.startswith("bm_edit_recs_"):
+            ids  = [int(x) for x in data[13:].split("_")]
+            recs = [get_recurring_order(rid) for rid in ids]
+            recs = [r for r in recs if r and r["group_chat_id"] == chat_id]
+            if not recs:
+                await query.answer("Standing orders not found.", show_alert=True)
+                return
+            import json
+            from b2b_bot.recurring import days_label
+            first = recs[0]
+            days  = json.loads(first["days_of_week"])
+            lines = [f"🔄 Standing orders — {days_label(days)} at {first['delivery_time']}", ""]
+            buttons = []
+            for rec in recs:
+                items  = json.loads(rec["items_json"])
+                method = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
+                lines.append(f"Order {rec['id']}  ({method}):")
+                for it in items.get("bread_items", []):
+                    line = f"  • {it['qty']}× {it['item']}"
+                    if it.get("grams"):
+                        line += f" — {it['grams']}g"
+                    lines.append(line)
+                lines.append("")
+                buttons.append([InlineKeyboardButton(
+                    f"✕ Cancel — {method}",
+                    callback_data=f"bm_cancel_rec_{rec['id']}",
+                )])
+            lines.append("Which would you like to cancel?")
+            buttons.append([InlineKeyboardButton("← Keep them", callback_data="bm_back")])
+            await query.edit_message_text(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+
         elif data.startswith("bm_cancel_rec_"):
             rec_id = int(data[14:])
             rec = get_recurring_order(rec_id)

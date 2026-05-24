@@ -568,11 +568,17 @@ def _existing_orders_keyboard(
                 f"✏️ Edit Order #{i + 1}",
                 callback_data=f"bm_edit_session_{i}",
             )])
+    # Group by (sorted days, time) so identical schedules share one button
+    groups: dict[tuple, list] = {}
     for rec in (recurring_orders or []):
-        days  = json.loads(rec["days_of_week"])
-        label = f"{days_label(days)} {rec['delivery_time']}"
-        rows.append([InlineKeyboardButton(
-            f"🔄 Edit {label}",
-            callback_data=f"bm_edit_rec_{rec['id']}",
-        )])
+        days = tuple(sorted(json.loads(rec["days_of_week"])))
+        key  = (days, rec["delivery_time"])
+        groups.setdefault(key, []).append(rec)
+    for (days, time), recs in groups.items():
+        label = f"{days_label(list(days))} {time}"
+        if len(recs) == 1:
+            cb = f"bm_edit_rec_{recs[0]['id']}"
+        else:
+            cb = "bm_edit_recs_" + "_".join(str(r["id"]) for r in recs)
+        rows.append([InlineKeyboardButton(f"🔄 Edit {label}", callback_data=cb)])
     return InlineKeyboardMarkup(rows)
