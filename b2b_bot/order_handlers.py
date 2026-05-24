@@ -410,8 +410,10 @@ async def handle_callback(update: Update, context) -> None:
         method_lbl = "Delivery" if pending.get("method") == "delivery" else "Pickup"
         items      = pending.get("items", {})
         bread_list = items.get("bread_items", [])
+        mention = query.from_user.mention_html() if query.from_user else "someone"
         lines = [
-            f"✅ Standing order confirmed — Every {days_lbl}",
+            f"✅ CONFIRMED by {mention}",
+            f"   Every {days_lbl}",
             f"🕐 {method_lbl} at {pending.get('time', '')}",
             "",
         ]
@@ -427,7 +429,8 @@ async def handle_callback(update: Update, context) -> None:
             await query.edit_message_text("✅ Standing order saved.", reply_markup=None)
         except Exception:
             pass
-        await context.bot.send_message(chat_id, "\n".join(lines))
+        from telegram.constants import ParseMode
+        await context.bot.send_message(chat_id, "\n".join(lines), parse_mode=ParseMode.HTML)
         logger.info("Recurring order #%s saved for %s (%s)", rec_id, business_name, chat_id)
 
     elif query.data == "b2b_rec_setup_cancel":
