@@ -265,6 +265,8 @@ async def handle_callback(update: Update, context) -> None:
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
+    if not is_b2b_group(chat_id):
+        return
 
     if query.data == "b2b_confirm":
         pending = _pending.pop(chat_id, None) or get_pending_order(chat_id)

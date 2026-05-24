@@ -134,9 +134,10 @@ async def handle_welcome(update: Update, context) -> None:
     if not member:
         return
     chat_id = member.chat.id
-    if not is_b2b_group(chat_id):
-        return
     if member.new_chat_member.status not in ("member", "administrator"):
+        return
+    if not is_b2b_group(chat_id):
+        await context.bot.leave_chat(chat_id)
         return
     _qty_pending.pop(chat_id, None)
     await _delete_old_menu(chat_id, context.bot)
