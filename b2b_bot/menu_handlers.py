@@ -353,37 +353,29 @@ async def handle_menu_callback(update: Update, context) -> None:
             time_code = rest[9:]
             _cart_date[chat_id] = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id] = _format_time(time_code)
-            if _get_cart_method(chat_id):
-                # Method already set — just update date+time and return to confirm screen
-                await query.edit_message_text(
-                    f"🛒 Ready to confirm?\n\n{_cart_block(chat_id)}\n\nHow would you like to receive this order?",
-                    reply_markup=_confirm_screen_keyboard(chat_id),
-                )
-            else:
-                # First order for this group — need to ask for method
-                cart = _cart.get(chat_id, {})
-                bread_tmp, cake_tmp = [], []
-                for k, q in cart.items():
-                    if "|" in k:
-                        parts = k.split("|")
-                        nm, gs = parts[0], int(parts[1])
-                        bread_tmp.append({"item": nm, "qty": q, "grams": gs, "notes": None})
-                    elif k in B2B_MENU:
-                        bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
-                    else:
-                        ck_def = B2B_CAKE_MENU[k]
-                        ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
-                        cake_tmp.append({"item": k, "qty": q, "order_type": ot})
-                total        = order_total(bread_tmp, cake_tmp)
-                d            = datetime.strptime(date_str, "%Y%m%d").date()
-                tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
-                back_cb      = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
-                await query.edit_message_text(
-                    f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
-                    reply_markup=_method_picker_keyboard(
-                        f"bm_method_{date_str}_{time_code}_", back_cb, total
-                    ),
-                )
+            cart = _cart.get(chat_id, {})
+            bread_tmp, cake_tmp = [], []
+            for k, q in cart.items():
+                if "|" in k:
+                    parts = k.split("|")
+                    nm, gs = parts[0], int(parts[1])
+                    bread_tmp.append({"item": nm, "qty": q, "grams": gs, "notes": None})
+                elif k in B2B_MENU:
+                    bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
+                else:
+                    ck_def = B2B_CAKE_MENU[k]
+                    ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
+                    cake_tmp.append({"item": k, "qty": q, "order_type": ot})
+            total        = order_total(bread_tmp, cake_tmp)
+            d            = datetime.strptime(date_str, "%Y%m%d").date()
+            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+            back_cb      = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
+            await query.edit_message_text(
+                f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",
+                reply_markup=_method_picker_keyboard(
+                    f"bm_method_{date_str}_{time_code}_", back_cb, total
+                ),
+            )
 
         elif data.startswith("bm_method_"):
             rest     = data[10:]
