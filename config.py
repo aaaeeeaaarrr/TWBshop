@@ -56,3 +56,7 @@ DISPATCH_REMINDER_TELEGRAM_ID: int = 1271537077
 BAKERY_LAT: float = 11.5387774
 BAKERY_LNG: float = 104.9147998
 
+# Path to shop QR code image — sent to customers when they pay to the wrong account.
+# Leave empty string to skip sending the QR.
+SHOP_QR_PATH: str = "photos/shop_qr.jpg"
+

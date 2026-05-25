@@ -371,6 +371,9 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
                 f"⚠️ This payment was sent to the wrong account.\n\n{cust_guide}",
                 reply_to_message_id=message_id,
             )
+            if config.SHOP_QR_PATH and os.path.exists(config.SHOP_QR_PATH):
+                with open(config.SHOP_QR_PATH, "rb") as qr_file:
+                    await bot.send_photo(chat_id, qr_file)
             alert_id = save_wrong_account_alert(None, business, amount, wrong_detail)
             msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail)
             if msg:

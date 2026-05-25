@@ -70,6 +70,9 @@ DISPATCH_REMINDER_TELEGRAM_ID: int = 0
 BAKERY_LAT: float = 0.0   # ← FILL IN
 BAKERY_LNG: float = 0.0   # ← FILL IN
 
+# Path to shop QR code image — sent to customers when they pay to the wrong account.
+SHOP_QR_PATH: str = ""  # e.g. "photos/shop_qr.jpg"
+
 # Valid bank account numbers customers should pay to.
 # Leave empty [] to skip validation.
 VALID_BANK_ACCOUNTS: list[str] = []  # e.g. ["000123456", "789012345"]
