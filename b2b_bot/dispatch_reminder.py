@@ -90,7 +90,7 @@ def _build_keyboard(reminder_id: int, mins: int, delivery_method: str):
         confirm_label = "✅ Ready for Pickup"
     row1 = [InlineKeyboardButton(confirm_label, callback_data=f"b2b_dispatch_confirm_{reminder_id}")]
     row2 = [
-        InlineKeyboardButton(f"{snooze_mins} min", callback_data=f"b2b_dispatch_snooze_{reminder_id}_{snooze_mins}")
+        InlineKeyboardButton(f"Remind me in {snooze_mins} min", callback_data=f"b2b_dispatch_snooze_{reminder_id}_{snooze_mins}")
         for snooze_mins, threshold in [(30, 45), (20, 35), (10, 25)]
         if mins > threshold
     ]
@@ -98,7 +98,7 @@ def _build_keyboard(reminder_id: int, mins: int, delivery_method: str):
 
 
 async def _send_reminder(bot, rec: dict) -> None:
-    if not config.OWNER_TELEGRAM_ID:
+    if not config.DISPATCH_REMINDER_TELEGRAM_ID:
         return
     fulfillment_utc = _parse_fulfillment_dt(rec["fulfillment_date"], rec["fulfillment_time"])
     if not fulfillment_utc:
@@ -107,7 +107,7 @@ async def _send_reminder(bot, rec: dict) -> None:
     text = _build_text(rec["group_chat_id"], rec["fulfillment_date"], rec["delivery_method"], rec["fulfillment_time"])
     kb   = _build_keyboard(rec["id"], mins, rec["delivery_method"])
     try:
-        msg = await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
+        msg = await bot.send_message(config.DISPATCH_REMINDER_TELEGRAM_ID, text, reply_markup=kb)
         set_dispatch_reminder_reminded(rec["id"], msg.message_id)
         logger.info("Dispatch reminder sent for group %s on %s (msg_id=%s)", rec["group_chat_id"], rec["fulfillment_date"], msg.message_id)
     except Exception as e:
