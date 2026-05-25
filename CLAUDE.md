@@ -131,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** (1) Dispatch reminders to shop staff phone (DISPATCH_REMINDER_TELEGRAM_ID = 1271537077) — 1h before fulfillment, items+costs+buttons. Confirm: "🚗 Already in delivery" / "✅ Ready for Pickup". Snooze buttons stacked vertically: "Remind me in 30/20/10 min", auto-stripped by time remaining. Confirm marks DELIVERED/READY FOR PICKUP (LATE prefix if past fulfillment). 5min escalation to staff group if unconfirmed. 60s polling job, fully restart-safe via b2b_dispatch_reminders table. (2) Location pin prompt — when customer selects delivery and no pin stored, bot sends one message asking them to share via attachment. Order proceeds immediately. Pin stored permanently; sending a new pin anytime overwrites. (3) pull.ps1 for full pull procedure.
+**Last completed:** Payment photo/PDF validation pipeline fully working. (1) Bank account + seller name validation against DB-stored accounts (no restart needed to add/change). (2) Wrong-account: sends QR as photo+caption in group, owner alert with "Have you seen this?" button, 6-hour re-nudge. (3) Unverifiable payment: group gets "awaiting verification", owner gets payment photo + [Received]/[Not Received] buttons, hourly re-nudge. (4) PDF payments now extract to_account + seller (not just amount) so they hit the same validation path as photos — no more false manual verification for valid PDFs. (5) After button press, payment photo stays visible (edit_message_caption). Balance shown in bold HTML throughout.
 **Next task:** None defined
 **Known issues:** None
 **Notes:**
