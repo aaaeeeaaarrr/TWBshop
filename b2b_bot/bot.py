@@ -29,6 +29,7 @@ from b2b_bot.menu_flow import (
 )
 from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder, send_b2b_dispatch_reminder
+from b2b_bot.delivery import handle_location
 from b2b_bot.recurring import send_recurring_reminders, auto_skip_unconfirmed
 
 logging.basicConfig(
@@ -181,6 +182,12 @@ def main() -> None:
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
         handle_group_message,
+    ))
+
+    # Location pins in groups → delivery distance + Grab cost
+    app.add_handler(MessageHandler(
+        filters.LOCATION & filters.ChatType.GROUPS,
+        handle_location,
     ))
 
     # Photos in groups → payment or order photo detection

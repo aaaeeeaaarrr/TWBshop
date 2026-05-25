@@ -161,6 +161,11 @@ async def handle_welcome(update: Update, context) -> None:
     )
     _menu_msg[chat_id] = sent.message_id
     set_menu_message_id(chat_id, sent.message_id)
+    await context.bot.send_message(
+        chat_id,
+        "📍 One more thing — please share your location pin so we can set up delivery.\n"
+        "Tap the 📎 attachment icon → Location.",
+    )
 
 
 async def handle_qty_input(update: Update, context) -> None:

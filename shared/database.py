@@ -97,6 +97,18 @@ def init_db() -> None:
                 ADD COLUMN IF NOT EXISTS bot_editing_session TEXT
             """)
             cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS delivery_cost NUMERIC(8,2)
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_orders (
                     id             SERIAL  PRIMARY KEY,
                     group_chat_id  BIGINT  NOT NULL,
@@ -266,6 +278,22 @@ def upsert_b2b_customer(
                     location        = COALESCE(EXCLUDED.location,        b2b_customers.location),
                     updated_at      = EXCLUDED.updated_at
             """, (group_chat_id, business_name, delivery_method, delivery_time, location, now))
+
+
+def update_b2b_location(
+    group_chat_id: int,
+    lat: float,
+    lng: float,
+    delivery_cost: float,
+) -> None:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_customers
+                SET location_lat = %s, location_lng = %s, delivery_cost = %s, updated_at = %s
+                WHERE group_chat_id = %s
+            """, (lat, lng, delivery_cost, now, group_chat_id))
 
 
 def get_b2b_customer(group_chat_id: int) -> dict | None:

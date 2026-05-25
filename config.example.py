@@ -61,3 +61,8 @@ B2B_ADMIN_USER_IDS: list[int] = []
 # Your personal Telegram user ID — payment screenshots are forwarded here for approval.
 # Get your ID from @userinfobot. You must also send /start to the B2B bot in private first.
 OWNER_TELEGRAM_ID: int = 0
+
+# Bakery coordinates — used as the origin for Grab Express delivery cost estimates.
+# Get from Google Maps: long-press the bakery location → copy the numbers at the top.
+BAKERY_LAT: float = 0.0   # ← FILL IN
+BAKERY_LNG: float = 0.0   # ← FILL IN
