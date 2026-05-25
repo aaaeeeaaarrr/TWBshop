@@ -19,6 +19,9 @@ from b2b_bot.billing import (
     handle_payment_photo,
     handle_payment_document,
     handle_payment_callback,
+    handle_payment_received,
+    handle_payment_not_received,
+    run_verification_nudge_tick,
     send_daily_reminders,
     send_weekly_reminders,
     get_all_outstanding_summary,
@@ -209,7 +212,9 @@ def main() -> None:
         handle_payment_document,
     ))
 
-    # Payment callbacks (owner approve/reject + customer yes/no/order)
+    # Payment callbacks — manual verification first, then general
+    app.add_handler(CallbackQueryHandler(handle_payment_received,    pattern=r"^b2b_pay_received_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_payment_not_received, pattern=r"^b2b_pay_notreceived_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern=r"^b2b_pay_"))
 
     # Dispatch reminder callbacks (confirm delivery/pickup + snooze)
@@ -293,6 +298,12 @@ def main() -> None:
     # Dispatch reminder tick — every 60s, fires 1h reminders and escalations
     app.job_queue.run_repeating(_job_dispatch_reminder_tick, interval=60, first=30)
     logger.info("Dispatch reminder tick scheduled every 60s")
+
+    # Payment verification nudge — hourly re-nudge owner for unverified payments
+    async def _job_verification_nudge(ctx):
+        await run_verification_nudge_tick(ctx.bot)
+    app.job_queue.run_repeating(_job_verification_nudge, interval=3600, first=3600)
+    logger.info("Payment verification nudge scheduled every 1h")
 
     # Recurring order reminders — 7am, 1pm, 6pm Phnom Penh (the day before fulfillment)
     for hour_utc, num in [

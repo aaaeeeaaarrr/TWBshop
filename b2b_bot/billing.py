@@ -22,6 +22,11 @@ from shared.database import (
     mark_b2b_cake_orders_paid,
     save_b2b_payment,
     get_valid_payment_accounts,
+    save_pending_verification,
+    get_pending_verifications,
+    get_pending_verification,
+    set_verification_owner_msg,
+    set_verification_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -170,6 +175,104 @@ async def send_weekly_reminders(bot) -> None:
             logger.error("Weekly reminder failed for %s: %s", row["business_name"], exc)
 
 
+# ─── Payment helpers ─────────────────────────────────────────────────────────
+
+def _build_cust_confirmation(chat_id: int, amount: float) -> str:
+    remaining = get_unpaid_total(chat_id)
+    if remaining <= 0:
+        return f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: $0.00</b>"
+    return f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: ${remaining:.2f}</b>"
+
+
+def _verification_keyboard(verification_id: int):
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Received", callback_data=f"b2b_pay_received_{verification_id}"),
+        InlineKeyboardButton("❌ Not Received", callback_data=f"b2b_pay_notreceived_{verification_id}"),
+    ]])
+
+
+async def _send_owner_nudge(bot, verification_id: int | None, business: str, amount: float, chat_id: int):
+    if not config.OWNER_TELEGRAM_ID:
+        return None
+    amount_str = f"${amount:.2f}" if amount else "amount unclear"
+    text = f"💳 Payment verification needed\n{business} — {amount_str}\nDid you receive this?"
+    kb = _verification_keyboard(verification_id) if verification_id else None
+    try:
+        return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
+    except Exception as e:
+        logger.error("Failed to send owner nudge: %s", e)
+        return None
+
+
+async def run_verification_nudge_tick(bot) -> None:
+    """Hourly — re-nudge owner for any still-pending payment verifications."""
+    for rec in get_pending_verifications():
+        if rec["owner_msg_id"]:
+            try:
+                await bot.delete_message(config.OWNER_TELEGRAM_ID, rec["owner_msg_id"])
+            except Exception:
+                pass
+        msg = await _send_owner_nudge(bot, rec["id"], rec["business_name"], rec["amount"], rec["group_chat_id"])
+        if msg:
+            set_verification_owner_msg(rec["id"], msg.message_id)
+
+
+async def handle_payment_received(update, context) -> None:
+    query = update.callback_query
+    await query.answer()
+    verification_id = int(query.data.split("_")[3])
+    rec = get_pending_verification(verification_id)
+    if not rec or rec["status"] != "pending":
+        await query.edit_message_text("Already resolved.")
+        return
+
+    set_verification_status(verification_id, "received")
+
+    # Apply payment and update balance if amount known
+    if rec["amount"] > 0:
+        save_b2b_payment(rec["group_chat_id"], rec["business_name"], rec["amount"], rec["file_path"] or "", rec["photo_msg_id"])
+        cust_msg = _build_cust_confirmation(rec["group_chat_id"], rec["amount"])
+    else:
+        cust_msg = "Thank you! Payment confirmed. ✓\nWe'll update your balance shortly."
+
+    # Edit the group "awaiting verification" message
+    if rec["group_ack_msg_id"]:
+        try:
+            await context.bot.edit_message_text(
+                cust_msg, chat_id=rec["group_chat_id"],
+                message_id=rec["group_ack_msg_id"], parse_mode="HTML",
+            )
+        except Exception:
+            await context.bot.send_message(rec["group_chat_id"], cust_msg, parse_mode="HTML")
+
+    await query.edit_message_text(f"✅ Marked received — {rec['business_name']} ${rec['amount']:.2f}")
+
+
+async def handle_payment_not_received(update, context) -> None:
+    query = update.callback_query
+    await query.answer()
+    verification_id = int(query.data.split("_")[3])
+    rec = get_pending_verification(verification_id)
+    if not rec or rec["status"] != "pending":
+        await query.edit_message_text("Already resolved.")
+        return
+
+    set_verification_status(verification_id, "not_received")
+
+    if rec["group_ack_msg_id"]:
+        try:
+            await context.bot.edit_message_text(
+                "❌ Amount not received — please double-check and resend if needed.",
+                chat_id=rec["group_chat_id"],
+                message_id=rec["group_ack_msg_id"],
+            )
+        except Exception:
+            pass
+
+    await query.edit_message_text(f"❌ Marked not received — {rec['business_name']}")
+
+
 # ─── Payment photo flow ───────────────────────────────────────────────────────
 
 async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, is_pdf: bool, mime_type: str) -> None:
@@ -217,8 +320,9 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
                 wrong = True
                 wrong_detail = f"Seller shown: {seller}"
 
+        business = get_business_name(chat_id)
+
         if wrong:
-            business = get_business_name(chat_id)
             acct_list = "\n".join(f"  • {a}" for a in accounts["bank"])
             seller_list = "\n".join(f"  • {s}" for s in accounts["seller"])
             guide = ""
@@ -238,7 +342,28 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
                 )
             return
 
-        business = get_business_name(chat_id)
+        # Can't verify (no account/seller visible) — manual owner confirmation
+        if not to_account and not seller and (valid_banks or valid_sellers):
+            os.makedirs(config.PHOTO_STORAGE_DIR, exist_ok=True)
+            ext = "pdf" if is_pdf else "jpg"
+            filename = f"payment_{chat_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{ext}"
+            file_path = os.path.join(config.PHOTO_STORAGE_DIR, filename)
+            with open(file_path, "wb") as f:
+                f.write(file_bytes)
+            ack_msg = await bot.send_message(
+                chat_id,
+                "Thanks! Payment received — awaiting verification.",
+                reply_to_message_id=message_id,
+            )
+            # Save first to get the ID, then send nudge with proper buttons
+            verification_id = save_pending_verification(
+                chat_id, message_id, ack_msg.message_id, None, amount, business, file_path,
+            )
+            owner_msg = await _send_owner_nudge(bot, verification_id, business, amount, chat_id)
+            if owner_msg:
+                set_verification_owner_msg(verification_id, owner_msg.message_id)
+            return
+
         balance_before = get_unpaid_total(chat_id)
 
         os.makedirs(config.PHOTO_STORAGE_DIR, exist_ok=True)
@@ -249,22 +374,11 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             f.write(file_bytes)
 
         save_b2b_payment(chat_id, business, amount, file_path, message_id)
-
-        if amount > 0:
-            res = apply_payment(chat_id, amount)
-            if res["remaining"] <= 0:
-                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: $0.00</b>"
-            else:
-                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: ${res['remaining']:.2f}</b>"
-            owner_detail = (f"Dates covered: {', '.join(res['paid_dates'])}\n<b>Remaining: ${res['remaining']:.2f}</b>"
-                            if res["paid_dates"] else f"Doesn't cover any full delivery date.\n<b>Balance: ${res['remaining']:.2f}</b>")
-            caption = f"Payment — {business}\n\nAmount: ${amount:.2f}\nBalance before: ${balance_before:.2f}\n{owner_detail}"
-        else:
-            cust_msg = "Thank you! Payment received — we'll update your balance shortly."
-            caption = f"Payment — {business}\n\nAmount: unclear — check manually\n<b>Outstanding: ${balance_before:.2f}</b>"
-
+        cust_msg = _build_cust_confirmation(chat_id, amount)
         await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id, parse_mode=ParseMode.HTML)
         if config.OWNER_TELEGRAM_ID:
+            balance_after = get_unpaid_total(chat_id)
+            caption = f"Payment — {business}\n\nAmount: ${amount:.2f}\nBalance before: ${balance_before:.2f}\n<b>Remaining: ${balance_after:.2f}</b>"
             send = bot.send_document if is_pdf else bot.send_photo
             kwarg = "document" if is_pdf else "photo"
             await send(chat_id=config.OWNER_TELEGRAM_ID, caption=caption, parse_mode=ParseMode.HTML, **{kwarg: file_id})

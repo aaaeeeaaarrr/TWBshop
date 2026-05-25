@@ -213,6 +213,21 @@ def init_db() -> None:
                     active BOOLEAN NOT NULL DEFAULT TRUE
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_pending_verifications (
+                    id               SERIAL  PRIMARY KEY,
+                    group_chat_id    BIGINT  NOT NULL,
+                    photo_msg_id     INTEGER NOT NULL,
+                    group_ack_msg_id INTEGER,
+                    owner_msg_id     INTEGER,
+                    amount           FLOAT   NOT NULL DEFAULT 0,
+                    business_name    TEXT,
+                    file_path        TEXT,
+                    status           TEXT    NOT NULL DEFAULT 'pending',
+                    created_at       TEXT    NOT NULL,
+                    last_nudge_at    TEXT
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -1069,3 +1084,55 @@ def upsert_payment_account(type_: str, value: str, active: bool = True) -> None:
                 VALUES (%s, %s, %s)
                 ON CONFLICT (value) DO UPDATE SET type = EXCLUDED.type, active = EXCLUDED.active
             """, (type_, value, active))
+
+
+# ─── Pending payment verifications ────────────────────────────────────────────
+
+def save_pending_verification(group_chat_id: int, photo_msg_id: int, group_ack_msg_id: int | None,
+                               owner_msg_id: int | None, amount: float, business_name: str,
+                               file_path: str | None) -> int:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_pending_verifications
+                    (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
+                     amount, business_name, file_path, status, created_at, last_nudge_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s)
+                RETURNING id
+            """, (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
+                  amount, business_name, file_path, now, now))
+            return cur.fetchone()["id"]
+
+
+def get_pending_verifications() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM b2b_pending_verifications WHERE status = 'pending'")
+            return cur.fetchall()
+
+
+def get_pending_verification(verification_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM b2b_pending_verifications WHERE id = %s", (verification_id,))
+            return cur.fetchone()
+
+
+def set_verification_owner_msg(verification_id: int, owner_msg_id: int) -> None:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_pending_verifications SET owner_msg_id = %s, last_nudge_at = %s WHERE id = %s",
+                (owner_msg_id, now, verification_id),
+            )
+
+
+def set_verification_status(verification_id: int, status: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_pending_verifications SET status = %s WHERE id = %s",
+                (status, verification_id),
+            )
