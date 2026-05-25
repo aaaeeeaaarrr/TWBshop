@@ -143,7 +143,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - PDF payments extract to_account + seller same as photos — no false manual verification for valid PDFs.
 - Wrong-account: QR photo+caption in group, owner alert with "Have you seen this?" button, 6-hour re-nudge.
 - Unverifiable payment: "awaiting verification" in group, owner gets photo + [Received]/[Not Received], hourly re-nudge.
-**Next task:** Bakong/KHQR registration (need passport — on other PC). Check ABA app merchant QR first, else Bakong standalone app with passport.
+**Next task:** Test new commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, 📊 Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
