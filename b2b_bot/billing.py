@@ -362,9 +362,13 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
 
     if is_pdf:
         # PDFs are always payment receipts
-        result = {"type": "payment", "amount": None}
         ai_pay = await read_payment_amount_pdf(file_bytes)
-        result["amount"] = ai_pay.get("amount") or 0.0
+        result = {
+            "type": "payment",
+            "amount": ai_pay.get("amount") or 0.0,
+            "to_account": ai_pay.get("to_account"),
+            "seller": ai_pay.get("seller"),
+        }
     else:
         result = await classify_b2b_image(file_bytes, mime_type)
 

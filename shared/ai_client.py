@@ -63,6 +63,17 @@ _PAYMENT_SYSTEM = (
     "amount must be a plain number (e.g. 42.50), not a string."
 )
 
+_PDF_PAYMENT_SYSTEM = (
+    "You are a payment verification assistant. Read a bank transfer PDF document and extract details. "
+    "Return only valid JSON:\n"
+    '{"amount": <number or null>, "currency": "<string or null>", '
+    '"to_account": "<destination account number digits only or null>", '
+    '"seller": "<seller/merchant name exactly as shown or null>"}\n'
+    "Rules: amount is a plain number (e.g. 138.60). "
+    "to_account: digits only, no spaces or dashes. If partially visible (e.g. ***1234) extract only the visible digits. "
+    "seller: the merchant/payee name field if present. Set each to null if not found."
+)
+
 _STAFF_MSG_SYSTEM = (
     "You monitor bakery staff communications for issues needing management attention. "
     "Flag: safety concerns, customer complaints, conflicts, significant frustration, policy violations. "
@@ -254,26 +265,26 @@ async def extract_b2b_order_from_image(image_bytes: bytes, menu_items: list[str]
 
 
 async def read_payment_amount_pdf(pdf_bytes: bytes) -> dict:
-    """Read payment amount from a PDF bank document."""
+    """Read payment amount, destination account, and seller from a PDF bank document."""
     if not config.ANTHROPIC_API_KEY:
-        return {"amount": None, "currency": None, "notes": "API not configured"}
+        return {"amount": None, "currency": None, "to_account": None, "seller": None}
     try:
         resp = await _get_client().messages.create(
             model=config.CLAUDE_MODEL,
             max_tokens=256,
-            system=[{"type": "text", "text": _PAYMENT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            system=[{"type": "text", "text": _PDF_PAYMENT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
             messages=[{
                 "role": "user",
                 "content": [
                     {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": _encode(pdf_bytes)}},
-                    {"type": "text", "text": "Extract the transfer amount from this payment document."},
+                    {"type": "text", "text": "Extract the payment details from this document."},
                 ],
             }],
         )
-        return _parse_json(resp.content[0].text) or {"amount": None, "currency": None, "notes": "Could not parse"}
+        return _parse_json(resp.content[0].text) or {"amount": None, "currency": None, "to_account": None, "seller": None}
     except Exception as exc:
         logger.error("PDF payment reading failed: %s", exc)
-        return {"amount": None, "currency": None, "notes": "API error"}
+        return {"amount": None, "currency": None, "to_account": None, "seller": None}
 
 
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:
