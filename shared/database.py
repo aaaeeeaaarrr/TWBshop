@@ -229,6 +229,14 @@ def init_db() -> None:
                 )
             """)
             cur.execute("""
+                ALTER TABLE b2b_pending_verifications
+                ADD COLUMN IF NOT EXISTS tg_file_id TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_pending_verifications
+                ADD COLUMN IF NOT EXISTS tg_file_unique_id TEXT
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS b2b_wrong_account_alerts (
                     id            SERIAL  PRIMARY KEY,
                     owner_msg_id  INTEGER,
@@ -239,6 +247,14 @@ def init_db() -> None:
                     created_at    TEXT    NOT NULL,
                     last_nudge_at TEXT
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_wrong_account_alerts
+                ADD COLUMN IF NOT EXISTS tg_file_id TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_payments
+                ADD COLUMN IF NOT EXISTS tg_file_unique_id TEXT
             """)
     logger.info("Database ready")
 
@@ -806,17 +822,50 @@ def save_b2b_payment(
     amount: float,
     screenshot_path: str | None,
     group_message_id: int | None = None,
+    tg_file_unique_id: str | None = None,
 ) -> int:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO b2b_payments "
-                "(group_chat_id, business_name, amount, screenshot_path, group_message_id, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                (group_chat_id, business_name, amount, screenshot_path, group_message_id, now),
+                "(group_chat_id, business_name, amount, screenshot_path, group_message_id, tg_file_unique_id, created_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (group_chat_id, business_name, amount, screenshot_path, group_message_id, tg_file_unique_id, now),
             )
             return cur.fetchone()["id"]
+
+
+def is_payment_already_processed(group_chat_id: int, message_id: int, file_unique_id: str | None = None) -> bool:
+    """True if this message or file was already processed as a payment (dedup guard)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM b2b_payments WHERE group_chat_id = %s AND group_message_id = %s",
+                (group_chat_id, message_id),
+            )
+            if cur.fetchone():
+                return True
+            cur.execute(
+                "SELECT 1 FROM b2b_pending_verifications WHERE group_chat_id = %s AND photo_msg_id = %s",
+                (group_chat_id, message_id),
+            )
+            if cur.fetchone():
+                return True
+            if file_unique_id:
+                cur.execute(
+                    "SELECT 1 FROM b2b_payments WHERE group_chat_id = %s AND tg_file_unique_id = %s",
+                    (group_chat_id, file_unique_id),
+                )
+                if cur.fetchone():
+                    return True
+                cur.execute(
+                    "SELECT 1 FROM b2b_pending_verifications WHERE group_chat_id = %s AND tg_file_unique_id = %s",
+                    (group_chat_id, file_unique_id),
+                )
+                if cur.fetchone():
+                    return True
+            return False
 
 
 def get_b2b_payment(payment_id: int) -> dict | None:
@@ -1102,18 +1151,20 @@ def upsert_payment_account(type_: str, value: str, active: bool = True) -> None:
 
 def save_pending_verification(group_chat_id: int, photo_msg_id: int, group_ack_msg_id: int | None,
                                owner_msg_id: int | None, amount: float, business_name: str,
-                               file_path: str | None, tg_file_id: str | None = None) -> int:
+                               file_path: str | None, tg_file_id: str | None = None,
+                               tg_file_unique_id: str | None = None) -> int:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO b2b_pending_verifications
                     (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
-                     amount, business_name, file_path, tg_file_id, status, created_at, last_nudge_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s)
+                     amount, business_name, file_path, tg_file_id, tg_file_unique_id,
+                     status, created_at, last_nudge_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s)
                 RETURNING id
             """, (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
-                  amount, business_name, file_path, tg_file_id, now, now))
+                  amount, business_name, file_path, tg_file_id, tg_file_unique_id, now, now))
             return cur.fetchone()["id"]
 
 

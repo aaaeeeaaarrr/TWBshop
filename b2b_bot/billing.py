@@ -21,6 +21,7 @@ from shared.database import (
     mark_b2b_orders_paid,
     mark_b2b_cake_orders_paid,
     save_b2b_payment,
+    is_payment_already_processed,
     get_valid_payment_accounts,
     save_pending_verification,
     get_pending_verifications,
@@ -242,6 +243,7 @@ async def handle_payment_received(update, context) -> None:
     # Apply payment and update balance if amount known
     if rec["amount"] > 0:
         save_b2b_payment(rec["group_chat_id"], rec["business_name"], rec["amount"], rec["file_path"] or "", rec["photo_msg_id"])
+        apply_payment(rec["group_chat_id"], rec["amount"])
         cust_msg = _build_cust_confirmation(rec["group_chat_id"], rec["amount"])
     else:
         cust_msg = "Thank you! Payment confirmed. ✓\nWe'll update your balance shortly."
@@ -355,7 +357,8 @@ async def handle_wrong_alert_seen(update, context) -> None:
 
 # ─── Payment photo flow ───────────────────────────────────────────────────────
 
-async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, is_pdf: bool, mime_type: str) -> None:
+async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, is_pdf: bool, mime_type: str,
+                              file_unique_id: str | None = None) -> None:
     """Download, classify, and route a B2B group image automatically."""
     dl_file = await bot.get_file(file_id)
     file_bytes = bytes(await dl_file.download_as_bytearray())
@@ -378,6 +381,9 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
         await handle_order_photo(bot, chat_id, file_bytes, message_id, mime_type=mime_type, ai_items=items)
 
     elif result["type"] == "payment":
+        if is_payment_already_processed(chat_id, message_id, file_unique_id):
+            return
+
         amount = result.get("amount") or 0.0
         if not amount and not is_pdf:
             # Re-read for amount if classify didn't extract it
@@ -437,7 +443,7 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             # Save first to get the ID, then send nudge with proper buttons
             verification_id = save_pending_verification(
                 chat_id, message_id, ack_msg.message_id, None, amount, business, file_path,
-                tg_file_id=file_id,
+                tg_file_id=file_id, tg_file_unique_id=file_unique_id,
             )
             owner_msg = await _send_owner_nudge(bot, verification_id, business, amount, chat_id,
                                                  tg_file_id=file_id, is_pdf=is_pdf)
@@ -454,7 +460,8 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        save_b2b_payment(chat_id, business, amount, file_path, message_id)
+        save_b2b_payment(chat_id, business, amount, file_path, message_id, file_unique_id)
+        apply_payment(chat_id, amount)
         cust_msg = _build_cust_confirmation(chat_id, amount)
         await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id, parse_mode=ParseMode.HTML)
         if config.OWNER_TELEGRAM_ID:
@@ -472,7 +479,9 @@ async def handle_payment_photo(update: Update, context) -> None:
     if not is_b2b_group(chat_id) or not update.message.photo:
         return
     msg = update.message
-    await _process_b2b_image(context.bot, chat_id, msg.photo[-1].file_id, msg.message_id, is_pdf=False, mime_type="image/jpeg")
+    await _process_b2b_image(context.bot, chat_id, msg.photo[-1].file_id, msg.message_id,
+                              is_pdf=False, mime_type="image/jpeg",
+                              file_unique_id=msg.photo[-1].file_unique_id)
 
 
 async def handle_payment_document(update: Update, context) -> None:
@@ -488,7 +497,9 @@ async def handle_payment_document(update: Update, context) -> None:
     if not is_pdf and not is_image:
         return
     mime = doc.mime_type if is_image else "image/jpeg"
-    await _process_b2b_image(context.bot, chat_id, doc.file_id, update.message.message_id, is_pdf=is_pdf, mime_type=mime)
+    await _process_b2b_image(context.bot, chat_id, doc.file_id, update.message.message_id,
+                              is_pdf=is_pdf, mime_type=mime,
+                              file_unique_id=doc.file_unique_id)
 
 
 async def handle_payment_callback(update: Update, context) -> None:
