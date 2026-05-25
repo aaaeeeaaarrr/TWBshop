@@ -31,6 +31,9 @@ from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder, send_b2b_dispatch_reminder
 from b2b_bot.delivery import handle_location
 from b2b_bot.recurring import send_recurring_reminders, auto_skip_unconfirmed
+from b2b_bot.dispatch_reminder import (
+    handle_dispatch_confirm, handle_dispatch_snooze, run_dispatch_reminder_tick,
+)
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -114,6 +117,10 @@ async def _job_dispatch_reminder_1(context) -> None:
 
 async def _job_dispatch_reminder_2(context) -> None:
     await send_b2b_dispatch_reminder(context.bot, reminder_num=2)
+
+
+async def _job_dispatch_reminder_tick(context) -> None:
+    await run_dispatch_reminder_tick(context.bot)
 
 
 async def _job_daily_payment_reminder(context) -> None:
@@ -205,8 +212,12 @@ def main() -> None:
     # Payment callbacks (owner approve/reject + customer yes/no/order)
     app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern=r"^b2b_pay_"))
 
+    # Dispatch reminder callbacks (confirm delivery/pickup + snooze)
+    app.add_handler(CallbackQueryHandler(handle_dispatch_confirm, pattern=r"^b2b_dispatch_confirm_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_dispatch_snooze,  pattern=r"^b2b_dispatch_snooze_\d+_\d+$"))
+
     # Order callbacks (confirm, edit, cancel, extra, mini)
-    app.add_handler(CallbackQueryHandler(handle_callback, pattern=r"^b2b_(?!pay_)"))
+    app.add_handler(CallbackQueryHandler(handle_callback, pattern=r"^b2b_(?!pay_|dispatch_)"))
 
     # Staff commands
     app.add_handler(CommandHandler("summary", cmd_summary))
@@ -278,6 +289,10 @@ def main() -> None:
             "Dispatch reminder %s scheduled at %02d:%02d UTC (%02d:%02d Phnom Penh)",
             num, hour_utc, minute_utc, pnh_hour, pnh_minute,
         )
+
+    # Dispatch reminder tick — every 60s, fires 1h reminders and escalations
+    app.job_queue.run_repeating(_job_dispatch_reminder_tick, interval=60, first=30)
+    logger.info("Dispatch reminder tick scheduled every 60s")
 
     # Recurring order reminders — 7am, 1pm, 6pm Phnom Penh (the day before fulfillment)
     for hour_utc, num in [

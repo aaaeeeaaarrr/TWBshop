@@ -190,6 +190,21 @@ def init_db() -> None:
                     UNIQUE(recurring_order_id, fulfillment_date)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_dispatch_reminders (
+                    id                SERIAL  PRIMARY KEY,
+                    group_chat_id     BIGINT  NOT NULL,
+                    fulfillment_date  TEXT    NOT NULL,
+                    fulfillment_time  TEXT    NOT NULL,
+                    delivery_method   TEXT    NOT NULL,
+                    status            TEXT    NOT NULL DEFAULT 'pending',
+                    owner_message_id  INTEGER,
+                    snooze_until      TEXT,
+                    escalated         BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at        TEXT    NOT NULL,
+                    UNIQUE(group_chat_id, fulfillment_date)
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -923,4 +938,101 @@ def get_pending_recurring_for_date(target_date: str) -> list[dict]:
                 JOIN b2b_recurring_orders ro ON ro.id = rc.recurring_order_id
                 WHERE rc.fulfillment_date = %s AND rc.status = 'pending'
             """, (target_date,))
+            return cur.fetchall()
+
+
+# ─── B2B dispatch reminders ───────────────────────────────────────────────────
+
+def ensure_b2b_dispatch_reminder(
+    group_chat_id: int, fulfillment_date: str,
+    fulfillment_time: str, delivery_method: str,
+) -> dict:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_dispatch_reminders
+                    (group_chat_id, fulfillment_date, fulfillment_time, delivery_method, created_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (group_chat_id, fulfillment_date) DO NOTHING
+            """, (group_chat_id, fulfillment_date, fulfillment_time, delivery_method, now))
+            cur.execute("""
+                SELECT id, group_chat_id, fulfillment_date, fulfillment_time, delivery_method,
+                       status, owner_message_id, snooze_until, escalated
+                FROM b2b_dispatch_reminders
+                WHERE group_chat_id = %s AND fulfillment_date = %s
+            """, (group_chat_id, fulfillment_date))
+            return cur.fetchone()
+
+
+def get_pending_dispatch_reminders(today_date: str) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, group_chat_id, fulfillment_date, fulfillment_time, delivery_method,
+                       status, owner_message_id, snooze_until, escalated
+                FROM b2b_dispatch_reminders
+                WHERE fulfillment_date = %s AND status != 'confirmed'
+            """, (today_date,))
+            return cur.fetchall()
+
+
+def get_dispatch_reminder(reminder_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, group_chat_id, fulfillment_date, fulfillment_time, delivery_method,
+                       status, owner_message_id, snooze_until, escalated
+                FROM b2b_dispatch_reminders WHERE id = %s
+            """, (reminder_id,))
+            return cur.fetchone()
+
+
+def set_dispatch_reminder_reminded(reminder_id: int, owner_message_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_dispatch_reminders
+                SET status = 'reminded', owner_message_id = %s
+                WHERE id = %s
+            """, (owner_message_id, reminder_id))
+
+
+def set_dispatch_reminder_snoozed(reminder_id: int, snooze_until: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE b2b_dispatch_reminders
+                SET status = 'snoozed', snooze_until = %s, owner_message_id = NULL
+                WHERE id = %s
+            """, (snooze_until, reminder_id))
+
+
+def set_dispatch_reminder_confirmed(reminder_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_dispatch_reminders SET status = 'confirmed' WHERE id = %s",
+                (reminder_id,),
+            )
+
+
+def set_dispatch_reminder_escalated(reminder_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_dispatch_reminders SET escalated = TRUE WHERE id = %s",
+                (reminder_id,),
+            )
+
+
+def get_b2b_bread_orders_for_group_date(group_chat_id: int, delivery_date: str) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT item, quantity, grams, notes
+                FROM b2b_orders
+                WHERE group_chat_id = %s AND delivery_date = %s AND status = 'confirmed'
+                ORDER BY item
+            """, (group_chat_id, delivery_date))
             return cur.fetchall()

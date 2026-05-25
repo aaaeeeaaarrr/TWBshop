@@ -131,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Fixed stale CLAUDE.md phase checklist — Phase 2 (recurring orders) was already fully built and scheduled; marked complete and expanded both phase descriptions.
+**Last completed:** Dispatch reminders to owner — 1h before fulfillment, message with items+costs+buttons (confirm delivery/pickup, snooze 30/20/10min). Buttons auto-strip as time runs out (≤45m: no 30m, ≤35m: no 20m, ≤25m: no 10m). Snooze deletes message + reschedules via DB. Confirm marks DELIVERED/READY FOR PICKUP (LATE prefix if after fulfillment time). 5min escalation to staff group if unconfirmed. 60s polling job, fully restart-safe (all state in b2b_dispatch_reminders table).
 **Next task:** None defined
 **Known issues:** None
 **Notes:**
