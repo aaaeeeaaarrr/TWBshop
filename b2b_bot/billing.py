@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from telegram import Update
+from telegram.constants import ParseMode
 
 import config
 from b2b_bot.customers import get_business_name, is_b2b_group
@@ -211,19 +212,19 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             if res["remaining"] <= 0:
                 cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. Your balance is now $0. ✓"
             else:
-                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\nRemaining balance: ${res['remaining']:.2f}"
-            owner_detail = (f"Dates covered: {', '.join(res['paid_dates'])}\nRemaining: ${res['remaining']:.2f}"
-                            if res["paid_dates"] else f"Doesn't cover any full delivery date. Balance: ${res['remaining']:.2f}")
+                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: ${res['remaining']:.2f}</b>"
+            owner_detail = (f"Dates covered: {', '.join(res['paid_dates'])}\n<b>Remaining: ${res['remaining']:.2f}</b>"
+                            if res["paid_dates"] else f"Doesn't cover any full delivery date.\n<b>Balance: ${res['remaining']:.2f}</b>")
             caption = f"Payment — {business}\n\nAmount: ${amount:.2f}\nBalance before: ${balance_before:.2f}\n{owner_detail}"
         else:
             cust_msg = "Thank you! Payment received — we'll update your balance shortly."
-            caption = f"Payment — {business}\n\nAmount: unclear — check manually\nOutstanding: ${balance_before:.2f}"
+            caption = f"Payment — {business}\n\nAmount: unclear — check manually\n<b>Outstanding: ${balance_before:.2f}</b>"
 
-        await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id)
+        await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id, parse_mode=ParseMode.HTML)
         if config.OWNER_TELEGRAM_ID:
             send = bot.send_document if is_pdf else bot.send_photo
             kwarg = "document" if is_pdf else "photo"
-            await send(chat_id=config.OWNER_TELEGRAM_ID, caption=caption, **{kwarg: file_id})
+            await send(chat_id=config.OWNER_TELEGRAM_ID, caption=caption, parse_mode=ParseMode.HTML, **{kwarg: file_id})
     # type == "other": ignore silently
 
 
