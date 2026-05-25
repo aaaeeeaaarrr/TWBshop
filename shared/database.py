@@ -1102,18 +1102,18 @@ def upsert_payment_account(type_: str, value: str, active: bool = True) -> None:
 
 def save_pending_verification(group_chat_id: int, photo_msg_id: int, group_ack_msg_id: int | None,
                                owner_msg_id: int | None, amount: float, business_name: str,
-                               file_path: str | None) -> int:
+                               file_path: str | None, tg_file_id: str | None = None) -> int:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO b2b_pending_verifications
                     (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
-                     amount, business_name, file_path, status, created_at, last_nudge_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s)
+                     amount, business_name, file_path, tg_file_id, status, created_at, last_nudge_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s)
                 RETURNING id
             """, (group_chat_id, photo_msg_id, group_ack_msg_id, owner_msg_id,
-                  amount, business_name, file_path, now, now))
+                  amount, business_name, file_path, tg_file_id, now, now))
             return cur.fetchone()["id"]
 
 
@@ -1152,16 +1152,17 @@ def set_verification_status(verification_id: int, status: str) -> None:
 
 # ─── Wrong account alerts ──────────────────────────────────────────────────────
 
-def save_wrong_account_alert(owner_msg_id: int | None, business_name: str, amount: float, wrong_detail: str) -> int:
+def save_wrong_account_alert(owner_msg_id: int | None, business_name: str, amount: float,
+                              wrong_detail: str, tg_file_id: str | None = None) -> int:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO b2b_wrong_account_alerts
-                    (owner_msg_id, business_name, amount, wrong_detail, status, created_at, last_nudge_at)
-                VALUES (%s, %s, %s, %s, 'pending', %s, %s)
+                    (owner_msg_id, business_name, amount, wrong_detail, tg_file_id, status, created_at, last_nudge_at)
+                VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
                 RETURNING id
-            """, (owner_msg_id, business_name, amount, wrong_detail, now, now))
+            """, (owner_msg_id, business_name, amount, wrong_detail, tg_file_id, now, now))
             return cur.fetchone()["id"]
 
 

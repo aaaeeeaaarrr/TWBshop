@@ -196,13 +196,16 @@ def _verification_keyboard(verification_id: int):
     ]])
 
 
-async def _send_owner_nudge(bot, verification_id: int | None, business: str, amount: float, chat_id: int):
+async def _send_owner_nudge(bot, verification_id: int | None, business: str, amount: float,
+                            chat_id: int, tg_file_id: str | None = None):
     if not config.OWNER_TELEGRAM_ID:
         return None
     amount_str = f"${amount:.2f}" if amount else "amount unclear"
     text = f"💳 Payment verification needed\n{business} — {amount_str}\nDid you receive this?"
     kb = _verification_keyboard(verification_id) if verification_id else None
     try:
+        if tg_file_id:
+            return await bot.send_photo(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
     except Exception as e:
         logger.error("Failed to send owner nudge: %s", e)
@@ -217,7 +220,8 @@ async def run_verification_nudge_tick(bot) -> None:
                 await bot.delete_message(config.OWNER_TELEGRAM_ID, rec["owner_msg_id"])
             except Exception:
                 pass
-        msg = await _send_owner_nudge(bot, rec["id"], rec["business_name"], rec["amount"], rec["group_chat_id"])
+        msg = await _send_owner_nudge(bot, rec["id"], rec["business_name"], rec["amount"],
+                                       rec["group_chat_id"], rec.get("tg_file_id"))
         if msg:
             set_verification_owner_msg(rec["id"], msg.message_id)
 
@@ -256,7 +260,10 @@ async def handle_payment_received(update, context) -> None:
         f"Amount: ${rec['amount']:.2f}\n"
         f"<b>Remaining balance: ${remaining:.2f}</b>"
     )
-    await query.edit_message_text(owner_text, parse_mode="HTML")
+    if rec.get("tg_file_id"):
+        await query.edit_message_caption(owner_text, parse_mode="HTML")
+    else:
+        await query.edit_message_text(owner_text, parse_mode="HTML")
 
 
 async def handle_payment_not_received(update, context) -> None:
@@ -290,10 +297,14 @@ async def handle_payment_not_received(update, context) -> None:
         f"Amount: {amount_str}\n"
         f"<b>Outstanding balance: ${outstanding:.2f}</b>"
     )
-    await query.edit_message_text(owner_text, parse_mode="HTML")
+    if rec.get("tg_file_id"):
+        await query.edit_message_caption(owner_text, parse_mode="HTML")
+    else:
+        await query.edit_message_text(owner_text, parse_mode="HTML")
 
 
-async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: float, wrong_detail: str):
+async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: float,
+                                   wrong_detail: str, tg_file_id: str | None = None):
     if not config.OWNER_TELEGRAM_ID:
         return None
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -303,6 +314,8 @@ async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: flo
         InlineKeyboardButton("👁 Have you seen this?", callback_data=f"b2b_wrongseen_{alert_id}"),
     ]])
     try:
+        if tg_file_id:
+            return await bot.send_photo(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
     except Exception as e:
         logger.error("Failed to send wrong alert nudge: %s", e)
@@ -317,7 +330,9 @@ async def run_wrong_alert_nudge_tick(bot) -> None:
                 await bot.delete_message(config.OWNER_TELEGRAM_ID, alert["owner_msg_id"])
             except Exception:
                 pass
-        msg = await _send_wrong_alert_nudge(bot, alert["id"], alert["business_name"], alert["amount"], alert["wrong_detail"] or "")
+        msg = await _send_wrong_alert_nudge(bot, alert["id"], alert["business_name"],
+                                              alert["amount"], alert["wrong_detail"] or "",
+                                              alert.get("tg_file_id"))
         if msg:
             set_wrong_alert_owner_msg(alert["id"], msg.message_id)
 
@@ -327,7 +342,11 @@ async def handle_wrong_alert_seen(update, context) -> None:
     await query.answer()
     alert_id = int(query.data.split("_")[2])
     set_wrong_alert_seen(alert_id)
-    await query.edit_message_text(query.message.text + "\n\n✅ Acknowledged")
+    caption = (query.message.caption or query.message.text or "") + "\n\n✅ Acknowledged"
+    if query.message.photo:
+        await query.edit_message_caption(caption)
+    else:
+        await query.edit_message_text(caption)
 
 
 # ─── Payment photo flow ───────────────────────────────────────────────────────
@@ -388,8 +407,8 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
                     await bot.send_photo(chat_id, qr_file, caption=cust_text, reply_to_message_id=message_id)
             else:
                 await bot.send_message(chat_id, cust_text, reply_to_message_id=message_id)
-            alert_id = save_wrong_account_alert(None, business, amount, wrong_detail)
-            msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail)
+            alert_id = save_wrong_account_alert(None, business, amount, wrong_detail, tg_file_id=file_id)
+            msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail, tg_file_id=file_id)
             if msg:
                 set_wrong_alert_owner_msg(alert_id, msg.message_id)
             return
@@ -410,8 +429,10 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             # Save first to get the ID, then send nudge with proper buttons
             verification_id = save_pending_verification(
                 chat_id, message_id, ack_msg.message_id, None, amount, business, file_path,
+                tg_file_id=file_id,
             )
-            owner_msg = await _send_owner_nudge(bot, verification_id, business, amount, chat_id)
+            owner_msg = await _send_owner_nudge(bot, verification_id, business, amount, chat_id,
+                                                 tg_file_id=file_id)
             if owner_msg:
                 set_verification_owner_msg(verification_id, owner_msg.message_id)
             return
