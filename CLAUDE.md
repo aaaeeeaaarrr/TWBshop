@@ -131,14 +131,26 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Payment photo/PDF validation pipeline fully working. (1) Bank account + seller name validation against DB-stored accounts (no restart needed to add/change). (2) Wrong-account: sends QR as photo+caption in group, owner alert with "Have you seen this?" button, 6-hour re-nudge. (3) Unverifiable payment: group gets "awaiting verification", owner gets payment photo + [Received]/[Not Received] buttons, hourly re-nudge. (4) PDF payments now extract to_account + seller (not just amount) so they hit the same validation path as photos — no more false manual verification for valid PDFs. (5) After button press, payment photo stays visible (edit_message_caption). Balance shown in bold HTML throughout.
-**Next task:** None defined
+**Last completed:** Full staff/owner command suite + credit tracking.
+- `/markpaid` — staff or owner records cash/bank payment. In group → that customer directly. Private → customer picker. Staff flow: owner gets [Confirm]/[Reject] in private; both see details regardless of outcome. Owner doing it → applies immediately, no self-verification.
+- `/balance` — private: all customers with effective balances. In group: date-by-date breakdown, credit applied to oldest date first.
+- `/history` — payment log per customer or all. Shows date, amount, method, delivery dates covered.
+- `/addaccount` / `/removeaccount` — owner only, private. Bot prompts for type then value. No restart needed.
+- `/commands` — role-aware list (owner sees full set, staff sees subset).
+- 📊 Check Balance button — bottom of every group menu keyboard.
+- Credit tracking — leftover from partial payments stored per customer, consumed automatically next payment. Effective balance = unpaid orders − credit.
+- Duplicate payment guard — same photo (by message_id or file_unique_id) silently ignored after first processing.
+- PDF payments extract to_account + seller same as photos — no false manual verification for valid PDFs.
+- Wrong-account: QR photo+caption in group, owner alert with "Have you seen this?" button, 6-hour re-nudge.
+- Unverifiable payment: "awaiting verification" in group, owner gets photo + [Received]/[Not Received], hourly re-nudge.
+**Next task:** Bakong/KHQR registration (need passport — on other PC). Check ABA app merchant QR first, else Bakong standalone app with passport.
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
 - B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
 - Business names live in `b2b_bot/customers.py` — add group chat ID + name, restart bot to register new customer
+- Valid bank accounts and seller names stored in DB (`b2b_payment_accounts` table) — manage via `/addaccount` and `/removeaccount`, no restart needed
 
 ---
 
