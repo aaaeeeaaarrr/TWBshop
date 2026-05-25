@@ -197,13 +197,15 @@ def _verification_keyboard(verification_id: int):
 
 
 async def _send_owner_nudge(bot, verification_id: int | None, business: str, amount: float,
-                            chat_id: int, tg_file_id: str | None = None):
+                            chat_id: int, tg_file_id: str | None = None, is_pdf: bool = False):
     if not config.OWNER_TELEGRAM_ID:
         return None
     amount_str = f"${amount:.2f}" if amount else "amount unclear"
     text = f"💳 Payment verification needed\n{business} — {amount_str}\nDid you receive this?"
     kb = _verification_keyboard(verification_id) if verification_id else None
     try:
+        if tg_file_id and is_pdf:
+            return await bot.send_document(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         if tg_file_id:
             return await bot.send_photo(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
@@ -304,7 +306,7 @@ async def handle_payment_not_received(update, context) -> None:
 
 
 async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: float,
-                                   wrong_detail: str, tg_file_id: str | None = None):
+                                   wrong_detail: str, tg_file_id: str | None = None, is_pdf: bool = False):
     if not config.OWNER_TELEGRAM_ID:
         return None
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -314,6 +316,8 @@ async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: flo
         InlineKeyboardButton("👁 Have you seen this?", callback_data=f"b2b_wrongseen_{alert_id}"),
     ]])
     try:
+        if tg_file_id and is_pdf:
+            return await bot.send_document(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         if tg_file_id:
             return await bot.send_photo(config.OWNER_TELEGRAM_ID, tg_file_id, caption=text, reply_markup=kb)
         return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
@@ -408,7 +412,7 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             else:
                 await bot.send_message(chat_id, cust_text, reply_to_message_id=message_id)
             alert_id = save_wrong_account_alert(None, business, amount, wrong_detail, tg_file_id=file_id)
-            msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail, tg_file_id=file_id)
+            msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail, tg_file_id=file_id, is_pdf=is_pdf)
             if msg:
                 set_wrong_alert_owner_msg(alert_id, msg.message_id)
             return
@@ -432,7 +436,7 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
                 tg_file_id=file_id,
             )
             owner_msg = await _send_owner_nudge(bot, verification_id, business, amount, chat_id,
-                                                 tg_file_id=file_id)
+                                                 tg_file_id=file_id, is_pdf=is_pdf)
             if owner_msg:
                 set_verification_owner_msg(verification_id, owner_msg.message_id)
             return
