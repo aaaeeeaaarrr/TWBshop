@@ -86,9 +86,11 @@ _B2B_IMAGE_CLASSIFY_SYSTEM = (
     "You analyze images sent to a bakery B2B ordering system. "
     "Decide if the image is: a payment receipt/bank transfer, a bakery order, or something else. "
     "Return only valid JSON with one of these shapes:\n"
-    '  Payment: {"type": "payment", "amount": <number or null>, "currency": "<string or null>"}\n'
+    '  Payment: {"type": "payment", "amount": <number or null>, "currency": "<string or null>", "to_account": "<destination account number as shown, or null if not visible>"}\n'
     '  Order:   {"type": "order", "items": [{"item": "<product name>", "qty": <integer>}]}\n'
     '  Other:   {"type": "other"}\n'
+    "For payments: extract the destination/recipient account number exactly as shown (digits only, no spaces or dashes). "
+    "If the screenshot shows a partial number (e.g. ***1234), extract only the visible digits (1234). "
     "For orders: extract readable product names only — ignore item codes like PP-FOOD-BK-2503. "
     "If a row has a code column and a description column, use the description. "
     "Look for quantities in columns named Qty, Quantity, Pcs, or similar."

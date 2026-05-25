@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -195,6 +196,28 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             ai_pay = await read_payment_amount(file_bytes)
             amount = ai_pay.get("amount") or 0.0
 
+        # Validate destination account if configured and AI extracted one
+        to_account = result.get("to_account")
+        if config.VALID_BANK_ACCOUNTS and to_account:
+            extracted = re.sub(r"[\s\-]", "", str(to_account))
+            valid = [re.sub(r"[\s\-]", "", a) for a in config.VALID_BANK_ACCOUNTS]
+            # Match if extracted is a suffix of any valid account (handles partially visible numbers)
+            account_ok = any(v.endswith(extracted) or extracted.endswith(v) for v in valid)
+            if not account_ok:
+                acct_list = "\n".join(f"  • {a}" for a in config.VALID_BANK_ACCOUNTS)
+                business = get_business_name(chat_id)
+                await bot.send_message(
+                    chat_id,
+                    f"⚠️ This payment was sent to the wrong account.\n\nPlease send to:\n{acct_list}",
+                    reply_to_message_id=message_id,
+                )
+                if config.OWNER_TELEGRAM_ID:
+                    await bot.send_message(
+                        config.OWNER_TELEGRAM_ID,
+                        f"⚠️ Wrong account payment — {business}\nSent to: {to_account}\nAmount: ${amount:.2f}",
+                    )
+                return
+
         business = get_business_name(chat_id)
         balance_before = get_unpaid_total(chat_id)
 
@@ -210,7 +233,7 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
         if amount > 0:
             res = apply_payment(chat_id, amount)
             if res["remaining"] <= 0:
-                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. Your balance is now $0. ✓"
+                cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: $0.00</b>"
             else:
                 cust_msg = f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: ${res['remaining']:.2f}</b>"
             owner_detail = (f"Dates covered: {', '.join(res['paid_dates'])}\n<b>Remaining: ${res['remaining']:.2f}</b>"

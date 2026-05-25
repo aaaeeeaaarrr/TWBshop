@@ -55,3 +55,9 @@ DISPATCH_REMINDER_TELEGRAM_ID: int = 1271537077
 # Get from Google Maps: long-press the bakery location → copy the numbers at the top.
 BAKERY_LAT: float = 11.5387774
 BAKERY_LNG: float = 104.9147998
+
+# Valid bank account numbers customers should pay to.
+# Payments sent to any other account are flagged in the group and forwarded to OWNER_TELEGRAM_ID.
+# Add the full account number exactly as it appears (digits only, no spaces or dashes).
+# Leave empty [] to skip account validation.
+VALID_BANK_ACCOUNTS: list[str] = []

@@ -69,3 +69,7 @@ DISPATCH_REMINDER_TELEGRAM_ID: int = 0
 # Get from Google Maps: long-press the bakery location → copy the numbers at the top.
 BAKERY_LAT: float = 0.0   # ← FILL IN
 BAKERY_LNG: float = 0.0   # ← FILL IN
+
+# Valid bank account numbers customers should pay to.
+# Leave empty [] to skip validation.
+VALID_BANK_ACCOUNTS: list[str] = []  # e.g. ["000123456", "789012345"]
