@@ -250,7 +250,13 @@ async def handle_payment_received(update, context) -> None:
         except Exception:
             await context.bot.send_message(rec["group_chat_id"], cust_msg, parse_mode="HTML")
 
-    await query.edit_message_text(f"✅ Marked received — {rec['business_name']} ${rec['amount']:.2f}")
+    remaining = get_unpaid_total(rec["group_chat_id"])
+    owner_text = (
+        f"✅ Received — {rec['business_name']}\n"
+        f"Amount: ${rec['amount']:.2f}\n"
+        f"<b>Remaining balance: ${remaining:.2f}</b>"
+    )
+    await query.edit_message_text(owner_text, parse_mode="HTML")
 
 
 async def handle_payment_not_received(update, context) -> None:
@@ -264,17 +270,27 @@ async def handle_payment_not_received(update, context) -> None:
 
     set_verification_status(verification_id, "not_received")
 
+    amount_str = f"${rec['amount']:.2f}" if rec["amount"] else "amount unclear"
+    outstanding = get_unpaid_total(rec["group_chat_id"])
+    group_text = (
+        f"❌ Amount not received — please double-check and resend if needed.\n"
+        f"<b>Outstanding balance: ${outstanding:.2f}</b>"
+    )
     if rec["group_ack_msg_id"]:
         try:
             await context.bot.edit_message_text(
-                "❌ Amount not received — please double-check and resend if needed.",
-                chat_id=rec["group_chat_id"],
-                message_id=rec["group_ack_msg_id"],
+                group_text, chat_id=rec["group_chat_id"],
+                message_id=rec["group_ack_msg_id"], parse_mode="HTML",
             )
         except Exception:
             pass
 
-    await query.edit_message_text(f"❌ Marked not received — {rec['business_name']}")
+    owner_text = (
+        f"❌ Not received — {rec['business_name']}\n"
+        f"Amount: {amount_str}\n"
+        f"<b>Outstanding balance: ${outstanding:.2f}</b>"
+    )
+    await query.edit_message_text(owner_text, parse_mode="HTML")
 
 
 async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: float, wrong_detail: str):
