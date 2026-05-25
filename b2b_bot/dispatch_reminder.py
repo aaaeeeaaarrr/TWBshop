@@ -89,12 +89,12 @@ def _build_keyboard(reminder_id: int, mins: int, delivery_method: str):
     else:
         confirm_label = "✅ Ready for Pickup"
     row1 = [InlineKeyboardButton(confirm_label, callback_data=f"b2b_dispatch_confirm_{reminder_id}")]
-    row2 = [
-        InlineKeyboardButton(f"Remind me in {snooze_mins} min", callback_data=f"b2b_dispatch_snooze_{reminder_id}_{snooze_mins}")
+    snooze_rows = [
+        [InlineKeyboardButton(f"Remind me in {snooze_mins} min", callback_data=f"b2b_dispatch_snooze_{reminder_id}_{snooze_mins}")]
         for snooze_mins, threshold in [(30, 45), (20, 35), (10, 25)]
         if mins > threshold
     ]
-    return InlineKeyboardMarkup([row1] + ([row2] if row2 else []))
+    return InlineKeyboardMarkup([row1] + snooze_rows)
 
 
 async def _send_reminder(bot, rec: dict) -> None:
