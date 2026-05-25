@@ -228,6 +228,18 @@ def init_db() -> None:
                     last_nudge_at    TEXT
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_wrong_account_alerts (
+                    id            SERIAL  PRIMARY KEY,
+                    owner_msg_id  INTEGER,
+                    business_name TEXT,
+                    amount        FLOAT   NOT NULL DEFAULT 0,
+                    wrong_detail  TEXT,
+                    status        TEXT    NOT NULL DEFAULT 'pending',
+                    created_at    TEXT    NOT NULL,
+                    last_nudge_at TEXT
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -1135,4 +1147,45 @@ def set_verification_status(verification_id: int, status: str) -> None:
             cur.execute(
                 "UPDATE b2b_pending_verifications SET status = %s WHERE id = %s",
                 (status, verification_id),
+            )
+
+
+# ─── Wrong account alerts ──────────────────────────────────────────────────────
+
+def save_wrong_account_alert(owner_msg_id: int | None, business_name: str, amount: float, wrong_detail: str) -> int:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_wrong_account_alerts
+                    (owner_msg_id, business_name, amount, wrong_detail, status, created_at, last_nudge_at)
+                VALUES (%s, %s, %s, %s, 'pending', %s, %s)
+                RETURNING id
+            """, (owner_msg_id, business_name, amount, wrong_detail, now, now))
+            return cur.fetchone()["id"]
+
+
+def get_pending_wrong_account_alerts() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM b2b_wrong_account_alerts WHERE status = 'pending'")
+            return cur.fetchall()
+
+
+def set_wrong_alert_owner_msg(alert_id: int, owner_msg_id: int) -> None:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_wrong_account_alerts SET owner_msg_id = %s, last_nudge_at = %s WHERE id = %s",
+                (owner_msg_id, now, alert_id),
+            )
+
+
+def set_wrong_alert_seen(alert_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_wrong_account_alerts SET status = 'seen' WHERE id = %s",
+                (alert_id,),
             )

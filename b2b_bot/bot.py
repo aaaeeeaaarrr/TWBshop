@@ -22,6 +22,8 @@ from b2b_bot.billing import (
     handle_payment_received,
     handle_payment_not_received,
     run_verification_nudge_tick,
+    handle_wrong_alert_seen,
+    run_wrong_alert_nudge_tick,
     send_daily_reminders,
     send_weekly_reminders,
     get_all_outstanding_summary,
@@ -215,6 +217,7 @@ def main() -> None:
     # Payment callbacks — manual verification first, then general
     app.add_handler(CallbackQueryHandler(handle_payment_received,    pattern=r"^b2b_pay_received_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_payment_not_received, pattern=r"^b2b_pay_notreceived_\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_wrong_alert_seen,    pattern=r"^b2b_wrongseen_\d+$"))
     app.add_handler(CallbackQueryHandler(handle_payment_callback, pattern=r"^b2b_pay_"))
 
     # Dispatch reminder callbacks (confirm delivery/pickup + snooze)
@@ -304,6 +307,12 @@ def main() -> None:
         await run_verification_nudge_tick(ctx.bot)
     app.job_queue.run_repeating(_job_verification_nudge, interval=3600, first=3600)
     logger.info("Payment verification nudge scheduled every 1h")
+
+    # Wrong account alert nudge — every 6 hours until acknowledged
+    async def _job_wrong_alert_nudge(ctx):
+        await run_wrong_alert_nudge_tick(ctx.bot)
+    app.job_queue.run_repeating(_job_wrong_alert_nudge, interval=21600, first=21600)
+    logger.info("Wrong account alert nudge scheduled every 6h")
 
     # Recurring order reminders — 7am, 1pm, 6pm Phnom Penh (the day before fulfillment)
     for hour_utc, num in [

@@ -27,6 +27,10 @@ from shared.database import (
     get_pending_verification,
     set_verification_owner_msg,
     set_verification_status,
+    save_wrong_account_alert,
+    get_pending_wrong_account_alerts,
+    set_wrong_alert_owner_msg,
+    set_wrong_alert_seen,
 )
 
 logger = logging.getLogger(__name__)
@@ -273,6 +277,43 @@ async def handle_payment_not_received(update, context) -> None:
     await query.edit_message_text(f"❌ Marked not received — {rec['business_name']}")
 
 
+async def _send_wrong_alert_nudge(bot, alert_id: int, business: str, amount: float, wrong_detail: str):
+    if not config.OWNER_TELEGRAM_ID:
+        return None
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    amount_str = f"${amount:.2f}" if amount else "amount unclear"
+    text = f"⚠️ Wrong account payment — {business}\n{wrong_detail}\nAmount: {amount_str}"
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("👁 Have you seen this?", callback_data=f"b2b_wrongseen_{alert_id}"),
+    ]])
+    try:
+        return await bot.send_message(config.OWNER_TELEGRAM_ID, text, reply_markup=kb)
+    except Exception as e:
+        logger.error("Failed to send wrong alert nudge: %s", e)
+        return None
+
+
+async def run_wrong_alert_nudge_tick(bot) -> None:
+    """Every 6 hours — re-nudge owner for unacknowledged wrong-account payments."""
+    for alert in get_pending_wrong_account_alerts():
+        if alert["owner_msg_id"]:
+            try:
+                await bot.delete_message(config.OWNER_TELEGRAM_ID, alert["owner_msg_id"])
+            except Exception:
+                pass
+        msg = await _send_wrong_alert_nudge(bot, alert["id"], alert["business_name"], alert["amount"], alert["wrong_detail"] or "")
+        if msg:
+            set_wrong_alert_owner_msg(alert["id"], msg.message_id)
+
+
+async def handle_wrong_alert_seen(update, context) -> None:
+    query = update.callback_query
+    await query.answer()
+    alert_id = int(query.data.split("_")[2])
+    set_wrong_alert_seen(alert_id)
+    await query.edit_message_text(query.message.text + "\n\n✅ Acknowledged")
+
+
 # ─── Payment photo flow ───────────────────────────────────────────────────────
 
 async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, is_pdf: bool, mime_type: str) -> None:
@@ -324,22 +365,16 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
 
         if wrong:
             acct_list = "\n".join(f"  • {a}" for a in accounts["bank"])
-            seller_list = "\n".join(f"  • {s}" for s in accounts["seller"])
-            guide = ""
-            if acct_list:
-                guide += f"Bank accounts:\n{acct_list}\n"
-            if seller_list:
-                guide += f"QR seller name:\n{seller_list}"
+            cust_guide = f"Please send to:\n{acct_list}" if acct_list else "Please contact us for the correct account."
             await bot.send_message(
                 chat_id,
-                f"⚠️ This payment was sent to the wrong account.\n\nPlease send to:\n{guide.strip()}",
+                f"⚠️ This payment was sent to the wrong account.\n\n{cust_guide}",
                 reply_to_message_id=message_id,
             )
-            if config.OWNER_TELEGRAM_ID:
-                await bot.send_message(
-                    config.OWNER_TELEGRAM_ID,
-                    f"⚠️ Wrong account payment — {business}\n{wrong_detail}\nAmount: ${amount:.2f}",
-                )
+            alert_id = save_wrong_account_alert(None, business, amount, wrong_detail)
+            msg = await _send_wrong_alert_nudge(bot, alert_id, business, amount, wrong_detail)
+            if msg:
+                set_wrong_alert_owner_msg(alert_id, msg.message_id)
             return
 
         # Can't verify (no account/seller visible) — manual owner confirmation
