@@ -490,11 +490,30 @@ async def handle_callback(update: Update, context) -> None:
             save_b2b_order(chat_id, business_name, items["bread_items"], fulfillment_date, batch_id=batch_id)
         upsert_b2b_customer(chat_id, business_name, rec["delivery_method"], rec["delivery_time"])
         from b2b_bot.recurring import days_label
+        from b2b_bot.pricing import order_total, price_summary
         days_lbl = days_label(json.loads(rec["days_of_week"]))
-        await query.edit_message_text(
-            f"✅ Confirmed! Your {days_lbl} order is in for {fulfillment_date}.\n\nSee you tomorrow!",
-            reply_markup=None,
+        bread_priced = [{"item": it["item"], "qty": it["qty"], "grams": it.get("grams")} for it in items.get("bread_items", [])]
+        cake_priced  = [{"item": it["item"], "qty": it["qty"], "order_type": it.get("order_type"), "slices": it.get("slices")} for it in items.get("cake_items", [])]
+        total = order_total(bread_priced, cake_priced)
+        delivery_cost = _delivery_cost_for(chat_id, rec["delivery_method"])
+        method_label = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
+        item_lines = []
+        for it in items.get("bread_items", []):
+            line = f"  • {it['qty']}× {it['item']}"
+            if it.get("grams"):
+                line += f" — {it['grams']}g"
+            if it.get("notes"):
+                line += f" ({it['notes']})"
+            item_lines.append(line)
+        for it in items.get("cake_items", []):
+            item_lines.append(f"  • {it['qty']}× {it['item']}")
+        confirmed_text = (
+            f"✅ Confirmed for {fulfillment_date}!\n\n"
+            f"📅 {days_lbl}  |  {method_label} at {rec['delivery_time']}\n"
+            + "\n".join(item_lines)
+            + f"\n\n{price_summary(total, delivery_cost)}\n\nSee you tomorrow!"
         )
+        await query.edit_message_text(confirmed_text, reply_markup=None)
         logger.info("Recurring order #%s confirmed for %s by %s", rec_id, fulfillment_date, chat_id)
 
     elif query.data.startswith("b2b_rec_skip_"):

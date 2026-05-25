@@ -56,6 +56,18 @@ async def send_recurring_reminders(bot, reminder_num: int) -> None:
         bread_list = items.get("bread_items", [])
         cake_list  = items.get("cake_items", [])
 
+        from b2b_bot.pricing import order_total, price_summary
+        from shared.database import get_b2b_customer
+        customer = get_b2b_customer(rec["group_chat_id"])
+        delivery_cost = (
+            float(customer["delivery_cost"])
+            if customer and customer.get("delivery_cost") and rec["delivery_method"] == "delivery"
+            else None
+        )
+        bread_priced = [{"item": it["item"], "qty": it["qty"], "grams": it.get("grams")} for it in bread_list]
+        cake_priced  = [{"item": it["item"], "qty": it["qty"], "order_type": it.get("order_type"), "slices": it.get("slices")} for it in cake_list]
+        total = order_total(bread_priced, cake_priced)
+
         method_label = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
         lines = [
             f"📅 Standing order — {days_label(days)}",
@@ -71,7 +83,7 @@ async def send_recurring_reminders(bot, reminder_num: int) -> None:
             lines.append(line)
         for it in cake_list:
             lines.append(f"  • {it['qty']}× {it['item']}")
-        lines += ["", "Confirm for tomorrow?"]
+        lines += ["", price_summary(total, delivery_cost), "", "Confirm for tomorrow?"]
 
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("✅ Confirm", callback_data=f"b2b_rec_confirm_{rec['id']}_{tomorrow}"),
