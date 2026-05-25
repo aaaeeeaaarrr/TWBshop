@@ -160,12 +160,14 @@ async def run_dispatch_reminder_tick(bot) -> None:
         # 5-min escalation to staff group if still unconfirmed
         if not rec["escalated"] and mins <= 5:
             business = get_business_name(rec["group_chat_id"]) or "Customer"
-            method_label = "delivery" if rec["delivery_method"] == "delivery" else "pickup"
+            if rec["delivery_method"] == "delivery":
+                header = "⚠️ NOT DELIVERED YET!\n⚠️ PLEASE DO IT NOW!"
+            else:
+                header = "⚠️ NO ONE MADE READY!\n⚠️ PLEASE DO IT NOW!"
+            order_text = _build_text(rec["group_chat_id"], rec["fulfillment_date"], rec["delivery_method"], rec["fulfillment_time"])
+            escalation_text = f"{header}\n{business} for {rec['fulfillment_time']}\n\n{order_text}"
             try:
-                await bot.send_message(
-                    config.B2B_STAFF_GROUP_ID,
-                    f"⚠️ Not yet dispatched — {business}, {method_label} at {rec['fulfillment_time']}",
-                )
+                await bot.send_message(config.B2B_STAFF_GROUP_ID, escalation_text)
                 set_dispatch_reminder_escalated(rec["id"])
                 logger.info("Escalated dispatch reminder for group %s", rec["group_chat_id"])
             except Exception as e:
