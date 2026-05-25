@@ -21,6 +21,7 @@ from shared.database import (
     mark_b2b_orders_paid,
     mark_b2b_cake_orders_paid,
     save_b2b_payment,
+    get_valid_payment_accounts,
 )
 
 logger = logging.getLogger(__name__)
@@ -196,27 +197,46 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
             ai_pay = await read_payment_amount(file_bytes)
             amount = ai_pay.get("amount") or 0.0
 
-        # Validate destination account if configured and AI extracted one
+        # Validate destination account / seller name against DB-stored valid accounts
         to_account = result.get("to_account")
-        if config.VALID_BANK_ACCOUNTS and to_account:
+        seller     = result.get("seller")
+        accounts   = get_valid_payment_accounts()
+        valid_banks   = [re.sub(r"[\s\-]", "", a) for a in accounts["bank"]]
+        valid_sellers = [s.lower().strip() for s in accounts["seller"]]
+
+        wrong = False
+        wrong_detail = ""
+        if to_account and valid_banks:
             extracted = re.sub(r"[\s\-]", "", str(to_account))
-            valid = [re.sub(r"[\s\-]", "", a) for a in config.VALID_BANK_ACCOUNTS]
-            # Match if extracted is a suffix of any valid account (handles partially visible numbers)
-            account_ok = any(v.endswith(extracted) or extracted.endswith(v) for v in valid)
-            if not account_ok:
-                acct_list = "\n".join(f"  • {a}" for a in config.VALID_BANK_ACCOUNTS)
-                business = get_business_name(chat_id)
+            # suffix match handles partially visible numbers (***1234)
+            if not any(v.endswith(extracted) or extracted.endswith(v) for v in valid_banks):
+                wrong = True
+                wrong_detail = f"Sent to account: {to_account}"
+        elif seller and valid_sellers:
+            if not any(seller.lower().strip() == s for s in valid_sellers):
+                wrong = True
+                wrong_detail = f"Seller shown: {seller}"
+
+        if wrong:
+            business = get_business_name(chat_id)
+            acct_list = "\n".join(f"  • {a}" for a in accounts["bank"])
+            seller_list = "\n".join(f"  • {s}" for s in accounts["seller"])
+            guide = ""
+            if acct_list:
+                guide += f"Bank accounts:\n{acct_list}\n"
+            if seller_list:
+                guide += f"QR seller name:\n{seller_list}"
+            await bot.send_message(
+                chat_id,
+                f"⚠️ This payment was sent to the wrong account.\n\nPlease send to:\n{guide.strip()}",
+                reply_to_message_id=message_id,
+            )
+            if config.OWNER_TELEGRAM_ID:
                 await bot.send_message(
-                    chat_id,
-                    f"⚠️ This payment was sent to the wrong account.\n\nPlease send to:\n{acct_list}",
-                    reply_to_message_id=message_id,
+                    config.OWNER_TELEGRAM_ID,
+                    f"⚠️ Wrong account payment — {business}\n{wrong_detail}\nAmount: ${amount:.2f}",
                 )
-                if config.OWNER_TELEGRAM_ID:
-                    await bot.send_message(
-                        config.OWNER_TELEGRAM_ID,
-                        f"⚠️ Wrong account payment — {business}\nSent to: {to_account}\nAmount: ${amount:.2f}",
-                    )
-                return
+            return
 
         business = get_business_name(chat_id)
         balance_before = get_unpaid_total(chat_id)

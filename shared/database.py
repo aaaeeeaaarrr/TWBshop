@@ -205,6 +205,14 @@ def init_db() -> None:
                     UNIQUE(group_chat_id, fulfillment_date)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_payment_accounts (
+                    id     SERIAL PRIMARY KEY,
+                    type   TEXT   NOT NULL,
+                    value  TEXT   NOT NULL UNIQUE,
+                    active BOOLEAN NOT NULL DEFAULT TRUE
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -1036,3 +1044,28 @@ def get_b2b_bread_orders_for_group_date(group_chat_id: int, delivery_date: str) 
                 ORDER BY item
             """, (group_chat_id, delivery_date))
             return cur.fetchall()
+
+
+# ─── Payment account settings ─────────────────────────────────────────────────
+
+def get_valid_payment_accounts() -> dict:
+    """Return {'bank': [...], 'seller': [...]} of active payment accounts."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT type, value FROM b2b_payment_accounts WHERE active = TRUE")
+            rows = cur.fetchall()
+    result: dict[str, list[str]] = {"bank": [], "seller": []}
+    for row in rows:
+        if row["type"] in result:
+            result[row["type"]].append(row["value"])
+    return result
+
+
+def upsert_payment_account(type_: str, value: str, active: bool = True) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_payment_accounts (type, value, active)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (value) DO UPDATE SET type = EXCLUDED.type, active = EXCLUDED.active
+            """, (type_, value, active))
