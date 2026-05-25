@@ -50,6 +50,22 @@ _state:   dict[int, dict] = {}
 _last_confirmation: dict[int, int] = {}
 
 
+# ─── Shared helpers ───────────────────────────────────────────────────────────
+
+async def maybe_prompt_location_pin(bot, chat_id: int, method: str | None) -> None:
+    """Send a one-time location pin request if this is a delivery order with no pin stored."""
+    if method != "delivery":
+        return
+    customer = get_b2b_customer(chat_id)
+    if customer and customer.get("location_lat"):
+        return
+    await bot.send_message(
+        chat_id,
+        "📍 To calculate your delivery fee, please share your location — "
+        "tap the 📎 attachment icon → Location. We only need it once.",
+    )
+
+
 # ─── Instant notifications ────────────────────────────────────────────────────
 
 async def _notify_cake_order(bot, business_name: str, cake_items: list[dict], method: str | None, time_str: str | None, location: str | None, delivery_date: str) -> None:
@@ -409,6 +425,7 @@ async def handle_callback(update: Update, context) -> None:
         )
         location = business_name if pending.get("method") == "delivery" else None
         upsert_b2b_customer(chat_id, business_name, pending.get("method"), pending.get("time"), location)
+        await maybe_prompt_location_pin(context.bot, chat_id, pending.get("method"))
         _cart.pop(chat_id, None)
         _cart_time.pop(chat_id, None)
         _cart_date.pop(chat_id, None)

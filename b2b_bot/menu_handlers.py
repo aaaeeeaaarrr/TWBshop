@@ -895,7 +895,7 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
 
 
 async def _do_confirm(query, chat_id: int, context) -> None:
-    from b2b_bot.order_handlers import _pending, _state, _last_confirmation
+    from b2b_bot.order_handlers import _pending, _state, _last_confirmation, maybe_prompt_location_pin
     from b2b_bot.order_parsing import (
         _resolve_bread_history, _resolve_cake_history,
         _split_mini_items, _mini_rejection_note,
@@ -919,12 +919,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     location = customer["location"] if customer else None
     business = get_business_name(chat_id)
 
-    if method == "delivery" and (not customer or not customer.get("location_lat")):
-        await context.bot.send_message(
-            chat_id,
-            "📍 To calculate your delivery fee, please share your location — "
-            "tap the 📎 attachment icon → Location. We only need it once.",
-        )
+    await maybe_prompt_location_pin(context.bot, chat_id, method)
 
     editing_key = _editing_session.pop(chat_id, None) or get_editing_session(chat_id)
     set_editing_session(chat_id, None)
