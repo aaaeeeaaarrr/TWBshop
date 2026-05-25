@@ -28,6 +28,27 @@ from b2b_bot.billing import (
     send_weekly_reminders,
     get_all_outstanding_summary,
 )
+from b2b_bot.staff_commands import (
+    cmd_balance_enhanced,
+    cmd_markpaid,
+    cmd_addaccount,
+    cmd_removeaccount,
+    cmd_history,
+    cmd_commands,
+    callback_balance,
+    callback_markpaid_pick,
+    callback_markpaid_date,
+    callback_markpaid_full,
+    callback_markpaid_custom,
+    callback_markpaid_method,
+    callback_markpaid_confirm,
+    callback_markpaid_reject,
+    callback_acct_type,
+    callback_remove_account,
+    callback_history,
+    handle_staff_flow_text,
+    staff_flow_filter,
+)
 from b2b_bot.menu_flow import (
     handle_menu_command, handle_menu_callback, handle_welcome,
     handle_qty_input, qty_pending_filter,
@@ -144,16 +165,6 @@ async def cmd_summary(update: Update, context) -> None:
     await update.message.reply_text("B2B summary sent.")
 
 
-async def cmd_balance(update: Update, context) -> None:
-    if config.B2B_STAFF_USER_IDS and update.effective_user.id not in config.B2B_STAFF_USER_IDS:
-        await update.message.reply_text("Not authorised.")
-        return
-    lines = get_all_outstanding_summary()
-    await update.message.reply_text(
-        "\n".join(lines) if lines else "All B2B accounts are paid up."
-    )
-
-
 def main() -> None:
     database.init_db()
 
@@ -227,9 +238,39 @@ def main() -> None:
     # Order callbacks (confirm, edit, cancel, extra, mini)
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=r"^b2b_(?!pay_|dispatch_)"))
 
-    # Staff commands
-    app.add_handler(CommandHandler("summary", cmd_summary))
-    app.add_handler(CommandHandler("balance", cmd_balance))
+    # Private text — custom amount and addaccount flows (before general group handler)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE & staff_flow_filter,
+        handle_staff_flow_text,
+    ))
+
+    # Check Balance button (in group menus)
+    app.add_handler(CallbackQueryHandler(callback_balance, pattern=r"^bmc_balance$"))
+
+    # Mark-paid flow callbacks
+    app.add_handler(CallbackQueryHandler(callback_markpaid_pick,    pattern=r"^bmp_pick_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_date,    pattern=r"^bmp_date_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_full,    pattern=r"^bmp_full_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_custom,  pattern=r"^bmp_custom_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_method,  pattern=r"^bmp_(cash|bank)_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_confirm, pattern=r"^bmp_confirm_"))
+    app.add_handler(CallbackQueryHandler(callback_markpaid_reject,  pattern=r"^bmp_reject_"))
+
+    # Account management callbacks (owner only)
+    app.add_handler(CallbackQueryHandler(callback_acct_type,      pattern=r"^bmc_acct_"))
+    app.add_handler(CallbackQueryHandler(callback_remove_account, pattern=r"^bmc_rm_"))
+
+    # History callbacks
+    app.add_handler(CallbackQueryHandler(callback_history, pattern=r"^bmh_"))
+
+    # Staff / owner commands
+    app.add_handler(CommandHandler("summary",       cmd_summary))
+    app.add_handler(CommandHandler("balance",       cmd_balance_enhanced))
+    app.add_handler(CommandHandler("markpaid",      cmd_markpaid))
+    app.add_handler(CommandHandler("addaccount",    cmd_addaccount))
+    app.add_handler(CommandHandler("removeaccount", cmd_removeaccount))
+    app.add_handler(CommandHandler("history",       cmd_history))
+    app.add_handler(CommandHandler("commands",      cmd_commands))
 
     # Pre-summary at 9pm Phnom Penh — totals only, deleted when full summary fires
     pre_summary_time = datetime.time(

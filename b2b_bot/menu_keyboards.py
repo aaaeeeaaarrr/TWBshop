@@ -233,6 +233,7 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"),
             InlineKeyboardButton("🗑 Empty Cart",    callback_data="bm_empty_cart"),
         ])
+    rows.append([InlineKeyboardButton("📊 Check Balance", callback_data="bmc_balance")])
     return InlineKeyboardMarkup(rows)
 
 

@@ -32,6 +32,9 @@ from shared.database import (
     get_pending_wrong_account_alerts,
     set_wrong_alert_owner_msg,
     set_wrong_alert_seen,
+    get_b2b_customer,
+    get_b2b_customer_credit,
+    set_b2b_customer_credit,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,16 +85,14 @@ def _unpaid_by_date(group_chat_id: int) -> dict[str, dict]:
 # ─── Apply payment (oldest delivery date first) ───────────────────────────────
 
 def apply_payment(group_chat_id: int, amount: float) -> dict:
-    """Mark oldest delivery dates as paid until amount runs out.
-
-    Returns:
-        applied       — amount actually applied to orders
-        remaining     — outstanding balance after payment
-        paid_dates    — delivery dates fully covered
-        paid_count    — number of order rows marked paid
+    """Mark oldest delivery dates as paid until amount + existing credit runs out.
+    Leftover stored as credit for next payment.
     """
+    credit = get_b2b_customer_credit(group_chat_id)
+    total_available = round(amount + credit, 2)
+
     by_date = _unpaid_by_date(group_chat_id)
-    remaining = round(amount, 2)
+    remaining = total_available
     paid_dates: list[str] = []
     bread_ids: list[int] = []
     cake_ids:  list[int] = []
@@ -104,21 +105,63 @@ def apply_payment(group_chat_id: int, amount: float) -> dict:
             for row in day["rows"]:
                 (bread_ids if row["source"] == "bread" else cake_ids).append(row["id"])
         else:
-            break  # can't cover this date's full total
+            break
 
     if bread_ids:
         mark_b2b_orders_paid(bread_ids)
     if cake_ids:
         mark_b2b_cake_orders_paid(cake_ids)
 
-    new_balance = get_unpaid_total(group_chat_id)
+    set_b2b_customer_credit(group_chat_id, remaining)
 
     return {
-        "applied":     round(amount - remaining, 2),
-        "remaining":   new_balance,
+        "applied":     round(total_available - remaining, 2),
+        "credit_used": credit,
+        "new_credit":  remaining,
         "paid_dates":  paid_dates,
         "paid_count":  len(bread_ids) + len(cake_ids),
     }
+
+
+def get_effective_balance(group_chat_id: int) -> float:
+    """Unpaid orders total minus any stored credit."""
+    return round(max(0.0, get_unpaid_total(group_chat_id) - get_b2b_customer_credit(group_chat_id)), 2)
+
+
+def format_balance_for_group(group_chat_id: int, business: str) -> str:
+    """Per-date breakdown with credit applied, for display in a customer group."""
+    by_date = _unpaid_by_date(group_chat_id)
+    credit = get_b2b_customer_credit(group_chat_id)
+
+    if not by_date and credit <= 0:
+        return f"✅ No outstanding balance."
+
+    lines = [f"<b>Balance — {business}</b>", "━━━━━━━━━━━━━━━━"]
+    remaining_credit = credit
+
+    for d in sorted(by_date.keys()):
+        day = by_date[d]
+        try:
+            label = datetime.strptime(d, "%Y-%m-%d").strftime("%b %d")
+        except Exception:
+            label = d
+        total = day["total"]
+        if remaining_credit >= total:
+            remaining_credit = round(remaining_credit - total, 2)
+            lines.append(f"📅 {label} — ${total:.2f} <i>(credit applied)</i>")
+        elif remaining_credit > 0:
+            applied = remaining_credit
+            owed = round(total - applied, 2)
+            remaining_credit = 0.0
+            lines.append(f"📅 {label} — ${total:.2f}")
+            lines.append(f"   ${applied:.2f} credit · <b>${owed:.2f} remaining</b>")
+        else:
+            lines.append(f"📅 {label} — ${total:.2f}")
+
+    lines.append("━━━━━━━━━━━━━━━━")
+    eff = get_effective_balance(group_chat_id)
+    lines.append(f"<b>Outstanding: ${eff:.2f}</b>")
+    return "\n".join(lines)
 
 
 # ─── Outstanding balance summary (for /balance command) ───────────────────────
@@ -183,7 +226,7 @@ async def send_weekly_reminders(bot) -> None:
 # ─── Payment helpers ─────────────────────────────────────────────────────────
 
 def _build_cust_confirmation(chat_id: int, amount: float) -> str:
-    remaining = get_unpaid_total(chat_id)
+    remaining = get_effective_balance(chat_id)
     if remaining <= 0:
         return f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: $0.00</b>"
     return f"Thank you! Payment of ${amount:.2f} confirmed. ✓\n<b>Remaining balance: ${remaining:.2f}</b>"
@@ -258,7 +301,7 @@ async def handle_payment_received(update, context) -> None:
         except Exception:
             await context.bot.send_message(rec["group_chat_id"], cust_msg, parse_mode="HTML")
 
-    remaining = get_unpaid_total(rec["group_chat_id"])
+    remaining = get_effective_balance(rec["group_chat_id"])
     owner_text = (
         f"✅ Received — {rec['business_name']}\n"
         f"Amount: ${rec['amount']:.2f}\n"
@@ -282,7 +325,7 @@ async def handle_payment_not_received(update, context) -> None:
     set_verification_status(verification_id, "not_received")
 
     amount_str = f"${rec['amount']:.2f}" if rec["amount"] else "amount unclear"
-    outstanding = get_unpaid_total(rec["group_chat_id"])
+    outstanding = get_effective_balance(rec["group_chat_id"])
     group_text = (
         f"❌ Amount not received — please double-check and resend if needed.\n"
         f"<b>Outstanding balance: ${outstanding:.2f}</b>"

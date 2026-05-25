@@ -256,6 +256,33 @@ def init_db() -> None:
                 ALTER TABLE b2b_payments
                 ADD COLUMN IF NOT EXISTS tg_file_unique_id TEXT
             """)
+            cur.execute("""
+                ALTER TABLE b2b_payments
+                ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'photo'
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_payments
+                ADD COLUMN IF NOT EXISTS covered_dates TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS credit NUMERIC(8,2) DEFAULT 0
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS b2b_markpaid_requests (
+                    id            SERIAL  PRIMARY KEY,
+                    group_chat_id BIGINT  NOT NULL,
+                    business_name TEXT    NOT NULL,
+                    amount        NUMERIC(8,2),
+                    method        TEXT,
+                    staff_user_id BIGINT  NOT NULL,
+                    staff_msg_id  BIGINT,
+                    owner_msg_id  BIGINT,
+                    status        TEXT    NOT NULL DEFAULT 'draft',
+                    covered_dates TEXT,
+                    created_at    TEXT    NOT NULL
+                )
+            """)
     logger.info("Database ready")
 
 
@@ -823,15 +850,19 @@ def save_b2b_payment(
     screenshot_path: str | None,
     group_message_id: int | None = None,
     tg_file_unique_id: str | None = None,
+    method: str = "photo",
+    covered_dates: str | None = None,
 ) -> int:
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO b2b_payments "
-                "(group_chat_id, business_name, amount, screenshot_path, group_message_id, tg_file_unique_id, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                (group_chat_id, business_name, amount, screenshot_path, group_message_id, tg_file_unique_id, now),
+                "(group_chat_id, business_name, amount, screenshot_path, group_message_id, "
+                "tg_file_unique_id, method, covered_dates, created_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (group_chat_id, business_name, amount, screenshot_path, group_message_id,
+                 tg_file_unique_id, method, covered_dates, now),
             )
             return cur.fetchone()["id"]
 
@@ -882,6 +913,124 @@ def update_b2b_payment_status(payment_id: int, status: str) -> None:
             cur.execute(
                 "UPDATE b2b_payments SET status = %s, applied_at = %s WHERE id = %s",
                 (status, now, payment_id),
+            )
+
+
+def get_b2b_payment_history(group_chat_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, amount, method, covered_dates, created_at FROM b2b_payments "
+                "WHERE group_chat_id = %s ORDER BY created_at DESC LIMIT 50",
+                (group_chat_id,),
+            )
+            return cur.fetchall()
+
+
+def get_all_payment_history() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT business_name, amount, method, covered_dates, created_at FROM b2b_payments "
+                "ORDER BY business_name, created_at DESC"
+            )
+            return cur.fetchall()
+
+
+def get_all_payment_accounts() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, type, value FROM b2b_payment_accounts WHERE active = TRUE ORDER BY type, value")
+            return cur.fetchall()
+
+
+def remove_payment_account(account_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE b2b_payment_accounts SET active = FALSE WHERE id = %s", (account_id,))
+
+
+def get_all_b2b_customers() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT group_chat_id, business_name FROM b2b_customers ORDER BY business_name")
+            return cur.fetchall()
+
+
+# ─── Credit per customer ───────────────────────────────────────────────────────
+
+def get_b2b_customer_credit(group_chat_id: int) -> float:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT credit FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return float(row["credit"] or 0) if row else 0.0
+
+
+def set_b2b_customer_credit(group_chat_id: int, credit: float) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_customers SET credit = %s WHERE group_chat_id = %s",
+                (round(credit, 2), group_chat_id),
+            )
+
+
+# ─── Mark-paid requests ────────────────────────────────────────────────────────
+
+def save_markpaid_request(group_chat_id: int, business_name: str, staff_user_id: int) -> int:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO b2b_markpaid_requests "
+                "(group_chat_id, business_name, staff_user_id, status, created_at) "
+                "VALUES (%s, %s, %s, 'draft', %s) RETURNING id",
+                (group_chat_id, business_name, staff_user_id, now),
+            )
+            return cur.fetchone()["id"]
+
+
+def get_markpaid_request(request_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM b2b_markpaid_requests WHERE id = %s", (request_id,))
+            return cur.fetchone()
+
+
+def set_markpaid_amount(request_id: int, amount: float) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE b2b_markpaid_requests SET amount = %s WHERE id = %s", (amount, request_id))
+
+
+def set_markpaid_method(request_id: int, method: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_markpaid_requests SET method = %s, status = 'pending' WHERE id = %s",
+                (method, request_id),
+            )
+
+
+def set_markpaid_staff_msg(request_id: int, msg_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE b2b_markpaid_requests SET staff_msg_id = %s WHERE id = %s", (msg_id, request_id))
+
+
+def set_markpaid_owner_msg(request_id: int, msg_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE b2b_markpaid_requests SET owner_msg_id = %s WHERE id = %s", (msg_id, request_id))
+
+
+def set_markpaid_status(request_id: int, status: str, covered_dates: str | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE b2b_markpaid_requests SET status = %s, covered_dates = %s WHERE id = %s",
+                (status, covered_dates, request_id),
             )
 
 
