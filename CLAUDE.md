@@ -130,8 +130,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 > Update this section at the end of every Claude Code session.
 
 **Last updated:** 2026-05-25
-**Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
-**Last completed:** Several features this session — (1) 4:30am/6:10am dispatch reminders replaced nudges with detailed customer/time lists; (2) bot auto-registers groups when trusted admin adds it (B2B_ADMIN_USER_IDS in config), leaves immediately for anyone else, prompts for location pin on registration, calculates Grab Express delivery cost via OSRM ($0.68 base + $0.025/90m, truncated); (3) delivery cost shown in dispatch lists, nightly summary, and all order confirmation price blocks; (4) bakery coordinates set (11.5387774, 104.9147998).
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
+**Last completed:** Fixed stale CLAUDE.md phase checklist — Phase 2 (recurring orders) was already fully built and scheduled; marked complete and expanded both phase descriptions.
 **Next task:** None defined
 **Known issues:** None
 **Notes:**
@@ -175,10 +175,22 @@ run_b2b_bot.py          ← entry point: python run_b2b_bot.py
 ```
 
 ### B2B Build Phases
-- [x] Phase 1 — Foundation + full order flow (menu, customers, history, confirmation, delivery, 10:10pm summary)
-- [ ] Phase 2 — Recurring weekly orders (standing orders with 7am/1pm/6pm confirmations, 10:10pm cutoff)
-  - DB table: b2b_recurring_orders (group_chat_id, items_json, day_of_week, status: active/paused/cancelled)
-  - Saturday bot sends at 7am, reminds at 1pm if no reply, reminds again at 6pm, drops at 10:10pm if still no reply
-  - Customer presses [Confirm] or [Skip this week] — silence = no order, nothing baked
-  - Cancelled permanently: status = 'cancelled', record kept for history, bot never sends again
+- [x] Phase 1 — Foundation + full order flow
+  - Menu, customers, history resolution (grams, attributes), confirmation gate
+  - Delivery/pickup stored per group; Grab Express cost via OSRM ($0.68 base + $0.025/90m)
+  - Auto-registration: trusted admin adds bot → location pin prompted → cost calculated
+  - Bakery coordinates set (11.5387774, 104.9147998)
+  - Free delivery threshold ($10+), delivery fee shown when under
+  - 9pm pre-summary (totals only, deleted when full fires), 10:10pm full summary
+  - 4:30am + 6:10am dispatch reminders (replied to 10:10pm message); 9am 48h mini-order reminder
+  - Payment photos/PDFs: AI classifies → billing or order flow; forwarded to OWNER_TELEGRAM_ID
+  - Billing: unpaid balances tracked per customer, marked paid oldest-delivery-date-first
+  - Daily 6am payment reminder (yesterday's unpaid) + weekly Monday 6am (accumulated balance)
+  - /balance and /summary staff commands
+- [x] Phase 2 — Recurring daily/weekly orders
+  - DB: b2b_recurring_orders + b2b_recurring_confirmations
+  - 7am/1pm/6pm reminders the day before fulfillment
+  - [Confirm] / [Skip tomorrow] buttons; auto-skip at 10:10pm if still pending
+  - Grace period: no reminder if order created ≤1 day before fulfillment
+  - Permanent cancel: status = 'cancelled', record kept, bot never sends again
 - [ ] Phase 3 — Claude API for smarter matching and future AI features
