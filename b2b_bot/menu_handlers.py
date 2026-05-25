@@ -398,14 +398,6 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_date[chat_id]   = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id]   = _format_time(time_code)
             _cart_method[chat_id] = method
-            if method == "delivery":
-                cust = get_b2b_customer(chat_id)
-                if not cust or not cust.get("location_lat"):
-                    await context.bot.send_message(
-                        chat_id,
-                        "📍 To calculate your delivery fee, please share your location — "
-                        "tap the 📎 attachment icon → Location. We only need it once.",
-                    )
             await _do_confirm(query, chat_id, context)
 
         elif data == "bm_menu_prompt":
@@ -926,6 +918,13 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     time_str = _get_cart_time(chat_id)
     location = customer["location"] if customer else None
     business = get_business_name(chat_id)
+
+    if method == "delivery" and (not customer or not customer.get("location_lat")):
+        await context.bot.send_message(
+            chat_id,
+            "📍 To calculate your delivery fee, please share your location — "
+            "tap the 📎 attachment icon → Location. We only need it once.",
+        )
 
     editing_key = _editing_session.pop(chat_id, None) or get_editing_session(chat_id)
     set_editing_session(chat_id, None)
