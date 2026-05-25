@@ -460,6 +460,7 @@ def _build_confirmation(
     location:      str | None,
     delivery_date: str | None = None,
     heading:       str = "Here's the order:",
+    delivery_cost: float | None = None,
 ) -> str:
     parts = [heading, ""]
     if bread_items:
@@ -470,7 +471,8 @@ def _build_confirmation(
         parts += [_cake_line(it, show_edit_hint=True) for it in cake_items]
     total = order_total(bread_items, cake_items)
     dl    = _delivery_line(method, time_str, None, delivery_date)
-    parts += ["", price_summary(total)]
+    dc    = delivery_cost if method == "delivery" else None
+    parts += ["", price_summary(total, dc)]
     if dl:
         parts += ["", dl]
     parts += ["", "Is this correct?"]
@@ -486,6 +488,7 @@ def _build_confirmed_text(
     delivery_date: str | None,
     from_user=None,
     days_list:     list | None = None,
+    delivery_cost: float | None = None,
 ) -> str:
     mention = from_user.mention_html() if from_user else "someone"
     parts = [f"✅ CONFIRMED by {mention}", ""]
@@ -500,7 +503,8 @@ def _build_confirmed_text(
             parts.append("")
         parts += [_cake_line(it) for it in cake_items]
     total = order_total(bread_items, cake_items)
-    parts += ["", price_summary(total)]
+    dc    = delivery_cost if method == "delivery" else None
+    parts += ["", price_summary(total, dc)]
     if days_list is None:
         dl = _delivery_line(method, time_str, None, delivery_date)
         if dl:

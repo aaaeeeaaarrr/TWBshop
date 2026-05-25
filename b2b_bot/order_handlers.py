@@ -17,6 +17,12 @@ from b2b_bot.order_parsing import (
     _date_label, _bread_line, _cake_line,
 )
 from b2b_bot.customers import get_business_name, is_b2b_group
+
+def _delivery_cost_for(chat_id: int, method: str | None) -> float | None:
+    if method != "delivery":
+        return None
+    cust = get_b2b_customer(chat_id)
+    return float(cust["delivery_cost"]) if cust and cust.get("delivery_cost") else None
 from b2b_bot.menu import INSTANT_BREAD_ITEMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from shared.database import (
@@ -145,6 +151,7 @@ async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from
 
     confirmed_text = _build_confirmed_text(
         bread_items, cake_items, method_, time_str_, location_, delivery_date, from_user,
+        delivery_cost=_delivery_cost_for(chat_id, method_),
     )
     logger.info("B2B order confirmed for %s (%s) delivery %s", business_name, chat_id, delivery_date)
     await reply_fn(confirmed_text, parse_mode=ParseMode.HTML)
@@ -186,7 +193,8 @@ async def handle_group_message(update: Update, context) -> None:
         _pending[chat_id] = pending; set_pending_order(chat_id, pending)
         await _send_confirmation(
             update, chat_id,
-            _build_confirmation(pending.get("bread_items", []), pending.get("cake_items", []), method, time_str, location, pending.get("delivery_date")),
+            _build_confirmation(pending.get("bread_items", []), pending.get("cake_items", []), method, time_str, location, pending.get("delivery_date"),
+                                delivery_cost=_delivery_cost_for(chat_id, method)),
         )
         return
 
@@ -233,7 +241,8 @@ async def handle_group_message(update: Update, context) -> None:
         else:
             await _send_confirmation(
                 update, chat_id,
-                _build_confirmation(pending.get("bread_items", []), cake_items, m_, t_, l_, dd),
+                _build_confirmation(pending.get("bread_items", []), cake_items, m_, t_, l_, dd,
+                                    delivery_cost=_delivery_cost_for(chat_id, m_)),
             )
         return
 
@@ -417,6 +426,7 @@ async def handle_callback(update: Update, context) -> None:
             None,
             query.from_user,
             days_list=pending.get("days", []),
+            delivery_cost=_delivery_cost_for(chat_id, pending.get("method")),
         )
         try:
             await query.edit_message_text("✅ Standing order saved.", reply_markup=None)
@@ -549,7 +559,8 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
         return
 
     msg = _build_confirmation(bread_items, cake_items, method, time_str, location, delivery_date,
-                              heading="Order from your photo:")
+                              heading="Order from your photo:",
+                              delivery_cost=_delivery_cost_for(chat_id, method))
     if unmatched:
         unknown_lines = "\n".join(f"  ⚠️ {u['qty']}x {u['item']} — not on our menu" for u in unmatched)
         msg = msg.replace("Is this correct?", f"Not recognised:\n{unknown_lines}\n\nPlease edit or let us know what these are.\n\nIs this correct?")

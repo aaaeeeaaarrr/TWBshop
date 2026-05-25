@@ -200,8 +200,10 @@ async def send_b2b_mini_reminder(bot: Bot, target_date: str | None = None) -> No
         customer = get_b2b_customer(orders[0]["group_chat_id"])
         if customer and customer["delivery_method"]:
             if customer["delivery_method"] == "delivery":
-                loc = f" — {customer['location']}" if customer["location"] else ""
-                lines.append(f"  Delivery at {customer['delivery_time']}{loc}")
+                loc      = f" — {customer['location']}" if customer["location"] else ""
+                cost     = float(customer["delivery_cost"]) if customer.get("delivery_cost") else None
+                cost_str = f" — ${cost:.2f}" if cost else ""
+                lines.append(f"  Delivery at {customer['delivery_time']}{loc}{cost_str}")
             else:
                 lines.append(f"  Pickup at {customer['delivery_time']}")
         lines.append("")
@@ -235,14 +237,21 @@ def _build_dispatch_list(day: str) -> str:
         cust = get_b2b_customer(gid)
         time_str = (cust["delivery_time"] or "?") if cust else "?"
         method   = (cust["delivery_method"] or "?") if cust else "?"
-        entries.append((time_str, method, biz_name))
+        cost     = float(cust["delivery_cost"]) if cust and cust.get("delivery_cost") else None
+        entries.append((time_str, method, biz_name, cost))
 
     entries.sort(key=lambda x: _sort_key(x[0]))
 
     n = len(entries)
     lines = [f"{n} CUSTOMER{'S' if n != 1 else ''} — {day}", ""]
-    for time_str, method, biz_name in entries:
-        method_label = "Delivery" if method == "delivery" else "Pickup" if method == "pickup" else method
+    for time_str, method, biz_name, cost in entries:
+        if method == "delivery":
+            cost_str = f" ${cost:.2f}" if cost else ""
+            method_label = f"Delivery{cost_str}"
+        elif method == "pickup":
+            method_label = "Pickup"
+        else:
+            method_label = method
         lines.append(f"{time_str}  {method_label} — {biz_name}")
 
     return "\n".join(lines)

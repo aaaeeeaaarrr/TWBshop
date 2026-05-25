@@ -957,7 +957,9 @@ async def _do_confirm(query, chat_id: int, context) -> None:
         )
         return
 
-    msg = _build_confirmation(bread_items, cake_items, method, time_str, location, delivery_date)
+    cust = get_b2b_customer(chat_id)
+    dc   = float(cust["delivery_cost"]) if cust and cust.get("delivery_cost") and method == "delivery" else None
+    msg = _build_confirmation(bread_items, cake_items, method, time_str, location, delivery_date, delivery_cost=dc)
     if rejected:
         msg += "\n\n" + "─" * 32 + "\n" + _mini_rejection_note(rejected)
 

@@ -131,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phase 1 complete (including recurring orders). Infrastructure complete.
-**Last completed:** B2B dispatch reminders — 4:30am and 6:10am both send a detailed customer/time dispatch list (e.g. "5 CUSTOMERS — 2026-05-26 / 8:00am Delivery — Name") as a reply to the 10:10pm summary. 4:30am skips if no orders; 6:10am deletes the 4:30am message and sends a fresh list (or "No B2B orders today" if no orders). Both fall back to standalone if the summary was deleted. msg_ids stored in bot_meta with date guards to avoid stale deletes.
+**Last completed:** Several features this session — (1) 4:30am/6:10am dispatch reminders replaced nudges with detailed customer/time lists; (2) bot auto-registers groups when trusted admin adds it (B2B_ADMIN_USER_IDS in config), leaves immediately for anyone else, prompts for location pin on registration, calculates Grab Express delivery cost via OSRM ($0.68 base + $0.025/90m, truncated); (3) delivery cost shown in dispatch lists, nightly summary, and all order confirmation price blocks; (4) bakery coordinates set (11.5387774, 104.9147998).
 **Next task:** None defined
 **Known issues:** None
 **Notes:**

@@ -39,11 +39,17 @@ def order_total(bread_items: list[dict], cake_items: list[dict]) -> float:
     return round(sum(item_price(it) for it in bread_items + cake_items), 2)
 
 
-def price_summary(total: float) -> str:
-    """Return the price block shown at the bottom of every confirmation."""
+def price_summary(total: float, delivery_cost: float | None = None) -> str:
+    """Return the price block shown at the bottom of every confirmation.
+
+    delivery_cost: Grab Express estimate for this customer (pass only for delivery orders).
+    """
     if total >= FREE_DELIVERY_THRESHOLD:
         delivery_line = "Delivery: Free"
         total_line    = f"Total: ${total:.2f}"
+    elif delivery_cost is not None:
+        delivery_line = f"Delivery: ${delivery_cost:.2f} (order under $10)"
+        total_line    = f"Total: ${total:.2f} + ${delivery_cost:.2f}"
     else:
         delivery_line = "Delivery: Fee applies (order under $10)"
         total_line    = f"Total: ${total:.2f} + delivery fee"
