@@ -131,7 +131,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-05-25
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Dispatch reminders to owner — 1h before fulfillment, message with items+costs+buttons (confirm delivery/pickup, snooze 30/20/10min). Buttons auto-strip as time runs out (≤45m: no 30m, ≤35m: no 20m, ≤25m: no 10m). Snooze deletes message + reschedules via DB. Confirm marks DELIVERED/READY FOR PICKUP (LATE prefix if after fulfillment time). 5min escalation to staff group if unconfirmed. 60s polling job, fully restart-safe (all state in b2b_dispatch_reminders table).
+**Last completed:** Dispatch reminders to shop staff phone (DISPATCH_REMINDER_TELEGRAM_ID = 1271537077) — 1h before fulfillment, message with items+costs+buttons. Confirm button: "🚗 Already in delivery" / "✅ Ready for Pickup". Snooze buttons stacked vertically one per row: "Remind me in 30/20/10 min", auto-stripped as time runs out (≤45m: no 30m, ≤35m: no 20m, ≤25m: no 10m). Snooze deletes message + reschedules via DB. Confirm marks DELIVERED/READY FOR PICKUP (LATE prefix if after fulfillment time). 5min escalation to staff group if unconfirmed. 60s polling job, fully restart-safe — message deletion has no effect, all state in b2b_dispatch_reminders table. Also added pull.ps1 for full pull procedure (git + bootstrap sync + pip install).
 **Next task:** None defined
 **Known issues:** None
 **Notes:**
