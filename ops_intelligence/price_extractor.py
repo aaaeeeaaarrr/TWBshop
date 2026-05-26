@@ -34,6 +34,20 @@ def _date_from_filename(fname: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _normalize_date(date_str: str | None) -> str | None:
+    """Normalize partial dates to YYYY-MM-DD. Returns None if unparseable."""
+    if not date_str:
+        return None
+    date_str = str(date_str).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+        return date_str
+    if re.match(r"^\d{4}-\d{2}$", date_str):
+        return date_str + "-01"
+    if re.match(r"^\d{4}$", date_str):
+        return date_str + "-01-01"
+    return None
+
+
 async def _process_file(supplier: str, file_path: str) -> int:
     fname = os.path.basename(file_path)
     ext = os.path.splitext(fname)[1].lower()
@@ -64,7 +78,7 @@ async def _process_file(supplier: str, file_path: str) -> int:
             return 0
 
         items = result.get("items", [])
-        valid_date = result.get("valid_date") or price_date
+        valid_date = _normalize_date(result.get("valid_date")) or _normalize_date(price_date)
         saved = save_supplier_price_items(supplier, items, file_path, valid_date)
         mark_supplier_file_processed(file_path, saved)
         logger.info("  %s — %d items (date: %s)", fname, saved, valid_date or "unknown")
