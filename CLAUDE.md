@@ -135,10 +135,11 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 6)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** (1) /start handler: customers in a registered group get tappable group link(s); owner/staff get command list; everyone else silent. (2) Owner/staff: any unrecognised private message shows command list. (3) /markpaid restricted to private chat only — silent in customer groups. (4) CUSTOM AMOUNT button moved to top of markpaid picker, capitalized. (5) Markpaid date buttons show "(N bills)" when a date has multiple confirmed orders. (6) bm_dt_ crash fix + bm_edit_session_ cake key fix + TEST2 double-covered date fix (all from earlier in session 6).
-**Next task:** Test staff/owner commands — `/markpaid` (private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
+**Last updated:** 2026-05-26 (session 7)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete. Planning Phase 3: Operations Intelligence + Hiring Bot.
+**Last completed:** Planning session — full architecture designed for new Operations Intelligence system (see section below). No code written yet.
+**Next task (immediate):** Test existing B2B staff/owner commands — `/markpaid` (private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button.
+**Next task (new system):** Owner to provide: (1) ChatGPT export ZIP (Settings → Data controls → Export data) with hiring/interview conversations; (2) the questionnaire document. Then start building: listener account first, then data collector, then interview bot.
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
@@ -146,6 +147,64 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
 - Business names live in `b2b_bot/customers.py` — add group chat ID + name, restart bot to register new customer
 - Valid bank accounts and seller names stored in DB (`b2b_payment_accounts` table) — manage via `/addaccount` and `/removeaccount`, no restart needed
+- Bakong/KHQR registration pending — need passport (on other PC); check ABA app merchant QR first
+
+---
+
+## Operations Intelligence System — Planned (Phase 3)
+
+A new system to be built alongside the existing bots. Three layers:
+
+### Layer 1 — Data Collection (build first)
+- **Telethon user-account listener** runs on the server as the owner's personal Telegram account (or a dedicated staff account added to all groups). Reads full message history + streams all new messages silently into a new `messages` DB table: sender, timestamp, group_id, text, media metadata.
+- **One-time historical import script** reads Telegram JSON exports (exported manually from each group via the app) into the same table. Covers all history before the listener joined.
+- **Photo analysis included from day 1** — every image sent in any group gets passed to AI vision.
+- Both the listener and the existing bots share the same PostgreSQL database.
+
+### Layer 2 — AI Analysis (all 4 tiers active from day 1, owner monitors costs and tones down)
+| Tier | Model | Approx cost | Job |
+|------|-------|-------------|-----|
+| Free | None | $0 | Keyword summaries, counts, rule-based daily reports |
+| Budget | Claude Haiku | ~$0.25/M tokens in | Daily digest — who said what, complaints flagged, order mentions, photo descriptions |
+| Mid | Claude Sonnet | ~$3/M tokens in | Weekly deep analysis — staff behavior patterns, tone, operational issues |
+| Premium | Claude Opus | ~$15/M tokens in | Special reports — long-context reasoning across weeks of data, hiring evaluation |
+
+Scheduled jobs send analysis results to owner's private Telegram.
+
+### Layer 3 — Hiring / Interview Bot (build after Layer 1+2)
+**Access control — token-based, invite-only:**
+- Candidates first contact a separate Telegram account (human contact, not the bot) to apply
+- When candidate arrives in person, owner/staff runs `/approve @username` → bot generates a one-time deep link (e.g. `t.me/yourhirebot?start=abc123`)
+- Only that token works — random people get silence from the bot
+- Token is single-use and expires after a timeout (e.g. 30 min if not started)
+
+**Interview session flow:**
+- Candidate taps link → interview starts immediately in private chat with the bot
+- Each question sent → candidate replies → bot deletes BOTH the question and the answer from the chat immediately after recording the answer → next question appears. Chat window stays visually empty throughout.
+- If candidate goes inactive (no reply for 10 min) → session expires → token burned → owner notified: "Candidate @x abandoned at question N"
+- Completed or abandoned: session locked, that token never works again, no way to restart
+
+**Evaluation:**
+- AI (Sonnet or Opus) scores answers against the rubric from the questionnaire system already designed with ChatGPT
+- Owner receives a scored report in private Telegram
+
+**To provide before building:**
+1. ChatGPT export ZIP: ChatGPT → avatar → Settings → Data controls → Export data → download ZIP → upload here. Claude will read `conversations.json` and extract the hiring/interview system design.
+2. The questionnaire document.
+
+### Planned Repo Structure Addition
+```
+ops_intelligence/
+├── listener.py         ← Telethon user-account message collector
+├── importer.py         ← one-time Telegram JSON export loader
+├── analysis.py         ← scheduled AI analysis jobs (all 4 tiers)
+└── hire_bot/
+    ├── bot.py          ← interview bot handler registration
+    ├── sessions.py     ← token generation, session state, expiry
+    └── evaluator.py    ← AI scoring against questionnaire rubric
+run_listener.py         ← entry point: python run_listener.py (systemd: twbshop-listener)
+run_hire_bot.py         ← entry point: python run_hire_bot.py (systemd: twbshop-hire)
+```
 
 ---
 
