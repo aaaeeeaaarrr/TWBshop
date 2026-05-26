@@ -336,7 +336,7 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
             label,
             callback_data=f"bm_qty_{slug}_{cat_key}",
         )])
-    nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
+    nav = [InlineKeyboardButton("← MENU", callback_data="bm_back")]
     if cart:
         nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
@@ -353,7 +353,7 @@ def _bun_page_keyboard(chat_id: int) -> InlineKeyboardMarkup:
             f"{bun['emoji']} {bun['label']}{badge}",
             callback_data=f"bm_bun_{bun_key}",
         )])
-    nav = [InlineKeyboardButton("← Back", callback_data="bm_back")]
+    nav = [InlineKeyboardButton("← MENU", callback_data="bm_back")]
     if cart:
         nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
@@ -378,7 +378,7 @@ def _bun_size_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         "Other Grams",
         callback_data=f"bm_bun_other_{bun_key}",
     )])
-    nav = [InlineKeyboardButton("← Buns", callback_data="bm_buns")]
+    nav = [InlineKeyboardButton("← MENU", callback_data="bm_buns")]
     if cart:
         nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
@@ -426,7 +426,7 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
         nav = [InlineKeyboardButton(f"Other{other_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
-        nav.append(InlineKeyboardButton("← Menu", callback_data=f"bm_cat_{cat_key}"))
+        nav.append(InlineKeyboardButton("← MENU", callback_data=f"bm_cat_{cat_key}"))
         rows.append(nav)
     else:
         row = []
@@ -441,7 +441,7 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
         nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
-        nav.append(InlineKeyboardButton("← Menu", callback_data=f"bm_cat_{cat_key}"))
+        nav.append(InlineKeyboardButton("← MENU", callback_data=f"bm_cat_{cat_key}"))
         rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
@@ -458,7 +458,7 @@ def _bun_sesame_keyboard(bun_key: str, grams: int, chat_id: int) -> InlineKeyboa
             f"{label}{suffix}",
             callback_data=f"bm_bunsesame_{bun_key}_{grams}_{code}",
         )])
-    nav = [InlineKeyboardButton("← Menu", callback_data=f"bm_bun_{bun_key}")]
+    nav = [InlineKeyboardButton("← MENU", callback_data=f"bm_bun_{bun_key}")]
     if cart:
         nav.append(InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"))
     rows.append(nav)
@@ -484,7 +484,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, sesame_code: str | None, current
     if current_qty > 0:
         nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_bunqtyval_{bun_key}_{grams}{sfx}_0"))
     back_cb = f"bm_bun_size_{bun_key}_{grams}" if sesame_code else f"bm_bun_{bun_key}"
-    nav.append(InlineKeyboardButton("← Menu", callback_data=back_cb))
+    nav.append(InlineKeyboardButton("← MENU", callback_data=back_cb))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 
@@ -508,7 +508,7 @@ def _date_picker_keyboard(back_cb: str = "bm_back") -> InlineKeyboardMarkup:
                 callback_data=f"bm_date_m_{next_month.strftime('%Y%m')}",
             ),
         ],
-        [InlineKeyboardButton("← Back", callback_data=back_cb)],
+        [InlineKeyboardButton("← MENU", callback_data=back_cb)],
     ])
 
 
@@ -531,7 +531,7 @@ def _day_picker_keyboard(yyyymm: str) -> InlineKeyboardMarkup:
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("← Back", callback_data="bm_time_select")])
+    rows.append([InlineKeyboardButton("← MENU", callback_data="bm_time_select")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -548,7 +548,7 @@ def _time_picker_keyboard(cb_prefix: str, back_cb: str) -> InlineKeyboardMarkup:
             row = []
     if row:
         rows.append(row)
-    rows.append([InlineKeyboardButton("← Back", callback_data=back_cb)])
+    rows.append([InlineKeyboardButton("← MENU", callback_data=back_cb)])
     return InlineKeyboardMarkup(rows)
 
 
@@ -558,7 +558,7 @@ def _method_picker_keyboard(cb_prefix: str, back_cb: str, total: float = 0) -> I
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🏪 Pickup (free)", callback_data=f"{cb_prefix}pickup")],
         [InlineKeyboardButton(delivery_label,      callback_data=f"{cb_prefix}delivery")],
-        [InlineKeyboardButton("← Back",            callback_data=back_cb)],
+        [InlineKeyboardButton("← MENU",            callback_data=back_cb)],
     ])
 
 
@@ -578,7 +578,7 @@ def _confirm_screen_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     rows += [
         [InlineKeyboardButton("Change Date+Time+Delivery",  callback_data="bm_cs_datetime")],
         [InlineKeyboardButton("🔄 Daily/Weekly Orders",     callback_data="bm_cs_recurring")],
-        [InlineKeyboardButton("← Back to Menu",            callback_data="bm_back")],
+        [InlineKeyboardButton("← MENU",            callback_data="bm_back")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -604,7 +604,7 @@ def _recurring_day_keyboard(selected: set) -> InlineKeyboardMarkup:
     nav = []
     if selected:
         nav.append(InlineKeyboardButton("✅ Done", callback_data="bm_rd_done"))
-    nav.append(InlineKeyboardButton("← Back", callback_data="bm_cs_show"))
+    nav.append(InlineKeyboardButton("← MENU", callback_data="bm_cs_show"))
     rows.append(nav)
     return InlineKeyboardMarkup(rows)
 

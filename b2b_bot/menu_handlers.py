@@ -583,7 +583,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 f"How many {grams}g {bun['label']}?\nType a number (0 to remove):",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Menu", callback_data=back_cb),
+                    InlineKeyboardButton("← MENU", callback_data=back_cb),
                 ]]),
             )
 
@@ -752,7 +752,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 prompt,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← Menu", callback_data=f"bm_qty_{slug}_{cat_key}"),
+                    InlineKeyboardButton("← MENU", callback_data=f"bm_qty_{slug}_{cat_key}"),
                 ]]),
             )
 
@@ -894,7 +894,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 "\n".join(lines),
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✕ Cancel Recurring Order", callback_data=f"bm_cancel_rec_{rec_id}")],
-                    [InlineKeyboardButton("← Keep it",              callback_data="bm_back")],
+                    [InlineKeyboardButton("← MENU",              callback_data="bm_back")],
                 ]),
             )
 
@@ -926,7 +926,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                     callback_data=f"bm_cancel_rec_{rec['id']}",
                 )])
             lines.append("Which would you like to cancel?")
-            buttons.append([InlineKeyboardButton("← Keep them", callback_data="bm_back")])
+            buttons.append([InlineKeyboardButton("← MENU", callback_data="bm_back")])
             await query.edit_message_text(
                 "\n".join(lines),
                 reply_markup=InlineKeyboardMarkup(buttons),
