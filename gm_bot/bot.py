@@ -249,6 +249,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     reply_markup=_concern_keyboard(new_id),
                 )
                 gm_mark_sent(new_id, sent_msg.message_id)
+                # Forward original message so owner sees the photo/full context
+                if msg.photo or msg.document or msg.video:
+                    await context.bot.forward_message(
+                        chat_id=config.OWNER_TELEGRAM_ID,
+                        from_chat_id=chat_id,
+                        message_id=msg_id,
+                    )
                 logger.info("Live concern sent: %s from %s in %s", c["concern_type"], sender, chat_id)
             except Exception as e:
                 logger.error("Failed to send live concern: %s", e)
