@@ -825,7 +825,7 @@ def get_unpaid_b2b_orders(group_chat_id: int) -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, item, quantity, grams, notes, delivery_date, created_at
+                SELECT id, item, quantity, grams, notes, delivery_date, created_at, batch_id
                 FROM b2b_orders
                 WHERE group_chat_id = %s AND status = 'confirmed' AND payment_status = 'unpaid'
                 ORDER BY delivery_date, created_at
@@ -837,7 +837,7 @@ def get_unpaid_b2b_cake_orders(group_chat_id: int) -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, item, cake_category, order_type, quantity, slices, delivery_date, created_at
+                SELECT id, item, cake_category, order_type, quantity, slices, delivery_date, created_at, batch_id
                 FROM b2b_cake_orders
                 WHERE group_chat_id = %s AND status = 'confirmed' AND payment_status = 'unpaid'
                 ORDER BY delivery_date, created_at

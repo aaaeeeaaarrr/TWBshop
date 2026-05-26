@@ -52,6 +52,7 @@ def _unpaid_rows_with_price(group_chat_id: int) -> list[dict]:
             "source": "bread", "id": r["id"],
             "delivery_date": r["delivery_date"], "created_at": r["created_at"],
             "item": r["item"], "price": item_price(it),
+            "batch_id": r.get("batch_id"),
         })
 
     for r in get_unpaid_b2b_cake_orders(group_chat_id):
@@ -63,6 +64,7 @@ def _unpaid_rows_with_price(group_chat_id: int) -> list[dict]:
             "source": "cake", "id": r["id"],
             "delivery_date": r["delivery_date"], "created_at": r["created_at"],
             "item": r["item"], "price": item_price(it),
+            "batch_id": r.get("batch_id"),
         })
 
     return sorted(rows, key=lambda r: (r["delivery_date"], r["created_at"]))
@@ -73,12 +75,14 @@ def get_unpaid_total(group_chat_id: int) -> float:
 
 
 def _unpaid_by_date(group_chat_id: int) -> dict[str, dict]:
-    """Group unpaid rows by delivery_date: {date: {rows, total}}."""
-    by_date: dict[str, dict] = defaultdict(lambda: {"rows": [], "total": 0.0})
+    """Group unpaid rows by delivery_date: {date: {rows, total, bill_count}}."""
+    by_date: dict[str, dict] = defaultdict(lambda: {"rows": [], "total": 0.0, "batch_ids": set()})
     for row in _unpaid_rows_with_price(group_chat_id):
         d = row["delivery_date"]
         by_date[d]["rows"].append(row)
         by_date[d]["total"] = round(by_date[d]["total"] + row["price"], 2)
+        if row.get("batch_id"):
+            by_date[d]["batch_ids"].add(row["batch_id"])
     return by_date
 
 

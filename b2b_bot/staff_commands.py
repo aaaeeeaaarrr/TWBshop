@@ -158,6 +158,9 @@ async def _start_markpaid(bot, uid: int, group_chat_id: int) -> None:
             label = f"{_fmt_date(d)} — ${owed:.2f} remaining"
         else:
             label = f"{_fmt_date(d)} — ${total:.2f}"
+        bill_count = len(by_date[d].get("batch_ids") or set())
+        if bill_count > 1:
+            label += f" ({bill_count} bills)"
         rows.append([InlineKeyboardButton(label, callback_data=f"bmp_date_{req_id}_{d}")])
 
     rows.append([InlineKeyboardButton(f"Full balance — ${eff:.2f}", callback_data=f"bmp_full_{req_id}")])
