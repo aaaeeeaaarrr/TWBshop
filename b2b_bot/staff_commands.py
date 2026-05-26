@@ -50,13 +50,13 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 def _method_label(m: str) -> str:
-    return {"cash": "Cash 💵", "bank": "Bank Transfer 🏦", "photo": "Screenshot"}.get(m, m)
+    return {"cash": "Cash", "bank": "Bank Transfer", "photo": "Screenshot"}.get(m, m)
 
 
 def _status_label(s: str | None) -> str:
     if not s or s == "applied":
         return ""
-    return {"pending": " · Pending ⏳", "rejected": " · Rejected ❌"}.get(s, f" · {s}")
+    return {"pending": " · Pending", "rejected": " · Rejected"}.get(s, f" · {s}")
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
@@ -578,7 +578,7 @@ def _format_payment_row(r: dict, show_business: bool = False) -> str:
     method = r.get("method") or "photo"
     status = r.get("status")
     biz = f"<i>{r['business_name']}</i> — " if show_business else ""
-    line = f"📅 {dt} — {biz}<b>${float(r['amount']):.2f}</b> · {_method_label(method)}{_status_label(status)}"
+    line = f"{dt} — {biz}<b>${float(r['amount']):.2f}</b> · {_method_label(method)}{_status_label(status)}"
     if r.get("covered_dates"):
         dates = [_fmt_date(d) for d in r["covered_dates"].split(",") if d]
         if dates:
