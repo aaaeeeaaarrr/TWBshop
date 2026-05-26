@@ -28,6 +28,12 @@ A Telegram-based bakery operations system that handles:
 
 ---
 
+## After Every Pull
+
+**Read the "Current Status" section of this file immediately.** It is the only source of truth for what to work on next. Never use memory notes — they are local to one machine and go stale across machines.
+
+---
+
 ## Core Architectural Rules (READ BEFORE WRITING ANY CODE)
 
 ### 1. AI API Calls Only via shared/ai_client.py
