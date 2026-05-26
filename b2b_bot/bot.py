@@ -48,6 +48,7 @@ from b2b_bot.staff_commands import (
     callback_history,
     handle_staff_flow_text,
     staff_flow_filter,
+    handle_private_fallback,
 )
 from b2b_bot.menu_flow import (
     handle_menu_command, handle_menu_callback, handle_welcome,
@@ -266,6 +267,12 @@ def main() -> None:
 
     # History callbacks
     app.add_handler(CallbackQueryHandler(callback_history, pattern=r"^bmh_"))
+
+    # Fallback: unrecognised private text from owner/staff → show command list
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+        handle_private_fallback,
+    ))
 
     # Staff / owner commands
     app.add_handler(CommandHandler("summary",       cmd_summary))

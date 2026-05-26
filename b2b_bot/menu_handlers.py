@@ -44,13 +44,15 @@ logger = logging.getLogger(__name__)
 
 
 async def cmd_start(update: Update, context) -> None:
-    """Reply to /start in private chat with links to the customer's registered group(s).
-    Silent for owner/staff and for anyone not sharing a group with the bot.
+    """Reply to /start in private chat.
+    Owner/staff → show command list. Customer in a group → show group link(s). Anyone else → silent.
     """
     if update.effective_chat.type != "private":
         return
     user_id = update.effective_user.id
     if user_id in (config.OWNER_TELEGRAM_ID, config.DISPATCH_REMINDER_TELEGRAM_ID):
+        from b2b_bot.staff_commands import cmd_commands
+        await cmd_commands(update, context)
         return
     customers = get_all_b2b_customers()
     lines = []

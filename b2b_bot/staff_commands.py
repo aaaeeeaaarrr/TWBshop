@@ -633,3 +633,10 @@ async def handle_staff_flow_text(update: Update, context) -> None:
     if await handle_custom_amount_text(update, context):
         return
     await handle_addaccount_text(update, context)
+
+
+async def handle_private_fallback(update: Update, context) -> None:
+    """Catch-all for unrecognised private messages from owner/staff — show command list."""
+    uid = update.effective_user.id if update.effective_user else None
+    if _is_authorized(uid):
+        await cmd_commands(update, context)
