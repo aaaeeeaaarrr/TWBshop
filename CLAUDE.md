@@ -135,15 +135,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 3)
+**Last updated:** 2026-05-26 (session 4)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** B2B UX cleanup — Check Balance removed from food menu; all "Standing order/s" renamed to "Recurring order/s" everywhere; "Ready to order?" prompt redesign + full cart durability.
-- 4-button prompt: ⭐ OPEN MENU ⭐ (always fresh), SEE YOUR ORDERS (confirmed + recurring), Check Balance, Change Location
-- OPEN MENU always clears cart and starts fresh
-- SEE YOUR ORDERS shows both confirmed orders and recurring standing orders (was only showing confirmed)
-- Location pin prompt suppressed if delivery cost already stored
-- Cart persisted to PostgreSQL on every item change — survives restarts, server issues, deployments
-- All order state (confirmed orders, pending confirmation, cart, editing session) now fully DB-backed
+**Last completed:** Fixed Full Cakes / Desserts category separation bug — cat-A cakes (e.g. Peanut Cheesecake) appear in both categories. When ordered from Full Cakes → priced at price_full (whole cake), stored as {name}|cake_{spec}. When ordered from Desserts → priced at price_slice (per slice), stored as {name}|slice. Badges, qty pickers, cart block, _parse_cart_items, and pricing.py all updated for the |slice key. Also from previous sessions: 4-button "Ready to order?" prompt; COPY LAST ORDER?; ✅ tick; inline cake slicing; "Recurring order" rename; test customer renamed "TEST ORDER"; cart durability; SEE YOUR ORDERS shows confirmed + recurring; location pin prompt fix.
 **Next task:** Test staff/owner commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
