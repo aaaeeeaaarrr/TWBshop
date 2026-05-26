@@ -307,11 +307,11 @@ def _dessert_cart_qty(cart: dict, name: str) -> int:
 def _cake_slice_keyboard(name: str, qty: int) -> InlineKeyboardMarkup:
     slug = _SLUG[name]
     options = [
-        ("Not sliced",    f"bm_cake_slice_{slug}_{qty}_full"),
-        ("Slice 8",       f"bm_cake_slice_{slug}_{qty}_s8"),
-        ("Slice 10",      f"bm_cake_slice_{slug}_{qty}_s10"),
-        ("Slice 12",      f"bm_cake_slice_{slug}_{qty}_s12"),
-        ("Slice 16",      f"bm_cake_slice_{slug}_{qty}_s16"),
+        ("Not sliced",                      f"bm_cake_slice_{slug}_{qty}_full"),
+        ("Slice 8",                         f"bm_cake_slice_{slug}_{qty}_s8"),
+        ("Slice 10 (Not Recommended)",      f"bm_cake_slice_{slug}_{qty}_s10"),
+        ("Slice 12 (Not Recommended)",      f"bm_cake_slice_{slug}_{qty}_s12"),
+        ("Slice 16 (Not Recommended)",      f"bm_cake_slice_{slug}_{qty}_s16"),
     ]
     rows = [[InlineKeyboardButton(label, callback_data=cd)] for label, cd in options]
     return InlineKeyboardMarkup(rows)
