@@ -135,16 +135,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 2)
+**Last updated:** 2026-05-26
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** B2B "Ready to order?" prompt improvements + cart durability.
-- "Ready to order?" prompt now has 4 buttons: ⭐ OPEN MENU ⭐ (always fresh new order), SEE YOUR ORDERS (shows existing confirmed + recurring orders to edit), Check Balance, Change Location
-- OPEN MENU always starts a fresh cart, regardless of existing orders
-- EDIT ORDER fixed to show recurring orders (not just confirmed sessions)
-- Location pin prompt no longer fires if delivery cost already stored in DB
-- Cart state now persisted to PostgreSQL on every item add/remove — survives restarts and server issues
-- Confirmed orders and pending state were already DB-backed; cart was the last gap, now closed
-**Next task:** Test new commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
+**Last completed:** B2B "Ready to order?" prompt redesign + full cart durability.
+- 4-button prompt: ⭐ OPEN MENU ⭐ (always fresh), SEE YOUR ORDERS (confirmed + recurring), Check Balance, Change Location
+- OPEN MENU always clears cart and starts fresh
+- SEE YOUR ORDERS shows both confirmed orders and recurring standing orders (was only showing confirmed)
+- Location pin prompt suppressed if delivery cost already stored
+- Cart persisted to PostgreSQL on every item change — survives restarts, server issues, deployments
+- All order state (confirmed orders, pending confirmation, cart, editing session) now fully DB-backed
+**Next task:** Test staff/owner commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
