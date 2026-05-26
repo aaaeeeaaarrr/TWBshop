@@ -12,7 +12,7 @@ from b2b_bot.menu_keyboards import (
     _SESAME_CODE_LABEL, _SESAME_LABEL_CODE,
     _DELIVERY_TIME_CODES,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
-    _save_cart, _restore_cart, _cake_slice_keyboard, _cake_cart_qty,
+    _save_cart, _restore_cart, _cake_slice_keyboard, _cake_cart_qty, _dessert_cart_qty,
     _orders_locked, _MENU_PROMPT_COOLDOWN_SEC,
     _CATEGORIES, _BUNS, _NAME,
     _category_keyboard, _item_keyboard, _cart_block,
@@ -653,7 +653,13 @@ async def handle_menu_callback(update: Update, context) -> None:
             name = _NAME.get(slug)
             if not name:
                 return
-            current_qty = _cart.get(chat_id, {}).get(name, 0)
+            cart = _cart.get(chat_id, {})
+            if cat_key == "desserts" and B2B_CAKE_MENU.get(name, {}).get("cake_category") == "A":
+                current_qty = _dessert_cart_qty(cart, name)
+            elif cat_key == "cakes":
+                current_qty = _cake_cart_qty(cart, name)
+            else:
+                current_qty = cart.get(name, 0)
             cat         = _CATEGORIES[cat_key]
             note_line   = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
             await query.edit_message_text(
@@ -673,6 +679,25 @@ async def handle_menu_callback(update: Update, context) -> None:
                 return
             qty  = int(qty_str)
             cart = _cart.setdefault(chat_id, {})
+            if cat_key == "desserts" and B2B_CAKE_MENU.get(name, {}).get("cake_category") == "A":
+                # Cat-A cake in Desserts → store as {name}|slice for per-slice pricing
+                for k in list(cart.keys()):
+                    if k == name or k == f"{name}|slice":
+                        del cart[k]
+                if qty > 0:
+                    cart[f"{name}|slice"] = qty
+                _save_cart(chat_id)
+                cat       = _CATEGORIES["desserts"]
+                note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
+                cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
+                cat_kb    = _item_keyboard("desserts", chat_id)
+                try:
+                    await query.edit_message_text(cat_txt, reply_markup=cat_kb)
+                except Exception:
+                    sent = await context.bot.send_message(chat_id, cat_txt, reply_markup=cat_kb)
+                    _menu_msg[chat_id] = sent.message_id
+                    set_menu_message_id(chat_id, sent.message_id)
+                return
             if cat_key == "cakes" and qty > 0:
                 # Remove any existing cart entry for this cake before asking slice pref
                 for k in list(cart.keys()):
@@ -938,7 +963,10 @@ def _parse_cart_items(chat_id: int):
         if "|" in key:
             parts = key.split("|")
             item_name = parts[0]
-            if parts[1].startswith("cake_"):
+            if parts[1] == "slice":
+                d = B2B_CAKE_MENU[item_name]
+                cake_items.append({"item": item_name, "qty": qty, "cake_category": d["cake_category"], "order_type": "slice", "slices": None})
+            elif parts[1].startswith("cake_"):
                 slice_code = parts[1]
                 d = B2B_CAKE_MENU[item_name]
                 if slice_code == "cake_full":

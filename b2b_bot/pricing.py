@@ -20,6 +20,10 @@ def item_price(it: dict) -> float:
     if order_type == "tray":
         return round(qty * item_def.get("price_tray", 0), 2)
 
+    # Cake: individual slice of a full cake (ordered from Desserts)
+    if order_type == "slice":
+        return round(qty * item_def.get("price_slice", 0), 2)
+
     # Cake: individual pieces or brownie pieces
     if order_type == "piece":
         return round(qty * item_def.get("price_piece", 0), 2)
