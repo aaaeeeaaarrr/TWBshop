@@ -50,7 +50,13 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 def _method_label(m: str) -> str:
-    return {"cash": "Cash 💵", "bank": "Bank Transfer 🏦", "photo": "Payment screenshot"}.get(m, m)
+    return {"cash": "Cash 💵", "bank": "Bank Transfer 🏦", "photo": "Screenshot"}.get(m, m)
+
+
+def _status_label(s: str | None) -> str:
+    if not s or s == "applied":
+        return ""
+    return {"pending": " · Pending ⏳", "rejected": " · Rejected ❌"}.get(s, f" · {s}")
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
@@ -558,7 +564,8 @@ async def _send_history(send_fn, group_chat_id: int) -> None:
 def _format_payment_row(r: dict) -> str:
     dt = (r.get("created_at") or "")[:10]
     method = r.get("method") or "photo"
-    line = f"📅 {dt} — <b>${float(r['amount']):.2f}</b> · {_method_label(method)}"
+    status = r.get("status")
+    line = f"📅 {dt} — <b>${float(r['amount']):.2f}</b> · {_method_label(method)}{_status_label(status)}"
     if r.get("covered_dates"):
         dates = [_fmt_date(d) for d in r["covered_dates"].split(",") if d]
         if dates:

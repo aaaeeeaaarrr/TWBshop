@@ -970,7 +970,7 @@ def get_b2b_payment_history(group_chat_id: int) -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, amount, method, covered_dates, created_at FROM b2b_payments "
+                "SELECT id, amount, method, covered_dates, created_at, status FROM b2b_payments "
                 "WHERE group_chat_id = %s ORDER BY created_at DESC LIMIT 50",
                 (group_chat_id,),
             )
@@ -981,7 +981,7 @@ def get_all_payment_history() -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT business_name, amount, method, covered_dates, created_at FROM b2b_payments "
+                "SELECT business_name, amount, method, covered_dates, created_at, status FROM b2b_payments "
                 "ORDER BY business_name, created_at DESC"
             )
             return cur.fetchall()
