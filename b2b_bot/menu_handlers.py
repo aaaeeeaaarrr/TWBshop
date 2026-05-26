@@ -36,7 +36,7 @@ from shared.database import (
     get_editing_session, set_editing_session,
     set_pending_order, set_order_state, set_last_confirmation_msg,
     get_b2b_recurring_orders, get_recurring_order, cancel_b2b_recurring_order,
-    set_cart_state,
+    set_cart_state, get_last_b2b_order,
 )
 
 logger = logging.getLogger(__name__)
@@ -444,6 +444,31 @@ async def handle_menu_callback(update: Update, context) -> None:
                 chat_id,
                 "📍 To calculate your delivery fee, please share your location — "
                 "tap the 📎 attachment icon → Location. We only need it once.",
+            )
+
+        elif data == "bm_copy_last_order":
+            if _orders_locked():
+                await query.answer("Orders are locked after 10pm. Contact us directly.", show_alert=True)
+                return
+            items = get_last_b2b_order(chat_id)
+            if not items:
+                await query.answer("No previous order found.", show_alert=True)
+                return
+            cart = _cart.setdefault(chat_id, {})
+            cart.clear()
+            for it in items:
+                if it.get("grams"):
+                    from b2b_bot.menu_keyboards import _SESAME_LABEL_CODE
+                    sc  = _SESAME_LABEL_CODE.get(it.get("notes", ""))
+                    key = f"{it['item']}|{it['grams']}|{sc}" if sc else f"{it['item']}|{it['grams']}"
+                else:
+                    key = it["item"]
+                cart[key] = it["quantity"]
+            _save_cart(chat_id)
+            await query.answer()
+            await query.edit_message_text(
+                f"📋 Select a category:\n\n{_cart_block(chat_id)}",
+                reply_markup=_category_keyboard(chat_id),
             )
 
         elif data == "bm_buns":

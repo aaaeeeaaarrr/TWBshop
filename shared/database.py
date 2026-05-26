@@ -653,6 +653,32 @@ def delete_b2b_orders_for_date(group_chat_id: int, delivery_date: str) -> None:
             )
 
 
+def get_last_b2b_order(group_chat_id: int) -> list[dict]:
+    """Return bread items from the most recent confirmed order batch for this customer."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT item, quantity, grams, notes, created_at,
+                       CASE WHEN batch_id != '' THEN batch_id ELSE created_at END AS sid
+                FROM b2b_orders
+                WHERE group_chat_id = %s AND status = 'confirmed'
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (group_chat_id,))
+            row = cur.fetchone()
+            if not row:
+                return []
+            sid = row["sid"]
+            cur.execute("""
+                SELECT item, quantity, grams, notes
+                FROM b2b_orders
+                WHERE group_chat_id = %s AND status = 'confirmed'
+                  AND CASE WHEN batch_id != '' THEN batch_id ELSE created_at END = %s
+                ORDER BY item
+            """, (group_chat_id, sid))
+            return cur.fetchall()
+
+
 def get_b2b_order_sessions(group_chat_id: int, delivery_date: str) -> list[dict]:
     """Return confirmed orders grouped by batch session (batch_id or created_at for old rows).
     Each entry: {session_key, bread: [{item,qty,grams,notes}], cake: [{item,qty,cake_category,order_type,slices}]}

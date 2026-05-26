@@ -9,7 +9,7 @@ from telegram.ext import filters as _filters
 from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
-from shared.database import get_b2b_customer, get_cart_state, set_cart_state
+from shared.database import get_b2b_customer, get_cart_state, set_cart_state, get_last_b2b_order
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 _cart: dict[int, dict[str, int]] = {}         # {chat_id: {item_key: qty}}
@@ -246,6 +246,8 @@ def _cart_block(chat_id: int) -> str:
 def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
+    if not cart and get_last_b2b_order(chat_id):
+        rows.append([InlineKeyboardButton("COPY LAST ORDER", callback_data="bm_copy_last_order")])
     for key, cat in _CATEGORIES.items():
         count = sum(cart.get(n, 0) for n in cat["items"])
         badge = f" ({count})" if count else ""
