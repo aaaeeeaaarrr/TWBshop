@@ -537,12 +537,7 @@ async def callback_history(update: Update, context) -> None:
             await query.edit_message_text("No payment history yet.")
             return
         lines = ["<b>All Payment History</b>"]
-        current_biz = None
-        for r in rows:
-            if r["business_name"] != current_biz:
-                current_biz = r["business_name"]
-                lines.append(f"\n<b>{current_biz}</b>")
-            lines.append(_format_payment_row(r))
+        lines += _month_grouped_lines(rows, show_business=True)
         await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
     else:
         group_chat_id = int(key)
@@ -555,17 +550,35 @@ async def _send_history(send_fn, group_chat_id: int) -> None:
     if not rows:
         await send_fn(f"No payment history for <b>{business}</b>.", parse_mode=ParseMode.HTML)
         return
-    lines = [f"<b>Payment History — {business}</b>", ""]
-    for r in rows:
-        lines.append(_format_payment_row(r))
+    lines = [f"<b>Payment History — {business}</b>"]
+    lines += _month_grouped_lines(rows, show_business=False)
     await send_fn("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
-def _format_payment_row(r: dict) -> str:
-    dt = (r.get("created_at") or "")[:10]
+def _month_grouped_lines(rows: list[dict], show_business: bool) -> list[str]:
+    from collections import defaultdict
+    by_month: dict[str, list] = defaultdict(list)
+    for r in rows:
+        month = (r.get("created_at") or "")[:7]   # "YYYY-MM"
+        by_month[month].append(r)
+    lines = []
+    for month in sorted(by_month.keys(), reverse=True):
+        month_rows = by_month[month]
+        month_total = sum(float(r["amount"]) for r in month_rows)
+        year, mon = month.split("-")
+        month_name = datetime(int(year), int(mon), 1).strftime("%B").upper()
+        lines.append(f"\n<b>{month_name} {year} (${month_total:.2f})</b>")
+        for r in month_rows:
+            lines.append(_format_payment_row(r, show_business=show_business))
+    return lines
+
+
+def _format_payment_row(r: dict, show_business: bool = False) -> str:
+    dt = (r.get("created_at") or "")[5:10]   # MM-DD
     method = r.get("method") or "photo"
     status = r.get("status")
-    line = f"📅 {dt} — <b>${float(r['amount']):.2f}</b> · {_method_label(method)}{_status_label(status)}"
+    biz = f"<i>{r['business_name']}</i> — " if show_business else ""
+    line = f"📅 {dt} — {biz}<b>${float(r['amount']):.2f}</b> · {_method_label(method)}{_status_label(status)}"
     if r.get("covered_dates"):
         dates = [_fmt_date(d) for d in r["covered_dates"].split(",") if d]
         if dates:
