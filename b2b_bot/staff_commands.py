@@ -54,7 +54,7 @@ def _method_label(m: str) -> str:
 
 
 def _status_prefix(s: str | None) -> str:
-    return {"pending": "⏳ ", "rejected": "❌ "}.get(s or "", "")
+    return {"applied": "✅ ", "pending": "⏳ ", "rejected": "❌ "}.get(s or "", "✅ ")
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
