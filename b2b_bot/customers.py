@@ -14,7 +14,7 @@ import re
 # group_chat_id (integer) → business name (string)
 # Only kept for legacy seeding — new customers come in via auto-registration.
 B2B_CUSTOMERS: dict[int, str] = {
-    -5252815001: "Test",
+    -5252815001: "TEST ORDER",
 }
 
 _STRIP_WORDS = {"b2b", "wholesale", "bakery", "order", "orders", "wine"}
