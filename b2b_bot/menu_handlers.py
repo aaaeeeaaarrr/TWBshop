@@ -107,7 +107,7 @@ def _menu_state(chat_id: int):
         if recurring_orders:
             if lines:
                 lines.append("")
-            lines.append("Standing orders:")
+            lines.append("Recurring orders:")
             for rec in recurring_orders:
                 days = json.loads(rec["days_of_week"])
                 lines.append(f"  🔄 {days_label(days)} at {rec['delivery_time']}")
@@ -785,14 +785,14 @@ async def handle_menu_callback(update: Update, context) -> None:
             rec_id = int(data[12:])
             rec = get_recurring_order(rec_id)
             if not rec or rec["group_chat_id"] != chat_id:
-                await query.answer("Standing order not found.", show_alert=True)
+                await query.answer("Recurring order not found.", show_alert=True)
                 return
             import json
             from b2b_bot.recurring import days_label
             days   = json.loads(rec["days_of_week"])
             items  = json.loads(rec["items_json"])
             method = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
-            lines  = [f"🔄 Standing order — {days_label(days)}", f"🕐 {method} at {rec['delivery_time']}", ""]
+            lines  = [f"🔄 Recurring order — {days_label(days)}", f"🕐 {method} at {rec['delivery_time']}", ""]
             for it in items.get("bread_items", []):
                 line = f"  • {it['qty']}× {it['item']}"
                 if it.get("grams"):
@@ -802,7 +802,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 "\n".join(lines),
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✕ Cancel Standing Order", callback_data=f"bm_cancel_rec_{rec_id}")],
+                    [InlineKeyboardButton("✕ Cancel Recurring Order", callback_data=f"bm_cancel_rec_{rec_id}")],
                     [InlineKeyboardButton("← Keep it",              callback_data="bm_back")],
                 ]),
             )
@@ -812,13 +812,13 @@ async def handle_menu_callback(update: Update, context) -> None:
             recs = [get_recurring_order(rid) for rid in ids]
             recs = [r for r in recs if r and r["group_chat_id"] == chat_id]
             if not recs:
-                await query.answer("Standing orders not found.", show_alert=True)
+                await query.answer("Recurring orders not found.", show_alert=True)
                 return
             import json
             from b2b_bot.recurring import days_label
             first = recs[0]
             days  = json.loads(first["days_of_week"])
-            lines = [f"🔄 Standing orders — {days_label(days)} at {first['delivery_time']}", ""]
+            lines = [f"🔄 Recurring orders — {days_label(days)} at {first['delivery_time']}", ""]
             buttons = []
             for rec in recs:
                 items  = json.loads(rec["items_json"])
@@ -845,14 +845,14 @@ async def handle_menu_callback(update: Update, context) -> None:
             rec_id = int(data[14:])
             rec = get_recurring_order(rec_id)
             if not rec or rec["group_chat_id"] != chat_id:
-                await query.answer("Standing order not found.", show_alert=True)
+                await query.answer("Recurring order not found.", show_alert=True)
                 return
             cancel_b2b_recurring_order(rec_id)
             import json
             from b2b_bot.recurring import days_label
             days = json.loads(rec["days_of_week"])
             await query.edit_message_text(
-                f"✕ Standing order ({days_label(days)}) cancelled.",
+                f"✕ Recurring order ({days_label(days)}) cancelled.",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("📋 New Order", callback_data="bm_new_order"),
                 ]]),
@@ -914,7 +914,7 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
         await query.edit_message_text(
             "\n".join(lines),
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("✅ Confirm Standing Order", callback_data="b2b_rec_setup_confirm"),
+                InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm"),
                 InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
             ]]),
         )
@@ -923,7 +923,7 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
             chat_id,
             "\n".join(lines),
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("✅ Confirm Standing Order", callback_data="b2b_rec_setup_confirm"),
+                InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm"),
                 InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
             ]]),
         )

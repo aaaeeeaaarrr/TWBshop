@@ -70,7 +70,7 @@ async def send_recurring_reminders(bot, reminder_num: int) -> None:
 
         method_label = "Delivery" if rec["delivery_method"] == "delivery" else "Pickup"
         lines = [
-            f"📅 Standing order — {days_label(days)}",
+            f"📅 Recurring order — {days_label(days)}",
             f"🕐 {method_label} at {rec['delivery_time']}",
             "",
         ]

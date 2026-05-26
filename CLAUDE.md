@@ -135,9 +135,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26
+**Last updated:** 2026-05-26 (session 3)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** B2B "Ready to order?" prompt redesign + full cart durability.
+**Last completed:** B2B UX cleanup — Check Balance removed from food menu; all "Standing order/s" renamed to "Recurring order/s" everywhere; "Ready to order?" prompt redesign + full cart durability.
 - 4-button prompt: ⭐ OPEN MENU ⭐ (always fresh), SEE YOUR ORDERS (confirmed + recurring), Check Balance, Change Location
 - OPEN MENU always clears cart and starts fresh
 - SEE YOUR ORDERS shows both confirmed orders and recurring standing orders (was only showing confirmed)

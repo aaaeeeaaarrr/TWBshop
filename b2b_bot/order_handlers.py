@@ -446,7 +446,7 @@ async def handle_callback(update: Update, context) -> None:
             delivery_cost=_delivery_cost_for(chat_id, pending.get("method")),
         )
         try:
-            await query.edit_message_text("✅ Standing order saved.", reply_markup=None)
+            await query.edit_message_text("✅ Recurring order saved.", reply_markup=None)
         except Exception:
             pass
         from telegram.constants import ParseMode
@@ -458,7 +458,7 @@ async def handle_callback(update: Update, context) -> None:
         _recurring_pending.pop(chat_id, None)
         _recurring_days.pop(chat_id, None)
         await query.edit_message_text(
-            f"Standing order cancelled.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
+            f"Recurring order cancelled.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
             reply_markup=_category_keyboard(chat_id),
         )
 
@@ -468,7 +468,7 @@ async def handle_callback(update: Update, context) -> None:
         rec_id = int(rec_id_str)
         rec = get_recurring_order(rec_id)
         if not rec:
-            await query.edit_message_text("Standing order not found.")
+            await query.edit_message_text("Recurring order not found.")
             return
         conf = get_or_create_recurring_confirmation(rec_id, fulfillment_date)
         if conf["status"] == "confirmed":
