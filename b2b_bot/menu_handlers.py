@@ -50,9 +50,10 @@ async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
     await bot.send_message(
         chat_id,
         "Ready to order?",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📋 Open Menu", callback_data="bm_menu_prompt"),
-        ]]),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📋 Open Menu", callback_data="bm_menu_prompt")],
+            [InlineKeyboardButton("📍 Change Location", callback_data="bm_change_location")],
+        ]),
     )
 
 
@@ -410,6 +411,14 @@ async def handle_menu_callback(update: Update, context) -> None:
             sent = await context.bot.send_message(chat_id, text, reply_markup=keyboard)
             _menu_msg[chat_id] = sent.message_id
             set_menu_message_id(chat_id, sent.message_id)
+
+        elif data == "bm_change_location":
+            await query.answer()
+            await context.bot.send_message(
+                chat_id,
+                "📍 To calculate your delivery fee, please share your location — "
+                "tap the 📎 attachment icon → Location. We only need it once.",
+            )
 
         elif data == "bm_buns":
             _qty_pending.pop(chat_id, None)
