@@ -1487,3 +1487,132 @@ def set_wrong_alert_seen(alert_id: int) -> None:
                 "UPDATE b2b_wrong_account_alerts SET status = 'seen' WHERE id = %s",
                 (alert_id,),
             )
+
+
+# ─── Supplier price intelligence ──────────────────────────────────────────────
+
+def init_supplier_prices_db() -> None:
+    """Create supplier price tables. Called from run_extract_prices.py on startup."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS supplier_price_items (
+                    id            SERIAL PRIMARY KEY,
+                    supplier_name TEXT NOT NULL,
+                    product_name  TEXT NOT NULL,
+                    price         NUMERIC(10, 3),
+                    currency      TEXT DEFAULT 'USD',
+                    unit          TEXT,
+                    price_notes   TEXT,
+                    source_file   TEXT NOT NULL,
+                    price_date    DATE,
+                    extracted_at  TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(supplier_name, product_name, source_file)
+                );
+                CREATE TABLE IF NOT EXISTS supplier_files_processed (
+                    file_path    TEXT PRIMARY KEY,
+                    processed_at TIMESTAMPTZ DEFAULT NOW(),
+                    item_count   INTEGER DEFAULT 0,
+                    status       TEXT DEFAULT 'ok'
+                );
+            """)
+    logger.info("Supplier prices DB ready")
+
+
+def is_supplier_file_processed(file_path: str) -> bool:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM supplier_files_processed WHERE file_path = %s",
+                (file_path,),
+            )
+            return cur.fetchone() is not None
+
+
+def save_supplier_price_items(
+    supplier_name: str,
+    items: list[dict],
+    source_file: str,
+    price_date: str | None,
+) -> int:
+    if not items:
+        return 0
+    saved = 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for item in items:
+                product = (item.get("product") or "").strip()
+                if not product:
+                    continue
+                price_val = item.get("price")
+                if price_val is not None:
+                    try:
+                        price_val = float(price_val)
+                    except (ValueError, TypeError):
+                        price_val = None
+                cur.execute("""
+                    INSERT INTO supplier_price_items
+                        (supplier_name, product_name, price, currency, unit,
+                         price_notes, source_file, price_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (supplier_name, product_name, source_file) DO UPDATE
+                        SET price        = EXCLUDED.price,
+                            currency     = EXCLUDED.currency,
+                            unit         = EXCLUDED.unit,
+                            price_notes  = EXCLUDED.price_notes,
+                            price_date   = EXCLUDED.price_date,
+                            extracted_at = NOW()
+                """, (
+                    supplier_name, product, price_val,
+                    item.get("currency", "USD"),
+                    item.get("unit"),
+                    item.get("notes"),
+                    source_file, price_date,
+                ))
+                saved += 1
+    return saved
+
+
+def mark_supplier_file_processed(file_path: str, item_count: int, status: str = "ok") -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO supplier_files_processed (file_path, item_count, status)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (file_path) DO UPDATE
+                    SET processed_at = NOW(),
+                        item_count   = EXCLUDED.item_count,
+                        status       = EXCLUDED.status
+            """, (file_path, item_count, status))
+
+
+def query_supplier_prices(keyword: str | None = None, supplier: str | None = None) -> list[dict]:
+    """Return latest price per product×supplier matching the keyword."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            where_clauses = [
+                "spi.price_date = latest.max_date",
+            ]
+            params: list = []
+            if keyword:
+                where_clauses.append("LOWER(spi.product_name) LIKE %s")
+                params.append(f"%{keyword.lower()}%")
+            if supplier:
+                where_clauses.append("LOWER(spi.supplier_name) LIKE %s")
+                params.append(f"%{supplier.lower()}%")
+            where_sql = " AND ".join(where_clauses)
+            cur.execute(f"""
+                SELECT spi.supplier_name, spi.product_name, spi.price,
+                       spi.currency, spi.unit, spi.price_notes, spi.price_date
+                FROM supplier_price_items spi
+                JOIN (
+                    SELECT supplier_name, product_name, MAX(price_date) as max_date
+                    FROM supplier_price_items
+                    WHERE price IS NOT NULL
+                    GROUP BY supplier_name, product_name
+                ) latest ON latest.supplier_name = spi.supplier_name
+                       AND latest.product_name  = spi.product_name
+                WHERE {where_sql}
+                ORDER BY spi.product_name, spi.price ASC NULLS LAST
+            """, params)
+            return [dict(r) for r in cur.fetchall()]

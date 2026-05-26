@@ -287,6 +287,66 @@ async def read_payment_amount_pdf(pdf_bytes: bytes) -> dict:
         return {"amount": None, "currency": None, "to_account": None, "seller": None}
 
 
+_PRICE_LIST_SYSTEM = (
+    "You extract product prices from supplier price lists, catalogs, invoices, and promotional images.\n"
+    "Text may be in English, Khmer, French, Thai, or mixed. Always translate product names to English.\n"
+    "Return ONLY valid JSON:\n"
+    '{"valid_date": "YYYY-MM-DD or null", "currency": "USD", '
+    '"items": [{"product": "English name", "price": 1.50, "unit": "kg/case/bottle/piece/etc", "notes": ""}]}\n'
+    "Rules:\n"
+    "- product: English, specific (e.g. 'Cream cheese Philadelphia 1kg', 'Tiger draft beer keg 20L')\n"
+    "- price: plain number in the listed currency (if range, use lower; note range in notes)\n"
+    "- unit: what the price covers — kg, g, piece, bottle, case, box, pack, roll, etc.\n"
+    "- notes: promo conditions, minimum order, discount %, out of stock, or empty string\n"
+    "- If case and unit price both shown: use unit price, put case price in notes\n"
+    "- Skip items with no visible price\n"
+    "- Include ALL products — aim for completeness, up to 200 items\n"
+    'If nothing readable: {"valid_date": null, "currency": "USD", "items": []}'
+)
+
+
+async def extract_price_list_image(image_bytes: bytes) -> dict:
+    """Extract price items from a supplier price list photo."""
+    try:
+        resp = await _get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=8192,
+            system=[{"type": "text", "text": _PRICE_LIST_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _encode(image_bytes)}},
+                    {"type": "text", "text": "Extract all products and prices from this supplier price list."},
+                ],
+            }],
+        )
+        return _parse_json(resp.content[0].text) or {"valid_date": None, "currency": "USD", "items": []}
+    except Exception as exc:
+        logger.error("Price list image extraction failed: %s", exc)
+        return {"valid_date": None, "currency": "USD", "items": [], "error": str(exc)}
+
+
+async def extract_price_list_pdf(pdf_bytes: bytes) -> dict:
+    """Extract price items from a supplier price list PDF."""
+    try:
+        resp = await _get_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=8192,
+            system=[{"type": "text", "text": _PRICE_LIST_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": _encode(pdf_bytes)}},
+                    {"type": "text", "text": "Extract ALL products and prices from this price list. Include every item with a visible price."},
+                ],
+            }],
+        )
+        return _parse_json(resp.content[0].text) or {"valid_date": None, "currency": "USD", "items": []}
+    except Exception as exc:
+        logger.error("Price list PDF extraction failed: %s", exc)
+        return {"valid_date": None, "currency": "USD", "items": [], "error": str(exc)}
+
+
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:
     try:
         resp = await _get_client().messages.create(
