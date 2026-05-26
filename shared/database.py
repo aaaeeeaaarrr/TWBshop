@@ -290,6 +290,53 @@ def init_db() -> None:
     logger.info("Database ready")
 
 
+# ─── Ops Intelligence ─────────────────────────────────────────────────────────
+
+def init_ops_db() -> None:
+    """Create ops_messages table. Called from run_listener.py on startup."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ops_messages (
+                    id          BIGSERIAL PRIMARY KEY,
+                    chat_id     BIGINT NOT NULL,
+                    message_id  BIGINT NOT NULL,
+                    chat_title  TEXT,
+                    sender_id   BIGINT,
+                    sender_name TEXT,
+                    text        TEXT,
+                    media_type  TEXT,
+                    sent_at     TEXT,
+                    recorded_at TEXT NOT NULL,
+                    UNIQUE(chat_id, message_id)
+                )
+            """)
+    logger.info("Ops DB ready")
+
+
+def save_ops_message(
+    chat_id: int,
+    message_id: int,
+    chat_title: str | None,
+    sender_id: int | None,
+    sender_name: str | None,
+    text: str,
+    media_type: str | None,
+    sent_at: str | None,
+) -> None:
+    now = datetime.utcnow().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO ops_messages
+                    (chat_id, message_id, chat_title, sender_id, sender_name,
+                     text, media_type, sent_at, recorded_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chat_id, message_id) DO NOTHING
+            """, (chat_id, message_id, chat_title, sender_id, sender_name,
+                  text, media_type, sent_at, now))
+
+
 # ─── Retail orders ────────────────────────────────────────────────────────────
 
 def save_order(user_id: int, customer_name: str, items: list[tuple[str, int]]) -> None:

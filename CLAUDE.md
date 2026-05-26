@@ -135,11 +135,12 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 7)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete. Planning Phase 3: Operations Intelligence + Hiring Bot.
-**Last completed:** Planning session — full architecture designed for new Operations Intelligence system (see section below). No code written yet.
-**Next task (immediate):** Test existing B2B staff/owner commands — `/markpaid` (private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button.
-**Next task (new system):** Owner to provide: (1) ChatGPT export ZIP (Settings → Data controls → Export data) with hiring/interview conversations; (2) the questionnaire document. Then start building: listener account first, then data collector, then interview bot.
+**Last updated:** 2026-05-26 (session 8)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 listener built.
+**Last completed:** Telethon listener built — `ops_intelligence/listener.py`, `run_listener.py`, `ops_messages` DB table, `telethon>=1.36` added to requirements. Listener streams all messages from all chats the account is in into the DB (deduped by chat_id + message_id). Session file `ops_listener.session` is gitignored.
+**Next task (immediate):** Get Telethon credentials from https://my.telegram.org/apps → add TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE to secrets repo → `pip install telethon` on server → run `python run_listener.py` once interactively to authenticate (enter phone code) → session saved, then run as systemd service.
+**Next task (new system):** ChatGPT export ZIP still pending (check email). Hiring bot and AI analysis layer come after listener is running.
+**Known issues:** None
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`

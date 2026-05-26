@@ -45,3 +45,7 @@ Thumbs.db
 
 # Claude Code local settings (machine-specific, not for sharing)
 .claude/settings.local.json
+
+# Telethon session files (contain auth tokens — never commit)
+*.session
+*.session-journal

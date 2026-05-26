@@ -1,4 +1,4 @@
-from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, DATABASE_URL
+from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, DATABASE_URL, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE
 
 # Claude model used for all AI analysis.
 CLAUDE_MODEL = "claude-sonnet-4-6"

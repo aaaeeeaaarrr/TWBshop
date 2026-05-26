@@ -76,3 +76,11 @@ SHOP_QR_PATH: str = ""  # e.g. "photos/shop_qr.jpg"
 # Valid bank account numbers customers should pay to.
 # Leave empty [] to skip validation.
 VALID_BANK_ACCOUNTS: list[str] = []  # e.g. ["000123456", "789012345"]
+
+# ─── Ops Intelligence / Listener ──────────────────────────────────────────────
+# Get api_id and api_hash from https://my.telegram.org/apps (log in with the
+# listener phone number, go to API development tools, create an app).
+# TELETHON_PHONE: the phone number of the Telegram account used as the listener.
+TELETHON_API_ID = 0          # ← integer, e.g. 12345678
+TELETHON_API_HASH = ""       # ← string, e.g. "abc123def456..."
+TELETHON_PHONE = ""          # ← e.g. "+85512345678"
