@@ -135,27 +135,31 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 9)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete (listener + full historical import + supplier price list archive).
+**Last updated:** 2026-05-27 (session 10)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot built and tested.
 **Last completed:**
-- Full historical import done: 555,964 messages, 3,608 chats, March 2020–May 2026, 148MB in PostgreSQL
-- Listener running as systemd service `twbshop-listener`
-- All chats identified and annotated (suppliers, B2B customers, retail customers, internal ops, payment channels)
-- Supplier price lists downloaded to `/root/TWBshop/pricelists/` — 32 supplier folders, ~300MB, includes monthly Lee's HoReCa catalogs (Feb-May 2026), Indoguna daily PDFs, Auskhmer food + on-trade catalogs, Annam, AMN, ThaiHuot, SHG, Betagro, and more
-- `run_fetch_pricelists.py` / `ops_intelligence/price_list_fetcher.py` — re-runnable to refresh; skips already-downloaded files; filters out video/audio/stickers
-- Key correction: Pasta House Phnom Penh = TWB's own delivery brand (not a customer)
-- Key correction: C Bakery Store = supplier (not TWB's group)
-- Key correction: Auskhmer = full HoReCa distributor (food + on-trade catalogs), not just dairy
-**Next task (immediate):** Ops Intelligence Layer 2 in progress:
-  1. [IN PROGRESS] Supplier price extraction — run `python run_extract_prices.py` on server to continue. DB: `supplier_price_items` + `supplier_files_processed`. Query with `ops_intelligence/price_report.py` (compare(), cheapest(), summary()). Re-run any time to pick up new files. Fixed: _parse_json now handles nested JSON in code blocks.
-  2. Customer reactivation: extract customer names + phones from WOC DELIVERY PICTURES photos using AI vision → build customer DB → enable Telegram nudging
-  3. B2B bot rollout: add bot to all 24+ B2B customer groups (none registered yet — b2b_customers table has only 2 test entries)
+- GM Manager bot built: `gm_bot/` (analyzer.py, bot.py), `run_gm_bot.py`, systemd service `twbshop-gm`
+- Stock Checks group (chat_id=-4681466315) imported into ops_messages: 148 messages
+- First live analysis: 16 concerns detected correctly (8 mistakes, 6 waste, 2 low-stock)
+- Bot confirmed owner-only: all sends go to OWNER_TELEGRAM_ID, no group replies ever
+- Silent group handler added as safety net: explicit pass on all group messages
+- DB tables: gm_concerns, gm_rules, gm_state
+- Scheduled: daily 01:00 UTC + every 4h. Commands: /check /pending /rules /start
+- concern buttons: [✓ All good] [🚨 Real issue] [📚 Teach bot] per concern
+**Next task (immediate):**
+  1. User creates bot via BotFather → name "GM Manager TWB" → paste token into secrets.py on server → `systemctl enable twbshop-gm && systemctl start twbshop-gm`
+  2. Staff real names mapping: user to provide real names for Telegram aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
+  3. Import Management Group + Supervisors TWB into ops_messages DB (same HTML export process)
+  4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
+  5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
+  6. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
 - B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
 - Listener: `python run_listener.py` — systemd: `twbshop-listener`
+- GM bot: `python run_gm_bot.py` — systemd: `twbshop-gm` (needs GM_BOT_TOKEN set first)
 - Price list fetcher: `python run_fetch_pricelists.py` — run manually to refresh supplier files
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
 - B2B customers: 24+ active customer groups identified in ops_messages DB; none have the bot yet — all ordering manually

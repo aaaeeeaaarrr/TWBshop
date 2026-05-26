@@ -219,6 +219,11 @@ async def teach_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return ConversationHandler.END
 
 
+async def _silent_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Bot is in groups to observe only — never responds to anything in a group
+    pass
+
+
 # ─── Application builder ──────────────────────────────────────────────────────
 
 def build_app() -> Application:
@@ -243,6 +248,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(teach_conv)
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, _silent_group_handler))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)
     app.job_queue.run_daily(
