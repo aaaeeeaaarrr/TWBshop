@@ -135,10 +135,10 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 5)
+**Last updated:** 2026-05-26 (session 6)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Comprehensive B2B stress test + 2 bug fixes: (1) `bm_dt_` handler crashed on `|slice`/`|cake_*` cart keys — fixed by delegating to `_parse_cart_items(chat_id)`; (2) `bm_edit_session_` didn't reconstruct `|slice`/`|cake_*` keys when loading cake orders — fixed. TEST2 double-covered May 23 fixed in DB. 171 unit tests passed across pricing, parsing, cart encoding, summaries, billing, payment history, DB. Previous session: Full Cakes/Desserts separation, "(Not Recommended)" label, "Full" prefix, bun badge fix, category reorder, all ← MENU buttons to bm_back, payment history month grouping with emojis.
-**Next task:** Test staff/owner commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
+**Last completed:** (1) /start handler: customers in a registered group get tappable group link(s); owner/staff get command list; everyone else silent. (2) Owner/staff: any unrecognised private message shows command list. (3) /markpaid restricted to private chat only — silent in customer groups. (4) CUSTOM AMOUNT button moved to top of markpaid picker, capitalized. (5) Markpaid date buttons show "(N bills)" when a date has multiple confirmed orders. (6) bm_dt_ crash fix + bm_edit_session_ cake key fix + TEST2 double-covered date fix (all from earlier in session 6).
+**Next task:** Test staff/owner commands — `/markpaid` (private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
