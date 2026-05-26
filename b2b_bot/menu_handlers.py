@@ -12,6 +12,7 @@ from b2b_bot.menu_keyboards import (
     _SESAME_CODE_LABEL, _SESAME_LABEL_CODE,
     _DELIVERY_TIME_CODES,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
+    _save_cart, _restore_cart,
     _orders_locked, _MENU_PROMPT_COOLDOWN_SEC,
     _CATEGORIES, _BUNS, _NAME,
     _category_keyboard, _item_keyboard, _cart_block,
@@ -35,6 +36,7 @@ from shared.database import (
     get_editing_session, set_editing_session,
     set_pending_order, set_order_state, set_last_confirmation_msg,
     get_b2b_recurring_orders, get_recurring_order, cancel_b2b_recurring_order,
+    set_cart_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -198,6 +200,7 @@ async def handle_qty_input(update: Update, context) -> None:
             cart.pop(cart_key, None)
         else:
             cart[cart_key] = qty
+        _save_cart(chat_id)
         bun_key  = state["bun_key"]
         bun      = _BUNS[bun_key]
         _bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
@@ -226,6 +229,7 @@ async def handle_qty_input(update: Update, context) -> None:
             cart.pop(name, None)
         else:
             cart[name] = qty
+        _save_cart(chat_id)
         cat_key   = state["cat_key"]
         cat       = _CATEGORIES[cat_key]
         note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
@@ -278,6 +282,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_method.pop(chat_id, None)
             _recurring_days.pop(chat_id, None)
             _recurring_pending.pop(chat_id, None)
+            set_cart_state(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -321,6 +326,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_method.pop(chat_id, None)
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
+            set_cart_state(chat_id, None)
             await query.edit_message_text(
                 f"🗑 Cart cleared.\n\n📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),
@@ -421,9 +427,10 @@ async def handle_menu_callback(update: Update, context) -> None:
         elif data == "bm_edit_order":
             await query.answer()
             await _delete_old_menu(chat_id, context.bot)
-            delivery_date = _get_cart_date(chat_id)
-            sessions = get_b2b_order_sessions(chat_id, delivery_date)
-            if not sessions:
+            delivery_date    = _get_cart_date(chat_id)
+            sessions         = get_b2b_order_sessions(chat_id, delivery_date)
+            recurring_orders = get_b2b_recurring_orders(chat_id)
+            if not sessions and not recurring_orders:
                 sent = await context.bot.send_message(chat_id, "No orders to edit yet. Use OPEN MENU to place a new order.")
             else:
                 text, keyboard = _menu_state(chat_id)
@@ -488,6 +495,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 cart.pop(cart_key, None)
             else:
                 cart[cart_key] = qty
+            _save_cart(chat_id)
             bun_txt = f"{bun['emoji']} {bun['label']}\n\n{_cart_block(chat_id)}"
             bun_kb  = _bun_size_keyboard(bun_key, chat_id)
             try:
@@ -618,6 +626,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 cart.pop(name, None)
             else:
                 cart[name] = qty
+            _save_cart(chat_id)
             cat       = _CATEGORIES[cat_key]
             note_line = "".join(f"\n{e} {t}" for e, t in cat.get("note", []))
             cat_txt   = f"{cat.get('emoji','')} {cat.get('label','')}{note_line}\n\n{_cart_block(chat_id)}"
@@ -965,6 +974,7 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     _cart_time.pop(chat_id, None)
     _cart_date.pop(chat_id, None)
     _cart_method.pop(chat_id, None)
+    set_cart_state(chat_id, None)
 
     if needs_spec:
         _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}

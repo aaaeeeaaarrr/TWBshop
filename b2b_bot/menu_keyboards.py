@@ -9,7 +9,7 @@ from telegram.ext import filters as _filters
 from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
-from shared.database import get_b2b_customer
+from shared.database import get_b2b_customer, get_cart_state, set_cart_state
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 _cart: dict[int, dict[str, int]] = {}         # {chat_id: {item_key: qty}}
@@ -56,7 +56,36 @@ def _orders_locked() -> bool:
 
 # ── Cart accessors ────────────────────────────────────────────────────────────
 
+def _save_cart(chat_id: int) -> None:
+    """Persist current cart state to DB so it survives restarts."""
+    state = {
+        "cart":   dict(_cart.get(chat_id) or {}),
+        "method": _cart_method.get(chat_id),
+        "time":   _cart_time.get(chat_id),
+        "date":   _cart_date.get(chat_id),
+    }
+    set_cart_state(chat_id, state if state["cart"] else None)
+
+
+def _restore_cart(chat_id: int) -> None:
+    """Load cart state from DB into memory if in-memory cart is empty."""
+    if chat_id in _cart:
+        return
+    saved = get_cart_state(chat_id)
+    if not saved:
+        return
+    if saved.get("cart"):
+        _cart[chat_id] = saved["cart"]
+    if saved.get("method"):
+        _cart_method[chat_id] = saved["method"]
+    if saved.get("time"):
+        _cart_time[chat_id] = saved["time"]
+    if saved.get("date"):
+        _cart_date[chat_id] = saved["date"]
+
+
 def _get_cart_time(chat_id: int) -> str:
+    _restore_cart(chat_id)
     t = _cart_time.get(chat_id)
     if t:
         return t
@@ -67,6 +96,7 @@ def _get_cart_time(chat_id: int) -> str:
 
 
 def _get_cart_date(chat_id: int) -> str:
+    _restore_cart(chat_id)
     d = _cart_date.get(chat_id)
     if d:
         return d
@@ -74,6 +104,7 @@ def _get_cart_date(chat_id: int) -> str:
 
 
 def _get_cart_method(chat_id: int) -> str | None:
+    _restore_cart(chat_id)
     m = _cart_method.get(chat_id)
     if m:
         return m

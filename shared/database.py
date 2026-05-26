@@ -98,6 +98,10 @@ def init_db() -> None:
             """)
             cur.execute("""
                 ALTER TABLE b2b_customers
+                ADD COLUMN IF NOT EXISTS bot_cart TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE b2b_customers
                 ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION
             """)
             cur.execute("""
@@ -519,6 +523,26 @@ def set_editing_session(group_chat_id: int, session_key: str | None) -> None:
                 ON CONFLICT (group_chat_id) DO UPDATE SET
                     bot_editing_session = EXCLUDED.bot_editing_session, updated_at = EXCLUDED.updated_at
             """, (group_chat_id, session_key, datetime.utcnow().isoformat()))
+
+
+def get_cart_state(group_chat_id: int) -> dict | None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot_cart FROM b2b_customers WHERE group_chat_id = %s", (group_chat_id,))
+            row = cur.fetchone()
+            return json.loads(row["bot_cart"]) if row and row["bot_cart"] else None
+
+def set_cart_state(group_chat_id: int, state: dict | None) -> None:
+    import json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO b2b_customers (group_chat_id, business_name, bot_cart, updated_at)
+                VALUES (%s, '', %s, %s)
+                ON CONFLICT (group_chat_id) DO UPDATE SET
+                    bot_cart = EXCLUDED.bot_cart, updated_at = EXCLUDED.updated_at
+            """, (group_chat_id, json.dumps(state) if state else None, datetime.utcnow().isoformat()))
 
 
 def get_bot_meta(key: str) -> str | None:
