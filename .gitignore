@@ -31,6 +31,9 @@ logs/
 # Photos (stored on server / recreated by bootstrap)
 photos/
 
+# Downloaded supplier price lists (server-only, can be large)
+pricelists/
+
 # IDE
 .vscode/
 .idea/
