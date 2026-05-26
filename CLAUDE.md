@@ -135,21 +135,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-25
+**Last updated:** 2026-05-26
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Full staff/owner command suite + credit tracking.
-- `/markpaid` — staff or owner records cash/bank payment. In group → that customer directly. Private → customer picker. Staff flow: owner gets [Confirm]/[Reject] in private; both see details regardless of outcome. Owner doing it → applies immediately, no self-verification.
-- `/balance` — private: all customers with effective balances. In group: date-by-date breakdown, credit applied to oldest date first.
-- `/history` — payment log per customer or all. Shows date, amount, method, delivery dates covered.
-- `/addaccount` / `/removeaccount` — owner only, private. Bot prompts for type then value. No restart needed.
-- `/commands` — role-aware list (owner sees full set, staff sees subset).
-- 📊 Check Balance button — bottom of every group menu keyboard.
-- Credit tracking — leftover from partial payments stored per customer, consumed automatically next payment. Effective balance = unpaid orders − credit.
-- Duplicate payment guard — same photo (by message_id or file_unique_id) silently ignored after first processing.
-- PDF payments extract to_account + seller same as photos — no false manual verification for valid PDFs.
-- Wrong-account: QR photo+caption in group, owner alert with "Have you seen this?" button, 6-hour re-nudge.
-- Unverifiable payment: "awaiting verification" in group, owner gets photo + [Received]/[Not Received], hourly re-nudge.
-**Next task:** Test new commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, 📊 Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
+**Last completed:** B2B "Ready to order?" prompt improvements + cart durability.
+- "Ready to order?" prompt now has 4 buttons: ⭐ OPEN MENU ⭐ (always fresh new order), EDIT ORDER (shows existing confirmed + recurring orders to edit), Check Balance, Change Location
+- OPEN MENU always starts a fresh cart, regardless of existing orders
+- EDIT ORDER fixed to show recurring orders (not just confirmed sessions)
+- Location pin prompt no longer fires if delivery cost already stored in DB
+- Cart state now persisted to PostgreSQL on every item add/remove — survives restarts and server issues
+- Confirmed orders and pending state were already DB-backed; cart was the last gap, now closed
+**Next task:** Test new commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
