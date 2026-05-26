@@ -1761,7 +1761,7 @@ def gm_get_low_stock_history(chat_id: int, since_days: int = 7) -> list[dict]:
                        OR LOWER(text) LIKE '%%please buy%%'
                        OR LOWER(text) LIKE '%%please order%%'
                        OR LOWER(text) LIKE '%%running low%%')
-                  AND sent_at >= NOW() - INTERVAL '%s days'
+                  AND sent_at::timestamptz >= NOW() - INTERVAL '%s days'
                 ORDER BY sender_name, sent_at
             """, (chat_id, since_days))
             return [dict(r) for r in cur.fetchall()]
@@ -1774,7 +1774,7 @@ def gm_get_new_messages(chat_id: int, since: str) -> list[dict]:
             cur.execute("""
                 SELECT id, message_id, sender_name, text, media_type, sent_at
                 FROM ops_messages
-                WHERE chat_id = %s AND sent_at > %s
+                WHERE chat_id = %s AND sent_at::timestamptz > %s::timestamptz
                 ORDER BY sent_at ASC
             """, (chat_id, since))
             return [dict(r) for r in cur.fetchall()]
