@@ -145,7 +145,7 @@ async def _start_markpaid(bot, uid: int, group_chat_id: int) -> None:
 
     req_id = save_markpaid_request(group_chat_id, business, uid)
 
-    rows = []
+    rows = [[InlineKeyboardButton("CUSTOM AMOUNT", callback_data=f"bmp_custom_{req_id}")]]
     remaining_credit = credit
     for d in sorted(by_date.keys()):
         total = by_date[d]["total"]
@@ -161,7 +161,6 @@ async def _start_markpaid(bot, uid: int, group_chat_id: int) -> None:
         rows.append([InlineKeyboardButton(label, callback_data=f"bmp_date_{req_id}_{d}")])
 
     rows.append([InlineKeyboardButton(f"Full balance — ${eff:.2f}", callback_data=f"bmp_full_{req_id}")])
-    rows.append([InlineKeyboardButton("Custom amount", callback_data=f"bmp_custom_{req_id}")])
 
     try:
         await bot.send_message(
