@@ -146,8 +146,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Key correction: Pasta House Phnom Penh = TWB's own delivery brand (not a customer)
 - Key correction: C Bakery Store = supplier (not TWB's group)
 - Key correction: Auskhmer = full HoReCa distributor (food + on-trade catalogs), not just dairy
-**Next task (immediate):** Build Ops Intelligence Layer 2 — AI analysis:
-  1. Supplier price comparison: parse PDFs and photos from `pricelists/` using Claude vision, build per-product price table, flag changes and promo opportunities
+**Next task (immediate):** Ops Intelligence Layer 2 in progress:
+  1. [IN PROGRESS] Supplier price extraction — run `python run_extract_prices.py` on server to continue. DB: `supplier_price_items` + `supplier_files_processed`. Query with `ops_intelligence/price_report.py` (compare(), cheapest(), summary()). Re-run any time to pick up new files. Fixed: _parse_json now handles nested JSON in code blocks.
   2. Customer reactivation: extract customer names + phones from WOC DELIVERY PICTURES photos using AI vision → build customer DB → enable Telegram nudging
   3. B2B bot rollout: add bot to all 24+ B2B customer groups (none registered yet — b2b_customers table has only 2 test entries)
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
