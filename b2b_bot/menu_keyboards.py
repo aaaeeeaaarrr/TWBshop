@@ -276,7 +276,7 @@ def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
     for name in _CATEGORIES[cat_key]["items"]:
         qty    = cart.get(name, 0)
         slug   = _SLUG[name]
-        suffix = f"  ✓ ×{qty}" if qty else ""
+        suffix = f"  ✅ ×{qty}" if qty else ""
         label  = f"{name}{suffix}\n{_price_label(name, in_desserts=in_desserts)}"
         rows.append([InlineKeyboardButton(
             label,
@@ -314,7 +314,7 @@ def _bun_size_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
         prefix = f"{bun['item']}|{size['grams']}"
         qty    = sum(q for k, q in cart.items() if k == prefix or k.startswith(f"{prefix}|"))
         price  = _bun_price(size["grams"])
-        suffix = f" ✓×{qty}" if qty else ""
+        suffix = f" ✅×{qty}" if qty else ""
         label  = f"{size['label']}\n${price:.2f}{suffix}"
         rows.append([InlineKeyboardButton(
             label,
@@ -339,7 +339,7 @@ def _bun_gram_grid_keyboard(bun_key: str, chat_id: int) -> InlineKeyboardMarkup:
     for grams, price in sorted(_BUN_PRICE_BY_GRAMS.items()):
         prefix = f"{bun['item']}|{grams}"
         qty    = sum(q for k, q in cart.items() if k == prefix or k.startswith(f"{prefix}|"))
-        label  = f"{grams}g\n${price:.2f}" + (f" ✓×{qty}" if qty else "")
+        label  = f"{grams}g\n${price:.2f}" + (f" ✅×{qty}" if qty else "")
         row.append(InlineKeyboardButton(
             label,
             callback_data=f"bm_bun_size_{bun_key}_{grams}",
@@ -362,13 +362,13 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
         vals = [100, 200, 300, 400, 500]
         row = []
         for v in vals:
-            mark = " ✓" if current_qty == v else ""
+            mark = " ✅" if current_qty == v else ""
             row.append(InlineKeyboardButton(f"{v}{mark}", callback_data=f"bm_qtyval_{slug}_{cat_key}_{v}"))
             if len(row) == 3:
                 rows.append(row); row = []
         if row:
             rows.append(row)
-        other_mark = " ✓" if current_qty > 0 and current_qty not in vals else ""
+        other_mark = " ✅" if current_qty > 0 and current_qty not in vals else ""
         nav = [InlineKeyboardButton(f"Other{other_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
@@ -377,13 +377,13 @@ def _qty_button_keyboard(name: str, slug: str, cat_key: str, current_qty: int) -
     else:
         row = []
         for v in range(1, 10):
-            mark = " ✓" if current_qty == v else ""
+            mark = " ✅" if current_qty == v else ""
             row.append(InlineKeyboardButton(f"{v}{mark}", callback_data=f"bm_qtyval_{slug}_{cat_key}_{v}"))
             if len(row) == 3:
                 rows.append(row); row = []
         if row:
             rows.append(row)
-        plus_mark = " ✓" if current_qty >= 10 else ""
+        plus_mark = " ✅" if current_qty >= 10 else ""
         nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_qtytext_{slug}_{cat_key}")]
         if current_qty > 0:
             nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_qtyval_{slug}_{cat_key}_0"))
@@ -399,7 +399,7 @@ def _bun_sesame_keyboard(bun_key: str, grams: int, chat_id: int) -> InlineKeyboa
     for code, label in _SESAME_OPTIONS:
         cart_key = f"{bun['item']}|{grams}|{code}"
         qty      = cart.get(cart_key, 0)
-        suffix   = f"  ✓×{qty}" if qty else ""
+        suffix   = f"  ✅×{qty}" if qty else ""
         rows.append([InlineKeyboardButton(
             f"{label}{suffix}",
             callback_data=f"bm_bunsesame_{bun_key}_{grams}_{code}",
@@ -416,7 +416,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, sesame_code: str | None, current
     row  = []
     sfx  = f"_{sesame_code}" if sesame_code else ""
     for v in range(1, 10):
-        mark = " ✓" if current_qty == v else ""
+        mark = " ✅" if current_qty == v else ""
         row.append(InlineKeyboardButton(
             f"{v}{mark}",
             callback_data=f"bm_bunqtyval_{bun_key}_{grams}{sfx}_{v}",
@@ -425,7 +425,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, sesame_code: str | None, current
             rows.append(row); row = []
     if row:
         rows.append(row)
-    plus_mark = " ✓" if current_qty >= 10 else ""
+    plus_mark = " ✅" if current_qty >= 10 else ""
     nav = [InlineKeyboardButton(f"10+{plus_mark}", callback_data=f"bm_bunqtytext_{bun_key}_{grams}{sfx}")]
     if current_qty > 0:
         nav.append(InlineKeyboardButton("✕ Remove", callback_data=f"bm_bunqtyval_{bun_key}_{grams}{sfx}_0"))
