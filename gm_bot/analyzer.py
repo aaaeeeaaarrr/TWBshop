@@ -106,6 +106,13 @@ def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]
     return concerns
 
 
+def analyze_live_message(chat_id: int, msg_id: int, sender: str, text: str) -> list[dict]:
+    """Real-time analysis of a single group message. Returns concern dicts (text-based only)."""
+    rules = gm_get_rules()
+    fake_msg = {"id": str(msg_id), "chat_id": chat_id, "text": text, "sender_name": sender}
+    return _detect_text_concerns([fake_msg], rules)
+
+
 def _detect_low_stock_concerns(rules: list[dict]) -> list[dict]:
     """Detect items flagged as low stock for 3+ consecutive days."""
     threshold = config.GM_LOW_STOCK_THRESHOLD_DAYS

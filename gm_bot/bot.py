@@ -17,7 +17,7 @@ from shared.database import (
     gm_get_unsent_concerns, gm_mark_sent, gm_review_concern,
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
 )
-from gm_bot.analyzer import run_analysis
+from gm_bot.analyzer import run_analysis, analyze_live_message
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +219,39 @@ async def teach_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return ConversationHandler.END
 
 
-async def _silent_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Bot is in groups to observe only — never responds to anything in a group
-    pass
+async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.message or update.channel_post
+    if not msg:
+        return
+    text = msg.text or msg.caption or ""
+    if not text.strip():
+        return
+
+    chat_id = msg.chat_id
+    msg_id = msg.message_id
+    sender = msg.from_user.full_name if msg.from_user else (msg.chat.title or "Unknown")
+
+    concerns = analyze_live_message(chat_id, msg_id, sender, text)
+    for c in concerns:
+        new_id = gm_save_concern(
+            source_chat_id=chat_id,
+            source_msg_key=c["source_msg_key"],
+            concern_type=c["concern_type"],
+            severity=c["severity"],
+            sender_name=c.get("sender_name"),
+            description=c["description"],
+        )
+        if new_id:
+            try:
+                sent_msg = await context.bot.send_message(
+                    chat_id=config.OWNER_TELEGRAM_ID,
+                    text=_format_concern({**c, "id": new_id}),
+                    reply_markup=_concern_keyboard(new_id),
+                )
+                gm_mark_sent(new_id, sent_msg.message_id)
+                logger.info("Live concern sent: %s from %s in %s", c["concern_type"], sender, chat_id)
+            except Exception as e:
+                logger.error("Failed to send live concern: %s", e)
 
 
 # ─── Application builder ──────────────────────────────────────────────────────
@@ -249,7 +279,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(teach_conv)
-    app.add_handler(MessageHandler(filters.ChatType.GROUPS, _silent_group_handler))
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)
     app.job_queue.run_daily(
