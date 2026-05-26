@@ -69,8 +69,9 @@ def _session_summary(session: dict) -> str:
             line += f" — {it['grams']}g"
         lines.append(line)
     for it in session["cake"]:
-        line = f"  • {it['qty']}× {it['item']}"
         ot = it.get("order_type")
+        display_name = f"Full {it['item']}" if ot in ("full", "sliced") else it["item"]
+        line = f"  • {it['qty']}× {display_name}"
         if ot == "sliced":
             line += f" — sliced {it.get('slices','?')}pc"
         elif ot == "full":

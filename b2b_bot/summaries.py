@@ -28,28 +28,30 @@ _pre_summary_msg_id: int | None = None
 def _cake_total_label(row) -> str:
     order_type = row["order_type"]
     slices = row["slices"]
+    name = f"Full {row['item']}" if order_type in ("full", "sliced") else row["item"]
     if order_type == "full":
-        return f"{row['item']} (full)"
+        return f"{name} (full)"
     if order_type == "sliced":
         s = f"{slices}-slice" if slices else "sliced"
-        return f"{row['item']} ({s})"
+        return f"{name} ({s})"
     if order_type == "tray":
-        return f"{row['item']} (tray)"
-    return f"{row['item']} (piece)"
+        return f"{name} (tray)"
+    return f"{name} (piece)"
 
 
 def _cake_order_label(row) -> str:
     order_type = row["order_type"]
     slices = row["slices"]
     qty = row["quantity"]
+    name = f"Full {row['item']}" if order_type in ("full", "sliced") else row["item"]
     if order_type == "full":
-        return f"  • {qty}x {row['item']} — full"
+        return f"  • {qty}x {name} — full"
     if order_type == "sliced":
         s = f"{slices}-slice" if slices else "sliced"
-        return f"  • {qty}x {row['item']} — {s}"
+        return f"  • {qty}x {name} — {s}"
     if order_type == "tray":
-        return f"  • {qty}x {row['item']} — tray"
-    return f"  • {qty}x {row['item']} — piece"
+        return f"  • {qty}x {name} — tray"
+    return f"  • {qty}x {name} — piece"
 
 
 async def send_b2b_pre_summary(bot: Bot, target_date: str | None = None) -> None:

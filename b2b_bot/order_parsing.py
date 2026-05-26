@@ -400,8 +400,9 @@ def _bread_line(it: dict) -> str:
 
 
 def _cake_line(it: dict, show_edit_hint: bool = False) -> str:
-    line = f"  • {it['qty']}x {it['item']}"
     order_type = it.get("order_type")
+    display_name = f"Full {it['item']}" if order_type in ("full", "sliced") else it["item"]
+    line = f"  • {it['qty']}x {display_name}"
 
     if order_type == "full":
         src = it.get("order_type_source")

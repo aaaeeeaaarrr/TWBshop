@@ -228,11 +228,11 @@ def _cart_block(chat_id: int) -> str:
                 d = B2B_CAKE_MENU[item_name]
                 if slice_code == "cake_full":
                     it = {"item": item_name, "qty": qty, "order_type": "full", "cake_category": d["cake_category"], "slices": None}
-                    lines.append(f"  {qty}× {item_name} (not sliced) — ${item_price(it):.2f}")
+                    lines.append(f"  {qty}× Full {item_name} (not sliced) — ${item_price(it):.2f}")
                 else:
                     slices = int(slice_code[6:])
                     it = {"item": item_name, "qty": qty, "order_type": "sliced", "cake_category": d["cake_category"], "slices": slices}
-                    lines.append(f"  {qty}× {item_name} (sliced {slices}) — ${item_price(it):.2f}")
+                    lines.append(f"  {qty}× Full {item_name} (sliced {slices}) — ${item_price(it):.2f}")
                 cake.append(it)
             else:
                 # Bun
