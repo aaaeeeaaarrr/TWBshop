@@ -135,10 +135,10 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26
+**Last updated:** 2026-05-26 (session 2)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
 **Last completed:** B2B "Ready to order?" prompt improvements + cart durability.
-- "Ready to order?" prompt now has 4 buttons: ⭐ OPEN MENU ⭐ (always fresh new order), EDIT ORDER (shows existing confirmed + recurring orders to edit), Check Balance, Change Location
+- "Ready to order?" prompt now has 4 buttons: ⭐ OPEN MENU ⭐ (always fresh new order), SEE YOUR ORDERS (shows existing confirmed + recurring orders to edit), Check Balance, Change Location
 - OPEN MENU always starts a fresh cart, regardless of existing orders
 - EDIT ORDER fixed to show recurring orders (not just confirmed sessions)
 - Location pin prompt no longer fires if delivery cost already stored in DB
