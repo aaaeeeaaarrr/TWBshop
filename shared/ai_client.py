@@ -26,9 +26,15 @@ def _encode(image_bytes: bytes) -> str:
 
 def _parse_json(text: str) -> dict:
     """Extract JSON from Claude's response, handling optional markdown fences."""
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    # Strip markdown code block if present
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
     if match:
         text = match.group(1)
+    # Find outermost { } boundaries
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start : end + 1]
     try:
         return json.loads(text.strip())
     except json.JSONDecodeError:
