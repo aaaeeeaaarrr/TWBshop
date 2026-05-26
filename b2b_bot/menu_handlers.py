@@ -583,7 +583,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 f"How many {grams}g {bun['label']}?\nType a number (0 to remove):",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← MENU", callback_data=back_cb),
+                    InlineKeyboardButton("← MENU", callback_data="bm_back"),
                 ]]),
             )
 
@@ -752,7 +752,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             await query.edit_message_text(
                 prompt,
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("← MENU", callback_data=f"bm_qty_{slug}_{cat_key}"),
+                    InlineKeyboardButton("← MENU", callback_data="bm_back"),
                 ]]),
             )
 
