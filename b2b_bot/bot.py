@@ -53,6 +53,7 @@ from b2b_bot.menu_flow import (
     handle_menu_command, handle_menu_callback, handle_welcome,
     handle_qty_input, qty_pending_filter,
 )
+from b2b_bot.menu_handlers import cmd_start
 from b2b_bot.orders import handle_group_message, handle_callback
 from b2b_bot.summaries import send_b2b_summary, send_b2b_pre_summary, send_b2b_mini_reminder, send_b2b_dispatch_reminder
 from b2b_bot.delivery import handle_location
@@ -184,6 +185,9 @@ def main() -> None:
         .pool_timeout(20.0)
         .build()
     )
+
+    # /start in private → redirect to group(s)
+    app.add_handler(CommandHandler("start", cmd_start))
 
     # Bot added to a group → auto-welcome with menu
     app.add_handler(ChatMemberHandler(handle_welcome, ChatMemberHandler.MY_CHAT_MEMBER))

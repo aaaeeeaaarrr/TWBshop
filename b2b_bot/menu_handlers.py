@@ -37,9 +37,41 @@ from shared.database import (
     set_pending_order, set_order_state, set_last_confirmation_msg,
     get_b2b_recurring_orders, get_recurring_order, cancel_b2b_recurring_order,
     set_cart_state, get_last_b2b_order,
+    get_all_b2b_customers,
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def cmd_start(update: Update, context) -> None:
+    """Reply to /start in private chat with links to the customer's registered group(s)."""
+    if update.effective_chat.type != "private":
+        return
+    user_id = update.effective_user.id
+    customers = get_all_b2b_customers()
+    lines = []
+    for row in customers:
+        gid = row["group_chat_id"]
+        try:
+            member = await context.bot.get_chat_member(gid, user_id)
+            if member.status in ("left", "kicked", "banned"):
+                continue
+        except Exception:
+            continue
+        try:
+            chat = await context.bot.get_chat(gid)
+            link = chat.invite_link or await context.bot.export_chat_invite_link(gid)
+        except Exception:
+            link = None
+        name = row["business_name"]
+        lines.append(f"- [{name}]({link})" if link else f"- {name}")
+
+    if not lines:
+        await update.message.reply_text("Please ask your account manager to add you to your order group.")
+        return
+
+    text = "Please place your orders in your group:\n" + "\n".join(lines)
+    await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
 
 
 async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
