@@ -5,6 +5,8 @@ Does NOT post to any staff group. Owner-only, private chat.
 """
 import asyncio
 import logging
+import time
+from collections import defaultdict, deque
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -219,17 +221,57 @@ async def teach_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return ConversationHandler.END
 
 
+_PHOTO_WINDOW = 600  # seconds — how long to look back/forward for related photos
+_msg_buffer: dict = defaultdict(lambda: deque(maxlen=30))   # (chat_id, uid) → recent messages
+_concern_tracker: dict = defaultdict(list)                  # (chat_id, uid) → [(concern_id, ts)]
+
+
+def _sender_key(msg):
+    uid = msg.from_user.id if msg.from_user else 0
+    return (msg.chat_id, uid)
+
+
+def _prune_concerns(key: tuple) -> None:
+    cutoff = time.time() - _PHOTO_WINDOW
+    _concern_tracker[key] = [(cid, ts) for cid, ts in _concern_tracker[key] if ts > cutoff]
+
+
 async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.message or update.channel_post
     if not msg:
         return
-    text = msg.text or msg.caption or ""
-    if not text.strip():
-        return
 
+    now = time.time()
+    key = _sender_key(msg)
+    sender = msg.from_user.full_name if msg.from_user else (msg.chat.title or "Unknown")
     chat_id = msg.chat_id
     msg_id = msg.message_id
-    sender = msg.from_user.full_name if msg.from_user else (msg.chat.title or "Unknown")
+    has_media = bool(msg.photo or msg.document or msg.video)
+    text = msg.text or msg.caption or ""
+
+    # Always buffer this message for later correlation
+    _msg_buffer[key].append((now, msg))
+
+    # Photo with no triggering text — check if a recent concern needs it
+    if has_media and not text.strip():
+        _prune_concerns(key)
+        if _concern_tracker[key]:
+            try:
+                await context.bot.send_message(
+                    chat_id=config.OWNER_TELEGRAM_ID,
+                    text="📎 Photo from %s — possibly related to concern above" % sender,
+                )
+                await context.bot.forward_message(
+                    chat_id=config.OWNER_TELEGRAM_ID,
+                    from_chat_id=chat_id,
+                    message_id=msg_id,
+                )
+            except Exception as e:
+                logger.error("Failed to forward related photo: %s", e)
+        return
+
+    if not text.strip():
+        return
 
     concerns = analyze_live_message(chat_id, msg_id, sender, text)
     for c in concerns:
@@ -249,13 +291,31 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     reply_markup=_concern_keyboard(new_id),
                 )
                 gm_mark_sent(new_id, sent_msg.message_id)
-                # Forward original message so owner sees the photo/full context
-                if msg.photo or msg.document or msg.video:
+
+                if has_media:
+                    # Photo in the same message — forward it directly
                     await context.bot.forward_message(
                         chat_id=config.OWNER_TELEGRAM_ID,
                         from_chat_id=chat_id,
                         message_id=msg_id,
                     )
+                else:
+                    # Look back in buffer for photos from same sender within the window
+                    cutoff = now - _PHOTO_WINDOW
+                    related = [
+                        m for ts, m in _msg_buffer[key]
+                        if ts > cutoff and m.message_id != msg_id
+                        and (m.photo or m.document or m.video)
+                    ]
+                    for related_msg in related[-3:]:
+                        await context.bot.forward_message(
+                            chat_id=config.OWNER_TELEGRAM_ID,
+                            from_chat_id=chat_id,
+                            message_id=related_msg.message_id,
+                        )
+
+                # Track concern so future photos from this sender get linked
+                _concern_tracker[key].append((new_id, now))
                 logger.info("Live concern sent: %s from %s in %s", c["concern_type"], sender, chat_id)
             except Exception as e:
                 logger.error("Failed to send live concern: %s", e)
