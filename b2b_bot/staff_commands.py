@@ -109,25 +109,21 @@ async def cmd_markpaid(update: Update, context) -> None:
     uid = update.effective_user.id
     if not _is_authorized(uid):
         return
-    chat = update.effective_chat
-    if chat.type in ("group", "supergroup"):
-        if not is_b2b_group(chat.id):
-            return
-        await _start_markpaid(context.bot, uid, chat.id)
-    else:
-        groups = get_groups_with_unpaid_orders()
-        rows = []
-        for row in groups:
-            eff = get_effective_balance(row["group_chat_id"])
-            if eff > 0:
-                rows.append([InlineKeyboardButton(
-                    f"{row['business_name']} — ${eff:.2f}",
-                    callback_data=f"bmp_pick_{row['group_chat_id']}",
-                )])
-        if not rows:
-            await update.message.reply_text("✅ No outstanding balances.")
-            return
-        await update.message.reply_text("Which customer?", reply_markup=InlineKeyboardMarkup(rows))
+    if update.effective_chat.type in ("group", "supergroup"):
+        return
+    groups = get_groups_with_unpaid_orders()
+    rows = []
+    for row in groups:
+        eff = get_effective_balance(row["group_chat_id"])
+        if eff > 0:
+            rows.append([InlineKeyboardButton(
+                f"{row['business_name']} — ${eff:.2f}",
+                callback_data=f"bmp_pick_{row['group_chat_id']}",
+            )])
+    if not rows:
+        await update.message.reply_text("✅ No outstanding balances.")
+        return
+    await update.message.reply_text("Which customer?", reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def _start_markpaid(bot, uid: int, group_chat_id: int) -> None:
@@ -601,8 +597,7 @@ async def cmd_commands(update: Update, context) -> None:
             "/summary — send B2B nightly summary now\n"
             "/commands — this list\n\n"
             "<i>In a customer group:</i>\n"
-            "/balance — that customer's full balance breakdown\n"
-            "/markpaid — record payment for that customer"
+            "/balance — that customer's full balance breakdown"
         )
     elif uid == _STAFF_ID:
         text = (
@@ -612,8 +607,7 @@ async def cmd_commands(update: Update, context) -> None:
             "/history — payment history\n"
             "/commands — this list\n\n"
             "<i>In a customer group:</i>\n"
-            "/balance — that customer's full balance breakdown\n"
-            "/markpaid — record payment for that customer"
+            "/balance — that customer's full balance breakdown"
         )
     else:
         return
