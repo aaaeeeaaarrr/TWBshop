@@ -280,7 +280,7 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
             f"{cat['emoji']} {cat['label']}{badge}",
             callback_data=f"bm_cat_{key}",
         )])
-    bun_count = sum(qty for k, qty in cart.items() if "|" in k)
+    bun_count = sum(qty for k, qty in cart.items() if "|" in k and k.split("|", 1)[1][:1].isdigit())
     bun_badge = f" ({bun_count}pc)" if bun_count else ""
     rows.append([InlineKeyboardButton(
         f"🍔 Buns & Rolls{bun_badge}",
