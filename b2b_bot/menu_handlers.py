@@ -52,6 +52,7 @@ async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
         "Ready to order?",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⭐ OPEN MENU ⭐", callback_data="bm_menu_prompt")],
+            [InlineKeyboardButton("EDIT ORDER", callback_data="bm_edit_order")],
             [InlineKeyboardButton("Check Balance", callback_data="bmc_balance")],
             [InlineKeyboardButton("Change Location", callback_data="bm_change_location")],
         ]),
@@ -406,10 +407,27 @@ async def handle_menu_callback(update: Update, context) -> None:
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
             _editing_session.pop(chat_id, None); set_editing_session(chat_id, None)
+            _cart.pop(chat_id, None)
+            _cart_time.pop(chat_id, None)
+            _cart_date.pop(chat_id, None)
+            _cart_method.pop(chat_id, None)
             await query.answer()
             await _delete_old_menu(chat_id, context.bot)
-            text, keyboard = _menu_state(chat_id)
-            sent = await context.bot.send_message(chat_id, text, reply_markup=keyboard)
+            text = f"📋 Select a category:\n\n{_cart_block(chat_id)}"
+            sent = await context.bot.send_message(chat_id, text, reply_markup=_category_keyboard(chat_id))
+            _menu_msg[chat_id] = sent.message_id
+            set_menu_message_id(chat_id, sent.message_id)
+
+        elif data == "bm_edit_order":
+            await query.answer()
+            await _delete_old_menu(chat_id, context.bot)
+            delivery_date = _get_cart_date(chat_id)
+            sessions = get_b2b_order_sessions(chat_id, delivery_date)
+            if not sessions:
+                sent = await context.bot.send_message(chat_id, "No orders to edit yet. Use OPEN MENU to place a new order.")
+            else:
+                text, keyboard = _menu_state(chat_id)
+                sent = await context.bot.send_message(chat_id, text, reply_markup=keyboard)
             _menu_msg[chat_id] = sent.message_id
             set_menu_message_id(chat_id, sent.message_id)
 
