@@ -247,7 +247,7 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
     if not cart and get_last_b2b_order(chat_id):
-        rows.append([InlineKeyboardButton("COPY LAST ORDER", callback_data="bm_copy_last_order")])
+        rows.append([InlineKeyboardButton("COPY LAST ORDER?", callback_data="bm_copy_last_order")])
     for key, cat in _CATEGORIES.items():
         count = sum(cart.get(n, 0) for n in cat["items"])
         badge = f" ({count})" if count else ""
