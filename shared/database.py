@@ -1616,3 +1616,165 @@ def query_supplier_prices(keyword: str | None = None, supplier: str | None = Non
                 ORDER BY spi.product_name, spi.price ASC NULLS LAST
             """, params)
             return [dict(r) for r in cur.fetchall()]
+
+
+# ─── GM Manager Bot ───────────────────────────────────────────────────────────
+
+def init_gm_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_concerns (
+                    id              SERIAL PRIMARY KEY,
+                    source_chat_id  BIGINT,
+                    source_msg_key  TEXT,           -- composite key to avoid re-flagging
+                    concern_type    TEXT NOT NULL,  -- low_stock | cleanliness | waste | mistake | staffing | photo
+                    severity        TEXT DEFAULT 'warning',  -- info | warning | critical
+                    sender_name     TEXT,
+                    description     TEXT NOT NULL,
+                    detected_at     TIMESTAMPTZ DEFAULT NOW(),
+                    sent_msg_id     INTEGER,        -- Telegram msg ID in owner chat
+                    reviewed_at     TIMESTAMPTZ,
+                    review_action   TEXT,           -- all_good | real_issue | teach
+                    teaching_note   TEXT,
+                    UNIQUE(source_msg_key, concern_type)
+                );
+                CREATE TABLE IF NOT EXISTS gm_rules (
+                    id           SERIAL PRIMARY KEY,
+                    concern_type TEXT,
+                    pattern      TEXT NOT NULL,
+                    action       TEXT NOT NULL,  -- ignore | downgrade | escalate
+                    note         TEXT,
+                    created_at   TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS gm_state (
+                    key        TEXT PRIMARY KEY,
+                    value      TEXT,
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """)
+
+
+def gm_get_state(key: str) -> str | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM gm_state WHERE key = %s", (key,))
+            row = cur.fetchone()
+            return row["value"] if row else None
+
+
+def gm_set_state(key: str, value: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_state (key, value, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+            """, (key, value))
+
+
+def gm_save_concern(source_chat_id: int, source_msg_key: str, concern_type: str,
+                    severity: str, sender_name: str | None, description: str) -> int | None:
+    """Insert a concern. Returns the new id, or None if already exists."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_concerns
+                    (source_chat_id, source_msg_key, concern_type, severity, sender_name, description)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (source_msg_key, concern_type) DO NOTHING
+                RETURNING id
+            """, (source_chat_id, source_msg_key, concern_type, severity, sender_name, description))
+            row = cur.fetchone()
+            return row["id"] if row else None
+
+
+def gm_get_unsent_concerns() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, source_chat_id, concern_type, severity, sender_name, description, detected_at
+                FROM gm_concerns
+                WHERE sent_msg_id IS NULL AND review_action IS NULL
+                ORDER BY detected_at ASC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_mark_sent(concern_id: int, telegram_msg_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE gm_concerns SET sent_msg_id = %s WHERE id = %s",
+                (telegram_msg_id, concern_id)
+            )
+
+
+def gm_review_concern(concern_id: int, action: str, teaching_note: str | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_concerns
+                SET review_action = %s, teaching_note = %s, reviewed_at = NOW()
+                WHERE id = %s
+            """, (action, teaching_note, concern_id))
+
+
+def gm_get_concern_by_msg_id(telegram_msg_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM gm_concerns WHERE sent_msg_id = %s",
+                (telegram_msg_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def gm_save_rule(concern_type: str, pattern: str, action: str, note: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_rules (concern_type, pattern, action, note)
+                VALUES (%s, %s, %s, %s)
+            """, (concern_type, pattern, action, note))
+
+
+def gm_get_rules() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM gm_rules ORDER BY created_at DESC")
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_low_stock_history(chat_id: int, since_days: int = 7) -> list[dict]:
+    """Return recent low-stock alert messages grouped by sender and date."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender_name, text, sent_at::date as day
+                FROM ops_messages
+                WHERE chat_id = %s
+                  AND (LOWER(text) LIKE '%%almost out%%'
+                       OR LOWER(text) LIKE '%%out of stock%%'
+                       OR LOWER(text) LIKE '%%almost out%%'
+                       OR LOWER(text) LIKE '%%please buy%%'
+                       OR LOWER(text) LIKE '%%please order%%'
+                       OR LOWER(text) LIKE '%%running low%%')
+                  AND sent_at >= NOW() - INTERVAL '%s days'
+                ORDER BY sender_name, sent_at
+            """, (chat_id, since_days))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_new_messages(chat_id: int, since: str) -> list[dict]:
+    """Return messages newer than `since` ISO timestamp."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, message_id, sender_name, text, media_type, sent_at
+                FROM ops_messages
+                WHERE chat_id = %s AND sent_at > %s
+                ORDER BY sent_at ASC
+            """, (chat_id, since))
+            return [dict(r) for r in cur.fetchall()]

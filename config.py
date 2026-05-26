@@ -1,4 +1,4 @@
-from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, DATABASE_URL, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE
+from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, GM_BOT_TOKEN, DATABASE_URL, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE
 
 # Claude model used for all AI analysis.
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -59,4 +59,21 @@ BAKERY_LNG: float = 104.9147998
 # Path to shop QR code image — sent to customers when they pay to the wrong account.
 # Leave empty string to skip sending the QR.
 SHOP_QR_PATH: str = "photos/shop_qr.jpg"
+
+# ─── GM Manager Bot ───────────────────────────────────────────────────────────
+
+# Bot token for the GM Manager bot (create via @BotFather).
+GM_BOT_TOKEN: str = ""
+
+# Chat IDs the GM bot monitors for operational intelligence.
+STOCK_CHECKS_CHAT_ID: int = -4681466315   # "Stock Checks +Cleans +Mistakes"
+SUPERVISORS_CHAT_ID: int = 0              # set after import
+MANAGEMENT_CHAT_ID: int = 0              # set after import
+
+# Test group where the GM bot posts during development (before going live).
+# Create a private group, add the bot, paste the chat ID here.
+GM_TEST_GROUP_ID: int = 0
+
+# How many days of repeated low-stock alerts before flagging as a concern.
+GM_LOW_STOCK_THRESHOLD_DAYS: int = 3
 
