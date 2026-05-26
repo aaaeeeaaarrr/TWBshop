@@ -12,7 +12,7 @@ from b2b_bot.menu_keyboards import (
     _SESAME_CODE_LABEL, _SESAME_LABEL_CODE,
     _DELIVERY_TIME_CODES,
     _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label,
-    _save_cart, _restore_cart,
+    _save_cart, _restore_cart, _cake_slice_keyboard, _cake_cart_qty,
     _orders_locked, _MENU_PROMPT_COOLDOWN_SEC,
     _CATEGORIES, _BUNS, _NAME,
     _category_keyboard, _item_keyboard, _cart_block,
@@ -446,6 +446,32 @@ async def handle_menu_callback(update: Update, context) -> None:
                 "tap the 📎 attachment icon → Location. We only need it once.",
             )
 
+        elif data.startswith("bm_cake_slice_"):
+            rest   = data[14:]
+            parts  = rest.rsplit("_", 2)
+            if len(parts) < 3:
+                return
+            slug, qty_str, slice_code = parts[0], parts[1], parts[2]
+            name = _NAME.get(slug)
+            if not name:
+                return
+            qty  = int(qty_str)
+            cart = _cart.setdefault(chat_id, {})
+            for k in list(cart.keys()):
+                if k == name or k.startswith(f"{name}|cake_"):
+                    del cart[k]
+            if qty > 0:
+                cart[f"{name}|cake_{slice_code}"] = qty
+            _save_cart(chat_id)
+            cat_txt = f"🎂 Full Cakes\n\n{_cart_block(chat_id)}"
+            cat_kb  = _item_keyboard("cakes", chat_id)
+            try:
+                await query.edit_message_text(cat_txt, reply_markup=cat_kb)
+            except Exception:
+                sent = await context.bot.send_message(chat_id, cat_txt, reply_markup=cat_kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
+
         elif data == "bm_copy_last_order":
             if _orders_locked():
                 await query.answer("Orders are locked after 10pm. Contact us directly.", show_alert=True)
@@ -647,7 +673,21 @@ async def handle_menu_callback(update: Update, context) -> None:
                 return
             qty  = int(qty_str)
             cart = _cart.setdefault(chat_id, {})
-            if qty == 0:
+            if cat_key == "cakes" and qty > 0:
+                # Remove any existing cart entry for this cake before asking slice pref
+                for k in list(cart.keys()):
+                    if k == name or k.startswith(f"{name}|cake_"):
+                        del cart[k]
+                await query.edit_message_text(
+                    f"{name} — {qty} cake{'s' if qty > 1 else ''}\nHow would you like it?",
+                    reply_markup=_cake_slice_keyboard(name, qty),
+                )
+                return
+            if cat_key == "cakes" and qty == 0:
+                for k in list(cart.keys()):
+                    if k == name or k.startswith(f"{name}|cake_"):
+                        del cart[k]
+            elif qty == 0:
                 cart.pop(name, None)
             else:
                 cart[name] = qty
@@ -896,12 +936,21 @@ def _parse_cart_items(chat_id: int):
     bread_items, cake_items = [], []
     for key, qty in cart.items():
         if "|" in key:
-            parts       = key.split("|")
-            item_name   = parts[0]
-            grams       = int(parts[1])
-            sesame_code = parts[2] if len(parts) > 2 else None
-            notes       = _SESAME_CODE_LABEL.get(sesame_code) if sesame_code else None
-            bread_items.append({"item": item_name, "qty": qty, "grams": grams, "notes": notes})
+            parts = key.split("|")
+            item_name = parts[0]
+            if parts[1].startswith("cake_"):
+                slice_code = parts[1]
+                d = B2B_CAKE_MENU[item_name]
+                if slice_code == "cake_full":
+                    cake_items.append({"item": item_name, "qty": qty, "cake_category": d["cake_category"], "order_type": "full", "slices": None})
+                else:
+                    slices = int(slice_code[6:])
+                    cake_items.append({"item": item_name, "qty": qty, "cake_category": d["cake_category"], "order_type": "sliced", "slices": slices})
+            else:
+                grams       = int(parts[1])
+                sesame_code = parts[2] if len(parts) > 2 else None
+                notes       = _SESAME_CODE_LABEL.get(sesame_code) if sesame_code else None
+                bread_items.append({"item": item_name, "qty": qty, "grams": grams, "notes": notes})
         elif key in B2B_MENU:
             bread_items.append({"item": key, "qty": qty, "grams": None, "notes": None})
         else:
@@ -1000,16 +1049,6 @@ async def _do_confirm(query, chat_id: int, context) -> None:
     _cart_date.pop(chat_id, None)
     _cart_method.pop(chat_id, None)
     set_cart_state(chat_id, None)
-
-    if needs_spec:
-        _state[chat_id] = {"mode": "awaiting_cake_spec", "needs_spec": needs_spec}
-        set_order_state(chat_id, _state[chat_id])
-        await query.edit_message_text(
-            f"For the {', '.join(needs_spec)} — sliced or whole?\n"
-            "(If sliced, tell me how many slices, e.g. 'sliced 10')",
-            reply_markup=None,
-        )
-        return
 
     if not method:
         _state[chat_id] = {"mode": "awaiting_delivery"}

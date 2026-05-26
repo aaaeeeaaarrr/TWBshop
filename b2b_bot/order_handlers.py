@@ -214,54 +214,6 @@ async def handle_group_message(update: Update, context) -> None:
         )
         return
 
-    if state.get("mode") == "awaiting_cake_spec":
-        from b2b_bot.order_parsing import _WHOLE_RE, _SLICED_RE, _SLICE_COUNT_RE
-        pending = _pending.get(chat_id) or get_pending_order(chat_id) or {}
-        cake_items = pending.get("cake_items", [])
-        needs_spec = state.get("needs_spec", [])
-        lower = text.lower()
-
-        for it in cake_items:
-            if it["item"] not in needs_spec:
-                continue
-            cake_def = B2B_CAKE_MENU[it["item"]]
-            if _WHOLE_RE.search(lower):
-                it["order_type"] = "full"
-            elif _SLICED_RE.search(lower) or _SLICE_COUNT_RE.search(lower):
-                it["order_type"] = "sliced"
-                m = _SLICE_COUNT_RE.search(lower)
-                it["slices"] = int(m.group(1)) if m else cake_def["standard_slices"]
-
-        still_unresolved = [it["item"] for it in cake_items if it.get("order_type") is None]
-        if still_unresolved:
-            await update.message.reply_text(
-                f"Still need to know for: {', '.join(still_unresolved)}\n"
-                "Please reply: sliced or whole?"
-            )
-            return
-
-        _state.pop(chat_id, None); set_order_state(chat_id, None)
-        pending["cake_items"] = cake_items
-        _pending[chat_id] = pending; set_pending_order(chat_id, pending)
-        m_ = pending.get("delivery_method")
-        t_ = pending.get("delivery_time")
-        l_ = pending.get("location")
-        dd = pending.get("delivery_date")
-        if not m_:
-            _state[chat_id] = {"mode": "awaiting_delivery"}; set_order_state(chat_id, {"mode": "awaiting_delivery"})
-            upsert_b2b_customer(chat_id, business_name)
-            await update.message.reply_text(
-                "Got it! One quick question — pickup or delivery, and what time?\n"
-                "Example: Delivery at 8am  |  Pickup at 7am"
-            )
-        else:
-            await _send_confirmation(
-                update, chat_id,
-                _build_confirmation(pending.get("bread_items", []), cake_items, m_, t_, l_, dd,
-                                    delivery_cost=_delivery_cost_for(chat_id, m_)),
-            )
-        return
-
     pending = _pending.get(chat_id) or get_pending_order(chat_id)
     if pending and not state:
         _pending[chat_id] = pending

@@ -214,15 +214,29 @@ def _cart_block(chat_id: int) -> str:
     bread, cake = [], []
     for key, qty in cart.items():
         if "|" in key:
-            parts     = key.split("|")
+            parts = key.split("|")
             item_name = parts[0]
-            grams     = int(parts[1])
-            sesame_code  = parts[2] if len(parts) > 2 else None
-            sesame_label = _SESAME_CODE_LABEL.get(sesame_code, "") if sesame_code else ""
-            sesame_disp  = f" · {sesame_label}" if sesame_label else ""
-            it = {"item": item_name, "qty": qty, "grams": grams, "notes": sesame_label or None}
-            bread.append(it)
-            lines.append(f"  {qty}× {item_name} {grams}g{sesame_disp} — ${_bun_price(grams) * qty:.2f}")
+            if parts[1].startswith("cake_"):
+                # Full cake with slice spec
+                slice_code = parts[1]
+                d = B2B_CAKE_MENU[item_name]
+                if slice_code == "cake_full":
+                    it = {"item": item_name, "qty": qty, "order_type": "full", "cake_category": d["cake_category"], "slices": None}
+                    lines.append(f"  {qty}× {item_name} (not sliced) — ${item_price(it):.2f}")
+                else:
+                    slices = int(slice_code[6:])
+                    it = {"item": item_name, "qty": qty, "order_type": "sliced", "cake_category": d["cake_category"], "slices": slices}
+                    lines.append(f"  {qty}× {item_name} (sliced {slices}) — ${item_price(it):.2f}")
+                cake.append(it)
+            else:
+                # Bun
+                grams        = int(parts[1])
+                sesame_code  = parts[2] if len(parts) > 2 else None
+                sesame_label = _SESAME_CODE_LABEL.get(sesame_code, "") if sesame_code else ""
+                sesame_disp  = f" · {sesame_label}" if sesame_label else ""
+                it = {"item": item_name, "qty": qty, "grams": grams, "notes": sesame_label or None}
+                bread.append(it)
+                lines.append(f"  {qty}× {item_name} {grams}g{sesame_disp} — ${_bun_price(grams) * qty:.2f}")
         elif key in B2B_MENU:
             it = {"item": key, "qty": qty, "grams": B2B_MENU[key].get("standard_grams"), "notes": None}
             bread.append(it)
@@ -249,7 +263,10 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     if not cart and get_last_b2b_order(chat_id):
         rows.append([InlineKeyboardButton("COPY LAST ORDER?", callback_data="bm_copy_last_order")])
     for key, cat in _CATEGORIES.items():
-        count = sum(cart.get(n, 0) for n in cat["items"])
+        count = sum(
+            _cake_cart_qty(cart, n) if key == "cakes" else cart.get(n, 0)
+            for n in cat["items"]
+        )
         badge = f" ({count})" if count else ""
         rows.append([InlineKeyboardButton(
             f"{cat['emoji']} {cat['label']}{badge}",
@@ -269,12 +286,30 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def _cake_cart_qty(cart: dict, name: str) -> int:
+    """Total qty in cart for a full cake, including slice variants."""
+    return cart.get(name, 0) + sum(q for k, q in cart.items() if k.startswith(f"{name}|cake_"))
+
+
+def _cake_slice_keyboard(name: str, qty: int) -> InlineKeyboardMarkup:
+    slug = _SLUG[name]
+    options = [
+        ("Not sliced",    f"bm_cake_slice_{slug}_{qty}_full"),
+        ("Slice 8",       f"bm_cake_slice_{slug}_{qty}_s8"),
+        ("Slice 10",      f"bm_cake_slice_{slug}_{qty}_s10"),
+        ("Slice 12",      f"bm_cake_slice_{slug}_{qty}_s12"),
+        ("Slice 16",      f"bm_cake_slice_{slug}_{qty}_s16"),
+    ]
+    rows = [[InlineKeyboardButton(label, callback_data=cd)] for label, cd in options]
+    return InlineKeyboardMarkup(rows)
+
+
 def _item_keyboard(cat_key: str, chat_id: int) -> InlineKeyboardMarkup:
     cart = _cart.get(chat_id, {})
     rows = []
     in_desserts = (cat_key == "desserts")
     for name in _CATEGORIES[cat_key]["items"]:
-        qty    = cart.get(name, 0)
+        qty    = _cake_cart_qty(cart, name) if cat_key == "cakes" else cart.get(name, 0)
         slug   = _SLUG[name]
         suffix = f"  ✅ ×{qty}" if qty else ""
         label  = f"{name}{suffix}\n{_price_label(name, in_desserts=in_desserts)}"
