@@ -11,7 +11,7 @@ from shared.database import init_ops_db, save_ops_message
 
 logger = logging.getLogger(__name__)
 
-SESSION_PATH = "ops_listener"
+SESSION_PATH = "ops_importer"
 
 
 def _classify_media(msg) -> str | None:
