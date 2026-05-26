@@ -310,7 +310,15 @@ async def handle_menu_callback(update: Update, context) -> None:
                     key = it["item"]
                 cart[key] = it["qty"]
             for it in session["cake"]:
-                cart[it["item"]] = it["qty"]
+                ot = it.get("order_type")
+                if ot == "slice":
+                    cart[f"{it['item']}|slice"] = it["qty"]
+                elif ot == "full":
+                    cart[f"{it['item']}|cake_full"] = it["qty"]
+                elif ot == "sliced" and it.get("slices"):
+                    cart[f"{it['item']}|cake_s{it['slices']}"] = it["qty"]
+                else:
+                    cart[it["item"]] = it["qty"]
             _editing_session[chat_id] = session["session_key"]
             set_editing_session(chat_id, session["session_key"])
             _qty_pending.pop(chat_id, None)
@@ -376,19 +384,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             time_code = rest[9:]
             _cart_date[chat_id] = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
             _cart_time[chat_id] = _format_time(time_code)
-            cart = _cart.get(chat_id, {})
-            bread_tmp, cake_tmp = [], []
-            for k, q in cart.items():
-                if "|" in k:
-                    parts = k.split("|")
-                    nm, gs = parts[0], int(parts[1])
-                    bread_tmp.append({"item": nm, "qty": q, "grams": gs, "notes": None})
-                elif k in B2B_MENU:
-                    bread_tmp.append({"item": k, "qty": q, "grams": None, "notes": None})
-                else:
-                    ck_def = B2B_CAKE_MENU[k]
-                    ot = "piece" if ck_def["cake_category"] in ("B", "C") else "full"
-                    cake_tmp.append({"item": k, "qty": q, "order_type": ot})
+            bread_tmp, cake_tmp = _parse_cart_items(chat_id)
             total        = order_total(bread_tmp, cake_tmp)
             d            = datetime.strptime(date_str, "%Y%m%d").date()
             tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
