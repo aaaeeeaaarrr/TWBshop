@@ -135,9 +135,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-26 (session 4)
+**Last updated:** 2026-05-26 (session 5)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Infrastructure complete.
-**Last completed:** Several B2B menu polish fixes this session — (1) Full Cakes/Desserts category separation: cat-A cakes ordered from Desserts priced at price_slice, stored as {name}|slice; Full Cakes priced at price_full, stored as {name}|cake_{spec}; (2) "(Not Recommended)" label on Slice 10/12/16 options in cake slice picker; (3) "Full " prepended to full cake names in cart, confirmation, summaries, and dispatch — not on selection buttons; (4) Buns & Rolls badge fix (was counting cake pipe-keys as buns); (5) Category order changed to: Bread, Bun, Pastries, Mini, Desserts, Full Cakes.
+**Last completed:** Comprehensive B2B stress test + 2 bug fixes: (1) `bm_dt_` handler crashed on `|slice`/`|cake_*` cart keys — fixed by delegating to `_parse_cart_items(chat_id)`; (2) `bm_edit_session_` didn't reconstruct `|slice`/`|cake_*` keys when loading cake orders — fixed. TEST2 double-covered May 23 fixed in DB. 171 unit tests passed across pricing, parsing, cart encoding, summaries, billing, payment history, DB. Previous session: Full Cakes/Desserts separation, "(Not Recommended)" label, "Full" prefix, bun badge fix, category reorder, all ← MENU buttons to bm_back, payment history month grouping with emojis.
 **Next task:** Test staff/owner commands — `/markpaid` (group + private, staff flow, owner flow), `/balance` (private + group), `/history`, `/addaccount`/`/removeaccount`, Check Balance button. After testing: Bakong/KHQR registration (need passport — on other PC; check ABA app merchant QR first).
 **Known issues:** None
 **Notes:**
