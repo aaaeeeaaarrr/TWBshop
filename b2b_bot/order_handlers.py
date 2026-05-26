@@ -57,7 +57,7 @@ async def maybe_prompt_location_pin(bot, chat_id: int, method: str | None) -> No
     if method != "delivery":
         return
     customer = get_b2b_customer(chat_id)
-    if customer and customer.get("location_lat"):
+    if customer and (customer.get("location_lat") or customer.get("delivery_cost")):
         return
     await bot.send_message(
         chat_id,
