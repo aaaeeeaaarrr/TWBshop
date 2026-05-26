@@ -909,8 +909,8 @@ def save_b2b_payment(
             cur.execute(
                 "INSERT INTO b2b_payments "
                 "(group_chat_id, business_name, amount, screenshot_path, group_message_id, "
-                "tg_file_unique_id, method, covered_dates, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                "tg_file_unique_id, method, covered_dates, created_at, status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'applied') RETURNING id",
                 (group_chat_id, business_name, amount, screenshot_path, group_message_id,
                  tg_file_unique_id, method, covered_dates, now),
             )
