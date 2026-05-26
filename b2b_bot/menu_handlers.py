@@ -44,10 +44,14 @@ logger = logging.getLogger(__name__)
 
 
 async def cmd_start(update: Update, context) -> None:
-    """Reply to /start in private chat with links to the customer's registered group(s)."""
+    """Reply to /start in private chat with links to the customer's registered group(s).
+    Silent for owner/staff and for anyone not sharing a group with the bot.
+    """
     if update.effective_chat.type != "private":
         return
     user_id = update.effective_user.id
+    if user_id in (config.OWNER_TELEGRAM_ID, config.DISPATCH_REMINDER_TELEGRAM_ID):
+        return
     customers = get_all_b2b_customers()
     lines = []
     for row in customers:
@@ -67,7 +71,6 @@ async def cmd_start(update: Update, context) -> None:
         lines.append(f"- [{name}]({link})" if link else f"- {name}")
 
     if not lines:
-        await update.message.reply_text("Please ask your account manager to add you to your order group.")
         return
 
     text = "Please place your orders in your group:\n" + "\n".join(lines)
