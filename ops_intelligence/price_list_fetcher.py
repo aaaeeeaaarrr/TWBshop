@@ -17,6 +17,8 @@ MAX_FILE_MB = 30
 MAX_DOCS = 6     # per chat — covers drinks/food/alcohol splits
 MAX_PHOTOS = 10  # per chat — price lists sent as photo pages
 
+SKIP_MIME_PREFIXES = ("video/", "audio/", "image/webp")  # voice notes, videos, stickers
+
 # chat_id → folder name. Add new suppliers here.
 SUPPLIER_CHATS = {
     -514657145:      "Lees",
@@ -77,6 +79,9 @@ async def _fetch_chat(client, chat_id: int, label: str):
 
         if isinstance(msg.media, MessageMediaDocument) and docs < MAX_DOCS:
             doc = msg.media.document
+            mime = doc.mime_type or ""
+            if any(mime.startswith(p) for p in SKIP_MIME_PREFIXES):
+                continue
             if doc.size > MAX_FILE_MB * 1024 * 1024:
                 continue
             fname = None
