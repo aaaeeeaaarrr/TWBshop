@@ -62,9 +62,6 @@ SHOP_QR_PATH: str = "photos/shop_qr.jpg"
 
 # ─── GM Manager Bot ───────────────────────────────────────────────────────────
 
-# Bot token for the GM Manager bot (create via @BotFather).
-GM_BOT_TOKEN: str = ""
-
 # Chat IDs the GM bot monitors for operational intelligence.
 STOCK_CHECKS_CHAT_ID: int = -4681466315   # "Stock Checks +Cleans +Mistakes"
 SUPERVISORS_CHAT_ID: int = 0              # set after import
