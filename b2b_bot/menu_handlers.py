@@ -54,7 +54,7 @@ async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
         "Ready to order?",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⭐ OPEN MENU ⭐", callback_data="bm_menu_prompt")],
-            [InlineKeyboardButton("EDIT ORDER", callback_data="bm_edit_order")],
+            [InlineKeyboardButton("SEE YOUR ORDERS", callback_data="bm_edit_order")],
             [InlineKeyboardButton("Check Balance", callback_data="bmc_balance")],
             [InlineKeyboardButton("Change Location", callback_data="bm_change_location")],
         ]),
