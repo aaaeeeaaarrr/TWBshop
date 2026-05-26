@@ -144,13 +144,13 @@ _CATEGORIES: dict[str, dict] = {
         "items": ["Mini Croissant", "Mini Chocolatin", "Mini Almond Croissant", "Mini Almond Chocolatin", "Mini Ham Cheese Croissant"],
         "note": [("⚠️", "Min. 100pc"), ("⚠️", "48h Advance Order")],
     },
-    "cakes": {
-        "emoji": "🎂", "label": "Full Cakes",
-        "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] == "A"],
-    },
     "desserts": {
         "emoji": "🍮", "label": "Desserts / Cake Slices",
         "items": [k for k, v in B2B_CAKE_MENU.items()],
+    },
+    "cakes": {
+        "emoji": "🎂", "label": "Full Cakes",
+        "items": [k for k, v in B2B_CAKE_MENU.items() if v["cake_category"] == "A"],
     },
 }
 
@@ -268,7 +268,9 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     rows = []
     if not cart and get_last_b2b_order(chat_id):
         rows.append([InlineKeyboardButton("COPY LAST ORDER?", callback_data="bm_copy_last_order")])
-    for key, cat in _CATEGORIES.items():
+    bun_count = sum(qty for k, qty in cart.items() if "|" in k and k.split("|", 1)[1][:1].isdigit())
+    bun_badge = f" ({bun_count}pc)" if bun_count else ""
+    for i, (key, cat) in enumerate(_CATEGORIES.items()):
         count = sum(
             _cake_cart_qty(cart, n) if key == "cakes"
             else _dessert_cart_qty(cart, n) if key == "desserts"
@@ -280,12 +282,11 @@ def _category_keyboard(chat_id: int) -> InlineKeyboardMarkup:
             f"{cat['emoji']} {cat['label']}{badge}",
             callback_data=f"bm_cat_{key}",
         )])
-    bun_count = sum(qty for k, qty in cart.items() if "|" in k and k.split("|", 1)[1][:1].isdigit())
-    bun_badge = f" ({bun_count}pc)" if bun_count else ""
-    rows.append([InlineKeyboardButton(
-        f"🍔 Buns & Rolls{bun_badge}",
-        callback_data="bm_buns",
-    )])
+        if i == 0:  # insert Buns after Bread
+            rows.append([InlineKeyboardButton(
+                f"🍔 Buns & Rolls{bun_badge}",
+                callback_data="bm_buns",
+            )])
     if cart:
         rows.append([
             InlineKeyboardButton("🟡 Confirm Order", callback_data="bm_confirm"),
