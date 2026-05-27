@@ -64,7 +64,7 @@ SHOP_QR_PATH: str = "photos/shop_qr.jpg"
 
 # Chat IDs the GM bot monitors for operational intelligence.
 STOCK_CHECKS_CHAT_ID: int = -1003952029131  # "Stock Checks +Cleans +Mistakes"
-SUPERVISORS_CHAT_ID: int = 0              # set after import
+SUPERVISORS_CHAT_ID: int = -4980513319    # SUPERVISORS TWB
 MANAGEMENT_CHAT_ID: int = 0              # set after import
 
 # Test group where the GM bot posts during development (before going live).
