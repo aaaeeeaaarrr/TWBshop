@@ -2178,3 +2178,32 @@ def receipt_save_answer(clarification_id: int, answer: str) -> None:
                 SET answer = %s, answered_at = NOW()
                 WHERE id = %s
             """, (answer, clarification_id))
+
+
+def receipt_get_answered_examples(chat_id: int, limit: int = 8) -> list[dict]:
+    """Return recent answered clarifications for a chat — used as few-shot context for AI."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT question, answer
+                FROM receipt_clarifications
+                WHERE chat_id = %s AND answer IS NOT NULL
+                ORDER BY answered_at DESC
+                LIMIT %s
+            """, (chat_id, limit))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def receipt_upsert_answered(chat_id: int, photo_msg_id: int, bot_msg_id: int,
+                             question: str, answer: str, sender_name: str) -> None:
+    """Insert a pre-answered clarification (for backfill). Ignores duplicates."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO receipt_clarifications
+                    (chat_id, photo_msg_id, bot_msg_id, question, answer, sender_name,
+                     created_at, answered_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                ON CONFLICT (chat_id, photo_msg_id) DO UPDATE
+                    SET answer = EXCLUDED.answer, answered_at = NOW()
+            """, (chat_id, photo_msg_id, bot_msg_id, question, answer, sender_name))

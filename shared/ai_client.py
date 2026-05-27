@@ -598,10 +598,29 @@ async def gm_compose_reply(solution_intent: str, trigger_text: str,
         return solution_intent
 
 
-async def assess_receipt_photo(image_bytes: bytes) -> dict:
+async def assess_receipt_photo(image_bytes: bytes,
+                               past_examples: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.
     Returns {"is_receipt": bool, "is_clear": bool, "issues": list[str]}
+
+    past_examples: list of {"question": str, "answer": str} from previous clarifications
+    in the same group — injected as few-shot context so the AI learns handwriting patterns.
     """
+    examples_text = ""
+    if past_examples:
+        lines = []
+        for ex in past_examples:
+            q = ex.get("question", "")
+            a = ex.get("answer", "")
+            if q and a:
+                lines.append(f'  Q: "{q}"\n  A: "{a}"')
+        if lines:
+            examples_text = (
+                "\n\nPast clarifications from this same group (use these to recognise "
+                "handwriting style and naming conventions):\n"
+                + "\n".join(lines) + "\n"
+            )
+
     prompt = (
         "Look at this photo.\n\n"
         "First: is this a receipt, invoice, expense list, or payment document? "
@@ -614,8 +633,9 @@ async def assess_receipt_photo(image_bytes: bytes) -> dict:
         "is_clear = true if BOTH total amount AND items are readable enough to record.\n"
         "Only flag something in issues if it is genuinely unreadable (too blurry, too dark, cut off, "
         "or handwriting completely illegible). Do NOT flag: missing vendor, missing date, blank columns, "
-        "crossed-out entries, 2-digit year formats.\n\n"
-        "Respond ONLY with JSON:\n"
+        "crossed-out entries, 2-digit year formats.\n"
+        + examples_text +
+        "\nRespond ONLY with JSON:\n"
         '{"is_receipt": true/false, "is_clear": true/false, "is_handwritten": true/false, '
         '"issues": ["short problem description"], "readable_partial": "any amounts/text you CAN read"}\n\n'
         "issues must be short (5 words max each). If is_clear is true, issues must be []."

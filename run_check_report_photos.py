@@ -19,6 +19,7 @@ from telethon import TelegramClient
 
 import config
 from shared.ai_client import assess_receipt_photo
+from shared.database import receipt_get_answered_examples
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,7 +49,8 @@ async def main():
             skipped += 1
             continue
 
-        result = await assess_receipt_photo(photo_bytes)
+        examples = receipt_get_answered_examples(REPORT_CHAT_ID)
+        result = await assess_receipt_photo(photo_bytes, past_examples=examples)
         checked += 1
 
         sender = ""

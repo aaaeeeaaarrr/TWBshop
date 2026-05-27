@@ -27,7 +27,7 @@ from shared.database import (
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
     gm_append_refinement_note, save_ops_message,
     init_receipt_clarifications_db, receipt_save_clarification,
-    receipt_get_pending, receipt_save_answer,
+    receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
@@ -919,7 +919,8 @@ async def _check_report_receipt(msg, context) -> None:
     try:
         photo_file = await msg.photo[-1].get_file()
         photo_bytes = bytes(await photo_file.download_as_bytearray())
-        result = await assess_receipt_photo(photo_bytes)
+        examples = receipt_get_answered_examples(msg.chat_id)
+        result = await assess_receipt_photo(photo_bytes, past_examples=examples)
 
         if not result["is_receipt"] or result["is_clear"]:
             return
