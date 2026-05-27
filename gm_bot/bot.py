@@ -765,7 +765,29 @@ async def teach_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def teach_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("teaching_concern_id", None)
+    context.user_data.pop("refining_proposal_id", None)
     await update.message.reply_text("Cancelled.")
+    return ConversationHandler.END
+
+
+async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Any command typed while in a teach/refine state — exit conversation and run the command."""
+    context.user_data.pop("teaching_concern_id", None)
+    context.user_data.pop("refining_proposal_id", None)
+    cmd = update.message.text.split()[0].lstrip("/").split("@")[0].lower()
+    dispatch = {
+        "check":     cmd_check,
+        "review":    cmd_review,
+        "proposals": cmd_proposals,
+        "approved":  cmd_approved,
+        "points":    cmd_points,
+        "pending":   cmd_pending,
+        "staff":     cmd_staff,
+        "rules":     cmd_rules,
+        "start":     cmd_start,
+    }
+    if cmd in dispatch:
+        await dispatch[cmd](update, context)
     return ConversationHandler.END
 
 
@@ -893,13 +915,18 @@ def build_app() -> Application:
             TEACH_WAITING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, teach_receive),
                 CommandHandler("cancel", teach_cancel),
+                MessageHandler(filters.COMMAND, _conv_interrupt),
             ],
             REFINE_WAITING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, refine_receive),
                 CommandHandler("cancel", refine_cancel),
+                MessageHandler(filters.COMMAND, _conv_interrupt),
             ],
         },
-        fallbacks=[CommandHandler("cancel", teach_cancel)],
+        fallbacks=[
+            CommandHandler("cancel", teach_cancel),
+            MessageHandler(filters.COMMAND, _conv_interrupt),
+        ],
         per_message=False,
         per_chat=True,
     )
