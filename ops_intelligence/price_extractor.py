@@ -68,7 +68,7 @@ def _pdf_to_page_images(file_path: str, dpi: int = 100) -> list[bytes]:
     try:
         tmp_dir = tempfile.mkdtemp()
         result = subprocess.run(
-            ["pdftoppm", "-jpeg", f"-r{dpi}", file_path, os.path.join(tmp_dir, "page")],
+            ["pdftoppm", "-jpeg", "-r", str(dpi), file_path, os.path.join(tmp_dir, "page")],
             capture_output=True, timeout=120,
         )
         if result.returncode != 0:
