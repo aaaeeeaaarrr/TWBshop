@@ -324,13 +324,12 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
     concerns = gm_get_unsent_by_sender(name)
 
     if not concerns:
-        await query.edit_message_text(query.message.text + "\n\n(No pending concerns for %s.)" % name)
+        await query.edit_message_text("No pending concerns for %s." % name)
         return
 
     sender_display = concerns[0]["sender_name"]
-    await query.edit_message_text(
-        query.message.text + "\n\nSending %d concerns for %s..." % (len(concerns), sender_display)
-    )
+    # Delete the button list immediately — concerns will follow
+    await query.message.delete()
 
     sent = 0
     for c in concerns:
