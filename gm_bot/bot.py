@@ -164,22 +164,29 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+def _staff_list_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
+    buttons = []
+    for r in rows:
+        name = r["sender_name"] or "Unknown"
+        label = "%s  (%d)" % (name, r["count"])
+        cb = ("ss:" + name)[:64]
+        buttons.append([InlineKeyboardButton(label, callback_data=cb)])
+    return InlineKeyboardMarkup(buttons)
+
+
 async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
     msg = await update.message.reply_text("⏳ Running analysis...")
     try:
         new_count = await run_analysis()
-        from shared.database import gm_get_pending_by_sender
         rows = gm_get_pending_by_sender()
         total_unsent = sum(r["count"] for r in rows)
         if new_count == 0 and total_unsent == 0:
             await msg.edit_text("✓ Nothing new.")
-        else:
-            lines = ["✓ Analysis done. %d new concerns found." % new_count]
-            if total_unsent:
-                lines.append("%d total unsent — use /staff to review by person." % total_unsent)
-            await msg.edit_text("\n".join(lines))
+            return
+        header = "✓ %d new concerns found.\nTap a name to review:" % new_count if new_count else "Tap a name to review:"
+        await msg.edit_text(header, reply_markup=_staff_list_keyboard(rows))
     except Exception as e:
         await msg.edit_text("Error: %s" % e)
 
@@ -302,6 +309,76 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ─── Button callback handler ──────────────────────────────────────────────────
+
+async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+
+    name = query.data[3:]  # strip "ss:" prefix
+    concerns = gm_get_unsent_by_sender(name)
+
+    if not concerns:
+        await query.edit_message_text(query.message.text + "\n\n(No pending concerns for %s.)" % name)
+        return
+
+    sender_display = concerns[0]["sender_name"]
+    await query.edit_message_text(
+        query.message.text + "\n\nSending %d concerns for %s..." % (len(concerns), sender_display)
+    )
+
+    sent = 0
+    for c in concerns:
+        try:
+            tg_msg_ids = []
+            key = c.get("source_msg_key", "")
+            if key.startswith("msg:"):
+                parts = key.split(":")
+                if len(parts) >= 3:
+                    try:
+                        tg_msg_ids = gm_get_related_photos(
+                            c["source_chat_id"], int(parts[2]), c.get("sender_name", "")
+                        )
+                    except (ValueError, IndexError):
+                        pass
+
+            for tg_msg_id in tg_msg_ids[:10]:
+                try:
+                    await context.bot.forward_message(
+                        chat_id=config.OWNER_TELEGRAM_ID,
+                        from_chat_id=c["source_chat_id"],
+                        message_id=tg_msg_id,
+                    )
+                    await asyncio.sleep(0.1)
+                except Exception:
+                    pass
+
+            msg = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=_format_concern(c),
+                reply_markup=_concern_keyboard(c["id"]),
+            )
+            gm_mark_sent(c["id"], msg.message_id)
+            sent += 1
+            await asyncio.sleep(0.3)
+        except Exception as e:
+            logger.error("Failed to send concern %d: %s", c["id"], e)
+
+    # Refresh the staff list
+    rows = gm_get_pending_by_sender()
+    if rows:
+        await context.bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text="✓ Sent %d concerns for %s.\nRemaining:" % (sent, sender_display),
+            reply_markup=_staff_list_keyboard(rows),
+        )
+    else:
+        await context.bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text="✓ All concerns reviewed.",
+        )
+
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -498,6 +575,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("staff", cmd_staff))
     app.add_handler(CommandHandler("rules", cmd_rules))
+    app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(teach_conv)
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
 
