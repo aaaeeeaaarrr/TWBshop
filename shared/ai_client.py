@@ -623,7 +623,7 @@ async def assess_receipt_photo(image_bytes: bytes) -> dict:
     try:
         resp = await _get_client().messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=200,
+            max_tokens=400,
             messages=[{
                 "role": "user",
                 "content": [
