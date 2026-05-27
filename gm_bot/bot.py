@@ -19,6 +19,7 @@ from shared.database import (
     gm_get_unsent_concerns, gm_mark_sent, gm_review_concern,
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
     gm_get_related_photos, gm_get_unsent_by_sender, gm_get_pending_by_sender,
+    gm_get_unreviewed_by_sender, gm_get_unreviewed_by_sender_name,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
@@ -156,10 +157,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await update.message.reply_text(
         "GM Manager active.\n"
-        "/check — run analysis now\n"
+        "/check — run analysis, show new concerns by staff\n"
+        "/review — resend concerns waiting for your button tap\n"
         "/staff — list pending concerns by staff member\n"
-        "/staff <name> — send that person's concerns with photos\n"
-        "/pending — send all unsent concerns\n"
+        "/staff <name> — send that person's concerns\n"
         "/rules — show learned rules"
     )
 
@@ -295,6 +296,33 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("✓ Sent %d concerns for '%s'." % (sent, query))
 
 
+async def cmd_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List concerns already sent but not yet reviewed (button not tapped)."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+
+    # Delete any previous button list still open in chat
+    prev_id = context.bot_data.pop("review_list_msg_id", None)
+    if prev_id:
+        try:
+            await context.bot.delete_message(chat_id=config.OWNER_TELEGRAM_ID, message_id=prev_id)
+        except Exception:
+            pass
+
+    rows = gm_get_unreviewed_by_sender()
+    if not rows:
+        await update.message.reply_text("✓ Nothing awaiting review.")
+        return
+
+    total = sum(r["count"] for r in rows)
+    msg = await update.message.reply_text(
+        "%d concerns sent but not reviewed yet.\nTap a name to resend:" % total,
+        reply_markup=_staff_list_keyboard(rows, context.bot_data),
+    )
+    context.bot_data["review_list_msg_id"] = msg.message_id
+    context.bot_data["review_mode"] = True
+
+
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
@@ -322,18 +350,26 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
     idx = query.data[3:]  # numeric index
     name = context.bot_data.get("staff_index", {}).get(idx)
     if not name:
-        await query.edit_message_text("Session expired — send /check again.")
+        await query.edit_message_text("Session expired — send /check or /review again.")
         return
-    concerns = gm_get_unsent_by_sender(name)
+
+    review_mode = context.bot_data.pop("review_mode", False)
+
+    if review_mode:
+        concerns = gm_get_unreviewed_by_sender_name(name)
+    else:
+        concerns = gm_get_unsent_by_sender(name)
 
     if not concerns:
-        await query.edit_message_text("No pending concerns for %s." % name)
+        label = "unreviewed" if review_mode else "pending"
+        await query.edit_message_text("No %s concerns for %s." % (label, name))
         return
 
     sender_display = concerns[0]["sender_name"]
     # Delete the button list immediately — concerns will follow
     await query.message.delete()
     context.bot_data.pop("check_list_msg_id", None)
+    context.bot_data.pop("review_list_msg_id", None)
 
     sent = 0
     for c in concerns:
@@ -372,19 +408,36 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as e:
             logger.error("Failed to send concern %d: %s", c["id"], e)
 
-    # Refresh the staff list
-    rows = gm_get_pending_by_sender()
-    if rows:
-        await context.bot.send_message(
-            chat_id=config.OWNER_TELEGRAM_ID,
-            text="✓ Sent %d concerns for %s.\nRemaining:" % (sent, sender_display),
-            reply_markup=_staff_list_keyboard(rows, context.bot_data),
-        )
+    # Refresh the appropriate list
+    if review_mode:
+        rows = gm_get_unreviewed_by_sender()
+        if rows:
+            context.bot_data["review_mode"] = True
+            new_msg = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="✓ Resent %d for %s.\nStill awaiting review:" % (sent, sender_display),
+                reply_markup=_staff_list_keyboard(rows, context.bot_data),
+            )
+            context.bot_data["review_list_msg_id"] = new_msg.message_id
+        else:
+            await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="✓ All caught up — nothing left to review.",
+            )
     else:
-        await context.bot.send_message(
-            chat_id=config.OWNER_TELEGRAM_ID,
-            text="✓ All concerns reviewed.",
-        )
+        rows = gm_get_pending_by_sender()
+        if rows:
+            new_msg = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="✓ Sent %d concerns for %s.\nRemaining:" % (sent, sender_display),
+                reply_markup=_staff_list_keyboard(rows, context.bot_data),
+            )
+            context.bot_data["check_list_msg_id"] = new_msg.message_id
+        else:
+            await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="✓ All concerns reviewed.",
+            )
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -579,6 +632,7 @@ def build_app() -> Application:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("check", cmd_check))
+    app.add_handler(CommandHandler("review", cmd_review))
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("staff", cmd_staff))
     app.add_handler(CommandHandler("rules", cmd_rules))

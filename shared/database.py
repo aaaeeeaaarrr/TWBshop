@@ -1752,6 +1752,38 @@ def gm_get_pending_by_sender() -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def gm_get_unreviewed_by_sender() -> list[dict]:
+    """Concerns already sent to owner but not yet reviewed (button not tapped)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender_name, COUNT(*) as count,
+                       SUM(CASE WHEN concern_type = 'mistake' THEN 1 ELSE 0 END) as mistakes,
+                       SUM(CASE WHEN concern_type = 'waste' THEN 1 ELSE 0 END) as waste,
+                       SUM(CASE WHEN concern_type = 'low_stock' THEN 1 ELSE 0 END) as low_stock
+                FROM gm_concerns
+                WHERE sent_msg_id IS NOT NULL AND review_action IS NULL
+                GROUP BY sender_name
+                ORDER BY count DESC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_unreviewed_by_sender_name(sender_name: str) -> list[dict]:
+    """Return all unreviewed (sent but no button tapped) concerns for an exact sender name."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, source_chat_id, source_msg_key, concern_type,
+                       severity, sender_name, description, detected_at
+                FROM gm_concerns
+                WHERE sent_msg_id IS NOT NULL AND review_action IS NULL
+                  AND sender_name = %s
+                ORDER BY detected_at ASC
+            """, (sender_name,))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def gm_mark_sent(concern_id: int, telegram_msg_id: int) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
