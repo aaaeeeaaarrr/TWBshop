@@ -177,6 +177,15 @@ def _staff_list_keyboard(rows: list[dict], bot_data: dict) -> InlineKeyboardMark
 async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
+
+    # Delete any previous button list still open in chat
+    prev_id = context.bot_data.pop("check_list_msg_id", None)
+    if prev_id:
+        try:
+            await context.bot.delete_message(chat_id=config.OWNER_TELEGRAM_ID, message_id=prev_id)
+        except Exception:
+            pass
+
     msg = await update.message.reply_text("⏳ Running analysis...")
     try:
         new_count = await run_analysis()
@@ -187,6 +196,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         header = "✓ %d new concerns found.\nTap a name to review:" % new_count if new_count else "Tap a name to review:"
         await msg.edit_text(header, reply_markup=_staff_list_keyboard(rows, context.bot_data))
+        context.bot_data["check_list_msg_id"] = msg.message_id
     except Exception as e:
         await msg.edit_text("Error: %s" % e)
 
@@ -248,13 +258,6 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     sent = 0
     for c in concerns:
         try:
-            msg = await context.bot.send_message(
-                chat_id=config.OWNER_TELEGRAM_ID,
-                text=_format_concern(c),
-                reply_markup=_concern_keyboard(c["id"]),
-            )
-            gm_mark_sent(c["id"], msg.message_id)
-
             tg_msg_ids = []
             key = c.get("source_msg_key", "")
             if key.startswith("msg:"):
@@ -330,6 +333,7 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
     sender_display = concerns[0]["sender_name"]
     # Delete the button list immediately — concerns will follow
     await query.message.delete()
+    context.bot_data.pop("check_list_msg_id", None)
 
     sent = 0
     for c in concerns:
