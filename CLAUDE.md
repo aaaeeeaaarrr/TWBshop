@@ -168,7 +168,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
 - B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
 - Listener: `python run_listener.py` — systemd: `twbshop-listener`
-- GM bot: `python run_gm_bot.py` — systemd: `twbshop-gm` (needs GM_BOT_TOKEN set first)
+- GM bot: `python run_gm_bot.py` — systemd: `twbshop-gm`
+  Groups the GM bot is IN: Stock Checks (-1003952029131), Supervisors, Management, COMMS & Transfers, TWB REPORT (-5136886404)
+  Groups it monitors but does NOT post to (except TWB REPORT receipt checks): all of the above
 - Price list fetcher: `python run_fetch_pricelists.py` — run manually to refresh supplier files
 - Set ANTHROPIC_API_KEY in config.py to enable AI features (retail bot only for now)
 - B2B customers: 24+ active customer groups identified in ops_messages DB; none have the bot yet — all ordering manually
