@@ -8,7 +8,7 @@ import logging
 import time
 from collections import defaultdict, deque
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Bot, InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler,
     ContextTypes, ConversationHandler, MessageHandler, filters,
@@ -58,6 +58,37 @@ def _format_concern(c: dict) -> str:
     return "%s [%s] — %s\n%s" % (emoji, label, sender, desc)
 
 
+async def _send_concern_with_photos(bot: Bot, concern: dict, file_ids: list[str]) -> int:
+    """Send concern card + photo album. Returns telegram message_id of the concern card."""
+    text = _format_concern(concern)
+    keyboard = _concern_keyboard(concern["id"])
+    file_ids = file_ids[:10]  # Telegram album cap
+
+    if len(file_ids) == 1:
+        msg = await bot.send_photo(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            photo=file_ids[0],
+            caption=text,
+            reply_markup=keyboard,
+        )
+    elif len(file_ids) > 1:
+        # Album first (no buttons), then concern card with buttons below
+        media = [InputMediaPhoto(fid) for fid in file_ids]
+        await bot.send_media_group(chat_id=config.OWNER_TELEGRAM_ID, media=media)
+        msg = await bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text=text,
+            reply_markup=keyboard,
+        )
+    else:
+        msg = await bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text=text,
+            reply_markup=keyboard,
+        )
+    return msg.message_id
+
+
 async def send_pending_concerns(bot: Bot) -> int:
     concerns = gm_get_unsent_concerns()
     if not concerns:
@@ -65,36 +96,38 @@ async def send_pending_concerns(bot: Bot) -> int:
     sent = 0
     for c in concerns:
         try:
-            msg = await bot.send_message(
-                chat_id=config.OWNER_TELEGRAM_ID,
-                text=_format_concern(c),
-                reply_markup=_concern_keyboard(c["id"]),
-            )
-            gm_mark_sent(c["id"], msg.message_id)
-
-            # Forward related photos (source message + nearby same-sender media)
+            # Try to get related photo Telegram message IDs
+            tg_msg_ids = []
             key = c.get("source_msg_key", "")
             if key.startswith("msg:"):
                 parts = key.split(":")
                 if len(parts) >= 3:
                     try:
                         ops_id = int(parts[2])
-                        photo_ids = gm_get_related_photos(
+                        tg_msg_ids = gm_get_related_photos(
                             c["source_chat_id"], ops_id, c.get("sender_name", "")
                         )
-                        for tg_msg_id in photo_ids:
-                            try:
-                                await bot.forward_message(
-                                    chat_id=config.OWNER_TELEGRAM_ID,
-                                    from_chat_id=c["source_chat_id"],
-                                    message_id=tg_msg_id,
-                                )
-                                await asyncio.sleep(0.1)
-                            except Exception:
-                                pass  # message may be too old to forward
                     except (ValueError, IndexError):
                         pass
 
+            # Send each photo (forward), then concern card — photos before card
+            for tg_msg_id in tg_msg_ids[:10]:
+                try:
+                    await bot.forward_message(
+                        chat_id=config.OWNER_TELEGRAM_ID,
+                        from_chat_id=c["source_chat_id"],
+                        message_id=tg_msg_id,
+                    )
+                    await asyncio.sleep(0.1)
+                except Exception:
+                    pass  # old pre-conversion messages silently skipped
+
+            msg = await bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=_format_concern(c),
+                reply_markup=_concern_keyboard(c["id"]),
+            )
+            gm_mark_sent(c["id"], msg.message_id)
             sent += 1
             await asyncio.sleep(0.3)
         except Exception as e:
@@ -215,27 +248,35 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             gm_mark_sent(c["id"], msg.message_id)
 
+            tg_msg_ids = []
             key = c.get("source_msg_key", "")
             if key.startswith("msg:"):
                 parts = key.split(":")
                 if len(parts) >= 3:
                     try:
-                        photo_ids = gm_get_related_photos(
+                        tg_msg_ids = gm_get_related_photos(
                             c["source_chat_id"], int(parts[2]), c.get("sender_name", "")
                         )
-                        for tg_msg_id in photo_ids:
-                            try:
-                                await context.bot.forward_message(
-                                    chat_id=config.OWNER_TELEGRAM_ID,
-                                    from_chat_id=c["source_chat_id"],
-                                    message_id=tg_msg_id,
-                                )
-                                await asyncio.sleep(0.1)
-                            except Exception:
-                                pass
                     except (ValueError, IndexError):
                         pass
 
+            for tg_msg_id in tg_msg_ids[:10]:
+                try:
+                    await context.bot.forward_message(
+                        chat_id=config.OWNER_TELEGRAM_ID,
+                        from_chat_id=c["source_chat_id"],
+                        message_id=tg_msg_id,
+                    )
+                    await asyncio.sleep(0.1)
+                except Exception:
+                    pass
+
+            msg = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=_format_concern(c),
+                reply_markup=_concern_keyboard(c["id"]),
+            )
+            gm_mark_sent(c["id"], msg.message_id)
             sent += 1
             await asyncio.sleep(0.3)
         except Exception as e:
@@ -405,36 +446,27 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         if new_id:
             try:
-                sent_msg = await context.bot.send_message(
-                    chat_id=config.OWNER_TELEGRAM_ID,
-                    text=_format_concern({**c, "id": new_id}),
-                    reply_markup=_concern_keyboard(new_id),
+                # Collect file_ids from buffer (this message + nearby same-sender photos)
+                cutoff = now - _PHOTO_WINDOW
+                file_ids = []
+                for ts, bm in list(_msg_buffer[key]):
+                    if ts < cutoff:
+                        continue
+                    if bm.photo:
+                        file_ids.append(bm.photo[-1].file_id)
+                    elif bm.video:
+                        file_ids.append(bm.video.file_id)
+                # Deduplicate preserving order
+                seen_fids = set()
+                unique_fids = []
+                for fid in file_ids:
+                    if fid not in seen_fids:
+                        seen_fids.add(fid); unique_fids.append(fid)
+
+                tg_msg_id = await _send_concern_with_photos(
+                    context.bot, {**c, "id": new_id}, unique_fids
                 )
-                gm_mark_sent(new_id, sent_msg.message_id)
-
-                if has_media:
-                    # Photo in the same message — forward it directly
-                    await context.bot.forward_message(
-                        chat_id=config.OWNER_TELEGRAM_ID,
-                        from_chat_id=chat_id,
-                        message_id=msg_id,
-                    )
-                else:
-                    # Look back in buffer for photos from same sender within the window
-                    cutoff = now - _PHOTO_WINDOW
-                    related = [
-                        m for ts, m in _msg_buffer[key]
-                        if ts > cutoff and m.message_id != msg_id
-                        and (m.photo or m.document or m.video)
-                    ]
-                    for related_msg in related[-3:]:
-                        await context.bot.forward_message(
-                            chat_id=config.OWNER_TELEGRAM_ID,
-                            from_chat_id=chat_id,
-                            message_id=related_msg.message_id,
-                        )
-
-                # Track concern so future photos from this sender get linked
+                gm_mark_sent(new_id, tg_msg_id)
                 _concern_tracker[key].append((new_id, now))
                 logger.info("Live concern sent: %s from %s in %s", c["concern_type"], sender, chat_id)
             except Exception as e:
