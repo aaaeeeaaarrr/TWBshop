@@ -135,20 +135,20 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-27 (session 10)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot built and tested.
+**Last updated:** 2026-05-27 (session 11)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use.
 **Last completed:**
-- GM Manager bot built: `gm_bot/` (analyzer.py, bot.py), `run_gm_bot.py`, systemd service `twbshop-gm`
-- Stock Checks group (chat_id=-4681466315) imported into ops_messages: 148 messages
-- First live analysis: 16 concerns detected correctly (8 mistakes, 6 waste, 2 low-stock)
-- Bot confirmed owner-only: all sends go to OWNER_TELEGRAM_ID, no group replies ever
-- Silent group handler added as safety net: explicit pass on all group messages
-- DB tables: gm_concerns, gm_rules, gm_state
-- Scheduled: daily 01:00 UTC + every 4h. Commands: /check /pending /rules /start
-- concern buttons: [✓ All good] [🚨 Real issue] [📚 Teach bot] per concern
+- GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
+- Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
+- 411 concerns analyzed; historical ones re-sent via local script run_send_historical_photos.py
+- 383 concerns sent with photos (364/383 had matched local photos, 95% rate)
+- /review command added: resends sent-but-unreviewed concerns by staff with fresh buttons
+- Fixed: double /check button session bug, cmd_staff double-send bug
+- Button flow: /check → staff buttons → concerns flow; /review → same for already-sent ones
+- Buttons: [✓ All good] closes concern; [🚨 Real issue] flags for tracking; [📚 Teach bot] suppresses future similar via gm_rules
 **Next task (immediate):**
-  1. User creates bot via BotFather → name "GM Manager TWB" → paste token into secrets.py on server → `systemctl enable twbshop-gm && systemctl start twbshop-gm`
-  2. Staff real names mapping: user to provide real names for Telegram aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
+  1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
+  2. Staff real names mapping: provide real names for aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
   3. Import Management Group + Supervisors TWB into ops_messages DB (same HTML export process)
   4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
   5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
