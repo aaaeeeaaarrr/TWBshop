@@ -109,8 +109,7 @@ async def _daily_analysis_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         new_count = await run_analysis()
         if new_count > 0:
-            sent = await send_pending_concerns(context.bot)
-            logger.info("GM: sent %d concerns to owner", sent)
+            logger.info("GM: %d new concerns saved — owner can review with /staff", new_count)
         else:
             logger.info("GM: no new concerns")
     except Exception as e:
@@ -138,8 +137,16 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = await update.message.reply_text("⏳ Running analysis...")
     try:
         new_count = await run_analysis()
-        sent = await send_pending_concerns(context.bot)
-        await msg.edit_text("✓ Analysis done. %d new concerns, %d sent." % (new_count, sent))
+        from shared.database import gm_get_pending_by_sender
+        rows = gm_get_pending_by_sender()
+        total_unsent = sum(r["count"] for r in rows)
+        if new_count == 0 and total_unsent == 0:
+            await msg.edit_text("✓ Nothing new.")
+        else:
+            lines = ["✓ Analysis done. %d new concerns found." % new_count]
+            if total_unsent:
+                lines.append("%d total unsent — use /staff to review by person." % total_unsent)
+            await msg.edit_text("\n".join(lines))
     except Exception as e:
         await msg.edit_text("Error: %s" % e)
 
