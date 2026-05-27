@@ -350,6 +350,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Always buffer this message for later correlation
     _msg_buffer[key].append((now, msg))
+    logger.info("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():
