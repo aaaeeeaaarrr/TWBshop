@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import config
 from shared.database import (
-    gm_get_new_messages, gm_get_low_stock_history,
+    gm_get_new_messages, gm_get_new_messages_multi, gm_get_low_stock_history,
     gm_save_concern, gm_set_state, gm_get_state, gm_get_rules,
 )
 from shared.ai_client import _get_client, _encode
@@ -20,9 +20,37 @@ logger = logging.getLogger(__name__)
 
 STOCK_CHECKS_CHAT = config.STOCK_CHECKS_CHAT_ID
 
+# Groups scanned for operational concerns (stock/waste/mistakes/photos)
+OPS_CHATS = [
+    config.STOCK_CHECKS_CHAT_ID,
+    config.DAILY_REPORT_CHAT_ID,
+]
+
+# Groups scanned for attendance concerns (AL, lateness, absences)
+ATTENDANCE_CHATS = [
+    config.SUPERVISORS_CHAT_ID,
+    config.MANAGEMENT_CHAT_ID,
+]
+
+# Human-readable labels for each chat
+CHAT_LABELS = {
+    config.STOCK_CHECKS_CHAT_ID:  "Stock Checks",
+    config.SUPERVISORS_CHAT_ID:   "Supervisors",
+    config.MANAGEMENT_CHAT_ID:    "Management",
+    config.COMMS_CHAT_ID:         "COMMS",
+    config.DAILY_REPORT_CHAT_ID:  "Daily Report",
+}
+
 LOW_STOCK_KW = ["almost out", "out of stock", "running low", "please buy", "please order", "no more", "finish"]
-WASTE_KW = ["throw", "threw", "spoil", "expired", "expire", "cannot sale", "can't sell", "bad", "broken and looked", "wasted"]
-MISTAKE_KW = ["apologize", "apologi", "mistake", "broke", "broken", "dropped", "drop", "accidentally", "accident", "sorry"]
+WASTE_KW     = ["throw", "threw", "spoil", "expired", "expire", "cannot sale", "can't sell", "bad", "broken and looked", "wasted"]
+MISTAKE_KW   = ["apologize", "apologi", "mistake", "broke", "broken", "dropped", "drop", "accidentally", "accident", "sorry"]
+ATTENDANCE_KW = [
+    "late", "lateness", "tardy", "annual leave", "day off", "off today", "off tomorrow",
+    "coming late", "can't come", "cannot come", "sick", "not feeling well",
+    "permission", "absent", "absence", "emergency leave", "won't come", "half day",
+    "want off", "need off", " al ", "take al", "taking al", "use al",
+]
+PAYBACK_KW = ["pay back", "payback", "pay-back", "make up time", "compensate", "owe time"]
 
 _PHOTO_SYSTEM = (
     "You analyze photos from a bakery/restaurant operations group called 'Stock Checks +Cleans +Mistakes'. "
@@ -72,6 +100,44 @@ async def _analyze_photo(image_bytes: bytes) -> dict:
     return {"concern": False}
 
 
+def _detect_attendance_concerns(messages: list[dict], rules: list[dict]) -> list[dict]:
+    """Detect AL requests, lateness, absences from Supervisors/Management messages."""
+    concerns = []
+    for msg in messages:
+        text = msg.get("text") or ""
+        if not text or len(text) < 5:
+            continue
+        sender = msg.get("sender_name") or "Unknown"
+        chat_id = msg.get("chat_id", 0)
+        chat_label = CHAT_LABELS.get(chat_id, "Group")
+        key = "msg:%s:%s" % (chat_id, msg["id"])
+        t = text.lower()
+
+        if any(kw in t for kw in ATTENDANCE_KW):
+            if _matches_rules(text, "staffing", rules) != "ignore":
+                concerns.append({
+                    "source_msg_key": key + ":staffing",
+                    "concern_type": "staffing",
+                    "severity": "info",
+                    "sender_name": sender,
+                    "source_chat_id": chat_id,
+                    "description": "[%s] %s — attendance/leave: %s" % (chat_label, sender, text[:200]),
+                })
+
+        if any(kw in t for kw in PAYBACK_KW):
+            if _matches_rules(text, "staffing", rules) != "ignore":
+                concerns.append({
+                    "source_msg_key": key + ":payback",
+                    "concern_type": "staffing",
+                    "severity": "info",
+                    "sender_name": sender,
+                    "source_chat_id": chat_id,
+                    "description": "[%s] %s — pay-back time: %s" % (chat_label, sender, text[:200]),
+                })
+
+    return concerns
+
+
 def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]:
     """Detect waste, mistakes from text messages. Returns list of concern dicts."""
     concerns = []
@@ -80,7 +146,10 @@ def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]
         if not text:
             continue
         sender = msg.get("sender_name") or "Unknown"
-        key = "msg:%s:%s" % (msg["chat_id"] if "chat_id" in msg else STOCK_CHECKS_CHAT, msg["id"])
+        chat_id = msg.get("chat_id", STOCK_CHECKS_CHAT)
+        chat_label = CHAT_LABELS.get(chat_id, "")
+        prefix = "[%s] " % chat_label if chat_label else ""
+        key = "msg:%s:%s" % (chat_id, msg["id"])
         t = text.lower()
 
         if any(kw in t for kw in WASTE_KW):
@@ -90,7 +159,8 @@ def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]
                     "concern_type": "waste",
                     "severity": "info",
                     "sender_name": sender,
-                    "description": "%s reported waste/spoilage: %s" % (sender, text[:200]),
+                    "source_chat_id": chat_id,
+                    "description": "%s%s reported waste/spoilage: %s" % (prefix, sender, text[:200]),
                 })
 
         if any(kw in t for kw in MISTAKE_KW):
@@ -100,7 +170,8 @@ def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]
                     "concern_type": "mistake",
                     "severity": "info",
                     "sender_name": sender,
-                    "description": "%s reported a mistake: %s" % (sender, text[:200]),
+                    "source_chat_id": chat_id,
+                    "description": "%s%s reported a mistake: %s" % (prefix, sender, text[:200]),
                 })
 
     return concerns
@@ -151,40 +222,44 @@ async def run_analysis() -> int:
 
     logger.info("GM analysis: scanning messages since %s", since[:16])
 
-    new_messages = gm_get_new_messages(STOCK_CHECKS_CHAT, since)
-    logger.info("GM analysis: %d new messages", len(new_messages))
+    # Ops groups: waste, mistakes, low stock, photos
+    ops_messages = gm_get_new_messages_multi(OPS_CHATS, since)
+    # Attendance groups: AL, lateness, absences
+    attendance_messages = gm_get_new_messages_multi(ATTENDANCE_CHATS, since)
+
+    total = len(ops_messages) + len(attendance_messages)
+    logger.info("GM analysis: %d new messages (%d ops, %d attendance)",
+                total, len(ops_messages), len(attendance_messages))
 
     concerns = []
 
-    # Text-based concerns
-    concerns.extend(_detect_text_concerns(new_messages, rules))
+    # Text-based ops concerns (waste, mistakes)
+    concerns.extend(_detect_text_concerns(ops_messages, rules))
 
-    # Low-stock repeat detection (always runs, looks at last 14 days)
+    # Attendance concerns (AL, lateness, pay-back)
+    concerns.extend(_detect_attendance_concerns(attendance_messages, rules))
+
+    # Low-stock repeat detection (Stock Checks only, last 14 days)
     concerns.extend(_detect_low_stock_concerns(rules))
 
-    # Photo analysis — batch all new photos
-    photo_msgs = [m for m in new_messages if m.get("media_type") == "photo"]
+    # Photo analysis — ops groups only
+    photo_msgs = [m for m in ops_messages if m.get("media_type") == "photo"]
     if photo_msgs and config.ANTHROPIC_API_KEY:
         logger.info("GM analysis: analyzing %d photos", len(photo_msgs))
-        # Group photos sent within 2 minutes of each other (same check session)
-        # For now analyze individually but deduplicate by minute-bucket
         analyzed_buckets: set[str] = set()
         for msg in photo_msgs:
-            sent_at = str(msg.get("sent_at", ""))[:16]  # YYYY-MM-DDTHH:MM
+            sent_at = str(msg.get("sent_at", ""))[:16]
             bucket_key = "%s:%s" % (msg.get("sender_name", ""), sent_at)
             if bucket_key in analyzed_buckets:
                 continue
             analyzed_buckets.add(bucket_key)
-
-            # We don't have the actual photo bytes in the DB — skip vision for now
-            # Photos from the Telethon listener will be downloadable once we wire that up
-            # For imported HTML exports we don't have binary data in DB
+            # Vision analysis wired up once Telethon downloads photos to disk
             pass
 
     saved = 0
     for c in concerns:
         new_id = gm_save_concern(
-            source_chat_id=STOCK_CHECKS_CHAT,
+            source_chat_id=c.get("source_chat_id", STOCK_CHECKS_CHAT),
             source_msg_key=c["source_msg_key"],
             concern_type=c["concern_type"],
             severity=c["severity"],

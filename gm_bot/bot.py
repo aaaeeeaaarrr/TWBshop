@@ -434,8 +434,14 @@ async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await msg.edit_text("✓ No unreviewed concerns to analyse.")
             return
 
+        # Fetch approved proposals as learned context (Option 3)
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM gm_proposals WHERE status = 'approved' ORDER BY approved_at DESC LIMIT 30")
+                approved = [dict(r) for r in cur.fetchall()]
+
         await msg.edit_text("⏳ Analysing %d concerns — generating proposals..." % len(concerns))
-        proposals = await generate_proposals(concerns)
+        proposals = await generate_proposals(concerns, approved_proposals=approved)
 
         if not proposals:
             await msg.edit_text("Could not generate proposals. Check API key or try again.")

@@ -2043,11 +2043,24 @@ def gm_get_new_messages(chat_id: int, since: str) -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, message_id, sender_name, text, media_type, sent_at
+                SELECT id, message_id, chat_id, chat_title, sender_name, text, media_type, sent_at
                 FROM ops_messages
                 WHERE chat_id = %s AND sent_at::timestamptz > %s::timestamptz
                 ORDER BY sent_at ASC
             """, (chat_id, since))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_new_messages_multi(chat_ids: list[int], since: str) -> list[dict]:
+    """Return messages newer than `since` from multiple chats, ordered by time."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, message_id, chat_id, chat_title, sender_name, text, media_type, sent_at
+                FROM ops_messages
+                WHERE chat_id = ANY(%s) AND sent_at::timestamptz > %s::timestamptz
+                ORDER BY sent_at ASC
+            """, (chat_ids, since))
             return [dict(r) for r in cur.fetchall()]
 
 

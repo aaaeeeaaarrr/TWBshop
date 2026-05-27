@@ -408,8 +408,13 @@ Return a JSON array where each item is:
 }}"""
 
 
-async def generate_proposals(concerns: list[dict]) -> list[dict]:
-    """Cluster concerns into groups and generate re-education or recognition proposals."""
+async def generate_proposals(concerns: list[dict],
+                             approved_proposals: list[dict] | None = None) -> list[dict]:
+    """Cluster concerns into groups and generate re-education or recognition proposals.
+
+    approved_proposals: previously approved decisions — injected as context so the AI
+    avoids re-proposing settled matters and builds on existing knowledge.
+    """
     if not config.ANTHROPIC_API_KEY:
         return []
 
@@ -420,6 +425,23 @@ async def generate_proposals(concerns: list[dict]) -> list[dict]:
                                            c.get("sender_name", "?"), desc))
     concerns_text = "\n".join(lines)
 
+    # Option 3: inject approved proposals as learned context
+    approved_context = ""
+    if approved_proposals:
+        ap_lines = []
+        for p in approved_proposals[:30]:
+            ap_lines.append("• [%s] %s — %s" % (
+                p.get("proposal_type", "correction"),
+                p.get("group_name", ""),
+                (p.get("solution_text") or "")[:120],
+            ))
+        approved_context = (
+            "\n\nPreviously approved decisions (owner has already settled these):\n"
+            + "\n".join(ap_lines)
+            + "\n\nDo NOT re-propose the above. Use them to understand tone, priorities, "
+            "and what the owner considers resolved. Build on them if new concerns relate."
+        )
+
     try:
         resp = await _get_client().messages.create(
             model=GM_PROPOSALS_MODEL,
@@ -427,8 +449,9 @@ async def generate_proposals(concerns: list[dict]) -> list[dict]:
             system=[{"type": "text", "text": _GM_PROPOSALS_SYSTEM,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user",
-                       "content": _GM_PROPOSALS_USER.format(n=len(concerns),
-                                                             concerns=concerns_text)}],
+                       "content": _GM_PROPOSALS_USER.format(
+                           n=len(concerns), concerns=concerns_text
+                       ) + approved_context}],
         )
         return _parse_json_list(resp.content[0].text)
     except Exception as exc:
