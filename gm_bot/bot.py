@@ -23,6 +23,7 @@ from shared.database import (
     gm_save_proposal, gm_get_proposal, gm_get_draft_proposals,
     gm_approve_proposal, gm_reject_proposal, gm_update_proposal_solution,
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
+    save_ops_message,
 )
 from shared.ai_client import generate_proposals
 from gm_bot.analyzer import run_analysis, analyze_live_message
@@ -165,6 +166,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/check — run analysis, show new concerns by staff\n"
         "/review — resend concerns awaiting your button tap\n"
         "/proposals — AI groups all concerns + drafts solutions\n"
+        "/approved — GM playbook: all approved proposals\n"
         "/points — monthly points leaderboard\n"
         "/staff <name> — send that person's concerns\n"
         "/rules — show learned suppression rules"
@@ -534,6 +536,43 @@ async def cmd_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("\n".join(lines))
 
 
+async def cmd_approved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show all approved proposals — the GM's current playbook."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_proposals
+                WHERE status = 'approved'
+                ORDER BY approved_at DESC
+            """)
+            proposals = [dict(r) for r in cur.fetchall()]
+
+    if not proposals:
+        await update.message.reply_text(
+            "No approved proposals yet.\n"
+            "Run /proposals to generate and approve some."
+        )
+        return
+
+    await update.message.reply_text("📋 GM Playbook — %d approved proposals:" % len(proposals))
+    for p in proposals:
+        import json as _json
+        ptype = p.get("proposal_type", "correction")
+        icon = "✓📊" if ptype == "correction" else "✓⭐"
+        text = _format_proposal(p) + "\n\n%s Approved" % icon
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📚 Teach Bot", callback_data="gmprop:refine:%d" % p["id"]),
+        ]])
+        await context.bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text=text,
+            reply_markup=kb,
+        )
+        await asyncio.sleep(0.3)
+
+
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
@@ -759,7 +798,21 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Always buffer this message for later correlation
     _msg_buffer[key].append((now, msg))
-    logger.info("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
+
+    # Persist to ops_messages so all groups accumulate history automatically
+    try:
+        media_type = ("photo" if msg.photo else
+                      "video" if msg.video else
+                      "document" if msg.document else None)
+        sent_at = msg.date.isoformat() if msg.date else None
+        sender_id = msg.from_user.id if msg.from_user else None
+        chat_title = msg.chat.title or None
+        save_ops_message(chat_id, msg_id, chat_title, sender_id, sender,
+                         text or None, media_type, sent_at)
+    except Exception as _e:
+        logger.debug("ops_messages log failed: %s", _e)
+
+    logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():
@@ -854,6 +907,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("check",     cmd_check))
     app.add_handler(CommandHandler("review",    cmd_review))
     app.add_handler(CommandHandler("proposals", cmd_proposals))
+    app.add_handler(CommandHandler("approved",  cmd_approved))
     app.add_handler(CommandHandler("points",    cmd_points))
     app.add_handler(CommandHandler("pending",   cmd_pending))
     app.add_handler(CommandHandler("staff",     cmd_staff))
