@@ -164,13 +164,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-def _staff_list_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
+def _staff_list_keyboard(rows: list[dict], bot_data: dict) -> InlineKeyboardMarkup:
+    bot_data["staff_index"] = {str(i): r["sender_name"] for i, r in enumerate(rows)}
     buttons = []
-    for r in rows:
+    for i, r in enumerate(rows):
         name = r["sender_name"] or "Unknown"
         label = "%s  (%d)" % (name, r["count"])
-        cb = ("ss:" + name)[:64]
-        buttons.append([InlineKeyboardButton(label, callback_data=cb)])
+        buttons.append([InlineKeyboardButton(label, callback_data="ss:%d" % i)])
     return InlineKeyboardMarkup(buttons)
 
 
@@ -186,7 +186,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await msg.edit_text("✓ Nothing new.")
             return
         header = "✓ %d new concerns found.\nTap a name to review:" % new_count if new_count else "Tap a name to review:"
-        await msg.edit_text(header, reply_markup=_staff_list_keyboard(rows))
+        await msg.edit_text(header, reply_markup=_staff_list_keyboard(rows, context.bot_data))
     except Exception as e:
         await msg.edit_text("Error: %s" % e)
 
@@ -316,7 +316,11 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
 
-    name = query.data[3:]  # strip "ss:" prefix
+    idx = query.data[3:]  # numeric index
+    name = context.bot_data.get("staff_index", {}).get(idx)
+    if not name:
+        await query.edit_message_text("Session expired — send /check again.")
+        return
     concerns = gm_get_unsent_by_sender(name)
 
     if not concerns:
@@ -371,7 +375,7 @@ async def staff_button_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.send_message(
             chat_id=config.OWNER_TELEGRAM_ID,
             text="✓ Sent %d concerns for %s.\nRemaining:" % (sent, sender_display),
-            reply_markup=_staff_list_keyboard(rows),
+            reply_markup=_staff_list_keyboard(rows, context.bot_data),
         )
     else:
         await context.bot.send_message(
