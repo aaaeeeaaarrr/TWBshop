@@ -369,6 +369,9 @@ async def extract_price_list_pdf(pdf_bytes: bytes) -> dict:
         return {"valid_date": None, "currency": "USD", "items": [], "error": str(exc)}
 
 
+GM_PROPOSALS_MODEL = "claude-opus-4-7"
+GM_REPLY_MODEL     = "claude-haiku-4-5-20251001"
+
 _GM_PROPOSALS_SYSTEM = (
     "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
     "You analyze months of staff operational messages and generate actionable proposals for the owner.\n\n"
@@ -419,7 +422,7 @@ async def generate_proposals(concerns: list[dict]) -> list[dict]:
 
     try:
         resp = await _get_client().messages.create(
-            model=config.CLAUDE_MODEL,
+            model=GM_PROPOSALS_MODEL,
             max_tokens=4000,
             system=[{"type": "text", "text": _GM_PROPOSALS_SYSTEM,
                      "cache_control": {"type": "ephemeral"}}],
@@ -431,6 +434,72 @@ async def generate_proposals(concerns: list[dict]) -> list[dict]:
     except Exception as exc:
         logger.error("Proposal generation failed: %s", exc)
         return []
+
+
+_GM_REFINE_SYSTEM = (
+    "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
+    "You are refining an operational proposal based on the owner's feedback. "
+    "Keep the same proposal_type and overall intent, but rewrite solution_text to incorporate the owner's context. "
+    "Tone: warm, encouraging, never shaming. Suitable for Khmer staff. "
+    "Return ONLY the updated solution_text — no labels, no JSON, just the message."
+)
+
+
+async def refine_proposal_with_ai(proposal: dict, feedback: str) -> str:
+    """Rewrite a proposal's solution_text using owner feedback. Returns new solution text."""
+    prompt = (
+        "Proposal type: %s\n"
+        "Group: %s\n"
+        "Root cause: %s\n"
+        "Current solution:\n%s\n\n"
+        "Owner's feedback/additional context:\n%s\n\n"
+        "Rewrite the solution incorporating this feedback."
+    ) % (proposal.get("proposal_type", "correction"), proposal.get("group_name", ""),
+         proposal.get("root_cause", ""), proposal.get("solution_text", ""), feedback)
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_PROPOSALS_MODEL,
+            max_tokens=500,
+            system=_GM_REFINE_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("Proposal refine failed: %s", exc)
+        return proposal.get("solution_text", "")
+
+
+_GM_REPLY_SYSTEM = (
+    "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
+    "You post occasional messages in staff group chats based on approved operational policies. "
+    "Your tone is warm, direct, and encouraging — never robotic or preachy. "
+    "Write naturally, as a real manager who noticed something specific. "
+    "2-3 sentences max. English unless strongly contextual Khmer is needed."
+)
+
+
+async def gm_compose_reply(solution_intent: str, trigger_text: str,
+                           sender_name: str, chat_title: str) -> str:
+    """Compose a fresh, contextual GM group reply using an approved solution as policy.
+    Uses Haiku — cheap per call, called at delivery time."""
+    prompt = (
+        "Approved policy: %s\n\n"
+        "What just happened in '%s':\n"
+        "%s posted: %s\n\n"
+        "Write a short natural response for this specific moment. "
+        "Don't repeat the policy word-for-word — phrase it freshly."
+    ) % (solution_intent, chat_title, sender_name, trigger_text)
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_REPLY_MODEL,
+            max_tokens=200,
+            system=_GM_REPLY_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("GM reply composition failed: %s", exc)
+        return solution_intent
 
 
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:
