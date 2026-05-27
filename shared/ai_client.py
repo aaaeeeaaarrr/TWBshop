@@ -429,16 +429,16 @@ async def generate_proposals(concerns: list[dict],
     approved_context = ""
     if approved_proposals:
         ap_lines = []
-        for p in approved_proposals[:30]:
+        for p in approved_proposals:
             ap_lines.append("• [%s] %s — %s" % (
                 p.get("proposal_type", "correction"),
                 p.get("group_name", ""),
                 (p.get("solution_text") or "")[:120],
             ))
         approved_context = (
-            "\n\nPreviously approved decisions (owner has already settled these):\n"
+            "\n\nAll previously approved decisions (owner has settled these — never expire):\n"
             + "\n".join(ap_lines)
-            + "\n\nDo NOT re-propose the above. Use them to understand tone, priorities, "
+            + "\n\nDo NOT re-propose any of the above. Use them to understand tone, priorities, "
             "and what the owner considers resolved. Build on them if new concerns relate."
         )
 

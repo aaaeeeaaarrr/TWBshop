@@ -437,7 +437,7 @@ async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Fetch approved proposals as learned context (Option 3)
         with _db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM gm_proposals WHERE status = 'approved' ORDER BY approved_at DESC LIMIT 30")
+                cur.execute("SELECT * FROM gm_proposals WHERE status = 'approved' ORDER BY approved_at DESC")
                 approved = [dict(r) for r in cur.fetchall()]
 
         await msg.edit_text("⏳ Analysing %d concerns — generating proposals..." % len(concerns))
