@@ -20,12 +20,17 @@ from shared.database import (
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
     gm_get_related_photos, gm_get_unsent_by_sender, gm_get_pending_by_sender,
     gm_get_unreviewed_by_sender, gm_get_unreviewed_by_sender_name,
+    gm_save_proposal, gm_get_proposal, gm_get_draft_proposals,
+    gm_approve_proposal, gm_reject_proposal, gm_update_proposal_solution,
+    gm_set_proposal_msg_id, gm_get_points_summary, _db,
 )
+from shared.ai_client import generate_proposals
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
 logger = logging.getLogger(__name__)
 
-TEACH_WAITING = 1  # ConversationHandler state
+TEACH_WAITING  = 1  # ConversationHandler states
+REFINE_WAITING = 2
 
 
 # ─── Keyboard builders ────────────────────────────────────────────────────────
@@ -156,12 +161,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
     await update.message.reply_text(
-        "GM Manager active.\n"
+        "GM Manager active.\n\n"
         "/check — run analysis, show new concerns by staff\n"
-        "/review — resend concerns waiting for your button tap\n"
-        "/staff — list pending concerns by staff member\n"
+        "/review — resend concerns awaiting your button tap\n"
+        "/proposals — AI groups all concerns + drafts solutions\n"
+        "/points — monthly points leaderboard\n"
         "/staff <name> — send that person's concerns\n"
-        "/rules — show learned rules"
+        "/rules — show learned suppression rules"
     )
 
 
@@ -323,6 +329,211 @@ async def cmd_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     context.bot_data["review_mode"] = True
 
 
+def _format_proposal(p: dict, index: int = 0, total: int = 0) -> str:
+    import json as _json
+    ptype = p.get("proposal_type", "correction")
+    icon = "📊" if ptype == "correction" else "⭐"
+    names = _json.loads(p.get("staff_names") or "[]") if isinstance(p.get("staff_names"), str) else (p.get("staff_names") or [])
+    ids = _json.loads(p.get("concern_ids") or "[]") if isinstance(p.get("concern_ids"), str) else (p.get("concern_ids") or [])
+
+    staff_str = ", ".join(names[:5])
+    if len(names) > 5:
+        staff_str += " (+%d)" % (len(names) - 5)
+
+    counter = " (%d/%d)" % (index, total) if total else ""
+    points_line = "\nPoints to award: +%d per person" % p["points"] if p.get("points") else ""
+    ids_preview = ", ".join("#%d" % i for i in ids[:8])
+    if len(ids) > 8:
+        ids_preview += "..."
+
+    return (
+        "%s Proposal%s: %s\n\n"
+        "Staff: %s\n"
+        "Root cause: %s\n%s\n"
+        "━━━━━━━━━━━━━━━\n"
+        "%s\n"
+        "━━━━━━━━━━━━━━━\n"
+        "Recipients: %s  •  %d concerns\n"
+        "Covers: %s"
+    ) % (icon, counter, p["group_name"],
+         staff_str or "—",
+         p.get("root_cause") or "—",
+         points_line,
+         p.get("solution_text") or "—",
+         p.get("recipients", "group"), len(ids),
+         ids_preview)
+
+
+def _proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✓ Approve", callback_data="gmprop:approve:%d" % proposal_id),
+        InlineKeyboardButton("✏️ Refine",  callback_data="gmprop:refine:%d" % proposal_id),
+        InlineKeyboardButton("✗ Skip",    callback_data="gmprop:skip:%d" % proposal_id),
+    ]])
+
+
+async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+
+    # Show existing drafts first if any
+    drafts = gm_get_draft_proposals()
+    if drafts:
+        msg = await update.message.reply_text(
+            "📋 %d existing proposal drafts. Resending them now..." % len(drafts)
+        )
+        for i, p in enumerate(drafts, 1):
+            text = _format_proposal(p, i, len(drafts))
+            sent = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=text,
+                reply_markup=_proposal_keyboard(p["id"]),
+            )
+            gm_set_proposal_msg_id(p["id"], sent.message_id)
+        await msg.delete()
+        return
+
+    # Generate new proposals
+    msg = await update.message.reply_text("⏳ Analysing concerns with AI — this takes a moment...")
+    try:
+        # Fetch all unreviewed concerns (sent + unsent)
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, concern_type, sender_name, description
+                    FROM gm_concerns
+                    WHERE review_action IS NULL
+                    ORDER BY detected_at ASC
+                """)
+                concerns = [dict(r) for r in cur.fetchall()]
+
+        if not concerns:
+            await msg.edit_text("✓ No unreviewed concerns to analyse.")
+            return
+
+        await msg.edit_text("⏳ Analysing %d concerns — generating proposals..." % len(concerns))
+        proposals = await generate_proposals(concerns)
+
+        if not proposals:
+            await msg.edit_text("Could not generate proposals. Check API key or try again.")
+            return
+
+        await msg.edit_text("✓ %d proposals generated. Sending now..." % len(proposals))
+
+        for i, p in enumerate(proposals, 1):
+            prop_id = gm_save_proposal(
+                proposal_type=p.get("proposal_type", "correction"),
+                group_name=p.get("group_name", "Unnamed"),
+                concern_type=p.get("concern_type", "mixed"),
+                concern_ids=p.get("concern_ids", []),
+                root_cause=p.get("root_cause", ""),
+                solution_text=p.get("solution_text", ""),
+                recipients=p.get("recipients", "group"),
+                staff_names=p.get("staff_names", []),
+                points=p.get("points", 0),
+            )
+            p["id"] = prop_id
+            text = _format_proposal(p, i, len(proposals))
+            sent = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=text,
+                reply_markup=_proposal_keyboard(prop_id),
+            )
+            gm_set_proposal_msg_id(prop_id, sent.message_id)
+            await asyncio.sleep(0.3)
+
+        await msg.delete()
+
+    except Exception as e:
+        await msg.edit_text("Error generating proposals: %s" % e)
+        logger.error("Proposals generation error: %s", e)
+
+
+async def gmprop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return ConversationHandler.END
+
+    parts = query.data.split(":")
+    action, proposal_id = parts[1], int(parts[2])
+    p = gm_get_proposal(proposal_id)
+    if not p:
+        await query.edit_message_text("Proposal not found.")
+        return ConversationHandler.END
+
+    if action == "approve":
+        gm_approve_proposal(proposal_id)
+        ptype = p.get("proposal_type", "correction")
+        label = "armed for future re-education" if ptype == "correction" else "recognition armed — points will be awarded"
+        await query.edit_message_text(
+            query.message.text + "\n\n✓ Approved — %s." % label
+        )
+        return ConversationHandler.END
+
+    if action == "skip":
+        gm_reject_proposal(proposal_id)
+        await query.edit_message_text(
+            query.message.text + "\n\n✗ Skipped."
+        )
+        return ConversationHandler.END
+
+    if action == "refine":
+        context.user_data["refining_proposal_id"] = proposal_id
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(
+            "✏️ Refining: %s\n\n"
+            "Current message:\n%s\n\n"
+            "━━━━━━━━━━━━━━━\n"
+            "Type your revised message — I'll update the proposal and show it again.\n"
+            "/cancel to keep as is." % (p["group_name"], p["solution_text"])
+        )
+        return REFINE_WAITING
+
+    return ConversationHandler.END
+
+
+async def refine_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return ConversationHandler.END
+
+    revised = update.message.text.strip()
+    proposal_id = context.user_data.pop("refining_proposal_id", None)
+    if not proposal_id:
+        return ConversationHandler.END
+
+    gm_update_proposal_solution(proposal_id, revised)
+    p = gm_get_proposal(proposal_id)
+    text = _format_proposal(p)
+    sent = await context.bot.send_message(
+        chat_id=config.OWNER_TELEGRAM_ID,
+        text=text,
+        reply_markup=_proposal_keyboard(proposal_id),
+    )
+    gm_set_proposal_msg_id(proposal_id, sent.message_id)
+    await update.message.reply_text("✓ Updated.")
+    return ConversationHandler.END
+
+
+async def refine_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("refining_proposal_id", None)
+    await update.message.reply_text("Cancelled — proposal unchanged.")
+    return ConversationHandler.END
+
+
+async def cmd_points(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    rows = gm_get_points_summary(since_days=30)
+    if not rows:
+        await update.message.reply_text("No points recorded yet this month.")
+        return
+    lines = ["⭐ Points — last 30 days:\n"]
+    for r in rows:
+        lines.append("• %s  +%d pts" % (r["staff_name"] or "Unknown", r["good_points"]))
+    await update.message.reply_text("\n".join(lines))
+
+
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
@@ -468,12 +679,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if action == "teach":
         context.user_data["teaching_concern_id"] = concern_id
-        context.user_data["teaching_msg_text"] = query.message.text
+        # Pull description from DB so we can show the original staff message
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT description FROM gm_concerns WHERE id = %s", (concern_id,))
+                row = cur.fetchone()
+        desc = row["description"] if row else query.message.text
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text(
-            "📚 What should I know about this concern?\n"
-            "Reply with your explanation. I'll remember it for similar cases.\n\n"
-            "(Send /cancel to skip)"
+            "📚 Teach — Concern #%d\n\n"
+            "Original:\n%s\n\n"
+            "━━━━━━━━━━━━━━━\n"
+            "Type the phrase I should watch for in future staff messages to recognise this pattern.\n"
+            "Copy a key phrase from above, or write your own. No length limit.\n\n"
+            "/cancel to skip" % (concern_id, desc)
         )
         return TEACH_WAITING
 
@@ -484,29 +703,21 @@ async def teach_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return ConversationHandler.END
 
-    note = update.message.text.strip()
+    pattern = update.message.text.strip()  # full phrase, no truncation
     concern_id = context.user_data.get("teaching_concern_id")
 
     if concern_id:
-        gm_review_concern(concern_id, "teach", teaching_note=note)
-        concern = gm_get_concern_by_msg_id(None)  # we have the id already
-
-        # Save as a rule — use first 60 chars of note as the pattern
-        pattern = note[:60]
-        from shared.database import _db
         with _db() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT concern_type FROM gm_concerns WHERE id = %s", (concern_id,))
                 row = cur.fetchone()
                 ctype = row["concern_type"] if row else None
 
-        gm_save_rule(
-            concern_type=ctype,
-            pattern=pattern,
-            action="ignore",
-            note=note,
+        gm_review_concern(concern_id, "teach", teaching_note=pattern)
+        gm_save_rule(concern_type=ctype, pattern=pattern, action="ignore", note=pattern)
+        await update.message.reply_text(
+            "✓ Saved. Future messages containing this phrase will be suppressed:\n\n\"%s\"" % pattern
         )
-        await update.message.reply_text("✓ Got it. I'll remember this for future concerns of this type.")
 
     context.user_data.pop("teaching_concern_id", None)
     return ConversationHandler.END
@@ -618,24 +829,35 @@ def build_app() -> Application:
 
     app = Application.builder().token(config.GM_BOT_TOKEN).build()
 
-    # ConversationHandler wraps the teach flow
+    # ConversationHandler wraps the teach + proposal-refine flows
     teach_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(button_callback, pattern=r"^gm:")],
-        states={TEACH_WAITING: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, teach_receive),
-            CommandHandler("cancel", teach_cancel),
-        ]},
+        entry_points=[
+            CallbackQueryHandler(button_callback, pattern=r"^gm:"),
+            CallbackQueryHandler(gmprop_callback, pattern=r"^gmprop:"),
+        ],
+        states={
+            TEACH_WAITING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, teach_receive),
+                CommandHandler("cancel", teach_cancel),
+            ],
+            REFINE_WAITING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, refine_receive),
+                CommandHandler("cancel", refine_cancel),
+            ],
+        },
         fallbacks=[CommandHandler("cancel", teach_cancel)],
         per_message=False,
         per_chat=True,
     )
 
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("check", cmd_check))
-    app.add_handler(CommandHandler("review", cmd_review))
-    app.add_handler(CommandHandler("pending", cmd_pending))
-    app.add_handler(CommandHandler("staff", cmd_staff))
-    app.add_handler(CommandHandler("rules", cmd_rules))
+    app.add_handler(CommandHandler("start",     cmd_start))
+    app.add_handler(CommandHandler("check",     cmd_check))
+    app.add_handler(CommandHandler("review",    cmd_review))
+    app.add_handler(CommandHandler("proposals", cmd_proposals))
+    app.add_handler(CommandHandler("points",    cmd_points))
+    app.add_handler(CommandHandler("pending",   cmd_pending))
+    app.add_handler(CommandHandler("staff",     cmd_staff))
+    app.add_handler(CommandHandler("rules",     cmd_rules))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(teach_conv)
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))

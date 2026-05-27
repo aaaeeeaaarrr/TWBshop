@@ -1652,6 +1652,30 @@ def init_gm_db() -> None:
                     value      TEXT,
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                CREATE TABLE IF NOT EXISTS gm_proposals (
+                    id              SERIAL PRIMARY KEY,
+                    proposal_type   TEXT NOT NULL DEFAULT 'correction', -- correction | recognition
+                    group_name      TEXT NOT NULL,
+                    concern_type    TEXT DEFAULT 'mixed',
+                    concern_ids     TEXT NOT NULL DEFAULT '[]',  -- JSON array of concern IDs
+                    root_cause      TEXT,
+                    solution_text   TEXT NOT NULL,               -- message to eventually send
+                    recipients      TEXT DEFAULT 'group',        -- group | individual
+                    staff_names     TEXT DEFAULT '[]',           -- JSON array of names
+                    points          INTEGER DEFAULT 0,           -- points to award (recognition only)
+                    status          TEXT DEFAULT 'draft',        -- draft | approved | rejected
+                    created_at      TIMESTAMPTZ DEFAULT NOW(),
+                    approved_at     TIMESTAMPTZ,
+                    owner_msg_id    INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS gm_staff_points (
+                    id          SERIAL PRIMARY KEY,
+                    staff_name  TEXT NOT NULL,
+                    points      INTEGER NOT NULL DEFAULT 1,
+                    reason      TEXT,
+                    concern_id  INTEGER,
+                    awarded_at  TIMESTAMPTZ DEFAULT NOW()
+                );
             """)
 
 
@@ -1781,6 +1805,97 @@ def gm_get_unreviewed_by_sender_name(sender_name: str) -> list[dict]:
                   AND sender_name = %s
                 ORDER BY detected_at ASC
             """, (sender_name,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_save_proposal(proposal_type: str, group_name: str, concern_type: str,
+                     concern_ids: list, root_cause: str, solution_text: str,
+                     recipients: str, staff_names: list, points: int = 0) -> int:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_proposals
+                    (proposal_type, group_name, concern_type, concern_ids,
+                     root_cause, solution_text, recipients, staff_names, points)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (proposal_type, group_name, concern_type,
+                  _json.dumps(concern_ids), root_cause, solution_text,
+                  recipients, _json.dumps(staff_names), points))
+            return cur.fetchone()["id"]
+
+
+def gm_get_proposal(proposal_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM gm_proposals WHERE id = %s", (proposal_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def gm_get_draft_proposals() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_proposals WHERE status = 'draft' ORDER BY created_at DESC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_approve_proposal(proposal_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_proposals SET status = 'approved', approved_at = NOW()
+                WHERE id = %s
+            """, (proposal_id,))
+
+
+def gm_reject_proposal(proposal_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE gm_proposals SET status = 'rejected' WHERE id = %s", (proposal_id,))
+
+
+def gm_update_proposal_solution(proposal_id: int, solution_text: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE gm_proposals SET solution_text = %s WHERE id = %s",
+                        (solution_text, proposal_id))
+
+
+def gm_set_proposal_msg_id(proposal_id: int, msg_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE gm_proposals SET owner_msg_id = %s WHERE id = %s",
+                        (msg_id, proposal_id))
+
+
+def gm_award_points(staff_name: str, points: int, reason: str,
+                    concern_id: int | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_staff_points (staff_name, points, reason, concern_id)
+                VALUES (%s, %s, %s, %s)
+            """, (staff_name, points, reason, concern_id))
+
+
+def gm_get_points_summary(since_days: int = 30) -> list[dict]:
+    """Return monthly point totals per staff, ordered by total desc."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT staff_name,
+                       SUM(CASE WHEN points > 0 THEN points ELSE 0 END) AS good_points,
+                       SUM(CASE WHEN points < 0 THEN points ELSE 0 END) AS bad_points,
+                       COUNT(*) AS entries
+                FROM gm_staff_points
+                WHERE awarded_at >= NOW() - INTERVAL '%s days'
+                GROUP BY staff_name
+                ORDER BY good_points DESC
+            """, (since_days,))
             return [dict(r) for r in cur.fetchall()]
 
 

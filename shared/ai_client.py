@@ -24,6 +24,22 @@ def _encode(image_bytes: bytes) -> str:
     return base64.standard_b64encode(image_bytes).decode()
 
 
+def _parse_json_list(text: str) -> list:
+    """Extract JSON array from Claude response, handling optional markdown fences."""
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+    if match:
+        text = match.group(1)
+    start = text.find("[")
+    end = text.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end + 1]
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        logger.warning("Could not parse AI response as JSON list: %.200s", text)
+        return []
+
+
 def _parse_json(text: str) -> dict:
     """Extract JSON from Claude's response, handling optional markdown fences."""
     # Strip markdown code block if present
@@ -351,6 +367,70 @@ async def extract_price_list_pdf(pdf_bytes: bytes) -> dict:
     except Exception as exc:
         logger.error("Price list PDF extraction failed: %s", exc)
         return {"valid_date": None, "currency": "USD", "items": [], "error": str(exc)}
+
+
+_GM_PROPOSALS_SYSTEM = (
+    "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
+    "You analyze months of staff operational messages and generate actionable proposals for the owner.\n\n"
+    "Two types of proposals:\n"
+    "1. CORRECTION — recurring problems that need a re-education message\n"
+    "2. RECOGNITION — positive behaviors that deserve acknowledgement and a point award\n\n"
+    "Staff culture: Khmer-speaking team, mix of experience levels. Tone always warm and encouraging, never shaming. "
+    "The bakery monitors: stock checks, cleanliness, mistakes, waste, and accidents.\n\n"
+    "Return ONLY a valid JSON array, no other text."
+)
+
+_GM_PROPOSALS_USER = """Here are {n} operational concerns from the bakery's Stock Checks group:
+
+{concerns}
+
+Also note: this bakery rewards staff for transparency — staff who proactively report problems (even their own mistakes) should be recognized.
+
+Instructions:
+1. Group the CORRECTION concerns by root cause. Aim for 3-8 meaningful groups. Do not make groups too granular.
+2. Identify any RECOGNITION opportunities — patterns of good reporting behavior worth acknowledging.
+3. For each group, draft the message the GM will eventually send.
+
+Return a JSON array where each item is:
+{{
+  "proposal_type": "correction" or "recognition",
+  "group_name": "Short descriptive name (5 words max)",
+  "concern_ids": [list of concern ID integers in this group],
+  "root_cause": "Why this keeps happening or why this deserves recognition — 1-2 sentences",
+  "solution_text": "The message to send staff. Friendly, practical, 2-4 sentences. Start with 'Dear team,' or 'Dear [name],' as appropriate.",
+  "recipients": "group" or "individual",
+  "staff_names": ["Name1", "Name2"],
+  "concern_type": "mistake" or "waste" or "low_stock" or "mixed",
+  "points": 0 (correction) or 1 (recognition)
+}}"""
+
+
+async def generate_proposals(concerns: list[dict]) -> list[dict]:
+    """Cluster concerns into groups and generate re-education or recognition proposals."""
+    if not config.ANTHROPIC_API_KEY:
+        return []
+
+    lines = []
+    for c in concerns[:150]:
+        desc = (c.get("description") or "")[:150]
+        lines.append("#%d [%s] %s: %s" % (c["id"], c.get("concern_type", "?"),
+                                           c.get("sender_name", "?"), desc))
+    concerns_text = "\n".join(lines)
+
+    try:
+        resp = await _get_client().messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=4000,
+            system=[{"type": "text", "text": _GM_PROPOSALS_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user",
+                       "content": _GM_PROPOSALS_USER.format(n=len(concerns),
+                                                             concerns=concerns_text)}],
+        )
+        return _parse_json_list(resp.content[0].text)
+    except Exception as exc:
+        logger.error("Proposal generation failed: %s", exc)
+        return []
 
 
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:
