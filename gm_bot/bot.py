@@ -18,6 +18,7 @@ import config
 from shared.database import (
     gm_get_unsent_concerns, gm_mark_sent, gm_review_concern,
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
+    gm_get_related_photos,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
@@ -70,6 +71,30 @@ async def send_pending_concerns(bot: Bot) -> int:
                 reply_markup=_concern_keyboard(c["id"]),
             )
             gm_mark_sent(c["id"], msg.message_id)
+
+            # Forward related photos (source message + nearby same-sender media)
+            key = c.get("source_msg_key", "")
+            if key.startswith("msg:"):
+                parts = key.split(":")
+                if len(parts) >= 3:
+                    try:
+                        ops_id = int(parts[2])
+                        photo_ids = gm_get_related_photos(
+                            c["source_chat_id"], ops_id, c.get("sender_name", "")
+                        )
+                        for tg_msg_id in photo_ids:
+                            try:
+                                await bot.forward_message(
+                                    chat_id=config.OWNER_TELEGRAM_ID,
+                                    from_chat_id=c["source_chat_id"],
+                                    message_id=tg_msg_id,
+                                )
+                                await asyncio.sleep(0.1)
+                            except Exception:
+                                pass  # message may be too old to forward
+                    except (ValueError, IndexError):
+                        pass
+
             sent += 1
             await asyncio.sleep(0.3)
         except Exception as e:

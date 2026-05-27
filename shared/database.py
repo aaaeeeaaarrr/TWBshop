@@ -1778,3 +1778,45 @@ def gm_get_new_messages(chat_id: int, since: str) -> list[dict]:
                 ORDER BY sent_at ASC
             """, (chat_id, since))
             return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_related_photos(chat_id: int, ops_msg_id: int, sender_name: str,
+                          window_secs: int = 600) -> list[int]:
+    """
+    Return Telegram message_ids of photos from the same sender within
+    window_secs of the given ops_messages.id. Includes the source message
+    itself if it has media. Used to attach photos when sending historical concerns.
+    """
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT message_id, sent_at, media_type FROM ops_messages WHERE id = %s",
+                (ops_msg_id,)
+            )
+            ref = cur.fetchone()
+            if not ref:
+                return []
+
+            results = []
+            # Include source message if it has media
+            if ref["media_type"] in ("photo", "video", "document"):
+                results.append(ref["message_id"])
+
+            # Nearby media from same sender within the window
+            cur.execute("""
+                SELECT message_id FROM ops_messages
+                WHERE chat_id = %s
+                  AND sender_name = %s
+                  AND media_type IN ('photo', 'video', 'document')
+                  AND id != %s
+                  AND ABS(EXTRACT(EPOCH FROM (
+                      sent_at::timestamptz - %s::timestamptz
+                  ))) <= %s
+                ORDER BY sent_at
+                LIMIT 5
+            """, (chat_id, sender_name, ops_msg_id, ref["sent_at"], window_secs))
+            for r in cur.fetchall():
+                if r["message_id"] not in results:
+                    results.append(r["message_id"])
+
+            return results[:4]  # cap at 4 total
