@@ -62,6 +62,33 @@ def _compress_pdf(file_path: str) -> bytes | None:
             os.unlink(tmp_path)
 
 
+def _pdf_to_page_images(file_path: str, dpi: int = 100) -> list[bytes]:
+    """Convert each PDF page to a JPEG using pdftoppm. Returns list of image bytes."""
+    tmp_dir = None
+    try:
+        tmp_dir = tempfile.mkdtemp()
+        result = subprocess.run(
+            ["pdftoppm", "-jpeg", f"-r{dpi}", file_path, os.path.join(tmp_dir, "page")],
+            capture_output=True, timeout=120,
+        )
+        if result.returncode != 0:
+            return []
+        pages = sorted(
+            os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if f.endswith(".jpg")
+        )
+        images = []
+        for p in pages:
+            with open(p, "rb") as f:
+                images.append(f.read())
+        return images
+    except Exception:
+        return []
+    finally:
+        if tmp_dir:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def _normalize_date(date_str: str | None) -> str | None:
     """Normalize partial dates to YYYY-MM-DD. Returns None if unparseable."""
     if not date_str:
@@ -90,21 +117,39 @@ async def _process_file(supplier: str, file_path: str) -> int:
         elif ext in SUPPORTED_DOC_EXTS:
             if size_mb > MAX_FILE_MB:
                 logger.info("  Compressing (%.1fMB): %s", size_mb, fname)
-                data = _compress_pdf(file_path)
-                if data is None:
-                    logger.info("  SKIP compress failed: %s", fname)
-                    mark_supplier_file_processed(file_path, 0, "too_large")
-                    return 0
-                compressed_mb = len(data) / (1024 * 1024)
-                if compressed_mb > MAX_FILE_MB:
-                    logger.info("  SKIP still too large after compress (%.1fMB): %s", compressed_mb, fname)
-                    mark_supplier_file_processed(file_path, 0, "too_large")
-                    return 0
-                logger.info("  Compressed %.1fMB → %.1fMB: %s", size_mb, compressed_mb, fname)
+                compressed = _compress_pdf(file_path)
+                compressed_mb = len(compressed) / (1024 * 1024) if compressed else 0
+                if compressed and compressed_mb < size_mb and compressed_mb <= MAX_FILE_MB:
+                    logger.info("  Compressed %.1fMB → %.1fMB: %s", size_mb, compressed_mb, fname)
+                    data = compressed
+                    result = await extract_price_list_pdf(data)
+                else:
+                    # Compression didn't help — convert each page to JPEG and merge results
+                    logger.info("  Compress unhelpful (%.1fMB) — splitting into pages: %s", compressed_mb or size_mb, fname)
+                    pages = _pdf_to_page_images(file_path)
+                    if not pages:
+                        logger.info("  SKIP page conversion failed: %s", fname)
+                        mark_supplier_file_processed(file_path, 0, "too_large")
+                        return 0
+                    logger.info("  Processing %d pages: %s", len(pages), fname)
+                    all_items = []
+                    result_date = None
+                    for i, page_data in enumerate(pages):
+                        page_result = await extract_price_list_image(page_data)
+                        await asyncio.sleep(API_DELAY)
+                        if not page_result.get("error"):
+                            all_items.extend(page_result.get("items", []))
+                            if not result_date:
+                                result_date = page_result.get("valid_date")
+                    valid_date = _normalize_date(result_date) or _normalize_date(price_date)
+                    saved = save_supplier_price_items(supplier, all_items, file_path, valid_date)
+                    mark_supplier_file_processed(file_path, saved)
+                    logger.info("  %s — %d items across %d pages (date: %s)", fname, saved, len(pages), valid_date or "unknown")
+                    return saved
             else:
                 with open(file_path, "rb") as f:
                     data = f.read()
-            result = await extract_price_list_pdf(data)
+                result = await extract_price_list_pdf(data)
         else:
             mark_supplier_file_processed(file_path, 0, "unsupported")
             return 0
