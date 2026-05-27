@@ -15,7 +15,6 @@ if not os.path.exists("secrets.py"):
 
 sys.path.insert(0, "/root/TWBshop")
 
-import httpx
 from telethon import TelegramClient
 
 import config
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 REPORT_CHAT_ID = config.DAILY_REPORT_CHAT_ID
 LOOKBACK = 100   # scan last N messages in the group
-BOT_API  = f"https://api.telegram.org/bot{config.GM_BOT_TOKEN}"
 
 
 async def main():
@@ -37,9 +35,7 @@ async def main():
     client = TelegramClient("ops_listener", config.TELETHON_API_ID, config.TELETHON_API_HASH)
     await client.start(phone=config.TELETHON_PHONE)
 
-    checked = skipped = 0
-    # List of (sender_name, issues_str) for unclear receipts
-    unclear_receipts: list[tuple[str, str]] = []
+    checked = replied = skipped = 0
 
     logger.info("Scanning last %d messages in TWB REPORT (chat_id=%s)...", LOOKBACK, REPORT_CHAT_ID)
 
@@ -61,8 +57,6 @@ async def main():
             last = getattr(msg.sender, "last_name", "") or ""
             if last:
                 sender = f"{sender} {last}".strip()
-        if not sender:
-            sender = "Someone"
 
         if not result["is_receipt"]:
             logger.info("  msg %s (%s) — not a receipt, skip", msg.id, sender)
@@ -72,37 +66,28 @@ async def main():
             logger.info("  msg %s (%s) — receipt OK", msg.id, sender)
             continue
 
-        issues = ", ".join(result["issues"]) if result["issues"] else "photo not clear"
-        logger.info("  msg %s (%s) — unclear: %s", msg.id, sender, issues)
-        unclear_receipts.append((sender, issues))
+        # Build a short, simple reply
+        partial = result.get("readable_partial", "")
+        if result.get("is_handwritten") and partial:
+            reply = f"Can you tell me what this says? I can see \"{partial}\" but hard to read."
+        else:
+            issues = result.get("issues", [])
+            if issues:
+                issue_text = " and ".join(i.lower().rstrip(".") for i in issues[:2])
+                reply = f"Please send this photo again — {issue_text}."
+            else:
+                reply = "Please send this photo again — not clear enough to record."
+
+        # Use Telethon to reply — its IDs match, no mismatch with Bot API
+        await client.send_message(REPORT_CHAT_ID, reply, reply_to=msg.id)
+        replied += 1
+        logger.info("  msg %s (%s) — replied: %s", msg.id, sender, reply)
+
+        await asyncio.sleep(1)  # avoid flood wait
 
     await client.disconnect()
 
-    logger.info("\nDone. Checked %d receipts, %d unclear, skipped %d.", checked, len(unclear_receipts), skipped)
-
-    if unclear_receipts:
-        # Build one general message — no reply_to_message_id (avoids Telethon/Bot API ID mismatch)
-        lines = ["Some receipt photos were not clear enough to record:"]
-        seen = set()
-        for sender, issues in unclear_receipts:
-            key = f"{sender}:{issues}"
-            if key not in seen:
-                lines.append(f"• {sender} — {issues}")
-                seen.add(key)
-        lines.append("\nPlease check your recent photos and send again if not clear. Thank you.")
-        message = "\n".join(lines)
-
-        async with httpx.AsyncClient(timeout=15) as http:
-            resp = await http.post(f"{BOT_API}/sendMessage", json={
-                "chat_id": REPORT_CHAT_ID,
-                "text": message,
-            })
-        if resp.status_code == 200:
-            logger.info("Sent group summary message for %d unclear receipts.", len(unclear_receipts))
-        else:
-            logger.warning("Failed to send group message: %s", resp.text[:200])
-    else:
-        logger.info("All receipts were clear — no message needed.")
+    logger.info("\nDone. Checked %d receipts, replied to %d, skipped %d.", checked, replied, skipped)
 
     logger.info("Restarting listener service...")
     subprocess.run(["systemctl", "start", "twbshop-listener"], check=False)

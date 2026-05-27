@@ -604,20 +604,21 @@ async def assess_receipt_photo(image_bytes: bytes) -> dict:
     """
     prompt = (
         "Look at this photo.\n\n"
-        "First: is this a receipt, invoice, or expense document? "
-        "(not a product photo, menu, staff selfie, or unrelated image)\n\n"
-        "If yes, check whether these can be clearly read:\n"
-        "- Total amount / price (may be USD or Khmer Riel ៛ — both valid)\n"
-        "- What was purchased (items or description)\n"
-        "- Vendor / store name\n"
-        "- Date\n\n"
-        "Also check: is this handwritten (not printed)?\n\n"
+        "First: is this a receipt, invoice, expense list, or payment document? "
+        "(handwritten or printed — both are normal. Not a product photo, menu, or unrelated image)\n\n"
+        "If yes, check ONLY these two things:\n"
+        "1. Can you read the TOTAL AMOUNT? (USD or Khmer Riel ៛ — both valid. Missing vendor name, "
+        "date, phone number, or blank columns are NOT a problem — ignore those.)\n"
+        "2. Can you read WHAT WAS BOUGHT? (items, descriptions, or quantities — at least roughly)\n\n"
+        "Also: is this handwritten?\n\n"
+        "is_clear = true if BOTH total amount AND items are readable enough to record.\n"
+        "Only flag something in issues if it is genuinely unreadable (too blurry, too dark, cut off, "
+        "or handwriting completely illegible). Do NOT flag: missing vendor, missing date, blank columns, "
+        "crossed-out entries, 2-digit year formats.\n\n"
         "Respond ONLY with JSON:\n"
         '{"is_receipt": true/false, "is_clear": true/false, "is_handwritten": true/false, '
-        '"issues": ["specific problem 1", ...], "readable_partial": "any text you CAN read"}\n\n'
-        "Only list genuine readability problems (blurry, cut off, too dark, amount hidden, handwriting unclear). "
-        "readable_partial: write any amounts/text you can partially make out, or empty string if nothing. "
-        "If is_clear is true, issues must be empty []."
+        '"issues": ["short problem description"], "readable_partial": "any amounts/text you CAN read"}\n\n'
+        "issues must be short (5 words max each). If is_clear is true, issues must be []."
     )
     try:
         resp = await _get_client().messages.create(

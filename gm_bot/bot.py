@@ -928,8 +928,7 @@ async def _check_report_receipt(msg, context) -> None:
         partial = result.get("readable_partial", "")
 
         if result.get("is_handwritten") and partial:
-            # Ask for clarification on specific text we can partially see
-            question = f"Can you tell me what this says? I can see \"{partial}\" but cannot read it all."
+            question = f"Can you tell me what this says? I can see \"{partial}\" but hard to read."
             sent = await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=question,
@@ -938,8 +937,12 @@ async def _check_report_receipt(msg, context) -> None:
             receipt_save_clarification(msg.chat_id, msg.message_id, sent.message_id, question, sender)
             logger.info("Asked handwritten clarification for msg %s", msg.message_id)
         else:
-            issues = ", ".join(result["issues"]) if result["issues"] else "not clear"
-            reply = f"Please send this photo again. {issues.capitalize()}."
+            issues = result["issues"]
+            if issues:
+                issue_text = " and ".join(i.lower().rstrip(".") for i in issues[:2])
+                reply = f"Please send this photo again — {issue_text}."
+            else:
+                reply = "Please send this photo again — not clear enough to record."
             await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=reply,
