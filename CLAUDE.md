@@ -135,7 +135,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-27 (session 13)
+**Last updated:** 2026-05-27 (session 14)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
@@ -155,13 +155,21 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Staff alias map: 25+ Telegram display name → real name mappings from May 2026 salary sheet
 - Proposals redesigned: Opus model, soft skip (pool return), AI-powered refine, 24h auto-skip, model ranking
 - [✏️ Refine] on /approved: stacked notes, conflict detection, [New/Old/Keep both] resolution buttons, refinement_history column
+- Buonissimo supplier added to price fetcher (chat_id=-5218925376)
+- PDF price list handling rewritten with PyMuPDF: text-layer PDFs sent as PDF; image-only PDFs rendered page-by-page as JPEG
+- TWB REPORT receipt checking: GM bot now monitors every new photo in REPORT group and replies in-thread if unclear
+- Reply uses Telethon (not Bot API) to avoid MTProto/Bot API message ID mismatch for regular groups
+- AI clarity rules tightened: only flags unreadable total amount or items — ignores missing vendor, date, phone, blank columns
+- Receipt clarification learning: past answered Q&As stored in receipt_clarifications DB, injected into AI prompt as few-shot examples
+- Backfilled 5 expense format examples into DB (mixed delivery+gas sheet, Atlas Ice, daily staff food money, food ingredient expense list, B2B delivery charges)
+- run_check_report_photos.py: one-time historical scan — all 9 existing REPORT photos now pass clean (zero unclear after learning)
+- run_backfill_clarifications.py: one-time script to import staff replies to historical clarification questions into DB
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
-  2. Management Group history: already imported (538 messages) ✓
-  3. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
-  4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
-  5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
-  6. B2B bot rollout: add bot to all 24+ B2B customer groups
+  2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
+  3. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
+  4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
+  5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
