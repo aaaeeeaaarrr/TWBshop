@@ -76,3 +76,57 @@ GM_TEST_GROUP_ID: int = 0
 # How many days of repeated low-stock alerts before flagging as a concern.
 GM_LOW_STOCK_THRESHOLD_DAYS: int = 3
 
+# Telegram display name → real name mapping for GM bot output.
+# Key = exact sender_name from ops_messages. Value = real name from salary sheet.
+# Add unknowns as replies come in from staff.
+STAFF_ALIAS_MAP: dict[str, str] = {
+    # ── Confirmed from salary sheet ──────────────────────────────────────
+    "FAI LYNN⚕️KAG LYNN":                  "Vann Failin",
+    "SAM PHARM":                            "Chim Samphass",
+    "LONG":                                 "Lim Kimlong",
+    "Rath Phal":                            "Rath",
+    "Hong Vannary":                         "Vannary",
+    "Hong Vanary":                          "Vannary",
+    "Thy Da":                               "Tyda",
+    "Sachak Anan":                          "Kiry Sachak Anan",
+    "CHUN CHOMREUN":                        "Chun Chomruen",
+    "Neat Kheak":                           "Neat Kheak",
+    "Bad boy Somnang":                      "Sot Somnang",
+    "Buy Vong Sakda":                       "Buy Vong Sakada",
+    "Monyboth Sopheaknal":                  "Sopheak Nalmonyboth",
+    "DET🌿":                                "Ret Det",
+    "Khil Chantra":                         "Khil Chantra",
+    "CHEA SEAVLUY":                         "Chea Seavluy",
+    "Cheata Sok":                           "Cheata Sok",      # Delis supervisor
+    "Met Solina":                           "Met Solina",
+    "Pisey":                                "Khon Visalpisey",
+    "Sao Visal":                            "Sao Visal",
+    "Som Renaud":                           "Som Renaud",
+    "Von Vichhka":                          "Von Vichhka",
+    "An Davy":                              "An Davy",
+    "Sie Sopheaktra":                       "Rom Sopheaktra",
+    # ── Khmer-script names ───────────────────────────────────────────────
+    "បាន ឈៀងម៉េង💨":                        "Ban Chheangmeng",
+    'ពិសិដ្ឋ វិណាល់ Piseth Vinal "Hikaru"': "Vinal Piseth",
+    "ម៉ន ពុទ្ធាវី":                          "Morn Putheavy",
+    # ── Pending — fill in as staff reply ────────────────────────────────
+    # "Cat":        "",
+    # "Nakk":       "",
+    # "NY":         "",
+    # "O":          "",
+    # "Pew":        "",
+    # "Me Me":      "",
+    # "Seth 🫵":    "",
+    # "Lina So":    "",
+    # "Boss TT":    "",
+    # "Chan Oun":   "",
+    # "Roth":       "",
+    # "por Khmer Bruce PP": "",
+    # "por":        "",
+}
+
+
+def resolve_staff_name(telegram_name: str) -> str:
+    """Return real name for a Telegram display name, or the original if unknown."""
+    return STAFF_ALIAS_MAP.get(telegram_name, telegram_name)
+

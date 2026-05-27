@@ -15,6 +15,7 @@ from telegram.ext import (
 )
 
 import config
+from config import resolve_staff_name
 from shared.database import (
     gm_get_unsent_concerns, gm_mark_sent, gm_review_concern,
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
@@ -60,7 +61,7 @@ TYPE_LABEL = {
 def _format_concern(c: dict) -> str:
     emoji = SEVERITY_EMOJI.get(c["severity"], "⚠️")
     label = TYPE_LABEL.get(c["concern_type"], c["concern_type"].replace("_", " ").title())
-    sender = c.get("sender_name") or "Unknown"
+    sender = resolve_staff_name(c.get("sender_name") or "Unknown")
     desc = c["description"]
     return "%s [%s] — %s\n%s" % (emoji, label, sender, desc)
 
@@ -177,7 +178,7 @@ def _staff_list_keyboard(rows: list[dict], bot_data: dict) -> InlineKeyboardMark
     bot_data["staff_index"] = {str(i): r["sender_name"] for i, r in enumerate(rows)}
     buttons = []
     for i, r in enumerate(rows):
-        name = r["sender_name"] or "Unknown"
+        name = resolve_staff_name(r["sender_name"] or "Unknown")
         label = "%s  (%d)" % (name, r["count"])
         buttons.append([InlineKeyboardButton(label, callback_data="ss:%d" % i)])
     return InlineKeyboardMarkup(buttons)
@@ -236,7 +237,7 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if r["mistakes"]: parts.append("%d mistakes" % r["mistakes"])
             if r["waste"]: parts.append("%d waste" % r["waste"])
             if r["low_stock"]: parts.append("%d low-stock" % r["low_stock"])
-            lines.append("• %s — %s" % (r["sender_name"] or "Unknown", ", ".join(parts)))
+            lines.append("• %s — %s" % (resolve_staff_name(r["sender_name"] or "Unknown"), ", ".join(parts)))
         lines.append("\nUse /staff <name> to send their concerns.")
         await update.message.reply_text("\n".join(lines))
         return
@@ -252,7 +253,7 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         matched = [r for r in all_rows if query.lower() in r["sender_name"].lower()]
         lines = ["'%s' matches multiple people — be more specific:\n" % query]
         for r in matched:
-            lines.append("• %s (%d concerns)" % (r["sender_name"], r["count"]))
+            lines.append("• %s (%d concerns)" % (resolve_staff_name(r["sender_name"]), r["count"]))
         await update.message.reply_text("\n".join(lines))
         return
 
@@ -260,7 +261,7 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("No pending concerns matching '%s'." % query)
         return
 
-    sender_display = concerns[0]["sender_name"]
+    sender_display = resolve_staff_name(concerns[0]["sender_name"])
     await update.message.reply_text(
         "Sending %d concerns for %s..." % (len(concerns), sender_display)
     )
