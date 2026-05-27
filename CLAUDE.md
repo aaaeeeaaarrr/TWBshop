@@ -135,7 +135,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-27 (session 11)
+**Last updated:** 2026-05-27 (session 12)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
@@ -146,10 +146,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Fixed: double /check button session bug, cmd_staff double-send bug
 - Button flow: /check → staff buttons → concerns flow; /review → same for already-sent ones
 - Buttons: [✓ All good] closes concern; [🚨 Real issue] flags for tracking; [📚 Teach bot] suppresses future similar via gm_rules
+- /proposals + /approved + /points commands added (Claude API clustering, approval flow, monthly leaderboard)
+- Teach flow improved: shows original concern text, no 60-char limit
+- Supervisors TWB history imported: 323 messages (Jun 2025 – May 2026)
+- All group chat_ids confirmed: Stock Checks, Supervisors, Management, COMMS & Transfers
+- DAILY_REPORT_CHAT_ID=-5136886404 (TWB REPORT group, replaces Facebook Messenger daily reports)
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
-  2. Staff real names mapping: provide real names for aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
-  3. Import Management Group + Supervisors TWB into ops_messages DB (same HTML export process)
+  2. Import Management Group history (HTML export — user downloading)
+  3. Staff real names mapping: provide real names for aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
   4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
   5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   6. B2B bot rollout: add bot to all 24+ B2B customer groups

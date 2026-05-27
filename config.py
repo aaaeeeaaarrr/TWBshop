@@ -67,6 +67,7 @@ STOCK_CHECKS_CHAT_ID: int = -1003952029131  # "Stock Checks +Cleans +Mistakes"
 SUPERVISORS_CHAT_ID: int  = -4980513319     # SUPERVISORS TWB
 MANAGEMENT_CHAT_ID: int   = -865916135      # MANAGEMENT
 COMMS_CHAT_ID: int        = -4248492531     # COMMS & Transfers
+DAILY_REPORT_CHAT_ID: int = -5136886404     # TWB REPORT (daily staff reports, replaces Facebook Messenger)
 
 # Test group where the GM bot posts during development (before going live).
 # Create a private group, add the bot, paste the chat ID here.
