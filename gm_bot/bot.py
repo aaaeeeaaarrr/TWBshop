@@ -178,12 +178,25 @@ async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Send concerns for a specific staff member
     query = " ".join(args)
     concerns = gm_get_unsent_by_sender(query)
+
+    if concerns is None:
+        # Multiple senders matched — list them
+        from shared.database import gm_get_pending_by_sender
+        all_rows = gm_get_pending_by_sender()
+        matched = [r for r in all_rows if query.lower() in r["sender_name"].lower()]
+        lines = ["'%s' matches multiple people — be more specific:\n" % query]
+        for r in matched:
+            lines.append("• %s (%d concerns)" % (r["sender_name"], r["count"]))
+        await update.message.reply_text("\n".join(lines))
+        return
+
     if not concerns:
         await update.message.reply_text("No pending concerns matching '%s'." % query)
         return
 
+    sender_display = concerns[0]["sender_name"]
     await update.message.reply_text(
-        "Sending %d concerns for '%s'..." % (len(concerns), query)
+        "Sending %d concerns for %s..." % (len(concerns), sender_display)
     )
     sent = 0
     for c in concerns:

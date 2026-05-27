@@ -1702,16 +1702,36 @@ def gm_get_unsent_concerns() -> list[dict]:
 
 
 def gm_get_unsent_by_sender(sender_query: str) -> list[dict]:
-    """Return unsent concerns where sender_name contains sender_query (case-insensitive)."""
+    """
+    Return unsent concerns for a sender. Tries exact match first, then prefix,
+    then contains. Returns None if more than one distinct sender matches
+    (caller should show the ambiguous list instead of sending).
+    """
     with _db() as conn:
         with conn.cursor() as cur:
+            for pattern in [sender_query, sender_query + '%', '%' + sender_query + '%']:
+                cur.execute("""
+                    SELECT DISTINCT sender_name FROM gm_concerns
+                    WHERE sent_msg_id IS NULL AND review_action IS NULL
+                      AND sender_name ILIKE %s
+                """, (pattern,))
+                matches = [r["sender_name"] for r in cur.fetchall()]
+                if matches:
+                    break
+
+            if not matches:
+                return []
+            if len(matches) > 1:
+                return None  # ambiguous — caller will list the options
+
+            exact = matches[0]
             cur.execute("""
                 SELECT id, source_chat_id, source_msg_key, concern_type, severity, sender_name, description, detected_at
                 FROM gm_concerns
                 WHERE sent_msg_id IS NULL AND review_action IS NULL
-                  AND sender_name ILIKE %s
+                  AND sender_name = %s
                 ORDER BY detected_at ASC
-            """, ('%' + sender_query + '%',))
+            """, (exact,))
             return [dict(r) for r in cur.fetchall()]
 
 
