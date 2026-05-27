@@ -525,10 +525,10 @@ async def gmprop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         history_text = ""
         if history:
             lines = []
-            for i, h in enumerate(history[-3:], 1):
+            for i, h in enumerate(history, 1):
                 at = h.get("at", "")[:10]
-                lines.append("%d. [%s] %s" % (i, at, h.get("note", "")[:100]))
-            history_text = "\n\nPrevious notes (%d total):\n%s" % (len(history), "\n".join(lines))
+                lines.append("%d. [%s] %s" % (i, at, h.get("note", "")))
+            history_text = "\n\nPrevious notes:\n%s" % "\n".join(lines)
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text(
             "✏️ Refining: %s\n\n"
