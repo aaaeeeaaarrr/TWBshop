@@ -37,9 +37,10 @@ from gm_bot.analyzer import run_analysis, analyze_live_message
 
 logger = logging.getLogger(__name__)
 
-TEACH_WAITING    = 1  # ConversationHandler states
-REFINE_WAITING   = 2
-CONFLICT_WAITING = 3
+TEACH_WAITING           = 1  # ConversationHandler states
+REFINE_WAITING          = 2
+CONFLICT_WAITING        = 3
+CONFLICT_EXPLAIN_WAITING = 4
 
 
 # ─── Keyboard builders ────────────────────────────────────────────────────────
@@ -576,6 +577,7 @@ async def refine_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             InlineKeyboardButton("New applies",   callback_data="gmprop:conflict:new:%d" % proposal_id),
             InlineKeyboardButton("Old applies",   callback_data="gmprop:conflict:old:%d" % proposal_id),
             InlineKeyboardButton("Keep both",     callback_data="gmprop:conflict:merge:%d" % proposal_id),
+            InlineKeyboardButton("✏️ Explain...", callback_data="gmprop:conflict:custom:%d" % proposal_id),
         ]])
         await update.message.reply_text(
             "⚠️ Conflict in your notes:\n\n%s\n\nWhich should the AI use?" % result["conflict"],
@@ -609,10 +611,20 @@ async def conflict_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     resolution = parts[2]
     proposal_id = int(parts[3])
 
-    pending = context.user_data.pop("pending_conflict", None)
+    pending = context.user_data.get("pending_conflict")
     if not pending or pending["proposal_id"] != proposal_id:
         await query.edit_message_text("Session expired — please tap Refine again.")
         return ConversationHandler.END
+
+    if resolution == "custom":
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(
+            "✏️ Tell me how to resolve it — type your instruction and I'll pass it to the AI.\n\n"
+            "/cancel to keep as is."
+        )
+        return CONFLICT_EXPLAIN_WAITING
+
+    context.user_data.pop("pending_conflict", None)
 
     p = gm_get_proposal(proposal_id)
     if not p:
@@ -642,8 +654,43 @@ async def conflict_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return ConversationHandler.END
 
 
+async def conflict_explain_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Owner typed a custom conflict resolution instruction."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return ConversationHandler.END
+
+    instruction = update.message.text.strip()
+    pending = context.user_data.pop("pending_conflict", None)
+    if not pending:
+        return ConversationHandler.END
+
+    p = gm_get_proposal(pending["proposal_id"])
+    if not p:
+        return ConversationHandler.END
+
+    import json as _json
+    history = _json.loads(p.get("refinement_history") or "[]") if isinstance(p.get("refinement_history"), str) else (p.get("refinement_history") or [])
+
+    thinking = await update.message.reply_text("⏳ Applying your instruction...")
+    new_solution = await refine_proposal_resolve_conflict(
+        p, pending["feedback"], history, pending["conflict_desc"], instruction
+    )
+    await thinking.delete()
+
+    gm_update_proposal_solution(pending["proposal_id"], new_solution)
+    gm_append_refinement_note(pending["proposal_id"], pending["feedback"])
+
+    p = gm_get_proposal(pending["proposal_id"])
+    is_approved = p.get("status") == "approved"
+    text = _format_proposal(p) + ("\n\n✓ Approved" if is_approved else "")
+    kb = _approved_keyboard(pending["proposal_id"]) if is_approved else _proposal_keyboard(pending["proposal_id"])
+    await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=text, reply_markup=kb)
+    return ConversationHandler.END
+
+
 async def refine_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("refining_proposal_id", None)
+    context.user_data.pop("pending_conflict", None)
     await update.message.reply_text("Cancelled — proposal unchanged.")
     return ConversationHandler.END
 
@@ -1116,6 +1163,11 @@ def build_app() -> Application:
             ],
             CONFLICT_WAITING: [
                 CallbackQueryHandler(conflict_callback, pattern=r"^gmprop:conflict:"),
+                CommandHandler("cancel", refine_cancel),
+                MessageHandler(filters.COMMAND, _conv_interrupt),
+            ],
+            CONFLICT_EXPLAIN_WAITING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, conflict_explain_receive),
                 CommandHandler("cancel", refine_cancel),
                 MessageHandler(filters.COMMAND, _conv_interrupt),
             ],
