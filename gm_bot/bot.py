@@ -18,7 +18,7 @@ import config
 from shared.database import (
     gm_get_unsent_concerns, gm_mark_sent, gm_review_concern,
     gm_get_concern_by_msg_id, gm_save_rule, init_gm_db,
-    gm_get_related_photos,
+    gm_get_related_photos, gm_get_unsent_by_sender, gm_get_pending_by_sender,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
@@ -125,7 +125,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "GM Manager active.\n"
         "/check — run analysis now\n"
-        "/pending — show unsent concerns\n"
+        "/staff — list pending concerns by staff member\n"
+        "/staff <name> — send that person's concerns with photos\n"
+        "/pending — send all unsent concerns\n"
         "/rules — show learned rules"
     )
 
@@ -148,6 +150,78 @@ async def cmd_pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     sent = await send_pending_concerns(context.bot)
     if sent == 0:
         await update.message.reply_text("No pending concerns.")
+
+
+async def cmd_staff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+
+    args = context.args
+    if not args:
+        # List all staff with pending concern counts
+        rows = gm_get_pending_by_sender()
+        if not rows:
+            await update.message.reply_text("No pending concerns for any staff.")
+            return
+        total = sum(r["count"] for r in rows)
+        lines = ["📋 Pending concerns by staff (%d total):\n" % total]
+        for r in rows:
+            parts = []
+            if r["mistakes"]: parts.append("%d mistakes" % r["mistakes"])
+            if r["waste"]: parts.append("%d waste" % r["waste"])
+            if r["low_stock"]: parts.append("%d low-stock" % r["low_stock"])
+            lines.append("• %s — %s" % (r["sender_name"] or "Unknown", ", ".join(parts)))
+        lines.append("\nUse /staff <name> to send their concerns.")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    # Send concerns for a specific staff member
+    query = " ".join(args)
+    concerns = gm_get_unsent_by_sender(query)
+    if not concerns:
+        await update.message.reply_text("No pending concerns matching '%s'." % query)
+        return
+
+    await update.message.reply_text(
+        "Sending %d concerns for '%s'..." % (len(concerns), query)
+    )
+    sent = 0
+    for c in concerns:
+        try:
+            msg = await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text=_format_concern(c),
+                reply_markup=_concern_keyboard(c["id"]),
+            )
+            gm_mark_sent(c["id"], msg.message_id)
+
+            key = c.get("source_msg_key", "")
+            if key.startswith("msg:"):
+                parts = key.split(":")
+                if len(parts) >= 3:
+                    try:
+                        photo_ids = gm_get_related_photos(
+                            c["source_chat_id"], int(parts[2]), c.get("sender_name", "")
+                        )
+                        for tg_msg_id in photo_ids:
+                            try:
+                                await context.bot.forward_message(
+                                    chat_id=config.OWNER_TELEGRAM_ID,
+                                    from_chat_id=c["source_chat_id"],
+                                    message_id=tg_msg_id,
+                                )
+                                await asyncio.sleep(0.1)
+                            except Exception:
+                                pass
+                    except (ValueError, IndexError):
+                        pass
+
+            sent += 1
+            await asyncio.sleep(0.3)
+        except Exception as e:
+            logger.error("Failed to send concern %d: %s", c["id"], e)
+
+    await update.message.reply_text("✓ Sent %d concerns for '%s'." % (sent, query))
 
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -369,6 +443,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("check", cmd_check))
     app.add_handler(CommandHandler("pending", cmd_pending))
+    app.add_handler(CommandHandler("staff", cmd_staff))
     app.add_handler(CommandHandler("rules", cmd_rules))
     app.add_handler(teach_conv)
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))

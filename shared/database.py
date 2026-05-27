@@ -1693,10 +1693,41 @@ def gm_get_unsent_concerns() -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, source_chat_id, concern_type, severity, sender_name, description, detected_at
+                SELECT id, source_chat_id, source_msg_key, concern_type, severity, sender_name, description, detected_at
                 FROM gm_concerns
                 WHERE sent_msg_id IS NULL AND review_action IS NULL
                 ORDER BY detected_at ASC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_unsent_by_sender(sender_query: str) -> list[dict]:
+    """Return unsent concerns where sender_name contains sender_query (case-insensitive)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, source_chat_id, source_msg_key, concern_type, severity, sender_name, description, detected_at
+                FROM gm_concerns
+                WHERE sent_msg_id IS NULL AND review_action IS NULL
+                  AND sender_name ILIKE %s
+                ORDER BY detected_at ASC
+            """, ('%' + sender_query + '%',))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_pending_by_sender() -> list[dict]:
+    """Return each sender with their count of unsent concerns, sorted by count desc."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender_name, COUNT(*) as count,
+                       SUM(CASE WHEN concern_type = 'mistake' THEN 1 ELSE 0 END) as mistakes,
+                       SUM(CASE WHEN concern_type = 'waste' THEN 1 ELSE 0 END) as waste,
+                       SUM(CASE WHEN concern_type = 'low_stock' THEN 1 ELSE 0 END) as low_stock
+                FROM gm_concerns
+                WHERE sent_msg_id IS NULL AND review_action IS NULL
+                GROUP BY sender_name
+                ORDER BY count DESC
             """)
             return [dict(r) for r in cur.fetchall()]
 
