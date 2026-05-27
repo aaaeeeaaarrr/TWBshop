@@ -21,10 +21,11 @@ logging.basicConfig(
     handlers=[handler, logging.StreamHandler()],
 )
 
-from shared.database import init_gm_db
+from shared.database import init_gm_db, init_receipt_clarifications_db
 from gm_bot.bot import build_app
 
 init_gm_db()
+init_receipt_clarifications_db()
 
 app = build_app()
 logging.info("GM Manager bot starting...")

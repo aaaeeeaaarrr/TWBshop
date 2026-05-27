@@ -2122,3 +2122,59 @@ def gm_get_related_photos(chat_id: int, ops_msg_id: int, sender_name: str,
                     results.append(r["message_id"])
 
             return results[:4]  # cap at 4 total
+
+
+# ─── Receipt clarifications ───────────────────────────────────────────────────
+
+def init_receipt_clarifications_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS receipt_clarifications (
+                    id              SERIAL PRIMARY KEY,
+                    chat_id         BIGINT NOT NULL,
+                    photo_msg_id    INTEGER NOT NULL,   -- original receipt message
+                    bot_msg_id      INTEGER,            -- GM's question message
+                    question        TEXT NOT NULL,
+                    answer          TEXT,
+                    sender_name     TEXT,
+                    created_at      TIMESTAMPTZ DEFAULT NOW(),
+                    answered_at     TIMESTAMPTZ,
+                    UNIQUE (chat_id, photo_msg_id)
+                )
+            """)
+
+
+def receipt_save_clarification(chat_id: int, photo_msg_id: int, bot_msg_id: int,
+                                question: str, sender_name: str) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO receipt_clarifications (chat_id, photo_msg_id, bot_msg_id, question, sender_name)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (chat_id, photo_msg_id) DO UPDATE
+                    SET bot_msg_id = EXCLUDED.bot_msg_id, question = EXCLUDED.question
+                RETURNING id
+            """, (chat_id, photo_msg_id, bot_msg_id, question, sender_name))
+            return cur.fetchone()["id"]
+
+
+def receipt_get_pending(chat_id: int, bot_msg_id: int) -> dict | None:
+    """Return a pending clarification that the staff member is replying to."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM receipt_clarifications
+                WHERE chat_id = %s AND bot_msg_id = %s AND answer IS NULL
+            """, (chat_id, bot_msg_id))
+            return cur.fetchone()
+
+
+def receipt_save_answer(clarification_id: int, answer: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE receipt_clarifications
+                SET answer = %s, answered_at = NOW()
+                WHERE id = %s
+            """, (answer, clarification_id))

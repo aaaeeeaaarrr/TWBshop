@@ -26,6 +26,8 @@ from shared.database import (
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
     gm_append_refinement_note, save_ops_message,
+    init_receipt_clarifications_db, receipt_save_clarification,
+    receipt_get_pending, receipt_save_answer,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
@@ -913,22 +915,59 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def _check_report_receipt(msg, context) -> None:
-    """Download a TWB REPORT photo and reply in-group if the receipt is unclear."""
+    """Download a TWB REPORT photo, assess clarity, reply in-group if unclear."""
     try:
         photo_file = await msg.photo[-1].get_file()
         photo_bytes = bytes(await photo_file.download_as_bytearray())
         result = await assess_receipt_photo(photo_bytes)
-        if result["is_receipt"] and not result["is_clear"]:
-            issues = ", ".join(result["issues"]) if result["issues"] else "photo not clear"
-            reply = f"📷 Please resend — {issues}. Need a clear photo to record this expense."
+
+        if not result["is_receipt"] or result["is_clear"]:
+            return
+
+        sender = msg.from_user.full_name if msg.from_user else "Staff"
+        partial = result.get("readable_partial", "")
+
+        if result.get("is_handwritten") and partial:
+            # Ask for clarification on specific text we can partially see
+            question = f"Can you tell me what this says? I can see \"{partial}\" but cannot read it all."
+            sent = await context.bot.send_message(
+                chat_id=msg.chat_id,
+                text=question,
+                reply_to_message_id=msg.message_id,
+            )
+            receipt_save_clarification(msg.chat_id, msg.message_id, sent.message_id, question, sender)
+            logger.info("Asked handwritten clarification for msg %s", msg.message_id)
+        else:
+            issues = ", ".join(result["issues"]) if result["issues"] else "not clear"
+            reply = f"Please send this photo again. {issues.capitalize()}."
             await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=reply,
                 reply_to_message_id=msg.message_id,
             )
-            logger.info("Unclear receipt reply sent for msg %s", msg.message_id)
+            logger.info("Unclear receipt reply sent for msg %s: %s", msg.message_id, issues)
     except Exception as exc:
         logger.error("_check_report_receipt failed: %s", exc)
+
+
+async def _report_clarification_reply(msg, context) -> None:
+    """Handle staff reply to a GM clarification question — save the answer."""
+    replied_to = msg.reply_to_message
+    if not replied_to:
+        return
+    clarification = receipt_get_pending(msg.chat_id, replied_to.message_id)
+    if not clarification:
+        return
+    answer = msg.text or msg.caption or ""
+    if not answer.strip():
+        return
+    receipt_save_answer(clarification["id"], answer.strip())
+    await context.bot.send_message(
+        chat_id=msg.chat_id,
+        text="Got it, thanks! ✓",
+        reply_to_message_id=msg.message_id,
+    )
+    logger.info("Receipt clarification saved for photo_msg %s: %s", clarification["photo_msg_id"], answer[:60])
 
 
 _PHOTO_WINDOW = 600  # seconds — how long to look back/forward for related photos
@@ -977,10 +1016,14 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
-    # TWB REPORT group: check receipt photos for clarity and reply if unclear
-    if chat_id == config.DAILY_REPORT_CHAT_ID and msg.photo:
-        await _check_report_receipt(msg, context)
-        return
+    # TWB REPORT group: handle receipt photos and clarification replies
+    if chat_id == config.DAILY_REPORT_CHAT_ID:
+        if msg.reply_to_message and text.strip():
+            await _report_clarification_reply(msg, context)
+            return
+        if msg.photo:
+            await _check_report_receipt(msg, context)
+            return
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():

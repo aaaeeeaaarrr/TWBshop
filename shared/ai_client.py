@@ -607,13 +607,16 @@ async def assess_receipt_photo(image_bytes: bytes) -> dict:
         "First: is this a receipt, invoice, or expense document? "
         "(not a product photo, menu, staff selfie, or unrelated image)\n\n"
         "If yes, check whether these can be clearly read:\n"
-        "- Total amount / price (may be in USD or Khmer Riel ៛ — both are valid)\n"
+        "- Total amount / price (may be USD or Khmer Riel ៛ — both valid)\n"
         "- What was purchased (items or description)\n"
         "- Vendor / store name\n"
         "- Date\n\n"
+        "Also check: is this handwritten (not printed)?\n\n"
         "Respond ONLY with JSON:\n"
-        '{"is_receipt": true/false, "is_clear": true/false, "issues": ["specific problem 1", ...]}\n\n'
-        "Only list genuine readability problems (blurry, cut off, too dark, amount hidden). "
+        '{"is_receipt": true/false, "is_clear": true/false, "is_handwritten": true/false, '
+        '"issues": ["specific problem 1", ...], "readable_partial": "any text you CAN read"}\n\n'
+        "Only list genuine readability problems (blurry, cut off, too dark, amount hidden, handwriting unclear). "
+        "readable_partial: write any amounts/text you can partially make out, or empty string if nothing. "
         "If is_clear is true, issues must be empty []."
     )
     try:
@@ -630,9 +633,11 @@ async def assess_receipt_photo(image_bytes: bytes) -> dict:
         )
         result = _parse_json(resp.content[0].text)
         return {
-            "is_receipt": bool(result.get("is_receipt", False)),
-            "is_clear":   bool(result.get("is_clear", True)),
-            "issues":     result.get("issues", []),
+            "is_receipt":       bool(result.get("is_receipt", False)),
+            "is_clear":         bool(result.get("is_clear", True)),
+            "is_handwritten":   bool(result.get("is_handwritten", False)),
+            "issues":           result.get("issues", []),
+            "readable_partial": result.get("readable_partial", ""),
         }
     except Exception as exc:
         logger.error("assess_receipt_photo failed: %s", exc)
