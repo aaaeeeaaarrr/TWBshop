@@ -461,34 +461,107 @@ async def generate_proposals(concerns: list[dict],
 
 _GM_REFINE_SYSTEM = (
     "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
-    "You are refining an operational proposal based on the owner's feedback. "
-    "Keep the same proposal_type and overall intent, but rewrite solution_text to incorporate the owner's context. "
-    "Tone: warm, encouraging, never shaming. Suitable for Khmer staff. "
-    "Return ONLY the updated solution_text — no labels, no JSON, just the message."
+    "You are refining an operational proposal based on the owner's accumulated feedback. "
+    "Keep the same proposal_type and overall intent. Tone: warm, encouraging, never shaming.\n\n"
+    "Return ONLY valid JSON:\n"
+    '{"solution_text": "the rewritten message", "conflict": null}\n'
+    "OR if the new note directly contradicts an earlier note:\n"
+    '{"solution_text": "best guess incorporating new note", '
+    '"conflict": "Old note said X. New note says Y. Which should I use?"}\n'
+    "conflict should be null unless there is a genuine factual contradiction — not just an update or addition."
 )
 
 
-async def refine_proposal_with_ai(proposal: dict, feedback: str) -> str:
-    """Rewrite a proposal's solution_text using owner feedback. Returns new solution text."""
+async def refine_proposal_with_ai(proposal: dict, feedback: str,
+                                   refinement_history: list[dict] | None = None) -> dict:
+    """Rewrite a proposal using owner feedback, stacking all previous notes.
+
+    Returns {"solution_text": "...", "conflict": "description or None"}.
+    """
+    history_text = ""
+    if refinement_history:
+        lines = []
+        for i, h in enumerate(refinement_history, 1):
+            at = h.get("at", "")[:10]
+            lines.append("%d. [%s] %s" % (i, at, h.get("note", "")))
+        history_text = "\n\nAll previous refinement notes (oldest first):\n" + "\n".join(lines)
+
     prompt = (
         "Proposal type: %s\n"
         "Group: %s\n"
         "Root cause: %s\n"
-        "Current solution:\n%s\n\n"
-        "Owner's feedback/additional context:\n%s\n\n"
-        "Rewrite the solution incorporating this feedback."
+        "Current solution:\n%s%s\n\n"
+        "New feedback from owner:\n%s\n\n"
+        "Rewrite the solution incorporating all context above. "
+        "Check if the new feedback contradicts any previous note."
     ) % (proposal.get("proposal_type", "correction"), proposal.get("group_name", ""),
-         proposal.get("root_cause", ""), proposal.get("solution_text", ""), feedback)
+         proposal.get("root_cause", ""), proposal.get("solution_text", ""),
+         history_text, feedback)
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_PROPOSALS_MODEL,
+            max_tokens=600,
+            system=_GM_REFINE_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = _parse_json(resp.content[0].text)
+        if not result.get("solution_text"):
+            return {"solution_text": proposal.get("solution_text", ""), "conflict": None}
+        return {"solution_text": result["solution_text"], "conflict": result.get("conflict")}
+    except Exception as exc:
+        logger.error("Proposal refine failed: %s", exc)
+        return {"solution_text": proposal.get("solution_text", ""), "conflict": None}
+
+
+_GM_RESOLVE_SYSTEM = (
+    "You are the GM Manager AI for a bakery in Phnom Penh, Cambodia. "
+    "You are finalising a proposal rewrite after the owner resolved a conflict between notes. "
+    "Tone: warm, encouraging, never shaming. Suitable for Khmer staff. "
+    "Return ONLY the final solution_text — no labels, no JSON, just the message."
+)
+
+
+async def refine_proposal_resolve_conflict(proposal: dict, feedback: str,
+                                            refinement_history: list[dict] | None,
+                                            conflict_desc: str, resolution: str) -> str:
+    """Called after owner resolves a conflict. Returns final solution_text string."""
+    history_text = ""
+    if refinement_history:
+        lines = []
+        for i, h in enumerate(refinement_history, 1):
+            at = h.get("at", "")[:10]
+            lines.append("%d. [%s] %s" % (i, at, h.get("note", "")))
+        history_text = "\n\nAll previous notes:\n" + "\n".join(lines)
+
+    resolution_labels = {
+        "new": "Apply the new note; discard the conflicting old note.",
+        "old": "Keep the old note; ignore the new feedback for the conflicting point.",
+        "merge": "Both are valid — find a way to incorporate both.",
+    }
+    resolution_text = resolution_labels.get(resolution, resolution)
+
+    prompt = (
+        "Proposal type: %s\n"
+        "Group: %s\n"
+        "Root cause: %s\n"
+        "Current solution:\n%s%s\n\n"
+        "New feedback:\n%s\n\n"
+        "Conflict that was identified:\n%s\n\n"
+        "Owner's resolution: %s\n\n"
+        "Write the final solution_text applying this resolution."
+    ) % (proposal.get("proposal_type", "correction"), proposal.get("group_name", ""),
+         proposal.get("root_cause", ""), proposal.get("solution_text", ""),
+         history_text, feedback, conflict_desc, resolution_text)
     try:
         resp = await _get_client().messages.create(
             model=GM_PROPOSALS_MODEL,
             max_tokens=500,
-            system=_GM_REFINE_SYSTEM,
+            system=_GM_RESOLVE_SYSTEM,
             messages=[{"role": "user", "content": prompt}],
         )
         return resp.content[0].text.strip()
     except Exception as exc:
-        logger.error("Proposal refine failed: %s", exc)
+        logger.error("Proposal conflict resolve failed: %s", exc)
         return proposal.get("solution_text", "")
 
 

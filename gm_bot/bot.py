@@ -25,15 +25,19 @@ from shared.database import (
     gm_approve_proposal, gm_reject_proposal, gm_update_proposal_solution,
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
-    save_ops_message,
+    gm_append_refinement_note, save_ops_message,
 )
-from shared.ai_client import generate_proposals, refine_proposal_with_ai, GM_PROPOSALS_MODEL
+from shared.ai_client import (
+    generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
+    GM_PROPOSALS_MODEL,
+)
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
 logger = logging.getLogger(__name__)
 
-TEACH_WAITING  = 1  # ConversationHandler states
-REFINE_WAITING = 2
+TEACH_WAITING    = 1  # ConversationHandler states
+REFINE_WAITING   = 2
+CONFLICT_WAITING = 3
 
 
 # ─── Keyboard builders ────────────────────────────────────────────────────────
@@ -388,6 +392,12 @@ def _proposal_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
     ]])
 
 
+def _approved_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✏️ Refine", callback_data="gmprop:refine:%d" % proposal_id),
+    ]])
+
+
 async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
@@ -510,14 +520,23 @@ async def gmprop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if action == "refine":
         context.user_data["refining_proposal_id"] = proposal_id
+        import json as _json
+        history = _json.loads(p.get("refinement_history") or "[]") if isinstance(p.get("refinement_history"), str) else (p.get("refinement_history") or [])
+        history_text = ""
+        if history:
+            lines = []
+            for i, h in enumerate(history[-3:], 1):
+                at = h.get("at", "")[:10]
+                lines.append("%d. [%s] %s" % (i, at, h.get("note", "")[:100]))
+            history_text = "\n\nPrevious notes (%d total):\n%s" % (len(history), "\n".join(lines))
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text(
             "✏️ Refining: %s\n\n"
-            "Current solution:\n%s\n\n"
+            "Current solution:\n%s%s\n\n"
             "━━━━━━━━━━━━━━━\n"
-            "Tell me what to change — context, corrections, extra info.\n"
-            "AI will rewrite the solution incorporating your feedback.\n\n"
-            "/cancel to keep as is." % (p["group_name"], p["solution_text"])
+            "Add context, corrections, or new info. AI stacks all notes and rewrites.\n"
+            "If your new note conflicts with an old one, I'll ask which applies.\n\n"
+            "/cancel to keep as is." % (p["group_name"], p["solution_text"], history_text)
         )
         return REFINE_WAITING
 
@@ -537,17 +556,85 @@ async def refine_receive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not p:
         return ConversationHandler.END
 
+    import json as _json
+    history = _json.loads(p.get("refinement_history") or "[]") if isinstance(p.get("refinement_history"), str) else (p.get("refinement_history") or [])
+
     thinking = await update.message.reply_text("⏳ Rewriting with AI...")
-    new_solution = await refine_proposal_with_ai(p, feedback)
-    gm_update_proposal_solution(proposal_id, new_solution)
+    result = await refine_proposal_with_ai(p, feedback, refinement_history=history)
     await thinking.delete()
 
+    if result.get("conflict"):
+        # Conflict detected — pause and ask owner which applies
+        context.user_data["pending_conflict"] = {
+            "proposal_id": proposal_id,
+            "feedback": feedback,
+            "conflict_desc": result["conflict"],
+        }
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("New applies",   callback_data="gmprop:conflict:new:%d" % proposal_id),
+            InlineKeyboardButton("Old applies",   callback_data="gmprop:conflict:old:%d" % proposal_id),
+            InlineKeyboardButton("Keep both",     callback_data="gmprop:conflict:merge:%d" % proposal_id),
+        ]])
+        await update.message.reply_text(
+            "⚠️ Conflict in your notes:\n\n%s\n\nWhich should the AI use?" % result["conflict"],
+            reply_markup=kb,
+        )
+        return CONFLICT_WAITING
+
+    # No conflict — save immediately
+    gm_update_proposal_solution(proposal_id, result["solution_text"])
+    gm_append_refinement_note(proposal_id, feedback)
+
     p = gm_get_proposal(proposal_id)
-    text = _format_proposal(p)
+    is_approved = p.get("status") == "approved"
+    text = _format_proposal(p) + ("\n\n✓ Approved" if is_approved else "")
+    kb = _approved_keyboard(proposal_id) if is_approved else _proposal_keyboard(proposal_id)
     sent = await context.bot.send_message(
-        chat_id=config.OWNER_TELEGRAM_ID,
-        text=text,
-        reply_markup=_proposal_keyboard(proposal_id),
+        chat_id=config.OWNER_TELEGRAM_ID, text=text, reply_markup=kb,
+    )
+    gm_set_proposal_msg_id(proposal_id, sent.message_id)
+    return ConversationHandler.END
+
+
+async def conflict_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return ConversationHandler.END
+
+    parts = query.data.split(":")
+    # format: gmprop:conflict:<resolution>:<id>
+    resolution = parts[2]
+    proposal_id = int(parts[3])
+
+    pending = context.user_data.pop("pending_conflict", None)
+    if not pending or pending["proposal_id"] != proposal_id:
+        await query.edit_message_text("Session expired — please tap Refine again.")
+        return ConversationHandler.END
+
+    p = gm_get_proposal(proposal_id)
+    if not p:
+        return ConversationHandler.END
+
+    import json as _json
+    history = _json.loads(p.get("refinement_history") or "[]") if isinstance(p.get("refinement_history"), str) else (p.get("refinement_history") or [])
+
+    await query.edit_message_reply_markup(reply_markup=None)
+    thinking = await query.message.reply_text("⏳ Applying your decision...")
+    new_solution = await refine_proposal_resolve_conflict(
+        p, pending["feedback"], history, pending["conflict_desc"], resolution
+    )
+    await thinking.delete()
+
+    gm_update_proposal_solution(proposal_id, new_solution)
+    gm_append_refinement_note(proposal_id, pending["feedback"])
+
+    p = gm_get_proposal(proposal_id)
+    is_approved = p.get("status") == "approved"
+    text = _format_proposal(p) + ("\n\n✓ Approved" if is_approved else "")
+    kb = _approved_keyboard(proposal_id) if is_approved else _proposal_keyboard(proposal_id)
+    sent = await context.bot.send_message(
+        chat_id=config.OWNER_TELEGRAM_ID, text=text, reply_markup=kb,
     )
     gm_set_proposal_msg_id(proposal_id, sent.message_id)
     return ConversationHandler.END
@@ -594,17 +681,16 @@ async def cmd_approved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text("📋 GM Playbook — %d approved proposals:" % len(proposals))
     for p in proposals:
-        import json as _json
         ptype = p.get("proposal_type", "correction")
         icon = "✓📊" if ptype == "correction" else "✓⭐"
-        text = _format_proposal(p) + "\n\n%s Approved" % icon
-        kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("📚 Teach Bot", callback_data="gmprop:refine:%d" % p["id"]),
-        ]])
+        import json as _json
+        history = _json.loads(p.get("refinement_history") or "[]") if isinstance(p.get("refinement_history"), str) else (p.get("refinement_history") or [])
+        note_line = "  (%d refinement note%s)" % (len(history), "s" if len(history) != 1 else "") if history else ""
+        text = _format_proposal(p) + "\n\n%s Approved%s" % (icon, note_line)
         await context.bot.send_message(
             chat_id=config.OWNER_TELEGRAM_ID,
             text=text,
-            reply_markup=kb,
+            reply_markup=_approved_keyboard(p["id"]),
         )
         await asyncio.sleep(0.3)
 
@@ -954,6 +1040,11 @@ def build_app() -> Application:
             ],
             REFINE_WAITING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, refine_receive),
+                CommandHandler("cancel", refine_cancel),
+                MessageHandler(filters.COMMAND, _conv_interrupt),
+            ],
+            CONFLICT_WAITING: [
+                CallbackQueryHandler(conflict_callback, pattern=r"^gmprop:conflict:"),
                 CommandHandler("cancel", refine_cancel),
                 MessageHandler(filters.COMMAND, _conv_interrupt),
             ],

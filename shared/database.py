@@ -1653,26 +1653,28 @@ def init_gm_db() -> None:
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
                 CREATE TABLE IF NOT EXISTS gm_proposals (
-                    id              SERIAL PRIMARY KEY,
-                    proposal_type   TEXT NOT NULL DEFAULT 'correction', -- correction | recognition
-                    group_name      TEXT NOT NULL,
-                    concern_type    TEXT DEFAULT 'mixed',
-                    concern_ids     TEXT NOT NULL DEFAULT '[]',  -- JSON array of concern IDs
-                    root_cause      TEXT,
-                    solution_text   TEXT NOT NULL,               -- message to eventually send
-                    recipients      TEXT DEFAULT 'group',        -- group | individual
-                    staff_names     TEXT DEFAULT '[]',           -- JSON array of names
-                    points          INTEGER DEFAULT 0,           -- points to award (recognition only)
-                    status          TEXT DEFAULT 'draft',        -- draft | approved | skipped | rejected
-                    model           TEXT DEFAULT 'claude-sonnet-4-6', -- which model generated this
-                    created_at      TIMESTAMPTZ DEFAULT NOW(),
-                    approved_at     TIMESTAMPTZ,
-                    skipped_at      TIMESTAMPTZ,
-                    owner_msg_id    INTEGER
+                    id                  SERIAL PRIMARY KEY,
+                    proposal_type       TEXT NOT NULL DEFAULT 'correction', -- correction | recognition
+                    group_name          TEXT NOT NULL,
+                    concern_type        TEXT DEFAULT 'mixed',
+                    concern_ids         TEXT NOT NULL DEFAULT '[]',  -- JSON array of concern IDs
+                    root_cause          TEXT,
+                    solution_text       TEXT NOT NULL,               -- message to eventually send
+                    recipients          TEXT DEFAULT 'group',        -- group | individual
+                    staff_names         TEXT DEFAULT '[]',           -- JSON array of names
+                    points              INTEGER DEFAULT 0,           -- points to award (recognition only)
+                    status              TEXT DEFAULT 'draft',        -- draft | approved | skipped | rejected
+                    model               TEXT DEFAULT 'claude-sonnet-4-6', -- which model generated this
+                    refinement_history  TEXT DEFAULT '[]',           -- JSON array of {note, at} entries
+                    created_at          TIMESTAMPTZ DEFAULT NOW(),
+                    approved_at         TIMESTAMPTZ,
+                    skipped_at          TIMESTAMPTZ,
+                    owner_msg_id        INTEGER
                 );
                 -- Migrations for existing deployments
                 ALTER TABLE gm_proposals ADD COLUMN IF NOT EXISTS model TEXT DEFAULT 'claude-sonnet-4-6';
                 ALTER TABLE gm_proposals ADD COLUMN IF NOT EXISTS skipped_at TIMESTAMPTZ;
+                ALTER TABLE gm_proposals ADD COLUMN IF NOT EXISTS refinement_history TEXT DEFAULT '[]';
                 CREATE TABLE IF NOT EXISTS gm_staff_points (
                     id          SERIAL PRIMARY KEY,
                     staff_name  TEXT NOT NULL,
@@ -1936,6 +1938,22 @@ def gm_update_proposal_solution(proposal_id: int, solution_text: str) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE gm_proposals SET solution_text = %s WHERE id = %s",
                         (solution_text, proposal_id))
+
+
+def gm_append_refinement_note(proposal_id: int, note: str) -> None:
+    """Append one owner feedback note to the proposal's refinement history."""
+    import json as _json
+    from datetime import datetime, timezone
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT refinement_history FROM gm_proposals WHERE id = %s", (proposal_id,))
+            row = cur.fetchone()
+            history = _json.loads(row["refinement_history"] or "[]") if row else []
+            history.append({"note": note, "at": datetime.now(timezone.utc).isoformat()})
+            cur.execute(
+                "UPDATE gm_proposals SET refinement_history = %s WHERE id = %s",
+                (_json.dumps(history), proposal_id),
+            )
 
 
 def gm_set_proposal_msg_id(proposal_id: int, msg_id: int) -> None:

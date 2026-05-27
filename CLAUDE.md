@@ -135,7 +135,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-27 (session 12)
+**Last updated:** 2026-05-27 (session 13)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
@@ -151,10 +151,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Supervisors TWB history imported: 323 messages (Jun 2025 – May 2026)
 - All group chat_ids confirmed: Stock Checks, Supervisors, Management, COMMS & Transfers
 - DAILY_REPORT_CHAT_ID=-5136886404 (TWB REPORT group, replaces Facebook Messenger daily reports)
+- Management group imported: 538 messages (May 2023–May 2026)
+- Staff alias map: 25+ Telegram display name → real name mappings from May 2026 salary sheet
+- Proposals redesigned: Opus model, soft skip (pool return), AI-powered refine, 24h auto-skip, model ranking
+- [✏️ Refine] on /approved: stacked notes, conflict detection, [New/Old/Keep both] resolution buttons, refinement_history column
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
-  2. Import Management Group history (HTML export — user downloading)
-  3. Staff real names mapping: provide real names for aliases (Cat, LONG, Nakk, SAM PHARM, Por Khmer Bruce PP, Som Renaud, FAI LYNN, etc.)
+  2. Management Group history: already imported (538 messages) ✓
+  3. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
   4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
   5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   6. B2B bot rollout: add bot to all 24+ B2B customer groups
