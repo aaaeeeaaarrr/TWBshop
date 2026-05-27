@@ -53,6 +53,7 @@ SUPPLIER_CHATS = {
     -711904445:      "FPC_Packaging",
     5278321965:      "Supply_Lees_Personal",
     -4132634268:     "POSFlow_Support",
+    -5218925376:     "Buonissimo",
 }
 
 
