@@ -8,7 +8,9 @@ import asyncio
 import logging
 import os
 import re
+import subprocess
 import sys
+import tempfile
 sys.path.insert(0, '/root/TWBshop')
 
 import config
@@ -34,6 +36,32 @@ def _date_from_filename(fname: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _compress_pdf(file_path: str) -> bytes | None:
+    """Compress PDF via Ghostscript /screen preset (72 DPI). Returns bytes or None on failure."""
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = tmp.name
+        result = subprocess.run(
+            [
+                "gs", "-dNOPAUSE", "-dBATCH", "-dSAFER",
+                "-sDEVICE=pdfwrite", "-dCompatibilityLevel=1.4",
+                "-dPDFSETTINGS=/screen",
+                f"-sOutputFile={tmp_path}", file_path,
+            ],
+            capture_output=True, timeout=120,
+        )
+        if result.returncode != 0:
+            return None
+        with open(tmp_path, "rb") as f:
+            return f.read()
+    except Exception:
+        return None
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
 def _normalize_date(date_str: str | None) -> str | None:
     """Normalize partial dates to YYYY-MM-DD. Returns None if unparseable."""
     if not date_str:
@@ -52,21 +80,30 @@ async def _process_file(supplier: str, file_path: str) -> int:
     fname = os.path.basename(file_path)
     ext = os.path.splitext(fname)[1].lower()
     size_mb = os.path.getsize(file_path) / (1024 * 1024)
-
-    if size_mb > MAX_FILE_MB:
-        logger.info("  SKIP too large (%.1fMB): %s", size_mb, fname)
-        mark_supplier_file_processed(file_path, 0, "too_large")
-        return 0
-
     price_date = _date_from_filename(fname)
 
     try:
-        with open(file_path, "rb") as f:
-            data = f.read()
-
         if ext in SUPPORTED_IMAGE_EXTS:
+            with open(file_path, "rb") as f:
+                data = f.read()
             result = await extract_price_list_image(data)
         elif ext in SUPPORTED_DOC_EXTS:
+            if size_mb > MAX_FILE_MB:
+                logger.info("  Compressing (%.1fMB): %s", size_mb, fname)
+                data = _compress_pdf(file_path)
+                if data is None:
+                    logger.info("  SKIP compress failed: %s", fname)
+                    mark_supplier_file_processed(file_path, 0, "too_large")
+                    return 0
+                compressed_mb = len(data) / (1024 * 1024)
+                if compressed_mb > MAX_FILE_MB:
+                    logger.info("  SKIP still too large after compress (%.1fMB): %s", compressed_mb, fname)
+                    mark_supplier_file_processed(file_path, 0, "too_large")
+                    return 0
+                logger.info("  Compressed %.1fMB → %.1fMB: %s", size_mb, compressed_mb, fname)
+            else:
+                with open(file_path, "rb") as f:
+                    data = f.read()
             result = await extract_price_list_pdf(data)
         else:
             mark_supplier_file_processed(file_path, 0, "unsupported")
