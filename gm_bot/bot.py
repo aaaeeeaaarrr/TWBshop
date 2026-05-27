@@ -29,7 +29,7 @@ from shared.database import (
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
-    GM_PROPOSALS_MODEL,
+    GM_PROPOSALS_MODEL, assess_receipt_photo,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 
@@ -912,6 +912,25 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
+async def _check_report_receipt(msg, context) -> None:
+    """Download a TWB REPORT photo and reply in-group if the receipt is unclear."""
+    try:
+        photo_file = await msg.photo[-1].get_file()
+        photo_bytes = bytes(await photo_file.download_as_bytearray())
+        result = await assess_receipt_photo(photo_bytes)
+        if result["is_receipt"] and not result["is_clear"]:
+            issues = ", ".join(result["issues"]) if result["issues"] else "photo not clear"
+            reply = f"📷 Please resend — {issues}. Need a clear photo to record this expense."
+            await context.bot.send_message(
+                chat_id=msg.chat_id,
+                text=reply,
+                reply_to_message_id=msg.message_id,
+            )
+            logger.info("Unclear receipt reply sent for msg %s", msg.message_id)
+    except Exception as exc:
+        logger.error("_check_report_receipt failed: %s", exc)
+
+
 _PHOTO_WINDOW = 600  # seconds — how long to look back/forward for related photos
 _msg_buffer: dict = defaultdict(lambda: deque(maxlen=30))   # (chat_id, uid) → recent messages
 _concern_tracker: dict = defaultdict(list)                  # (chat_id, uid) → [(concern_id, ts)]
@@ -957,6 +976,11 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.debug("ops_messages log failed: %s", _e)
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
+
+    # TWB REPORT group: check receipt photos for clarity and reply if unclear
+    if chat_id == config.DAILY_REPORT_CHAT_ID and msg.photo:
+        await _check_report_receipt(msg, context)
+        return
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():
