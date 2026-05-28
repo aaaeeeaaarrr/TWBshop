@@ -236,8 +236,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
-  1. Run migration on server: `ssh twbshop "psql \$DATABASE_URL -f /root/TWBshop/migrations/2026_05_28_part_e_and_ops_assessment.sql"`
-  2. Run Seth import on server: `ssh twbshop "cd /root/TWBshop && python3 run_import_seth_assessment.py"`
+  1. Run migration on server: `ssh twbshop "psql \$DATABASE_URL -f /root/TWBshop/migrations/2026_05_28_part_e_v2.sql"`
+  2. Run Seth message refs on server: `ssh twbshop "cd /root/TWBshop && python3 run_import_seth_message_refs.py"`
   3. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
   4. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
   5. Insert Norin's 24-point bilingual feedback into hiring_feedback_points

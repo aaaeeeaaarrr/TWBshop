@@ -443,6 +443,59 @@ def complete_session(session_id: int, attempt_id: int) -> None:
 
 # ── Follow-up answer storage ─────────────────────────────────────────────────
 
+# ── Part E state persistence ─────────────────────────────────────────────────
+
+def get_answered_part_e_ids(attempt_id: int) -> set:
+    """Return set of Part E question IDs already answered (E-* prefix)."""
+    conn = _conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT question_id FROM hiring_quiz_answers
+            WHERE attempt_id = %s AND question_id LIKE 'E-%%' AND skipped = FALSE
+        """, (attempt_id,))
+        return {row[0] for row in cur.fetchall()}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def store_part_e_triggers(attempt_id: int, triggered: list) -> None:
+    """Persist triggered Part E question IDs to DB so resume survives bot restarts."""
+    conn = _conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE hiring_quiz_attempts SET part_e_triggered = %s WHERE id = %s",
+            (triggered, attempt_id)
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+def load_part_e_triggers(attempt_id: int) -> Optional[list]:
+    """Load persisted Part E triggers from DB. Returns None if column is NULL."""
+    conn = _conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT part_e_triggered FROM hiring_quiz_attempts WHERE id = %s",
+            (attempt_id,)
+        )
+        row = cur.fetchone()
+        if not row or row[0] is None:
+            return None
+        return list(row[0])
+    finally:
+        cur.close()
+        conn.close()
+
+
 def store_followup_answer(attempt_id: int, callback_key: str, answer_text: str) -> None:
     """Store a follow-up answer in score_summary.followup_answers JSONB."""
     conn = _conn()

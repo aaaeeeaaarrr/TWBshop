@@ -13,11 +13,21 @@ QUESTION_SEQUENCE defines the exact presentation order:
 Total: 111 questions.
 
 After all 111, Part E hiring-facts runs:
-  E-A1 … E-A5         — always-asked (start date, availability, school/job, leave, transport)
-  E-T1 (trigger)      — studying → exam communication timing
-  E-T2 (trigger)      — current job → last day + salary breakdown
-  E-Final             — first-3-days self-commitment (always last)
-Triggers evaluated from E-A3 answer text (keyword match, no AI).
+  E-A1               — exact start date (free text)
+  E-A2               — 30-day availability (free text)
+  E-A3a              — currently studying? (structured Yes/No single_choice)
+  E-A3b              — currently working elsewhere? (structured Yes/No single_choice)
+  E-A4               — known leave / exams next 30 days (free text)
+  E-A5               — transport + backup plan (free text)
+
+Triggers evaluated once after E-A5 — rule-based, no AI:
+  E-T1 (trigger)     — E-A3a=Yes OR exam keywords in E-A4 → exam communication timing
+  E-T2 (trigger)     — E-A3b=Yes → last working day + salary breakdown (answer_sensitivity=owner_only)
+  E-T3 (trigger)     — delay keywords in E-A1 → why not sooner? (Lyhouy trigger)
+  E-Final            — first-3-days self-commitment (always last)
+
+Trigger state is stored in both context.user_data AND hiring_quiz_attempts.part_e_triggered
+so Part E survives bot restarts and can be resumed from DB.
 """
 import json
 import logging
@@ -62,33 +72,43 @@ SECTION_LABEL: dict[str, str] = {
        "D3": "Part D — Situations", "D4": "Part D — Rewrite",
        "D-Final": "Part D — Final Reflection"},
     **{"E-A1": "Part E — Hiring Facts", "E-A2": "Part E — Hiring Facts",
-       "E-A3": "Part E — Hiring Facts", "E-A4": "Part E — Hiring Facts",
-       "E-A5": "Part E — Hiring Facts",
+       "E-A3": "Part E — Hiring Facts",   # legacy (deactivated in v2)
+       "E-A3a": "Part E — Hiring Facts", "E-A3b": "Part E — Hiring Facts",
+       "E-A4": "Part E — Hiring Facts", "E-A5": "Part E — Hiring Facts",
        "E-T1": "Part E — Clarification", "E-T2": "Part E — Clarification",
+       "E-T3": "Part E — Clarification",
        "E-Final": "Part E — Commitment"},
 }
 
 # ── Part E constants ──────────────────────────────────────────────────────────
 
-# Always asked, in this order
-PART_E_ALWAYS: list[str] = ["E-A1", "E-A2", "E-A3", "E-A4", "E-A5"]
+# Always asked, in this order — E-A3a/E-A3b replace old single-field E-A3
+PART_E_ALWAYS: list[str] = ["E-A1", "E-A2", "E-A3a", "E-A3b", "E-A4", "E-A5"]
 
-# Trigger question IDs (evaluated from E-A3 answer keywords)
-PART_E_CONDITIONAL: list[str] = ["E-T1", "E-T2"]
+# Trigger question IDs — evaluated once after E-A5 (last always-asked question)
+PART_E_CONDITIONAL: list[str] = ["E-T1", "E-T2", "E-T3"]
 
 # Always the last Part E question
 PART_E_FINAL: str = "E-Final"
 
-# Study-related keywords that fire E-T1
+# E-T1: exam keywords in E-A4 free-text (E-A3a=Yes already triggers E-T1 directly)
 _STUDY_KEYWORDS = {"school", "university", "study", "studying", "class", "classes",
-                   "lecture", "exam", "exams", "college", "institute", "university",
-                   "semester", "morning class", "cambodia", "royal university",
+                   "lecture", "exam", "exams", "college", "institute",
+                   "semester", "morning class", "royal university",
                    "ppp", "bbu", "rupp", "iu", "paragon", "norton"}
 
-# Job-related keywords that fire E-T2
+# E-T2: legacy fallback only — E-A3b=Yes is the primary trigger now
 _JOB_KEYWORDS = {"work", "working", "job", "salary", "employer", "company",
                  "restaurant", "cafe", "coffee", "shop", "hotel", "currently",
                  "still working", "part time", "part-time", "yes"}
+
+# E-T3: delay keywords in E-A1 free-text start-date answer (Lyhouy trigger)
+_DELAY_KEYWORDS = {"next month", "first of", "1st of", "cannot start", "can't start",
+                   "not yet", "need to finish", "need to quit", "need to resign",
+                   "serving notice", "notice period", "end of month", "end of the month",
+                   "after my", "after the", "need time", "few weeks", "two weeks",
+                   "one month", "30 days", "14 days", "haven't told", "have not told",
+                   "didn't tell", "my employer", "my current job"}
 
 # Cache loaded from DB
 _cache: dict[str, dict] = {}
@@ -104,10 +124,19 @@ def _conn():
 
 def evaluate_e_triggers(attempt_id: int) -> list[str]:
     """
-    Read E-A3 and C-Q1 answers from DB and return list of triggered E question IDs.
-    Rule-based keyword match — no AI.
+    Read E-A1, E-A3a, E-A3b, E-A4 answers from DB. Return triggered E question IDs.
+    Called once after E-A5 (last always-asked question) so all inputs are available.
+    Rule-based only — no AI.
+
+    Trigger rules:
+      E-T1: E-A3a answer = 'A' (Yes, studying) OR exam/study keywords in E-A4 free text
+      E-T2: E-A3b answer = 'A' (Yes, working elsewhere)
+      E-T3: delay keywords found in E-A1 free text (Lyhouy trigger)
+
+    Legacy fallback: if E-A3 (old single-field) is present instead of E-A3a/E-A3b,
+    keyword matching is used so in-progress old sessions are not broken.
     """
-    import psycopg2
+    import json as _json
     triggered: list[str] = []
     conn = _conn()
     cur = conn.cursor()
@@ -115,26 +144,53 @@ def evaluate_e_triggers(attempt_id: int) -> list[str]:
         cur.execute("""
             SELECT question_id, raw_answer
             FROM hiring_quiz_answers
-            WHERE attempt_id = %s AND question_id IN ('E-A3', 'C-Q1')
+            WHERE attempt_id = %s
+              AND question_id IN ('E-A1', 'E-A3', 'E-A3a', 'E-A3b', 'E-A4', 'C-Q1')
         """, (attempt_id,))
-        rows = {r[0]: (r[1] or {}) for r in cur.fetchall()}
+        rows: dict[str, dict] = {}
+        for qid, raw in cur.fetchall():
+            try:
+                rows[qid] = _json.loads(raw) if isinstance(raw, str) else (raw or {})
+            except Exception:
+                rows[qid] = {}
     finally:
         cur.close()
         conn.close()
 
-    def _text(row: dict) -> str:
-        if isinstance(row, dict):
-            return (row.get("text") or row.get("answer") or "").lower()
-        return ""
+    def _text(d: dict) -> str:
+        return (d.get("text") or d.get("answer") or "").lower()
 
-    e_a3_text = _text(rows.get("E-A3", {}))
-    c_q1_text = _text(rows.get("C-Q1", {}))
-    combined = e_a3_text + " " + c_q1_text
+    def _answer(d: dict) -> str:
+        return (d.get("answer") or "").upper()
 
-    if any(kw in e_a3_text for kw in _STUDY_KEYWORDS):
+    # ── E-T1: study / exam conflict ───────────────────────────────────────────
+    study_triggered = (
+        _answer(rows.get("E-A3a", {})) == "A"               # structured: Yes, studying
+        or any(kw in _text(rows.get("E-A4", {}))             # exam keywords in leave/dates field
+               for kw in _STUDY_KEYWORDS)
+        or any(kw in _text(rows.get("E-A3", {}))             # legacy single-field fallback
+               for kw in _STUDY_KEYWORDS)
+    )
+    if study_triggered:
         triggered.append("E-T1")
-    if any(kw in combined for kw in _JOB_KEYWORDS) and "no" not in e_a3_text[:30]:
+
+    # ── E-T2: current job ─────────────────────────────────────────────────────
+    e_a3b = rows.get("E-A3b", {})
+    if _answer(e_a3b) == "A":                                # structured: Yes, working elsewhere
         triggered.append("E-T2")
+    else:
+        # Legacy: keyword fallback for old sessions that used E-A3 free-text
+        e_a3_text = _text(rows.get("E-A3", {}))
+        c_q1_text = _text(rows.get("C-Q1", {}))
+        combined = e_a3_text + " " + c_q1_text
+        if (any(kw in combined for kw in _JOB_KEYWORDS)
+                and "no" not in e_a3_text[:30]):
+            triggered.append("E-T2")
+
+    # ── E-T3: delayed start (Lyhouy trigger) ─────────────────────────────────
+    e_a1_text = _text(rows.get("E-A1", {}))
+    if any(kw in e_a1_text for kw in _DELAY_KEYWORDS):
+        triggered.append("E-T3")
 
     return triggered
 

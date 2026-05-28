@@ -262,19 +262,20 @@ async def _send_part_e_question(context: ContextTypes.DEFAULT_TYPE, chat_id: int
 
 async def _advance_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
                           session_id: int, attempt_id: int, just_answered: str) -> None:
-    """Called after recording a Part E answer. Compute triggers if needed, advance."""
-    e_answered: set[str] = context.user_data.get("part_e_answered", set())
+    """Called after recording a Part E answer. Compute triggers after E-A5, then advance."""
+    e_answered: set = context.user_data.get("part_e_answered", set())
     e_answered.add(just_answered)
     context.user_data["part_e_answered"] = e_answered
 
-    # Compute triggers once, after E-A3 is answered
-    if just_answered == "E-A3" and not context.user_data.get("part_e_triggers_computed"):
+    # Evaluate triggers once — after E-A5 (last always-asked question) so E-A1 and E-A4
+    # inputs are both available. Store in DB so a restart can reload without re-evaluating.
+    if just_answered == "E-A5" and context.user_data.get("part_e_triggered") is None:
         triggered = questions.evaluate_e_triggers(attempt_id)
         context.user_data["part_e_triggered"] = triggered
-        context.user_data["part_e_triggers_computed"] = True
-        logger.info("_advance_part_e: triggers computed=%s attempt=%s", triggered, attempt_id)
+        sessions.store_part_e_triggers(attempt_id, triggered)
+        logger.info("_advance_part_e: triggers=%s attempt=%s", triggered, attempt_id)
 
-    triggered = context.user_data.get("part_e_triggered", [])
+    triggered = context.user_data.get("part_e_triggered") or []
     next_qid = questions.get_next_part_e_question(e_answered, triggered)
 
     if next_qid:
@@ -285,11 +286,10 @@ async def _advance_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
 
 async def _enter_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
                         attempt_id: int, session_id: int) -> None:
-    """Transition from main quiz to Part E."""
+    """Transition from main quiz to Part E. Only called when Part E has not started."""
     context.user_data["in_part_e"] = True
     context.user_data["part_e_answered"] = set()
-    context.user_data["part_e_triggered"] = []
-    context.user_data["part_e_triggers_computed"] = False
+    context.user_data["part_e_triggered"] = None  # None = not yet evaluated (evaluated after E-A5)
 
     await context.bot.send_message(
         chat_id,
@@ -308,12 +308,27 @@ async def _enter_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
 
 async def _after_main_quiz(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
                            session_id: int, attempt_id: int) -> None:
-    """Called when all 111 main quiz questions are answered."""
-    if context.user_data.get("in_part_e"):
-        # Part E already in progress (resume case) — find next unanswered E question
-        e_answered: set[str] = context.user_data.get("part_e_answered", set())
-        triggered = context.user_data.get("part_e_triggered", [])
-        next_qid = questions.get_next_part_e_question(e_answered, triggered)
+    """
+    Called when all 111 main quiz questions are answered.
+    Checks DB for any Part E answers already recorded — handles bot restart / resume
+    without relying on in-memory user_data.
+    """
+    e_answered = sessions.get_answered_part_e_ids(attempt_id)
+
+    if e_answered:
+        # Part E already started (even if bot restarted and user_data was cleared)
+        context.user_data["in_part_e"] = True
+        context.user_data["part_e_answered"] = e_answered
+
+        # Load triggers from DB; recompute if E-A5 was answered but triggers not stored yet
+        triggered = sessions.load_part_e_triggers(attempt_id)
+        if triggered is None and "E-A5" in e_answered:
+            triggered = questions.evaluate_e_triggers(attempt_id)
+            sessions.store_part_e_triggers(attempt_id, triggered)
+        context.user_data["part_e_triggered"] = triggered  # may still be None if E-A5 not reached
+
+        triggered_for_seq = triggered or []
+        next_qid = questions.get_next_part_e_question(e_answered, triggered_for_seq)
         if next_qid:
             await _send_part_e_question(context, chat_id, attempt_id, next_qid)
         else:
@@ -577,7 +592,7 @@ async def cb_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle yes/no/not_sure and single-choice callbacks.
     Format: ans:QUESTION_ID:VALUE
-    Validates that this callback is for the currently expected question.
+    Part E and main quiz use separate expected-question sources to avoid false rejects.
     """
     query = update.callback_query
     _, qid, value = query.data.split(":", 2)
@@ -587,33 +602,40 @@ async def cb_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.answer("Session not found. Use your invite link.")
         return
 
-    # Validate: is this callback for the expected question?
-    answered = sessions.get_answered_question_ids(attempt_id)
-    expected = questions.get_next_question_id(answered)
-    if qid != expected:
-        logger.info("cb_answer: stale callback qid=%s expected=%s attempt=%s",
-                    qid, expected, attempt_id)
-        await query.answer()  # Silently ignore stale/duplicate click
-        return
-
-    await query.answer()
-
-    # Delete question message (best-effort)
-    await _delete(query.message)
-
-    # Record answer
-    sessions.record_answer(attempt_id, qid, {"answer": value})
-    _cancel_timeout(context, update.effective_chat.id)
-
     session_id = context.user_data.get("session_id")
     chat_id = update.effective_chat.id
 
-    # Part E button answer (E-T1 is single_choice)
+    # ── Part E button answer (E-A3a, E-A3b are single_choice; E-T1 is single_choice) ──
     if context.user_data.get("in_part_e"):
+        e_answered: set = context.user_data.get("part_e_answered", set())
+        triggered: list = context.user_data.get("part_e_triggered", [])
+        expected = questions.get_next_part_e_question(e_answered, triggered)
+        if qid != expected:
+            logger.info("cb_answer(E): stale qid=%s expected=%s attempt=%s",
+                        qid, expected, attempt_id)
+            await query.answer()
+            return
+        await query.answer()
+        await _delete(query.message)
+        sessions.record_answer(attempt_id, qid, {"answer": value})
+        _cancel_timeout(context, chat_id)
         await _advance_part_e(context, chat_id, session_id, attempt_id, qid)
         return
 
-    # Main quiz advance
+    # ── Main quiz button answer ────────────────────────────────────────────────
+    answered = sessions.get_answered_question_ids(attempt_id)
+    expected = questions.get_next_question_id(answered)
+    if qid != expected:
+        logger.info("cb_answer: stale qid=%s expected=%s attempt=%s",
+                    qid, expected, attempt_id)
+        await query.answer()
+        return
+
+    await query.answer()
+    await _delete(query.message)
+    sessions.record_answer(attempt_id, qid, {"answer": value})
+    _cancel_timeout(context, chat_id)
+
     answered.add(qid)
     next_qid = questions.get_next_question_id(answered)
     if next_qid:
