@@ -131,9 +131,10 @@ ALTER TABLE hiring_assessment_message_refs
 ALTER TABLE hiring_assessment_message_refs
     ADD COLUMN IF NOT EXISTS telegram_message_id bigint;
 
--- Drop old unique constraint (auto-named by Postgres)
+-- Drop old unique constraint. Postgres truncates the auto-generated name to 63 chars.
+-- The actual name on the server (verified 2026-05-28) is the truncated form below.
 ALTER TABLE hiring_assessment_message_refs
-    DROP CONSTRAINT IF EXISTS hiring_assessment_message_refs_assessment_id_chat_id_message_id_key;
+    DROP CONSTRAINT IF EXISTS hiring_assessment_message_ref_assessment_id_chat_id_message_key;
 
 -- Drop new constraint if it already exists (idempotent re-run)
 ALTER TABLE hiring_assessment_message_refs
