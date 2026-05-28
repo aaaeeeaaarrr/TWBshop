@@ -210,9 +210,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - Placeholder rule: update row #1 to photo #1 when filing — never mix NULL file_name with real file_name rows
   - Vannary evidence_id=1: storage_status='chatgpt_only' (photos uploaded to ChatGPT, not saved elsewhere)
 **EVIDENCE STATUS:**
-  - assessment_id=2 (Vannary): COMPLETE — 12 photos linked, SHA-256 hashed, storage_status='local_to_pc'
-    Source: Vannary Test.zip, extracted to C:\Users\Papa\Documents\Bluetooth\Vannary\
-    Photos taken 2026-05-13. evidence_ids 1–12 in DB.
+  - assessment_id=2 (Vannary): COMPLETE — 12 photos linked, renamed 01_page.jpg–12_page.jpg, SHA-256 hashed
+    Path: C:\Users\Papa\Documents\Bluetooth\Staff Assessments\Vannary\2026-05-13 leadership audit\
+    storage_status=local_to_pc. Move to cloud/server when convenient.
   - Every future import: provide zip/photos at import time and evidence rows are inserted automatically
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
