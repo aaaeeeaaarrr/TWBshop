@@ -31,6 +31,11 @@ def map_staff_level(expectation: str, severity: str) -> str:
     return "worker_acceptable"  # safe fallback
 
 
+def map_confidence(confidence: str) -> str:
+    """Per-finding confidence only has low/medium/high; map medium_high → medium."""
+    return "medium" if confidence == "medium_high" else confidence
+
+
 def map_source_type(source_type: str) -> str:
     """Map ChatGPT source types to DB enum."""
     mapping = {
@@ -338,6 +343,7 @@ def run():
         for i, f in enumerate(FINDINGS, 1):
             staff_lvl = map_staff_level(f["staff_level_expectation"], f["severity"])
             source_t = map_source_type(f["source_type"])
+            conf = map_confidence(f["confidence"])
             cur.execute("""
                 INSERT INTO hiring_feedback_points
                     (candidate_id, assessment_id, source_type, source_ref,
@@ -351,7 +357,7 @@ def run():
                 candidate_id, assessment_id, source_t, f["source_ref"],
                 f["answer_summary"], f["trait_detected"], f["severity"],
                 staff_lvl, f["principle_tag"],
-                f["contradiction_score"], f["confidence"], f["interpretation"],
+                f["contradiction_score"], conf, f["interpretation"],
                 f["english_text"], f["khmer_text"],
                 i, "linked", "chatgpt_visual_review", "v1.0",
             ))
