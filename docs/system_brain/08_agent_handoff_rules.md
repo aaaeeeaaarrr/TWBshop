@@ -2,7 +2,9 @@
 
 This file defines what any new coding agent (Codex, a new Claude session, a contractor) may and may not do when working on this codebase. Read before touching any module.
 
-This file will become `AGENTS.md` at the root when the system is handed off for review or refactoring.
+This file will become `AGENTS.md` at the root when the system is handed off for review or refactoring. When that happens, create a short root-level `AGENTS.md` that lists only the hard non-negotiables and points to `docs/system_brain/` for detail — do not copy the full content. A new agent that reads 100 rules before starting the task is not a productive agent.
+
+**On chat IDs:** The Telegram group chat IDs in `docs/system_brain/03_telegram_ops_intelligence.md` and `config.py` are operationally sensitive. This repo is private; the IDs may remain. Do not copy them into public documentation, contractor handoffs, or any document that leaves this repo. A chat ID in the wrong hands allows someone to enumerate group membership or send messages impersonating the monitoring system.
 
 ---
 
