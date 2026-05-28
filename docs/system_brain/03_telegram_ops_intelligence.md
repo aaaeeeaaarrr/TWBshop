@@ -6,8 +6,8 @@
 |-------|---------|-------------------|------------------|
 | Stock Checks | -1003952029131 | Staff photo submissions: workstation, fridge, stock sheets. GM bot is a member and monitors photos. | 5,276 (Nov 2025 – May 2026) |
 | Supervisors TWB | -4980513319 | Supervisor attendance reports: lateness, payback, no-shows, excuses. Primary source for staff behavior evidence. | 323 (Jun 2025 – May 2026) |
-| Management | (confirmed) | Owner-level decisions, policy, salary discussions, escalations. | 538 (May 2023 – May 2026) |
-| COMMS & Transfers | (confirmed) | Inter-location coordination, delivery, stock transfers. | Monitored |
+| Management | -865916135 | Owner-level decisions, policy, salary discussions, escalations. | 538 (May 2023 – May 2026) |
+| COMMS & Transfers | -4248492531 | Inter-location coordination, delivery, stock transfers. | Monitored |
 | TWB REPORT | -5136886404 | Daily expense receipts submitted as photos. GM bot checks clarity and replies in-thread. | Active |
 
 The GM bot is a **member** of all groups. It reads messages and photos silently, except in TWB REPORT where it replies in-thread on unclear receipts.

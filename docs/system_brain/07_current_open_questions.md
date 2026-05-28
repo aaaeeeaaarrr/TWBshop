@@ -2,6 +2,8 @@
 
 This file tracks decisions not yet made, work not yet done, and things the system does not yet know. Update it as things resolve. Delete rows when resolved — do not leave "completed" items here as a log; that belongs in CLAUDE.md.
 
+**Maintenance rule:** If you are reading this file and a row is resolved, delete it now. Do not add a "completed" column or leave dead rows. This file should always reflect only what is currently open. A file that never shrinks is not being maintained.
+
 ---
 
 ## Hiring system — blocking for live use
