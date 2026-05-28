@@ -209,11 +209,11 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - hash_file() helper in import scripts: fills file_hash automatically when path is known, NULL otherwise
   - Placeholder rule: update row #1 to photo #1 when filing — never mix NULL file_name with real file_name rows
   - Vannary evidence_id=1: storage_status='chatgpt_only' (photos uploaded to ChatGPT, not saved elsewhere)
-**EVIDENCE FILENAMES NEEDED (storage_status='missing' — update when located):**
-  - assessment_id=2 (Vannary, leadership_audit): paper questionnaire photos uploaded to ChatGPT — how many pages/photos?
-    UPDATE hiring_assessment_evidence SET file_name='IMG_XXXX.jpg', file_path_or_url='...', storage_status='local_to_owner_phone' WHERE id=1;
-    Add extra rows if multiple photos: INSERT INTO hiring_assessment_evidence (assessment_id, evidence_type, file_name, page_or_photo_number, storage_status) VALUES (2,'photo','IMG_XXXX.jpg',2,'local_to_owner_phone');
-  - Every future import: provide filenames at import time or add evidence rows immediately after
+**EVIDENCE STATUS:**
+  - assessment_id=2 (Vannary): COMPLETE — 12 photos linked, SHA-256 hashed, storage_status='local_to_pc'
+    Source: Vannary Test.zip, extracted to C:\Users\Papa\Documents\Bluetooth\Vannary\
+    Photos taken 2026-05-13. evidence_ids 1–12 in DB.
+  - Every future import: provide zip/photos at import time and evidence rows are inserted automatically
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
