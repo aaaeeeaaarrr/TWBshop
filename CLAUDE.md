@@ -180,6 +180,13 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Session state schema added: attempt_status (9 states), abandoned_at_question_id, resume_count on attempts;
   resume_count + reopened_by on hiring_sessions; migration in migrations/2026_05_28_session_state_schema.sql
 - run_session_state_migration.py deleted (one-time script, already run on production)
+- hire_bot/bot.py built: token verify → identity confirm → intro block → 111 questions
+  (yes/no, single-choice, D1 ranking, free-text) → follow-ups → end screen → owner notify
+  Only accepts answer for currently expected question; deletion best-effort; 10-min timeout job
+  Staff /create [Name] → one-time deep link; /reopen [attempt_id] → second resume
+- hire_bot/sessions.py: DB layer; SELECT FOR UPDATE on open; check-before-insert on record_answer
+- hire_bot/questions.py: QUESTION_SEQUENCE (111 items); D1 uses sorted(correct_order) for scrambled buttons
+- run_hire_bot.py: entry point; requires HIRE_BOT_TOKEN in secrets repo (not added yet)
 - Schema additions: hiring_contradictions table, risk_profile+score_summary on quiz_attempts, quiet_time_behavior+schedule_story_match on trial_outcomes
 - Quiz bank live + reproducible: 111 questions in DB + migrations/2026_05_28_load_final_v3_quiz_questions.sql seed
 - migrations/2026_05_28_scoring_schema.sql preserved — idempotent, safe to re-run
@@ -192,9 +199,10 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
-  1. Build hire_bot/bot.py — token-based invite, disappearing questions, bilingual stacked buttons, read-time enforcement
-  2. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
-  3. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
+  1. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
+  2. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
+  3. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
+  4. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
