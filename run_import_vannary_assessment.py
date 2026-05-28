@@ -123,7 +123,15 @@ FINDINGS = [
         "principle_tag": "honesty_logic",
         "contradiction_score": 2,
         "confidence": "medium_high",
-        "interpretation": "Most serious tick-answer concern. A senior staff member must understand that hiding destroys trust faster than the original mistake. Must verbal retest.",
+        "interpretation": (
+            "PENDING VERBAL RETEST — do not treat as confirmed dishonesty. "
+            "The paper tick appears to show No, but handwriting/position was ambiguous. "
+            "A senior staff member must understand that hiding destroys trust faster than the original mistake. "
+            'Retest question: "This question says: Hiding a mistake is worse than making an honest mistake. '
+            "On your paper it looks like you answered No. Maybe you misunderstood. "
+            'Tell me in your own words: if you make a mistake and nobody sees it, what should you do first, and why?". '
+            "If she answers correctly in person, downgrade to gap_medium. If she defends hiding, escalate."
+        ),
         "english_text": "A mistake can usually be fixed. Hiding a mistake damages trust, and trust is much harder to repair.",
         "khmer_text": "កំហុសភាគច្រើនអាចកែបាន។ ប៉ុន្តែការលាក់កំហុសធ្វើឲ្យបាត់ទំនុកចិត្ត ហើយទំនុកចិត្តកែវិញពិបាកជាងកំហុសដើម។",
     },
@@ -217,11 +225,17 @@ FINDINGS = [
         "answer_summary": "For training new staff after experienced staff leave: wrote general ideas — no worry, learn from job, positive thinking, try your best, follow rules, follow good staff/good advice.",
         "trait_detected": "training_method_gap",
         "severity": "gap_medium",
-        "staff_level_expectation": "worker_acceptable",  # correct at worker level, gap at her level
+        "staff_level_expectation": "senior_expected",  # → senior_expected_gap via map_staff_level
         "principle_tag": "training_method",
         "contradiction_score": 0,
         "confidence": "high",
-        "interpretation": "Correct attitude, not senior-level method. Missing structured training: explain, show, watch, correct, test again, build backups. This is the core leadership gap.",
+        "interpretation": (
+            "Worker-level answer: correct attitude, not senior-level method. "
+            "Her answer (positive thinking, follow rules, try your best) is acceptable "
+            "for a normal worker but is the core training-method gap for someone at chef/senior level. "
+            "Missing: explain, show, watch them do it, correct mistakes, test again, build backups. "
+            "This is the most important growth target."
+        ),
         "english_text": "For senior staff, 'try your best' is not enough. Training means explain, show, watch them do it, correct mistakes, test again, and build backups.",
         "khmer_text": "សម្រាប់បុគ្គលិកចាស់ ពាក្យថា «ខំប្រឹងឲ្យអស់ពីសមត្ថភាព» មិនគ្រប់គ្រាន់ទេ។ ការបង្រៀនមានន័យថា ពន្យល់ បង្ហាញ មើលគេធ្វើ កែកំហុស សាកល្បងម្ដងទៀត និងបង្កើតអ្នកជំនួស។",
     },
