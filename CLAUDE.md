@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 16 continued)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built.
+**Last updated:** 2026-05-28 (session 17)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
@@ -192,6 +192,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - migrations/2026_05_28_scoring_schema.sql preserved — idempotent, safe to re-run
 - Server stash list cleared (3 stale stashes dropped — all work already in main)
 - Quiz bank audit passed: 0 duplicates, 0 missing answers, 23 critical tags correct, 8 verbal retest flags correct, D1 order correct
+- Legacy paper import system live: hiring_assessments table + schema migration (2026_05_28_hiring_assessments_schema.sql)
+  - assessment_id on hiring_feedback_points + hiring_contradictions; attempt_id made nullable on contradictions
+  - staff_level_expectation, confidence, interpretation columns added to hiring_feedback_points
+  - severity + source_type CHECKs expanded
+- Vannary imported: candidate_id=24, assessment_id=2, 14 findings (leadership_audit, senior_staff)
+  - Most critical: A2-Q13 risk_critical (appears to mark No on hiding=worse); verbal retest required
+  - Training method gap (D3): worker_acceptable answer, chef/senior expected gap
+  - Strengths: quiet-time instinct, problem chain detection (D2), customer/product awareness
+  - map_confidence() added: medium_high → medium for per-finding field (assessment level retains 4-value scale)
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
@@ -203,6 +212,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   2. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
   3. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
   4. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
+  5. Feed more questionnaire photos to ChatGPT → paste structured block here → import via same pipeline
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
