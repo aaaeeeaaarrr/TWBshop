@@ -2,18 +2,34 @@
 Scoring engine for the hiring bot.
 
 Phase 1 (in-session, immediate):
-  auto_grade(attempt_id)             — Part A, B, D1; stores score_summary + is_correct per answer
-  detect_contradictions(attempt_id)  — rule-based pairs; stores to hiring_contradictions
+  auto_grade(attempt_id)                   — Part A, B, D1 grading; stores score_summary +
+                                             is_correct per answer row; returns trigger list.
+                                             Produces NO contradiction rows — all objective
+                                             flags (critical_wrong, not_sure_critical, D1 score)
+                                             are already in score_summary.
 
-Phase 2 (post-session, async):
-  draft_rubric_scores(attempt_id)    — Claude grades Part C, D2–D4, Final; stores scores
-  build_risk_profile(attempt_id)     — aggregates all scores into risk_profile JSONB
+Phase 2 (post-session, async — runs after session ends):
+  draft_rubric_scores(attempt_id)          — Claude Opus scores Part C, D2–D4, Final written
+                                             answers using completeness/specificity/responsibility
+                                             rubric (0–3 each); stores in grader_notes + completeness_score.
+  detect_semantic_contradictions(attempt_id) — runs AFTER rubric scoring. Creates rows in
+                                             hiring_contradictions ONLY for real semantic conflicts:
+                                             tick=correct AND written=low responsibility. This is the
+                                             "polished liar" case — they know the right answer but
+                                             reveal opposite behavior in writing. Also detects
+                                             written-vs-written inconsistencies.
+  build_risk_profile(attempt_id)           — aggregates all scores into 8-category risk_profile JSONB.
+
+Design rule: hiring_contradictions contains only confirmed semantic conflicts.
+Wrong ticks alone are NOT contradictions — they are objective failures already in score_summary.
 
 Schema reference (actual DB columns):
   hiring_quiz_answers: id, attempt_id, question_id, raw_answer TEXT, normalized_answer,
                        is_correct BOOL, completeness_score INT, contradiction_score INT,
-                       time_spent_seconds, skipped, graded_by, graded_at, grader_notes
-  hiring_quiz_attempts: ..., score_summary JSONB, risk_profile JSONB
+                       time_spent_seconds, skipped, graded_by, graded_at, grader_notes TEXT
+  hiring_quiz_attempts: ..., score_summary JSONB, risk_profile JSONB,
+                        attempt_status TEXT, abandoned_at_question_id TEXT, resume_count INT
+  hiring_sessions: ..., status TEXT, resume_count INT, reopened_by TEXT
 """
 
 import json
@@ -227,81 +243,155 @@ def _build_triggers(summary: dict, attempt_id: int, cur) -> list[dict]:
     return triggers
 
 
-# ── Phase 1: Contradiction detection ────────────────────────────────────────
-
-# (tick_qid, written_qid, type, severity, description)
-# Rule: only stored when the tick answer is actually WRONG.
-# A correct tick + correct written = no contradiction row, regardless of pair importance.
+# ── Phase 2: Semantic contradiction detection ────────────────────────────────
+#
+# DESIGN: Phase 1 (auto_grade) produces NO contradiction rows.
+# All objective flags (wrong tick, not_sure, D1, schedule) live in score_summary.
+# Only Phase 2 — after written answers have been rubric-scored — can detect
+# whether a candidate's written behavior contradicts their tick answer.
+#
+# The case that matters most: tick=CORRECT but written=low responsibility score.
+# This is the "polished liar" — they know the right answer to tick, then reveal
+# the real behavior in writing. That person is more dangerous than someone who
+# simply ticked wrong.
+#
+# Contradiction pairs: (tick_qid, written_qid, type, severity, description)
 CONTRADICTION_PAIRS = [
-    # Strong pairs — direct logical link between tick and written question
+    # Strong pairs — direct logical link between tick value and written behavior
+
     ("A2-Q13", "C-Q8",
      "tick_vs_written", "critical",
-     "Ticked hiding mistakes is wrong, but written answer shows avoidance or 'handle quietly'"),
+     "Ticked hiding mistakes is worse than honest mistake, but written answer avoids reporting or 'handles quietly'"),
 
     ("A4-Q34", "C-Q12",
      "tick_vs_written", "critical",
-     "Ticked quiet time = work time, but written says 'wait' or 'check phone'"),
+     "Ticked quiet time should be productive, but written describes waiting, resting, or checking phone"),
 
-    # Revised: A4-Q38 (work without watching) → C-Q12 (quiet-time behavior)
-    # More direct than C-Q4 (old manager feedback) which tests self-awareness, not discipline
     ("A4-Q38", "C-Q12",
      "tick_vs_written", "critical",
-     "Ticked good staff work even without being watched, but quiet-time answer says 'wait' or 'phone'"),
+     "Ticked good staff work even when not watched, but quiet-time answer shows passive or phone behavior"),
 
-    # Revised: A5-Q42 (gossip harmful) → C-Q10 (what to do when team feeling is bad)
-    # More direct than C-Q20 (systems thinking / resignation) which is a weak link
-    ("A5-Q42", "C-Q10",
+    # Revised from C-Q20 (systems thinking / resignation — weak link):
+    # C-Q11 directly asks what they do when there is a problem with another staff member.
+    # A gossip-culture person writes "tell others" or "let it go" rather than going to management.
+    ("A5-Q42", "C-Q11",
      "tick_vs_written", "moderate",
-     "Ticked gossip is harmful, but team-feeling answer reveals spreading negativity vs going to management"),
+     "Ticked gossip is harmful, but written conflict-handling answer reveals sideways talk vs management escalation"),
 
     ("A6-Q58", "C-Q16",
      "tick_vs_written", "moderate",
-     "Ticked sudden leaving hurts team, but resignation answer is vague or contradicts this belief"),
+     "Ticked sudden leaving hurts the team, but resignation reasoning is self-focused or vague"),
 
     ("A6-Q51", "D3",
      "tick_vs_written", "moderate",
-     "Ticked training costs time/money, but step-up answer has no real training plan"),
+     "Ticked training costs time and money, but step-up answer shows no real training plan or system thinking"),
+]
+
+# Written-vs-written pairs checked in Phase 2 after rubric scoring
+# (tick_qid is None for these — both sides are free-text)
+WRITTEN_CONTRADICTION_PAIRS = [
+    # C-Q3 "what mistake did you make and what did you learn?" vs C-Q8 "friend asks to hide mistake"
+    # If C-Q3 says "I told my boss" but C-Q8 says "I would help my friend quietly" → honesty inconsistency
+    ("C-Q3", "C-Q8",
+     "written_vs_written", "critical",
+     "Claims to have reported past mistake (C-Q3) but says would help friend hide mistake (C-Q8)"),
 ]
 
 
-def detect_contradictions(attempt_id: int) -> list[dict]:
+def detect_semantic_contradictions(attempt_id: int) -> list[dict]:
     """
-    Checks contradiction pairs. Stores flagged pairs in hiring_contradictions.
-    All contradictions require human_confirmed before acting on them.
-    Returns list of flagged contradictions.
+    Phase 2 function — runs AFTER draft_rubric_scores() has scored written answers.
+
+    Creates rows in hiring_contradictions when:
+      - Tick answer is CORRECT but written answer scores responsibility ≤ 1
+        (the polished liar: knows what to tick, reveals opposite behavior in writing)
+      - Written-vs-written: one written answer contradicts another after rubric scoring
+
+    Does NOT run in Phase 1. Phase 1 objective flags live in score_summary.
+    All stored rows require human_confirmed before any decision is made.
     """
     conn = _conn()
     cur = conn.cursor()
     flagged = []
+
     try:
+        # Load all answers for this attempt (tick is_correct + written rubric scores)
         cur.execute("""
-            SELECT question_id, raw_answer, skipped
+            SELECT question_id, is_correct, completeness_score, grader_notes, skipped
             FROM hiring_quiz_answers
             WHERE attempt_id = %s
         """, (attempt_id,))
-        answers_by_q = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+        answers: dict[str, dict] = {}
+        for qid, is_correct, comp, notes_raw, skipped in cur.fetchall():
+            try:
+                notes = json.loads(notes_raw) if notes_raw else {}
+            except Exception:
+                notes = {}
+            notes["completeness_score"] = comp or 0
+            answers[qid] = {
+                "is_correct": is_correct,
+                "skipped": skipped,
+                "responsibility": notes.get("responsibility_score"),
+                "specificity": notes.get("specificity_score"),
+                "completeness": notes.get("completeness_score", 0),
+            }
 
-        tick_meta = _load_answers(cur)
-
-        for qa_id, qb_id, ctype, severity, description in CONTRADICTION_PAIRS:
-            raw_a, skip_a = answers_by_q.get(qa_id, (None, True))
-            raw_b, skip_b = answers_by_q.get(qb_id, (None, True))
-
-            if skip_a or skip_b or raw_a is None or raw_b is None:
-                continue
-
-            if _should_flag(qa_id, raw_a, tick_meta):
-                cur.execute("""
-                    INSERT INTO hiring_contradictions
-                        (attempt_id, question_id_a, question_id_b, contradiction_type,
-                         severity, description, ai_flagged)
-                    VALUES (%s, %s, %s, %s, %s, %s, FALSE)
-                    RETURNING id
-                """, (attempt_id, qa_id, qb_id, ctype, severity, description))
-                cid = cur.fetchone()[0]
-                flagged.append({"id": cid, "qa": qa_id, "qb": qb_id,
+        def _insert_contradiction(qa_id, qb_id, ctype, severity, description):
+            cur.execute("""
+                INSERT INTO hiring_contradictions
+                    (attempt_id, question_id_a, question_id_b, contradiction_type,
+                     severity, description, ai_flagged)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+                ON CONFLICT DO NOTHING
+                RETURNING id
+            """, (attempt_id, qa_id, qb_id, ctype, severity, description))
+            row = cur.fetchone()
+            if row:
+                flagged.append({"id": row[0], "qa": qa_id, "qb": qb_id,
                                 "severity": severity, "description": description})
 
+        # ── Tick-vs-written pairs ─────────────────────────────────────────────
+        for qa_id, qb_id, ctype, severity, description in CONTRADICTION_PAIRS:
+            ans_a = answers.get(qa_id, {})
+            ans_b = answers.get(qb_id, {})
+
+            if ans_a.get("skipped") or ans_b.get("skipped"):
+                continue
+
+            # Skip if written answer hasn't been rubric-scored yet
+            if ans_b.get("responsibility") is None:
+                continue
+
+            tick_correct = ans_a.get("is_correct")
+            written_responsibility = ans_b.get("responsibility", 2)
+            written_completeness = ans_b.get("completeness", 0)
+
+            # Only flag when:
+            # tick=CORRECT AND written answer shows avoidance/blame/no fix (responsibility ≤ 1)
+            # AND the written answer actually says something (completeness ≥ 1, not blank)
+            if (tick_correct is True
+                    and written_responsibility <= 1
+                    and written_completeness >= 1):
+                _insert_contradiction(qa_id, qb_id, ctype, severity, description)
+
+        # ── Written-vs-written pairs ──────────────────────────────────────────
+        for qa_id, qb_id, ctype, severity, description in WRITTEN_CONTRADICTION_PAIRS:
+            ans_a = answers.get(qa_id, {})
+            ans_b = answers.get(qb_id, {})
+
+            if ans_a.get("skipped") or ans_b.get("skipped"):
+                continue
+            if ans_a.get("responsibility") is None or ans_b.get("responsibility") is None:
+                continue
+
+            # C-Q3 high responsibility + C-Q8 low responsibility = inconsistency
+            # (claimed to report their own mistake, but would hide a friend's)
+            resp_a = ans_a.get("responsibility", 0)
+            resp_b = ans_b.get("responsibility", 0)
+            if resp_a >= 2 and resp_b <= 1 and ans_b.get("completeness", 0) >= 1:
+                _insert_contradiction(qa_id, qb_id, ctype, severity, description)
+
+        # Update contradiction_count in score_summary
         if flagged:
             cur.execute("""
                 UPDATE hiring_quiz_attempts
@@ -314,32 +404,12 @@ def detect_contradictions(attempt_id: int) -> list[dict]:
             """, (json.dumps(len(flagged)), attempt_id))
 
         conn.commit()
-        logger.info("detect_contradictions: attempt %s — %s flagged", attempt_id, len(flagged))
+        logger.info("detect_semantic_contradictions: attempt %s — %s found", attempt_id, len(flagged))
         return flagged
 
     finally:
         cur.close()
         conn.close()
-
-
-def _should_flag(qa_id: str, raw_a: str, tick_meta: dict) -> bool:
-    """
-    Only flags a real contradiction: the tick answer must be WRONG.
-    A correct tick + correct written = no row in hiring_contradictions, ever.
-    This keeps contradiction data clean for future prediction analytics.
-    (Correct-tick pairs that deserve human review are surfaced in the owner
-    report separately — they do not pollute the contradiction table.)
-    """
-    meta = tick_meta.get(qa_id, {})
-    if meta.get("part") != "A":
-        return False  # non-tick source questions are not auto-flagged
-
-    correct = meta.get("correct_answer", {})
-    resp = _parse_answer(raw_a)
-    given = resp.get("answer", "").lower()
-    expected = correct.get("answer", "").lower() if isinstance(correct, dict) else ""
-
-    return given != expected  # only flag when the tick was actually wrong
 
 
 # ── Phase 2: Claude rubric scoring ──────────────────────────────────────────
