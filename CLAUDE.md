@@ -211,8 +211,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - Vannary evidence_id=1: storage_status='chatgpt_only' (photos uploaded to ChatGPT, not saved elsewhere)
 **EVIDENCE FILENAMES NEEDED (storage_status='missing' — update when located):**
   - assessment_id=2 (Vannary, leadership_audit): paper questionnaire photos uploaded to ChatGPT — how many pages/photos?
-    UPDATE hiring_assessment_evidence SET file_name='...', storage_status='local_only' WHERE id=1;
-    Add extra rows if multiple photos: INSERT INTO hiring_assessment_evidence (assessment_id, evidence_type, file_name, page_or_photo_number, storage_status) VALUES (2,'photo','...',2,'local_only');
+    UPDATE hiring_assessment_evidence SET file_name='IMG_XXXX.jpg', file_path_or_url='...', storage_status='local_to_owner_phone' WHERE id=1;
+    Add extra rows if multiple photos: INSERT INTO hiring_assessment_evidence (assessment_id, evidence_type, file_name, page_or_photo_number, storage_status) VALUES (2,'photo','IMG_XXXX.jpg',2,'local_to_owner_phone');
   - Every future import: provide filenames at import time or add evidence rows immediately after
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
