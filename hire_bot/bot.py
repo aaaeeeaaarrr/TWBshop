@@ -732,7 +732,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         session = intake.get_intake_session(chat_id)
         if session and session["intake_status"] in intake.ACTIVE_STATUSES:
             await intake.handle_message(update, context, session)
-        elif intake.is_job_intent(update.message.text or ""):
+        elif not session:
+            # Bot is ad-linked — any first message is a job inquiry; no keyword gate needed
             await intake.start_intake(update, context)
         return
 

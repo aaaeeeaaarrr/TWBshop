@@ -152,32 +152,34 @@ from hire_bot import intake
 # ── Scenarios ─────────────────────────────────────────────────────────────────
 
 async def s1_cook_have():
-    head("SCENARIO 1: 'cook have?' — intent gap check")
+    head("SCENARIO 1: 'cook have?' — no-keyword first message starts intake")
     reset()
+    ctx = make_context()
 
+    # is_job_intent does NOT match "cook have?" — that's expected and fine now
     detected = intake.is_job_intent("cook have?")
     if not detected:
-        fail("'cook have?' NOT detected as job intent — keyword 'cook' missing")
-        info("GAP: Anyone who messages this bot from a job-ad link IS an applicant.")
-        info("RECOMMENDATION: treat all first private messages as job intent (bot is invite-only by design).")
+        ok("is_job_intent('cook have?') = False (expected — keyword not needed anymore)")
     else:
-        ok("'cook have?' detected as job intent")
+        info("is_job_intent('cook have?') = True (keyword added since last run)")
 
-    # Also check what does and doesn't trigger
-    cases = [
-        ("cook have?", False),
-        ("work here can?", True),
-        ("vacancy have?", True),
-        ("salary how much b", True),   # 'salary' is in _EN_INTENT
-        ("ខ្ញុំចង់ធ្វើការ", True),
-        ("hello", False),
-        ("what time open?", False),
-    ]
-    for text, expected in cases:
-        result = intake.is_job_intent(text)
-        sym = "✓" if result == expected else "✗"
-        color = GREEN if result == expected else RED
-        print(f"  {color}{sym} is_job_intent({text!r}) = {result} (expected {expected}){RESET}")
+    # Bot now starts intake on ANY first private message (no session exists)
+    # Simulate handle_text routing: not session → start_intake
+    info("Starting intake directly with 'cook have?' as first message")
+    upd = make_update(text="cook have?")
+    await intake.start_intake(upd, ctx)
+
+    s = get_intake()
+    if s and s['status'] == 'language_check':
+        ok(f"Session created: status={s['status']} — 'cook have?' now works ✓")
+    else:
+        fail(f"Expected language_check, got {s}")
+
+    # Verify greeting was sent
+    if upd.message.reply_text.called:
+        ok(f"Greeting sent ({len(upd.message.reply_text.call_args[0][0])} chars)")
+    else:
+        fail("Greeting not sent")
 
 
 async def s2_happy_path():

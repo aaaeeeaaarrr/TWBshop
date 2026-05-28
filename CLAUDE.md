@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 19b)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz. Intake code quality fixes done (CV media, cross-platform formatters, 39 unit tests).
+**Last updated:** 2026-05-28 (session 19c)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz. Intake code quality fixes done + "cook have?" routing fix.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
@@ -259,9 +259,10 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
      Use this test path: /create Test Candidate → intro → 111 Qs → E-A1a=B (triggers E-T3) + E-A3a=A (triggers E-T1) + E-A3b=A (triggers E-T2) → all 3 triggers fire → E-Final → end screen → owner notify
   2. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
   3. Intake funnel (hire_bot/intake.py) BUILT — all migrations run on server, 39 unit tests pass
-     Next: add HIRE_BOT_TOKEN → start bot → run fake public-intake flow
-     Happy path: public message → CV photo → full-time gate → appointment → listener confirms arrival → quiz unlocks
-     Bad path: voice strikes, part-time close, salary-before-CV redirect, no-show
+     "cook have?" fix: hire_bot/bot.py handle_text now starts intake on ANY first message (no session),
+       not just keyword matches. Bot is ad-linked — all first contacts are applicants.
+     6/6 integration test scenarios pass: run_test_intake.py on server
+     Next: add HIRE_BOT_TOKEN → start bot → run live Telegram test with real phone
      DESIGN NOTE: hiring_intake_sessions has flat UNIQUE (telegram_chat_id) — upsert overwrites old row
        on re-apply, no audit history. Future fix: partial unique index (active attempts only) or
        separate applicant_person → intake_attempts hierarchy. Not urgent before first real applicant.
