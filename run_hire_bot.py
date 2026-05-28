@@ -25,6 +25,9 @@ logging.basicConfig(
                             backupCount=3, encoding="utf-8"),
     ],
 )
+# Suppress httpx request logs — they print full Telegram API URLs containing the bot token
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 from hire_bot.bot import build_application
