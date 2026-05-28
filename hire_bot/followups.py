@@ -222,25 +222,36 @@ def get_followup(trigger_type: str, question_id: Optional[str] = None) -> Option
     return FOLLOWUP_QUESTIONS.get(trigger_type)
 
 
+MAX_FOLLOWUPS = 5
+
+# Priority order for follow-up selection when more than MAX_FOLLOWUPS triggers fire
+TRIGGER_PRIORITY = [
+    "verbal_retest",        # 1st: critical honesty/value contradiction (must ask)
+    "not_sure_critical",    # 2nd: uncertainty on a core value
+    "current_job_conflict", # 3rd: schedule/commitment risk
+    "commitment_maybe",     # 4th: unclear commitment
+    "start_date_missing",   # 5th: missing start date
+    "d1_wrong_priority",    # 6th: operational priority failure
+    "incomplete_answer",    # 7th: completeness issue (lowest)
+]
+
+
 def get_followups_for_triggers(triggers: list[dict]) -> list[dict]:
     """
     Takes the triggers list from scorer.auto_grade and returns
-    a deduplicated ordered list of follow-up questions to send.
-    Critical severity questions come first.
-    """
-    seen = set()
-    result = []
+    a deduplicated, priority-ordered list of follow-up questions — max MAX_FOLLOWUPS.
 
-    # Critical first
+    Priority: verbal_retest > not_sure_critical > schedule/job > completeness.
+    """
+    seen_callbacks = set()
+    prioritized: list[tuple[int, dict]] = []
+
     for t in triggers:
         q = get_followup(t["type"], t.get("question_id"))
-        if q and q["callback"] not in seen:
-            meta = FOLLOWUP_QUESTIONS.get(t.get("question_id", t["type"]), {})
-            # Put critical verbal retests first
-            if t["type"] == "verbal_retest":
-                result.insert(0, q)
-            else:
-                result.append(q)
-            seen.add(q["callback"])
+        if q and q["callback"] not in seen_callbacks:
+            priority = TRIGGER_PRIORITY.index(t["type"]) if t["type"] in TRIGGER_PRIORITY else 99
+            prioritized.append((priority, q))
+            seen_callbacks.add(q["callback"])
 
-    return result
+    prioritized.sort(key=lambda x: x[0])
+    return [q for _, q in prioritized[:MAX_FOLLOWUPS]]
