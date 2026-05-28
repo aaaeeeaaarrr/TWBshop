@@ -341,9 +341,13 @@ async def s4_salary_before_cv():
     ctx = make_context()
 
     await intake.start_intake(make_update(text="vacancy have for baker?"), ctx)
-    session = intake.get_intake_session(FAKE_CHAT_ID)
 
-    # Salary ask before CV
+    # First reply advances language_check → cv_pending
+    session = intake.get_intake_session(FAKE_CHAT_ID)
+    await intake.handle_message(make_update(text="Dara"), ctx, session)
+
+    # Salary ask (now in cv_pending — flag should fire)
+    session = intake.get_intake_session(FAKE_CHAT_ID)
     info("'b salary morning how much?'")
     upd = make_update(text="b salary morning how much?")
     await intake.handle_message(upd, ctx, session)
@@ -387,7 +391,11 @@ async def s5_parttime():
 
     await intake.start_intake(make_update(text="work here got vacancy?"), ctx)
 
-    # Text CV
+    # First reply advances language_check → cv_pending
+    session = intake.get_intake_session(FAKE_CHAT_ID)
+    await intake.handle_message(make_update(text="Sreymom"), ctx, session)
+
+    # Text CV (now in cv_pending)
     session = intake.get_intake_session(FAKE_CHAT_ID)
     upd = make_update(text="Sreymom, Star Mart cashier 2 years, available start soon")
     await intake.handle_message(upd, ctx, session)
@@ -415,9 +423,13 @@ async def s6_no_show():
     ctx = make_context()
 
     await intake.start_intake(make_update(text="i want to join"), ctx)
-    session = intake.get_intake_session(FAKE_CHAT_ID)
 
-    # Push through to appointment_set quickly
+    # Advance past language_check
+    session = intake.get_intake_session(FAKE_CHAT_ID)
+    await intake.handle_message(make_update(text="Makara"), ctx, session)
+
+    # Text CV (now in cv_pending)
+    session = intake.get_intake_session(FAKE_CHAT_ID)
     upd = make_update(text="Makara, Aeon staff 1 year, available full time anytime")
     await intake.handle_message(upd, ctx, session)
 

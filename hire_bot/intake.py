@@ -627,15 +627,13 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
     intake_id = session["id"]
     lang = session["language"]
 
-    # Detect language switch (Khmer after English start)
-    if lang == "en" and _is_khmer(text) and not has_media:
-        if _implies_cant_english(text):
+    # Detect language switch (Khmer script OR romanised "ot cheh angkles"-style)
+    if lang == "en" and not has_media:
+        if _is_khmer(text) or _implies_cant_english(text):
             _update(intake_id, language="km")
             lang = "km"
-        else:
-            _flag(intake_id, "continued_khmer_no_explanation", "gap_low")
-            _update(intake_id, language="km")
-            lang = "km"
+            if not _implies_cant_english(text) and _is_khmer(text):
+                _flag(intake_id, "continued_khmer_no_explanation", "gap_low")
 
     # Salary/schedule question before CV
     if _is_salary_schedule(text) and not has_media and not session["cv_submitted"]:
