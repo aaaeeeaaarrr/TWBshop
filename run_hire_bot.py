@@ -9,7 +9,10 @@ sys.path.insert(0, '/root/TWBshop')
 try:
     from secrets import HIRE_BOT_TOKEN
 except ImportError:
-    print("ERROR: HIRE_BOT_TOKEN not found in secrets.py — add it to the secrets repo and re-pull.")
+    HIRE_BOT_TOKEN = ""
+
+if not HIRE_BOT_TOKEN:
+    print("ERROR: HIRE_BOT_TOKEN missing or empty — add it to the secrets repo and re-pull.")
     sys.exit(1)
 
 os.makedirs("logs", exist_ok=True)

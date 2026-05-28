@@ -200,6 +200,23 @@ def _get_pending_arrivals() -> list[dict]:
         conn.close()
 
 
+# ── Date/time format helpers (cross-platform, no %-d Linux flag) ─────────────
+
+def _fmt_day(d) -> str:
+    """'28 May'"""
+    return f"{d.day} {d.strftime('%b')}"
+
+def _fmt_day_long(d) -> str:
+    """'28 May' using full month"""
+    return f"{d.day} {d.strftime('%B')}"
+
+def _fmt_time(dt) -> str:
+    """'2:00 PM'"""
+    h = dt.hour % 12 or 12
+    ampm = "AM" if dt.hour < 12 else "PM"
+    return f"{h}:{dt.minute:02d} {ampm}"
+
+
 # ── Text helpers ──────────────────────────────────────────────────────────────
 
 def _t(lang: str, en: str, km: str) -> str:
@@ -294,7 +311,7 @@ def kb_appointment() -> InlineKeyboardMarkup:
 
 
 def kb_day_slots(target_date: date) -> InlineKeyboardMarkup:
-    day_label = target_date.strftime("%-d %b")  # "28 May"
+    day_label = _fmt_day(target_date)
     rows = []
     for h in SLOT_HOURS:
         rows.append([InlineKeyboardButton(
@@ -310,7 +327,7 @@ def kb_pick_day() -> InlineKeyboardMarkup:
     rows = []
     for i in range(1, 8):
         d = today + timedelta(days=i)
-        label = d.strftime("%-d %b")  # "29 May"
+        label = _fmt_day(d)
         rows.append([InlineKeyboardButton(label, callback_data=f"intake:day:{d.isoformat()}")])
     rows.append([InlineKeyboardButton("◀ Back", callback_data="intake:appt_back")])
     return InlineKeyboardMarkup(rows)
@@ -512,8 +529,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         _update(intake_id, intake_status=S_APPT_SET,
                 appointment_slot=slot_dt,
                 appointment_confirmed_at=datetime.now(PP_TZ))
-        day_str = slot_dt.strftime("%-d %B")   # "28 May"
-        time_str = slot_dt.strftime("%-I:%M %p")  # "2:00 PM"
+        day_str  = _fmt_day_long(slot_dt)
+        time_str = _fmt_time(slot_dt)
         await query.edit_message_text(_t(lang,
             en=f"Confirmed. Please come to The Wine Bakery on {day_str} at {time_str}.\n\n"
                f"Please be on time. See you soon! 🙏",
@@ -530,7 +547,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             target = date.fromisoformat(parts[2])
         except ValueError:
             return
-        day_label = target.strftime("%-d %B")
+        day_label = _fmt_day_long(target)
         await query.edit_message_text(_t(lang,
             en=f"Choose a time on {day_label}:",
             km=f"ជ្រើសម៉ោងនៅថ្ងៃ {day_label}:"
@@ -634,7 +651,14 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
     # Accept: document, photo, or descriptive text (>30 chars)
     if has_media or len(text) > 30:
         cv_format = "document" if message.document else ("photo" if message.photo else "text")
+        cv_file_id = None
+        cv_message_id = message.message_id
+        if message.document:
+            cv_file_id = message.document.file_id
+        elif message.photo:
+            cv_file_id = message.photo[-1].file_id  # highest resolution
         _update(intake_id, cv_submitted=True, cv_format=cv_format,
+                cv_file_id=cv_file_id, cv_message_id=cv_message_id,
                 intake_status=S_FULLTIME_GATE)
         if cv_format == "text":
             _flag(intake_id, "cv_submitted_as_text", "gap_low")
@@ -674,8 +698,8 @@ async def _remind_slot(update: Update, session: dict) -> None:
     slot = session["appointment_slot"]
     if slot:
         slot_pp = slot.astimezone(PP_TZ)
-        day_str = slot_pp.strftime("%-d %B")
-        time_str = slot_pp.strftime("%-I:%M %p")
+        day_str  = _fmt_day_long(slot_pp)
+        time_str = _fmt_time(slot_pp)
         await update.message.reply_text(_t(lang,
             en=f"Your interview is scheduled for {day_str} at {time_str} "
                f"at The Wine Bakery. We look forward to seeing you.",
@@ -720,7 +744,7 @@ async def notify_owner_arrival(bot: Bot, intake_id: int, applicant_chat_id: int,
                                applicant_name: str, slot: datetime) -> None:
     """Send arrival confirmation button to the owner's private chat."""
     slot_pp = slot.astimezone(PP_TZ)
-    slot_str = slot_pp.strftime("%-d %B %-I:%M %p")
+    slot_str = f"{_fmt_day_long(slot_pp)} {_fmt_time(slot_pp)}"
     try:
         await bot.send_message(
             config.HIRE_ARRIVAL_STAFF_ID,
@@ -863,7 +887,7 @@ async def send_arrival_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
     for s in pending:
         chat_id = s["telegram_chat_id"]
         slot = s["appointment_slot"].astimezone(PP_TZ)
-        time_str = slot.strftime("%-I:%M %p")
+        time_str = _fmt_time(slot)
         lang = s["language"]
         try:
             await context.bot.send_message(
