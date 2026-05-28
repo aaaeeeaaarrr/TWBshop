@@ -229,6 +229,99 @@ async def _timeout_callback(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ── End of quiz ───────────────────────────────────────────────────────────────
 
+async def _send_part_e_question(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                                attempt_id: int, qid: str) -> None:
+    """Send a Part E question. Uses same rendering as main quiz questions."""
+    q = questions.get_question(qid)
+    if not q:
+        logger.error("_send_part_e_question: unknown question %s", qid)
+        return
+
+    triggered = context.user_data.get("part_e_triggered", [])
+    progress = questions.get_part_e_progress(qid, triggered)
+    section = questions.SECTION_LABEL.get(qid, "Part E — Hiring Facts")
+    header = f"[{progress}] {section}\n\n"
+
+    text = header + q["en"]
+    if q["km"]:
+        text += "\n\n" + q["km"]
+
+    answer_type = q["answer_type"]
+    if answer_type == "single_choice":
+        opts = questions.parse_b_options(q)
+        kb = _kb_single_choice(qid, opts)
+        msg = await context.bot.send_message(chat_id, text, reply_markup=kb)
+    else:
+        instruction = "\n\n✍️ Type your answer below.\nវាយចម្លើយរបស់ប្អូនខាងក្រោម។"
+        msg = await context.bot.send_message(chat_id, text + instruction)
+
+    context.user_data["last_q_msg_id"] = msg.message_id
+    context.user_data["current_qid"] = qid
+    _schedule_timeout(context, chat_id, attempt_id, qid)
+
+
+async def _advance_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                          session_id: int, attempt_id: int, just_answered: str) -> None:
+    """Called after recording a Part E answer. Compute triggers if needed, advance."""
+    e_answered: set[str] = context.user_data.get("part_e_answered", set())
+    e_answered.add(just_answered)
+    context.user_data["part_e_answered"] = e_answered
+
+    # Compute triggers once, after E-A3 is answered
+    if just_answered == "E-A3" and not context.user_data.get("part_e_triggers_computed"):
+        triggered = questions.evaluate_e_triggers(attempt_id)
+        context.user_data["part_e_triggered"] = triggered
+        context.user_data["part_e_triggers_computed"] = True
+        logger.info("_advance_part_e: triggers computed=%s attempt=%s", triggered, attempt_id)
+
+    triggered = context.user_data.get("part_e_triggered", [])
+    next_qid = questions.get_next_part_e_question(e_answered, triggered)
+
+    if next_qid:
+        await _send_part_e_question(context, chat_id, attempt_id, next_qid)
+    else:
+        await _finish_quiz(context, chat_id, session_id, attempt_id)
+
+
+async def _enter_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                        attempt_id: int, session_id: int) -> None:
+    """Transition from main quiz to Part E."""
+    context.user_data["in_part_e"] = True
+    context.user_data["part_e_answered"] = set()
+    context.user_data["part_e_triggered"] = []
+    context.user_data["part_e_triggers_computed"] = False
+
+    await context.bot.send_message(
+        chat_id,
+        "Almost done.\n"
+        "ជិតបញ្ចប់ហើយ។\n\n"
+        "A few short questions about your schedule and availability.\n"
+        "សំណួរខ្លីៗចំនួនមួយចំនួនអំពីកាលវិភាគ និងភាពអាចប្រើប្រាស់របស់ប្អូន។"
+    )
+
+    first_qid = questions.get_next_part_e_question(set(), [])
+    if first_qid:
+        await _send_part_e_question(context, chat_id, attempt_id, first_qid)
+    else:
+        await _finish_quiz(context, chat_id, session_id, attempt_id)
+
+
+async def _after_main_quiz(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                           session_id: int, attempt_id: int) -> None:
+    """Called when all 111 main quiz questions are answered."""
+    if context.user_data.get("in_part_e"):
+        # Part E already in progress (resume case) — find next unanswered E question
+        e_answered: set[str] = context.user_data.get("part_e_answered", set())
+        triggered = context.user_data.get("part_e_triggered", [])
+        next_qid = questions.get_next_part_e_question(e_answered, triggered)
+        if next_qid:
+            await _send_part_e_question(context, chat_id, attempt_id, next_qid)
+        else:
+            await _finish_quiz(context, chat_id, session_id, attempt_id)
+    else:
+        await _enter_part_e(context, chat_id, attempt_id, session_id)
+
+
 async def _finish_quiz(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
                        session_id: int, attempt_id: int) -> None:
     """Run auto_grade, select follow-ups, or go straight to end screen."""
@@ -458,7 +551,7 @@ async def cb_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _send_question(context, update.effective_chat.id, attempt_id, next_qid)
     else:
         session_id = context.user_data.get("session_id")
-        await _finish_quiz(context, update.effective_chat.id, session_id, attempt_id)
+        await _after_main_quiz(context, update.effective_chat.id, session_id, attempt_id)
 
 
 async def cb_start_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -477,7 +570,7 @@ async def cb_start_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await _send_question(context, update.effective_chat.id, attempt_id, next_qid)
     else:
         session_id = context.user_data.get("session_id")
-        await _finish_quiz(context, update.effective_chat.id, session_id, attempt_id)
+        await _after_main_quiz(context, update.effective_chat.id, session_id, attempt_id)
 
 
 async def cb_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -512,14 +605,21 @@ async def cb_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     sessions.record_answer(attempt_id, qid, {"answer": value})
     _cancel_timeout(context, update.effective_chat.id)
 
-    # Advance
+    session_id = context.user_data.get("session_id")
+    chat_id = update.effective_chat.id
+
+    # Part E button answer (E-T1 is single_choice)
+    if context.user_data.get("in_part_e"):
+        await _advance_part_e(context, chat_id, session_id, attempt_id, qid)
+        return
+
+    # Main quiz advance
     answered.add(qid)
     next_qid = questions.get_next_question_id(answered)
     if next_qid:
-        await _send_question(context, update.effective_chat.id, attempt_id, next_qid)
+        await _send_question(context, chat_id, attempt_id, next_qid)
     else:
-        session_id = context.user_data.get("session_id")
-        await _finish_quiz(context, update.effective_chat.id, session_id, attempt_id)
+        await _after_main_quiz(context, chat_id, session_id, attempt_id)
 
 
 async def cb_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -577,7 +677,7 @@ async def cb_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             await _send_question(context, update.effective_chat.id, attempt_id, next_qid)
         else:
             session_id = context.user_data.get("session_id")
-            await _finish_quiz(context, update.effective_chat.id, session_id, attempt_id)
+            await _after_main_quiz(context, update.effective_chat.id, session_id, attempt_id)
     else:
         # Update keyboard — remove chosen item
         q = questions.get_question(qid)
@@ -635,6 +735,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await _send_followup(context, chat_id, attempt_id)
         return
 
+    session_id = context.user_data.get("session_id")
+
+    # Part E free-text answer
+    if context.user_data.get("in_part_e"):
+        expected = context.user_data.get("current_qid")
+        if not expected:
+            return
+        q = questions.get_question(expected)
+        if not q or q["answer_type"] not in ("free_text", "rewrite"):
+            return
+        last_q = context.user_data.get("last_q_msg_id")
+        if last_q:
+            try:
+                await context.bot.delete_message(chat_id, last_q)
+            except TelegramError:
+                pass
+        await _delete(update.message)
+        sessions.record_answer(attempt_id, expected, {"text": user_text})
+        _cancel_timeout(context, chat_id)
+        await _advance_part_e(context, chat_id, session_id, attempt_id, expected)
+        return
+
     # Main quiz free-text answer
     answered = sessions.get_answered_question_ids(attempt_id)
     expected = questions.get_next_question_id(answered)
@@ -662,8 +784,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if next_qid:
         await _send_question(context, chat_id, attempt_id, next_qid)
     else:
-        session_id = context.user_data.get("session_id")
-        await _finish_quiz(context, chat_id, session_id, attempt_id)
+        await _after_main_quiz(context, chat_id, session_id, attempt_id)
 
 
 # ── Staff commands ────────────────────────────────────────────────────────────

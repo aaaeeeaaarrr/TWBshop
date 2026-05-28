@@ -11,6 +11,13 @@ QUESTION_SEQUENCE defines the exact presentation order:
   D-Final
 
 Total: 111 questions.
+
+After all 111, Part E hiring-facts runs:
+  E-A1 … E-A5         — always-asked (start date, availability, school/job, leave, transport)
+  E-T1 (trigger)      — studying → exam communication timing
+  E-T2 (trigger)      — current job → last day + salary breakdown
+  E-Final             — first-3-days self-commitment (always last)
+Triggers evaluated from E-A3 answer text (keyword match, no AI).
 """
 import json
 import logging
@@ -54,7 +61,34 @@ SECTION_LABEL: dict[str, str] = {
     **{"D1": "Part D — Priority", "D2": "Part D — Analysis",
        "D3": "Part D — Situations", "D4": "Part D — Rewrite",
        "D-Final": "Part D — Final Reflection"},
+    **{"E-A1": "Part E — Hiring Facts", "E-A2": "Part E — Hiring Facts",
+       "E-A3": "Part E — Hiring Facts", "E-A4": "Part E — Hiring Facts",
+       "E-A5": "Part E — Hiring Facts",
+       "E-T1": "Part E — Clarification", "E-T2": "Part E — Clarification",
+       "E-Final": "Part E — Commitment"},
 }
+
+# ── Part E constants ──────────────────────────────────────────────────────────
+
+# Always asked, in this order
+PART_E_ALWAYS: list[str] = ["E-A1", "E-A2", "E-A3", "E-A4", "E-A5"]
+
+# Trigger question IDs (evaluated from E-A3 answer keywords)
+PART_E_CONDITIONAL: list[str] = ["E-T1", "E-T2"]
+
+# Always the last Part E question
+PART_E_FINAL: str = "E-Final"
+
+# Study-related keywords that fire E-T1
+_STUDY_KEYWORDS = {"school", "university", "study", "studying", "class", "classes",
+                   "lecture", "exam", "exams", "college", "institute", "university",
+                   "semester", "morning class", "cambodia", "royal university",
+                   "ppp", "bbu", "rupp", "iu", "paragon", "norton"}
+
+# Job-related keywords that fire E-T2
+_JOB_KEYWORDS = {"work", "working", "job", "salary", "employer", "company",
+                 "restaurant", "cafe", "coffee", "shop", "hotel", "currently",
+                 "still working", "part time", "part-time", "yes"}
 
 # Cache loaded from DB
 _cache: dict[str, dict] = {}
@@ -64,6 +98,68 @@ def _conn():
     from secrets import DATABASE_URL
     import psycopg2
     return psycopg2.connect(DATABASE_URL)
+
+
+# ── Part E helpers ────────────────────────────────────────────────────────────
+
+def evaluate_e_triggers(attempt_id: int) -> list[str]:
+    """
+    Read E-A3 and C-Q1 answers from DB and return list of triggered E question IDs.
+    Rule-based keyword match — no AI.
+    """
+    import psycopg2
+    triggered: list[str] = []
+    conn = _conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT question_id, raw_answer
+            FROM hiring_quiz_answers
+            WHERE attempt_id = %s AND question_id IN ('E-A3', 'C-Q1')
+        """, (attempt_id,))
+        rows = {r[0]: (r[1] or {}) for r in cur.fetchall()}
+    finally:
+        cur.close()
+        conn.close()
+
+    def _text(row: dict) -> str:
+        if isinstance(row, dict):
+            return (row.get("text") or row.get("answer") or "").lower()
+        return ""
+
+    e_a3_text = _text(rows.get("E-A3", {}))
+    c_q1_text = _text(rows.get("C-Q1", {}))
+    combined = e_a3_text + " " + c_q1_text
+
+    if any(kw in e_a3_text for kw in _STUDY_KEYWORDS):
+        triggered.append("E-T1")
+    if any(kw in combined for kw in _JOB_KEYWORDS) and "no" not in e_a3_text[:30]:
+        triggered.append("E-T2")
+
+    return triggered
+
+
+def get_next_part_e_question(e_answered: set[str], triggered_ids: list[str]) -> Optional[str]:
+    """Return next unanswered Part E question, or None if Part E is complete."""
+    sequence = PART_E_ALWAYS + triggered_ids + [PART_E_FINAL]
+    for qid in sequence:
+        if qid not in e_answered:
+            return qid
+    return None
+
+
+def get_part_e_progress(qid: str, triggered_ids: list[str]) -> str:
+    """Progress label for a Part E question, e.g. 'E 2/7'."""
+    sequence = PART_E_ALWAYS + triggered_ids + [PART_E_FINAL]
+    try:
+        pos = sequence.index(qid) + 1
+    except ValueError:
+        return "E"
+    return f"E {pos}/{len(sequence)}"
+
+
+def is_part_e_question(qid: str) -> bool:
+    return qid.startswith("E-")
 
 
 def load_all_questions() -> dict[str, dict]:
