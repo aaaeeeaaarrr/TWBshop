@@ -2143,6 +2143,90 @@ def init_receipt_clarifications_db() -> None:
                     UNIQUE (chat_id, photo_msg_id)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS hiring_candidates (
+                    id              SERIAL PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    candidate_type  TEXT NOT NULL DEFAULT 'applicant',  -- 'applicant' or 'staff'
+                    position        TEXT,
+                    quiz_date       DATE,
+                    score_a         INTEGER,        -- Part A: /60
+                    score_b         INTEGER,        -- Part B: /22
+                    written_pct     INTEGER,        -- Part C+D: 0-100
+                    overall_pct     INTEGER,        -- 0-100
+                    classification  TEXT,           -- 'strong', 'conditional', 'borderline', 'reject'
+                    red_flags       JSONB,          -- list of flag strings
+                    retest_questions JSONB,         -- list of question numbers to retest verbally
+                    notes           TEXT,
+                    hired           BOOLEAN,
+                    created_at      TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS hiring_feedback_templates (
+                    id              SERIAL PRIMARY KEY,
+                    candidate_id    INTEGER REFERENCES hiring_candidates(id),
+                    candidate_name  TEXT,           -- denormalized for easy lookup
+                    score_range     TEXT,           -- 'high','medium','low' — NULL if candidate-specific
+                    topic           TEXT,           -- 'punctuality','mistake_reporting','quiet_time', etc.
+                    point_number    INTEGER,
+                    english_text    TEXT NOT NULL,
+                    khmer_text      TEXT NOT NULL,
+                    is_generic      BOOLEAN DEFAULT FALSE,  -- TRUE = reusable for similar future candidates
+                    created_at      TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
+
+# ── Hiring ────────────────────────────────────────────────────────────────────
+
+def hiring_save_candidate(name: str, candidate_type: str = "applicant", **kwargs) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            fields = ["name", "candidate_type"] + list(kwargs.keys())
+            values = [name, candidate_type] + list(kwargs.values())
+            placeholders = ", ".join(["%s"] * len(values))
+            cols = ", ".join(fields)
+            cur.execute(
+                f"INSERT INTO hiring_candidates ({cols}) VALUES ({placeholders}) RETURNING id",
+                values
+            )
+            return cur.fetchone()["id"]
+
+
+def hiring_save_feedback(candidate_name: str, points: list[dict],
+                          candidate_id: int = None, score_range: str = None,
+                          is_generic: bool = False):
+    """points: list of {point_number, topic, english_text, khmer_text}"""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for p in points:
+                cur.execute("""
+                    INSERT INTO hiring_feedback_templates
+                        (candidate_id, candidate_name, score_range, topic,
+                         point_number, english_text, khmer_text, is_generic)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (candidate_id, candidate_name, score_range, p.get("topic"),
+                      p["point_number"], p["english_text"], p["khmer_text"], is_generic))
+
+
+def hiring_get_feedback(candidate_name: str = None, score_range: str = None,
+                         generic_only: bool = False) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if generic_only:
+                cur.execute("""
+                    SELECT * FROM hiring_feedback_templates
+                    WHERE is_generic = TRUE AND (score_range = %s OR score_range IS NULL)
+                    ORDER BY point_number
+                """, (score_range,))
+            else:
+                cur.execute("""
+                    SELECT * FROM hiring_feedback_templates
+                    WHERE candidate_name = %s
+                    ORDER BY point_number
+                """, (candidate_name,))
+            return cur.fetchall()
 
 
 def receipt_save_clarification(chat_id: int, photo_msg_id: int, bot_msg_id: int,
