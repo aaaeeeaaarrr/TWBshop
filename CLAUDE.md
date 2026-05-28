@@ -204,7 +204,13 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - Strengths: quiet-time instinct, problem chain detection (D2), customer/product awareness
   - map_confidence() added: medium_high → medium for per-finding field (assessment level retains 4-value scale)
 - hiring_assessment_evidence table added: audit trail of photos/scans per assessment
-  (replaces source_photos placeholder in hiring_assessments.notes; add filenames when photos are named)
+  - file_hash (SHA-256 for tamper/compression detection) + storage_status (local_only/server/cloud/missing/deleted)
+  - Vannary evidence_id=1: placeholder row inserted, storage_status='missing' — real filenames needed (see below)
+**EVIDENCE FILENAMES NEEDED (storage_status='missing' — update when located):**
+  - assessment_id=2 (Vannary, leadership_audit): paper questionnaire photos uploaded to ChatGPT — how many pages/photos?
+    UPDATE hiring_assessment_evidence SET file_name='...', storage_status='local_only' WHERE id=1;
+    Add extra rows if multiple photos: INSERT INTO hiring_assessment_evidence (assessment_id, evidence_type, file_name, page_or_photo_number, storage_status) VALUES (2,'photo','...',2,'local_only');
+  - Every future import: provide filenames at import time or add evidence rows immediately after
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
@@ -217,6 +223,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   3. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
   4. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
   5. Feed more questionnaire photos to ChatGPT → paste structured block here → import via same pipeline
+  6. After 2–3 more person-specific import scripts: build generic structured-block importer
+     (reads one standard block → inserts candidate + assessment + evidence rows + findings in one pass)
+  7. Fill in evidence filenames (see EVIDENCE FILENAMES NEEDED above)
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
