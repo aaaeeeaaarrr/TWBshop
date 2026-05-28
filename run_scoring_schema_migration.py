@@ -12,8 +12,8 @@ try:
         CREATE TABLE IF NOT EXISTS hiring_contradictions (
             id                  SERIAL PRIMARY KEY,
             attempt_id          INTEGER NOT NULL REFERENCES hiring_quiz_attempts(id) ON DELETE CASCADE,
-            question_id_a       VARCHAR(20) NOT NULL REFERENCES hiring_quiz_questions(question_id),
-            question_id_b       VARCHAR(20) NOT NULL REFERENCES hiring_quiz_questions(question_id),
+            question_id_a       TEXT NOT NULL REFERENCES hiring_quiz_questions(id),
+            question_id_b       TEXT NOT NULL REFERENCES hiring_quiz_questions(id),
             contradiction_type  VARCHAR(50) NOT NULL
                                     CHECK (contradiction_type IN (
                                         'tick_vs_written',
@@ -89,6 +89,7 @@ try:
         WHERE table_name IN ('hiring_contradictions','hiring_quiz_attempts','hiring_trial_outcomes')
           AND column_name IN (
             'id','attempt_id','question_id_a','question_id_b','contradiction_type','severity',
+            'description','ai_flagged','human_confirmed','suppressed',
             'score_summary','risk_profile',
             'quiet_time_behavior','schedule_story_match'
           )
