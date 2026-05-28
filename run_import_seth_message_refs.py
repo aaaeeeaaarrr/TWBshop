@@ -106,9 +106,9 @@ def run():
             finding_id = FINDING_IDS.get(finding_point)
             cur.execute("""
                 INSERT INTO hiring_assessment_message_refs
-                    (assessment_id, finding_id, chat_id, message_id, confidence, notes)
+                    (assessment_id, finding_id, chat_id, ops_message_row_id, confidence, notes)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (assessment_id, chat_id, message_id) DO NOTHING
+                ON CONFLICT (assessment_id, finding_id, chat_id, ops_message_row_id) DO NOTHING
             """, (ASSESSMENT_ID, finding_id, chat_id, msg_id, confidence, notes))
             if cur.rowcount:
                 inserted += 1

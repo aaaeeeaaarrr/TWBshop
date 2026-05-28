@@ -267,9 +267,9 @@ async def _advance_part_e(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
     e_answered.add(just_answered)
     context.user_data["part_e_answered"] = e_answered
 
-    # Evaluate triggers once — after E-A5 (last always-asked question) so E-A1 and E-A4
-    # inputs are both available. Store in DB so a restart can reload without re-evaluating.
-    if just_answered == "E-A5" and context.user_data.get("part_e_triggered") is None:
+    # Evaluate triggers once — after the last always-asked question so all inputs are
+    # available. Store in DB so a restart can reload without re-evaluating.
+    if just_answered == questions.PART_E_ALWAYS[-1] and context.user_data.get("part_e_triggered") is None:
         triggered = questions.evaluate_e_triggers(attempt_id)
         context.user_data["part_e_triggered"] = triggered
         sessions.store_part_e_triggers(attempt_id, triggered)
@@ -322,7 +322,7 @@ async def _after_main_quiz(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
 
         # Load triggers from DB; recompute if E-A5 was answered but triggers not stored yet
         triggered = sessions.load_part_e_triggers(attempt_id)
-        if triggered is None and "E-A5" in e_answered:
+        if triggered is None and questions.PART_E_ALWAYS[-1] in e_answered:
             triggered = questions.evaluate_e_triggers(attempt_id)
             sessions.store_part_e_triggers(attempt_id, triggered)
         context.user_data["part_e_triggered"] = triggered  # may still be None if E-A5 not reached

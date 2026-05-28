@@ -71,7 +71,8 @@ SECTION_LABEL: dict[str, str] = {
     **{"D1": "Part D — Priority", "D2": "Part D — Analysis",
        "D3": "Part D — Situations", "D4": "Part D — Rewrite",
        "D-Final": "Part D — Final Reflection"},
-    **{"E-A1": "Part E — Hiring Facts", "E-A2": "Part E — Hiring Facts",
+    **{"E-A1a": "Part E — Hiring Facts",
+       "E-A1": "Part E — Hiring Facts", "E-A2": "Part E — Hiring Facts",
        "E-A3": "Part E — Hiring Facts",   # legacy (deactivated in v2)
        "E-A3a": "Part E — Hiring Facts", "E-A3b": "Part E — Hiring Facts",
        "E-A4": "Part E — Hiring Facts", "E-A5": "Part E — Hiring Facts",
@@ -82,8 +83,8 @@ SECTION_LABEL: dict[str, str] = {
 
 # ── Part E constants ──────────────────────────────────────────────────────────
 
-# Always asked, in this order — E-A3a/E-A3b replace old single-field E-A3
-PART_E_ALWAYS: list[str] = ["E-A1", "E-A2", "E-A3a", "E-A3b", "E-A4", "E-A5"]
+# Always asked, in this order — E-A1a is the structured start-gate (before free-text E-A1)
+PART_E_ALWAYS: list[str] = ["E-A1a", "E-A1", "E-A2", "E-A3a", "E-A3b", "E-A4", "E-A5"]
 
 # Trigger question IDs — evaluated once after E-A5 (last always-asked question)
 PART_E_CONDITIONAL: list[str] = ["E-T1", "E-T2", "E-T3"]
@@ -122,40 +123,40 @@ def _conn():
 
 # ── Part E helpers ────────────────────────────────────────────────────────────
 
-def evaluate_e_triggers(attempt_id: int) -> list[str]:
+def evaluate_e_triggers(attempt_id: int, _rows: dict = None) -> list[str]:
     """
-    Read E-A1, E-A3a, E-A3b, E-A4 answers from DB. Return triggered E question IDs.
-    Called once after E-A5 (last always-asked question) so all inputs are available.
+    Return triggered E question IDs. Call after PART_E_ALWAYS[-1] so all inputs are available.
     Rule-based only — no AI.
 
     Trigger rules:
       E-T1: E-A3a answer = 'A' (Yes, studying) OR exam/study keywords in E-A4 free text
       E-T2: E-A3b answer = 'A' (Yes, working elsewhere)
-      E-T3: delay keywords found in E-A1 free text (Lyhouy trigger)
+      E-T3: E-A1a answer = 'B' or 'C' (not starting within 3 days) OR delay keywords in E-A1
 
-    Legacy fallback: if E-A3 (old single-field) is present instead of E-A3a/E-A3b,
-    keyword matching is used so in-progress old sessions are not broken.
+    _rows: pass a pre-built dict for unit testing (skips DB). DB load when None.
+    Legacy fallback: if E-A3 (old single-field) is present, keyword matching is used.
     """
     import json as _json
-    triggered: list[str] = []
-    conn = _conn()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT question_id, raw_answer
-            FROM hiring_quiz_answers
-            WHERE attempt_id = %s
-              AND question_id IN ('E-A1', 'E-A3', 'E-A3a', 'E-A3b', 'E-A4', 'C-Q1')
-        """, (attempt_id,))
-        rows: dict[str, dict] = {}
-        for qid, raw in cur.fetchall():
-            try:
-                rows[qid] = _json.loads(raw) if isinstance(raw, str) else (raw or {})
-            except Exception:
-                rows[qid] = {}
-    finally:
-        cur.close()
-        conn.close()
+
+    if _rows is None:
+        conn = _conn()
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT question_id, raw_answer
+                FROM hiring_quiz_answers
+                WHERE attempt_id = %s
+                  AND question_id IN ('E-A1a', 'E-A1', 'E-A3', 'E-A3a', 'E-A3b', 'E-A4', 'C-Q1')
+            """, (attempt_id,))
+            _rows = {}
+            for qid, raw in cur.fetchall():
+                try:
+                    _rows[qid] = _json.loads(raw) if isinstance(raw, str) else (raw or {})
+                except Exception:
+                    _rows[qid] = {}
+        finally:
+            cur.close()
+            conn.close()
 
     def _text(d: dict) -> str:
         return (d.get("text") or d.get("answer") or "").lower()
@@ -163,33 +164,38 @@ def evaluate_e_triggers(attempt_id: int) -> list[str]:
     def _answer(d: dict) -> str:
         return (d.get("answer") or "").upper()
 
+    triggered: list[str] = []
+
     # ── E-T1: study / exam conflict ───────────────────────────────────────────
     study_triggered = (
-        _answer(rows.get("E-A3a", {})) == "A"               # structured: Yes, studying
-        or any(kw in _text(rows.get("E-A4", {}))             # exam keywords in leave/dates field
+        _answer(_rows.get("E-A3a", {})) == "A"               # structured: Yes, studying
+        or any(kw in _text(_rows.get("E-A4", {}))             # exam keywords in leave/dates field
                for kw in _STUDY_KEYWORDS)
-        or any(kw in _text(rows.get("E-A3", {}))             # legacy single-field fallback
+        or any(kw in _text(_rows.get("E-A3", {}))             # legacy single-field fallback
                for kw in _STUDY_KEYWORDS)
     )
     if study_triggered:
         triggered.append("E-T1")
 
     # ── E-T2: current job ─────────────────────────────────────────────────────
-    e_a3b = rows.get("E-A3b", {})
-    if _answer(e_a3b) == "A":                                # structured: Yes, working elsewhere
+    if _answer(_rows.get("E-A3b", {})) == "A":               # structured: Yes, working elsewhere
         triggered.append("E-T2")
     else:
         # Legacy: keyword fallback for old sessions that used E-A3 free-text
-        e_a3_text = _text(rows.get("E-A3", {}))
-        c_q1_text = _text(rows.get("C-Q1", {}))
+        e_a3_text = _text(_rows.get("E-A3", {}))
+        c_q1_text = _text(_rows.get("C-Q1", {}))
         combined = e_a3_text + " " + c_q1_text
         if (any(kw in combined for kw in _JOB_KEYWORDS)
                 and "no" not in e_a3_text[:30]):
             triggered.append("E-T2")
 
-    # ── E-T3: delayed start (Lyhouy trigger) ─────────────────────────────────
-    e_a1_text = _text(rows.get("E-A1", {}))
-    if any(kw in e_a1_text for kw in _DELAY_KEYWORDS):
+    # ── E-T3: delayed start — structured E-A1a takes priority over keyword fallback ──
+    e_a1a_ans = _answer(_rows.get("E-A1a", {}))
+    delay_triggered = (
+        e_a1a_ans in ("B", "C")                              # structured: No / Not sure
+        or any(kw in _text(_rows.get("E-A1", {})) for kw in _DELAY_KEYWORDS)  # keyword fallback
+    )
+    if delay_triggered:
         triggered.append("E-T3")
 
     return triggered
