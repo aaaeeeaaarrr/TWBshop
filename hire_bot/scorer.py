@@ -545,7 +545,7 @@ def build_risk_profile(attempt_id: int) -> dict:
 
         # ── Customer instinct ──
         # B-questions about customer situations, C-Q12 (quiet time = find customers?)
-        customer_wrong = len({"B3", "B8", "B9", "B19", "B21", "B22"} & critical_wrong)
+        customer_wrong = len({"B-Q3", "B-Q8", "B-Q9", "B-Q19", "B-Q21", "B-Q22"} & critical_wrong)
         customer_written = _written_avg(["C-Q12", "C-Q20"], "specificity_score")
         if customer_wrong == 0 and customer_written >= 2.0:
             customer = "strong"

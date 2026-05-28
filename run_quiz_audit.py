@@ -55,8 +55,8 @@ for m in missing_text:
 # 5. Critical questions check
 critical_expected = sorted([
     'A1-Q5','A1-Q7','A2-Q12','A2-Q13','A2-Q20','A4-Q34','A4-Q38',
-    'A5-Q42','A5-Q44','A6-Q57','A6-Q58',
-    'B3','B8','B9','B19','B21','B22',
+    'A5-Q42','A5-Q44','A6-Q51','A6-Q57','A6-Q58',
+    'B-Q3','B-Q8','B-Q9','B-Q19','B-Q21','B-Q22',
     'C-Q4','C-Q8','C-Q12','D1','D-Final'
 ])
 cur.execute("SELECT id FROM hiring_quiz_questions WHERE severity_if_wrong = 'critical' ORDER BY id")
