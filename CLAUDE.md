@@ -135,7 +135,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 16)
+**Last updated:** 2026-05-28 (session 16 continued)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
@@ -167,16 +167,19 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Proposal conflict resolution: added [✏️ Explain...] button — owner can type free-text instruction to Opus instead of choosing preset buttons
 - Global CLAUDE.md push protocol updated: any push/commit wording triggers full protocol (CLAUDE.md update + commit all + push)
 - Hiring scoring engine built, tested, and refined: hire_bot/scorer.py + followups.py + readtime.py
-  - auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile — match real DB schema
-  - Contradiction logic fixed: _should_flag() only stores real contradictions (tick actually wrong).
-    Perfect candidate = 0 contradiction rows. Table stays clean for future prediction analytics.
-  - Contradiction pairs revised: A4-Q38→C-Q12 (direct quiet-time test), A5-Q42→C-Q10 (team-feeling)
-  - Risk profile: category-gated overrides — A2-Q13 wrong = honesty 'weak' regardless of score;
-    A4-Q38 wrong = quiet 'weak'; A2-Q20 wrong = experience 'red_flag'; schedule questions gate schedule
-  - Follow-up priority: eligibility blockers first (current_job, start_date) → safety/honesty → operational
-  - 13 curated bilingual follow-ups, capped at 5 per session, priority-ordered
-  - Per-language read-time: EN button vs EN words, KH button vs KH words
-  - 6 repeatable tests in tests/test_hire_scorer.py: 24/24 passed
+  - Phase 1: auto_grade() → score_summary + is_correct per row; 0 contradiction rows written in Phase 1
+  - Phase 2: detect_semantic_contradictions() → polished liar detection (tick=CORRECT + responsibility ≤ 1)
+    Wrong tick + bad written = consistent failure → NOT flagged. hiring_contradictions stays clean.
+  - 6 CONTRADICTION_PAIRS finalized: A2-Q13/C-Q8, A4-Q34/C-Q12, A4-Q38/C-Q12, A5-Q42/C-Q11 (updated),
+    A6-Q58/C-Q16, A6-Q51/D3; + 1 written-vs-written pair: C-Q3/C-Q8
+  - Risk profile: category-gated overrides; A2-Q13 → honesty 'weak'; A4-Q38 → quiet 'weak';
+    A2-Q20 → experience 'red_flag'; both schedule questions wrong → schedule 'red_flag'
+  - 13 curated bilingual follow-ups, capped at 5, eligibility blockers first
+  - Per-language read-time: EN button vs EN words only; KH button vs KH words only
+  - 7 repeatable tests in tests/test_hire_scorer.py (6 Phase 1 + 1 Phase 2 pre-scored)
+- Session state schema added: attempt_status (9 states), abandoned_at_question_id, resume_count on attempts;
+  resume_count + reopened_by on hiring_sessions; migration in migrations/2026_05_28_session_state_schema.sql
+- run_session_state_migration.py deleted (one-time script, already run on production)
 - Schema additions: hiring_contradictions table, risk_profile+score_summary on quiz_attempts, quiet_time_behavior+schedule_story_match on trial_outcomes
 - Quiz bank live + reproducible: 111 questions in DB + migrations/2026_05_28_load_final_v3_quiz_questions.sql seed
 - migrations/2026_05_28_scoring_schema.sql preserved — idempotent, safe to re-run
