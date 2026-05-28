@@ -224,15 +224,17 @@ def get_followup(trigger_type: str, question_id: Optional[str] = None) -> Option
 
 MAX_FOLLOWUPS = 5
 
-# Priority order for follow-up selection when more than MAX_FOLLOWUPS triggers fire
+# Priority order when more than MAX_FOLLOWUPS triggers fire.
+# Schedule/eligibility blockers come FIRST — a candidate who cannot work the
+# schedule should not spend 30 minutes on moral follow-ups before that is resolved.
 TRIGGER_PRIORITY = [
-    "verbal_retest",        # 1st: critical honesty/value contradiction (must ask)
-    "not_sure_critical",    # 2nd: uncertainty on a core value
-    "current_job_conflict", # 3rd: schedule/commitment risk
-    "commitment_maybe",     # 4th: unclear commitment
-    "start_date_missing",   # 5th: missing start date
-    "d1_wrong_priority",    # 6th: operational priority failure
-    "incomplete_answer",    # 7th: completeness issue (lowest)
+    "current_job_conflict", # 1st: can they even start? — hard eligibility blocker
+    "start_date_missing",   # 2nd: no start date = cannot proceed
+    "verbal_retest",        # 3rd: critical safety/honesty (hiding mistakes, floor food, etc.)
+    "not_sure_critical",    # 4th: uncertainty on a core value
+    "d1_wrong_priority",    # 5th: operational priority (orders/tablet)
+    "commitment_maybe",     # 6th: unclear 1-year commitment
+    "incomplete_answer",    # 7th: completeness — only after the big issues
 ]
 
 

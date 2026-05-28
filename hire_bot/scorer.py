@@ -230,30 +230,37 @@ def _build_triggers(summary: dict, attempt_id: int, cur) -> list[dict]:
 # ── Phase 1: Contradiction detection ────────────────────────────────────────
 
 # (tick_qid, written_qid, type, severity, description)
+# Rule: only stored when the tick answer is actually WRONG.
+# A correct tick + correct written = no contradiction row, regardless of pair importance.
 CONTRADICTION_PAIRS = [
+    # Strong pairs — direct logical link between tick and written question
     ("A2-Q13", "C-Q8",
      "tick_vs_written", "critical",
-     "Ticked that hiding mistakes is wrong, but written may show avoidance or 'handle quietly'"),
+     "Ticked hiding mistakes is wrong, but written answer shows avoidance or 'handle quietly'"),
 
     ("A4-Q34", "C-Q12",
      "tick_vs_written", "critical",
      "Ticked quiet time = work time, but written says 'wait' or 'check phone'"),
 
-    ("A4-Q38", "C-Q4",
-     "tick_vs_written", "moderate",
-     "Ticked self-discipline matters, but written self-review avoids accountability"),
+    # Revised: A4-Q38 (work without watching) → C-Q12 (quiet-time behavior)
+    # More direct than C-Q4 (old manager feedback) which tests self-awareness, not discipline
+    ("A4-Q38", "C-Q12",
+     "tick_vs_written", "critical",
+     "Ticked good staff work even without being watched, but quiet-time answer says 'wait' or 'phone'"),
 
-    ("A5-Q42", "C-Q20",
+    # Revised: A5-Q42 (gossip harmful) → C-Q10 (what to do when team feeling is bad)
+    # More direct than C-Q20 (systems thinking / resignation) which is a weak link
+    ("A5-Q42", "C-Q10",
      "tick_vs_written", "moderate",
-     "Ticked anti-gossip but written answer reveals team-talk culture"),
+     "Ticked gossip is harmful, but team-feeling answer reveals spreading negativity vs going to management"),
 
     ("A6-Q58", "C-Q16",
      "tick_vs_written", "moderate",
-     "Ticked sudden leaving hurts team, but commitment answer is vague or contradicts"),
+     "Ticked sudden leaving hurts team, but resignation answer is vague or contradicts this belief"),
 
     ("A6-Q51", "D3",
      "tick_vs_written", "moderate",
-     "Ticked training is valuable, but step-up answer has no real training plan"),
+     "Ticked training costs time/money, but step-up answer has no real training plan"),
 ]
 
 
@@ -317,22 +324,22 @@ def detect_contradictions(attempt_id: int) -> list[dict]:
 
 def _should_flag(qa_id: str, raw_a: str, tick_meta: dict) -> bool:
     """
-    For Part A tick questions: flag if the tick was wrong OR if the question is critical.
-    For non-tick questions: always flag (human will confirm).
+    Only flags a real contradiction: the tick answer must be WRONG.
+    A correct tick + correct written = no row in hiring_contradictions, ever.
+    This keeps contradiction data clean for future prediction analytics.
+    (Correct-tick pairs that deserve human review are surfaced in the owner
+    report separately — they do not pollute the contradiction table.)
     """
     meta = tick_meta.get(qa_id, {})
     if meta.get("part") != "A":
-        return True  # non-tick — always send for human review
+        return False  # non-tick source questions are not auto-flagged
 
     correct = meta.get("correct_answer", {})
     resp = _parse_answer(raw_a)
     given = resp.get("answer", "").lower()
     expected = correct.get("answer", "").lower() if isinstance(correct, dict) else ""
 
-    if given != expected:
-        return True  # tick was wrong → contradiction likely
-    # Tick was right but still flag critical pairs for human review
-    return meta.get("severity") == "critical"
+    return given != expected  # only flag when the tick was actually wrong
 
 
 # ── Phase 2: Claude rubric scoring ──────────────────────────────────────────
@@ -512,27 +519,41 @@ def build_risk_profile(attempt_id: int) -> dict:
             vals = [rubric_by_q[q].get(dim, 0) for q in qids if q in rubric_by_q]
             return sum(vals) / len(vals) if vals else 0.0
 
-        # Honesty
-        honesty_wrong = len({"A2-Q13", "A1-Q7"} & critical_wrong)
+        # ── Category-gated scoring ───────────────────────────────────────────
+        # Rule: critical wrong answers on category-specific questions OVERRIDE
+        # the percentage-based calculation for that category.
+        # A 95% score with A2-Q13 wrong is NOT a strong honesty result.
+
+        a_pct = score_a / 60
+
+        # Honesty — gated on honesty-specific critical questions
+        # Any wrong answer on hiding mistakes (A2-Q13) or schedule honesty (A1-Q7)
+        # forces "weak" regardless of overall score or written quality.
+        honesty_critical_wrong = {"A2-Q13", "A1-Q7"} & critical_wrong
+        honesty_critical_ns = {"A2-Q13"} & not_sure_critical
         honesty_written = written_avg(["C-Q8", "C-Q4"], "responsibility_score")
-        if honesty_wrong == 0 and honesty_written >= 2.5 and contradiction_count == 0:
+        if honesty_critical_wrong or honesty_critical_ns:
+            honesty = "weak"  # override — specific question failed
+        elif honesty_written >= 2.5 and contradiction_count == 0:
             honesty = "strong"
-        elif honesty_wrong == 0 and honesty_written >= 1.5:
+        elif honesty_written >= 1.5:
             honesty = "medium"
         else:
-            honesty = "weak"
+            honesty = "medium"  # written sections not scored yet
 
-        # Schedule clarity
-        schedule_wrong = len({"A1-Q5", "A1-Q7", "A1-Q6"} & critical_wrong)
+        # Schedule clarity — gated on schedule-specific questions
+        # A1-Q5 (busy tomorrow) or A1-Q7 wrong = at minimum "unclear"
+        schedule_critical_wrong = {"A1-Q5", "A1-Q7"} & critical_wrong
         schedule_ns = len({"A1-Q5", "A1-Q6"} & not_sure_critical)
-        if schedule_wrong == 0 and schedule_ns == 0:
-            schedule = "clean"
-        elif schedule_wrong <= 1 or schedule_ns <= 1:
+        schedule_other_wrong = len({"A1-Q6"} & critical_wrong)
+        if len(schedule_critical_wrong) >= 2 or (schedule_critical_wrong and schedule_ns):
+            schedule = "red_flag"
+        elif schedule_critical_wrong or schedule_ns or schedule_other_wrong:
             schedule = "unclear"
         else:
-            schedule = "red_flag"
+            schedule = "clean"
 
-        # Completion discipline
+        # Completion discipline — based purely on written completeness scores
         comp_avg = written_avg(list(rubric_by_q.keys()), "completeness_score")
         if comp_avg >= 2.5:
             completion = "strong"
@@ -541,36 +562,44 @@ def build_risk_profile(attempt_id: int) -> dict:
         else:
             completion = "weak"
 
-        # Customer instinct
-        customer_wrong = len({"B-Q3", "B-Q8", "B-Q9", "B-Q19", "B-Q21", "B-Q22"} & critical_wrong)
-        customer_written = written_avg(["C-Q12", "C-Q20"], "specificity_score")
-        if customer_wrong == 0 and customer_written >= 2.0:
-            customer = "strong"
-        elif customer_wrong <= 1:
-            customer = "trainable"
-        else:
+        # Customer instinct — gated on customer scenario questions
+        # Wrong on critical B scenarios AND low written customer instinct = weak
+        customer_critical_wrong = {"B-Q3", "B-Q8", "B-Q9", "B-Q19", "B-Q21", "B-Q22"} & critical_wrong
+        customer_written = written_avg(["C-Q21", "C-Q22", "C-Q23", "C-Q24"], "specificity_score")
+        if len(customer_critical_wrong) >= 2:
             customer = "weak"
-
-        # Quiet-time work ethic
-        quiet_wrong = len({"A4-Q34", "A4-Q38"} & (critical_wrong | not_sure_critical))
-        quiet_written = written_avg(["C-Q12"], "completeness_score")
-        if quiet_wrong == 0 and quiet_written >= 2.0:
-            quiet = "strong"
-        elif quiet_wrong == 0:
-            quiet = "unclear"
+        elif customer_written >= 2.0 and not customer_critical_wrong:
+            customer = "strong"
         else:
-            quiet = "weak"
+            customer = "trainable"
 
-        # Experience credibility
-        a_pct = score_a / 60
-        if a_pct >= 0.90:
+        # Quiet-time work ethic — gated on A4 questions AND C-Q12
+        # Wrong on A4-Q34 or A4-Q38 overrides to "weak" regardless of written
+        quiet_critical_wrong = {"A4-Q34", "A4-Q38"} & critical_wrong
+        quiet_critical_ns = {"A4-Q34", "A4-Q38"} & not_sure_critical
+        quiet_written = written_avg(["C-Q12"], "completeness_score")
+        if quiet_critical_wrong:
+            quiet = "weak"  # override — core value failed
+        elif quiet_critical_ns:
+            quiet = "unclear"  # not sure on a core value = uncertain
+        elif quiet_written >= 2.0:
+            quiet = "strong"
+        else:
+            quiet = "unclear"
+
+        # Experience credibility — still uses a_pct as base, but food safety
+        # and dishonesty critical wrongs reduce credibility even at high scores
+        safety_wrong = {"A2-Q20"} & critical_wrong  # floor food can be sold = disqualifying
+        if safety_wrong:
+            experience = "red_flag"  # food safety failure overrides everything
+        elif a_pct >= 0.90 and not honesty_critical_wrong:
             experience = "verified"
         elif a_pct >= 0.80:
             experience = "unclear"
         else:
             experience = "inflated"
 
-        # Leadership potential
+        # Leadership potential — pure written score, no tick override
         leadership_written = written_avg(["C-Q20", "D3"], "specificity_score")
         if leadership_written >= 2.5:
             leadership = "strong"
@@ -579,11 +608,15 @@ def build_risk_profile(attempt_id: int) -> dict:
         else:
             leadership = "none"
 
-        # Trial recommendation
+        # Trial recommendation — category results gate the final decision
         critical_count = len(critical_wrong)
-        if critical_count >= 3 or honesty == "weak" or schedule == "red_flag":
+        is_honesty_failure = honesty == "weak"
+        is_safety_failure = experience == "red_flag"
+        is_schedule_failure = schedule == "red_flag"
+
+        if is_honesty_failure or is_safety_failure or is_schedule_failure or critical_count >= 3:
             recommendation = "reject"
-        elif critical_count == 0 and honesty == "strong" and a_pct >= 0.90:
+        elif critical_count == 0 and honesty == "strong" and schedule == "clean" and a_pct >= 0.90:
             recommendation = "hire"
         else:
             recommendation = "trial"
