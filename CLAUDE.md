@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-27 (session 15)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use.
+**Last updated:** 2026-05-28 (session 16)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
@@ -166,12 +166,19 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - run_backfill_clarifications.py: one-time script to import staff replies to historical clarification questions into DB
 - Proposal conflict resolution: added [✏️ Explain...] button — owner can type free-text instruction to Opus instead of choosing preset buttons
 - Global CLAUDE.md push protocol updated: any push/commit wording triggers full protocol (CLAUDE.md update + commit all + push)
+- Hiring scoring engine built: hire_bot/scorer.py (auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile) + hire_bot/followups.py (13 curated bilingual follow-up questions, no AI freestyling)
+- Schema additions: hiring_contradictions table, risk_profile+score_summary JSONB on hiring_quiz_attempts, quiet_time_behavior+schedule_story_match on hiring_trial_outcomes
+- Quiz bank live: 111 questions (60 Part A + 22 Part B + 24 Part C + 5 Part D) in hiring_quiz_questions
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
   3. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
+**Next task (hiring system):**
+  1. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
+  2. Build the actual Telegram hiring bot: hire_bot/bot.py — token-based invite, disappearing questions, bilingual stacked buttons, minimum read-time enforcement
+  3. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
