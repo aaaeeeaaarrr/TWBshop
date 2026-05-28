@@ -102,6 +102,19 @@ def test_kb_day_slots_all_five_slots():
         expected = f"intake:slot:2026-06-01T{h:02d}:00"
         assert expected in callbacks
 
+def test_slot_callback_colon_split():
+    # callback_data "intake:slot:2026-06-04T10:00" splits by ":" into 4 parts;
+    # parts[2:] must be rejoined to get the full "2026-06-04T10:00" string
+    callback = "intake:slot:2026-06-04T10:00"
+    parts = callback.split(":")
+    assert parts == ["intake", "slot", "2026-06-04T10", "00"]
+    slot_str = ":".join(parts[2:])
+    assert slot_str == "2026-06-04T10:00"
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    dt = datetime.strptime(slot_str, "%Y-%m-%dT%H:%M").replace(tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    assert dt.hour == 10
+
 def test_kb_day_slots_has_back():
     d = date(2026, 6, 1)
     kb = kb_day_slots(d)

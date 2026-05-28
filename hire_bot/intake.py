@@ -519,7 +519,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # intake:slot:YYYY-MM-DDTHH:00
     elif parts[1] == "slot" and len(parts) >= 3:
-        slot_str = parts[2]  # "2026-05-28T14:00"
+        slot_str = ":".join(parts[2:])  # rejoin — colon in time splits into extra parts
         try:
             slot_naive = datetime.strptime(slot_str, "%Y-%m-%dT%H:%M")
             slot_dt = slot_naive.replace(tzinfo=PP_TZ)
