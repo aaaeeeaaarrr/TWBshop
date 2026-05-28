@@ -39,7 +39,7 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 import config
-from hire_bot import sessions, questions
+from hire_bot import sessions, questions, intake
 from hire_bot.followups import get_followups_for_triggers
 from hire_bot.scorer import auto_grade
 
@@ -426,7 +426,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    # No token → check for active session (bot restart recovery)
+    # No token → check for active quiz session (bot restart recovery)
     if not args:
         sess = sessions.get_active_session(user.id)
         if sess and sess.get("attempt_id"):
@@ -442,10 +442,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     reply_markup=_kb_resume()
                 )
                 return
-        await update.message.reply_text(
-            "Please use your invite link to start the test.\n"
-            "សូមប្រើតំណផ្ញើអញ្ជើញ ដើម្បីចាប់ផ្តើមធ្វើតេស្ត។"
-        )
+        # No quiz session — route to intake (public ad entry point)
+        await intake.start_intake(update, context)
         return
 
     token = args[0]
@@ -722,14 +720,21 @@ async def cb_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle free-text answers (Part C, D2, D3, D4, D-Final, and follow-ups).
-    Only processes if the current expected question accepts free text.
+    Routes to intake if no active quiz session.
     """
     if update.message.chat.type != "private":
         return
 
     attempt_id = context.user_data.get("attempt_id")
     if not attempt_id:
-        return  # No active session — ignore
+        # Route to intake funnel
+        chat_id = update.effective_chat.id
+        session = intake.get_intake_session(chat_id)
+        if session and session["intake_status"] in intake.ACTIVE_STATUSES:
+            await intake.handle_message(update, context, session)
+        elif intake.is_job_intent(update.message.text or ""):
+            await intake.start_intake(update, context)
+        return
 
     user_text = update.message.text.strip()
     if not user_text:
@@ -878,6 +883,24 @@ def build_application(token: str) -> Application:
 
     app = Application.builder().token(token).build()
 
+    # Intake handlers (group=-1 = higher priority than quiz handlers)
+    app.add_handler(
+        MessageHandler(filters.VOICE | filters.VIDEO_NOTE, intake.handle_voice),
+        group=-1,
+    )
+    app.add_handler(
+        MessageHandler(
+            (filters.PHOTO | filters.Document.ALL) & filters.ChatType.PRIVATE,
+            _handle_document_or_photo,
+        ),
+        group=-1,
+    )
+    app.add_handler(
+        CallbackQueryHandler(intake.handle_callback, pattern="^intake:"),
+        group=-1,
+    )
+
+    # Quiz handlers (group=0, default)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("create", cmd_create))
     app.add_handler(CommandHandler("reopen", cmd_reopen))
@@ -890,4 +913,23 @@ def build_application(token: str) -> Application:
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
+    # Day-of arrival reminder — runs every 10 minutes
+    app.job_queue.run_repeating(
+        intake.send_arrival_reminders,
+        interval=600,
+        first=60,
+    )
+
     return app
+
+
+async def _handle_document_or_photo(update: Update,
+                                    context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Route photo/document to intake if in intake state; otherwise ignore."""
+    chat_id = update.effective_chat.id
+    attempt_id = context.user_data.get("attempt_id")
+    if attempt_id:
+        return  # In quiz — quiz doesn't use photos, just ignore
+    session = intake.get_intake_session(chat_id)
+    if session and session["intake_status"] in intake.ACTIVE_STATUSES:
+        await intake.handle_message(update, context, session)

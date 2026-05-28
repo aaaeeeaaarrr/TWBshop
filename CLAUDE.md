@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 18c)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E hiring-facts added to hire_bot. Seth attendance assessment imported. Part E v3 fixes complete — ready for internal test run.
+**Last updated:** 2026-05-28 (session 19)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
@@ -259,6 +259,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   2. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
      Use this test path: /create Test Candidate → intro → 111 Qs → E-A1a=B (triggers E-T3) + E-A3a=A (triggers E-T1) + E-A3b=A (triggers E-T2) → all 3 triggers fire → E-Final → end screen → owner notify
   3. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
+  4. Intake funnel (hire_bot/intake.py) BUILT — migration run on server, import tests pass
+     Next: add HIRE_BOT_TOKEN to secrets → start bot → test full public intake flow end-to-end
+     Test path: message bot with job intent → greeting → Khmer reply → CV → full-time confirm → slot buttons → owner arrival confirm → test unlocks
   5. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
   6. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
   7. Feed more questionnaire photos to ChatGPT → paste structured block here → import via same pipeline

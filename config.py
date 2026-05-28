@@ -1,4 +1,12 @@
-from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, GM_BOT_TOKEN, DATABASE_URL, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE
+from secrets import ANTHROPIC_API_KEY, BOT_TOKEN, B2B_BOT_TOKEN, DATABASE_URL, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE
+try:
+    from secrets import GM_BOT_TOKEN
+except ImportError:
+    GM_BOT_TOKEN = ""  # Add GM_BOT_TOKEN to twbshop-secrets to enable GM bot
+try:
+    from secrets import HIRE_BOT_TOKEN
+except ImportError:
+    HIRE_BOT_TOKEN = ""  # Add HIRE_BOT_TOKEN to twbshop-secrets to enable hire bot
 
 # Claude model used for all AI analysis.
 CLAUDE_MODEL = "claude-sonnet-4-6"
