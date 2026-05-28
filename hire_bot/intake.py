@@ -550,15 +550,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             km="សូមជ្រើសម៉ោងមកសម្ភាសន៍:"
         ), reply_markup=kb_appointment())
 
-    # intake:arrived:ID  (owner taps — only valid from owner's chat)
+    # intake:arrived:ID  (listener staff taps — only valid from their chat)
     elif parts[1] == "arrived" and len(parts) == 3:
-        if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        if update.effective_user.id != config.HIRE_ARRIVAL_STAFF_ID:
             return
         await _confirm_arrival(int(parts[2]), context, query)
 
-    # intake:noshow:ID  (owner taps)
+    # intake:noshow:ID  (listener staff taps)
     elif parts[1] == "noshow" and len(parts) == 3:
-        if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        if update.effective_user.id != config.HIRE_ARRIVAL_STAFF_ID:
             return
         await _confirm_noshow(int(parts[2]), context, query)
 
@@ -723,7 +723,7 @@ async def notify_owner_arrival(bot: Bot, intake_id: int, applicant_chat_id: int,
     slot_str = slot_pp.strftime("%-d %B %-I:%M %p")
     try:
         await bot.send_message(
-            config.OWNER_TELEGRAM_ID,
+            config.HIRE_ARRIVAL_STAFF_ID,
             f"📋 Applicant for interview:\n\n"
             f"Name: {applicant_name}\n"
             f"Scheduled: {slot_str}\n\n"
@@ -772,7 +772,7 @@ async def _confirm_arrival(intake_id: int, context: ContextTypes.DEFAULT_TYPE,
     try:
         _token, session_id = quiz_sessions.create_session(
             candidate_name=applicant_name,
-            created_by_staff_id=config.OWNER_TELEGRAM_ID,
+            created_by_staff_id=config.HIRE_ARRIVAL_STAFF_ID,
         )
         # Bind session to applicant's Telegram user
         conn2 = _conn()

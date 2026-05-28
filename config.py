@@ -59,6 +59,10 @@ OWNER_TELEGRAM_ID: int = 1313155971
 # Shop's Telegram (staff phone) — dispatch reminders (1h before fulfillment) are sent here.
 DISPATCH_REMINDER_TELEGRAM_ID: int = 1271537077
 
+# Staff listener account — receives [Arrived] / [Didn't come] buttons when an applicant is due.
+# This is the person physically at the shop who confirms arrival in person.
+HIRE_ARRIVAL_STAFF_ID: int = DISPATCH_REMINDER_TELEGRAM_ID
+
 # Bakery coordinates — used as the origin for Grab Express delivery cost estimates.
 # Get from Google Maps: long-press the bakery location → copy the numbers at the top.
 BAKERY_LAT: float = 11.5387774
