@@ -81,8 +81,9 @@ ALTER TABLE hiring_feedback_points
     ADD CONSTRAINT hiring_feedback_points_severity_check
         CHECK (severity IN (
             'strength_high', 'strength_medium',
-            'gap_minor', 'gap_low_medium', 'gap_medium', 'gap_critical',
-            'risk_critical', 'contradiction'
+            'gap_minor', 'gap_low_medium', 'gap_medium', 'gap_high', 'gap_critical',
+            'risk_low', 'risk_medium', 'risk_high', 'risk_critical',
+            'contradiction'
         ));
 
 -- Expand source_type CHECK to include legacy_paper
