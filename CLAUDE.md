@@ -255,25 +255,22 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
-  1. Run v3 migration on server: `ssh twbshop "psql \$DATABASE_URL -f /root/TWBshop/migrations/2026_05_28_part_e_v3.sql"`
-  2. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
+  1. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
      Use this test path: /create Test Candidate → intro → 111 Qs → E-A1a=B (triggers E-T3) + E-A3a=A (triggers E-T1) + E-A3b=A (triggers E-T2) → all 3 triggers fire → E-Final → end screen → owner notify
-  3. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
-  4. Intake funnel (hire_bot/intake.py) BUILT — intake schema migration run on server
-     Code quality fixes (session 19b):
-     - run_hire_bot.py: fails loudly on empty HIRE_BOT_TOKEN (not just ImportError)
-     - intake.py: CV media storage — cv_file_id + cv_message_id captured and stored
-     - intake.py: cross-platform formatters _fmt_day/_fmt_day_long/_fmt_time (no %-d Linux flag)
-     - tests/test_intake.py: 39 unit tests all pass
-     - migrations/2026_05_28_intake_cv_media.sql: NOT YET RUN ON SERVER
-     Next: run cv media migration → add HIRE_BOT_TOKEN → test full intake flow end-to-end
-     Test path: message bot with job intent → greeting → Khmer reply → CV → full-time confirm → slot buttons → listener arrival confirm → test unlocks
-  5. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
-  6. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
-  7. Feed more questionnaire photos to ChatGPT → paste structured block here → import via same pipeline
-  8. After 2–3 more person-specific import scripts: build generic structured-block importer
+  2. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
+  3. Intake funnel (hire_bot/intake.py) BUILT — all migrations run on server, 39 unit tests pass
+     Next: add HIRE_BOT_TOKEN → start bot → run fake public-intake flow
+     Happy path: public message → CV photo → full-time gate → appointment → listener confirms arrival → quiz unlocks
+     Bad path: voice strikes, part-time close, salary-before-CV redirect, no-show
+     DESIGN NOTE: hiring_intake_sessions has flat UNIQUE (telegram_chat_id) — upsert overwrites old row
+       on re-apply, no audit history. Future fix: partial unique index (active attempts only) or
+       separate applicant_person → intake_attempts hierarchy. Not urgent before first real applicant.
+  4. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
+  5. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
+  6. Feed more questionnaire photos to ChatGPT → paste structured block here → import via same pipeline
+  7. After 2–3 more person-specific import scripts: build generic structured-block importer
      (reads one standard block → inserts candidate + assessment + evidence rows + findings in one pass)
-  9. Seth: formal accountability conversation, then update assessment findings with outcome
+  8. Seth: formal accountability conversation, then update assessment findings with outcome
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
 **Notes:**
