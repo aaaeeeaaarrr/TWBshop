@@ -60,7 +60,20 @@ def insert_answer(attempt_id, question_id, response, skipped=False):
 
 
 def cleanup(candidate_ids):
-    # FK ON DELETE CASCADE handles attempts → answers → contradictions
+    # Delete in FK order: contradictions → answers → attempts → candidates
+    cur.execute("""
+        DELETE FROM hiring_contradictions
+        WHERE attempt_id IN (
+            SELECT id FROM hiring_quiz_attempts WHERE candidate_id = ANY(%s)
+        )
+    """, (candidate_ids,))
+    cur.execute("""
+        DELETE FROM hiring_quiz_answers
+        WHERE attempt_id IN (
+            SELECT id FROM hiring_quiz_attempts WHERE candidate_id = ANY(%s)
+        )
+    """, (candidate_ids,))
+    cur.execute("DELETE FROM hiring_quiz_attempts WHERE candidate_id = ANY(%s)", (candidate_ids,))
     cur.execute(
         "DELETE FROM hiring_candidates WHERE id = ANY(%s) AND name LIKE %s",
         (candidate_ids, r'__TEST_%')
