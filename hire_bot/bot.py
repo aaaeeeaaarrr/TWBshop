@@ -732,9 +732,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         session = intake.get_intake_session(chat_id)
         if session and session["intake_status"] in intake.ACTIVE_STATUSES:
             await intake.handle_message(update, context, session)
-        elif not session:
-            # Bot is ad-linked — any first message is a job inquiry; no keyword gate needed
+        elif not session or session["intake_status"] == intake.S_BLOCKED:
+            # Bot is ad-linked — any first message is a job inquiry; no keyword gate needed.
+            # S_BLOCKED: start_intake handles cooldown check and resets when expired.
             await intake.start_intake(update, context)
+        elif session["intake_status"] == intake.S_TEST_UNLOCKED:
+            await update.message.reply_text(
+                "Your interview quiz is ready. Please use your invite link to begin the test.\n\n"
+                "ការធ្វើតេស្តរបស់ប្អូនបានបើក។ សូមប្រើតំណផ្ញើអញ្ជើញ ដើម្បីចាប់ផ្ដើម។"
+            )
         return
 
     user_text = update.message.text.strip()
@@ -934,3 +940,15 @@ async def _handle_document_or_photo(update: Update,
     session = intake.get_intake_session(chat_id)
     if session and session["intake_status"] in intake.ACTIVE_STATUSES:
         await intake.handle_message(update, context, session)
+    elif not session or session["intake_status"] == intake.S_BLOCKED:
+        # First contact via photo CV (or re-applying after cooldown) — start intake first,
+        # then route the photo: _handle_language_check skips to CV processing when media present
+        await intake.start_intake(update, context)
+        session = intake.get_intake_session(chat_id)
+        if session and session["intake_status"] in intake.ACTIVE_STATUSES:
+            await intake.handle_message(update, context, session)
+    elif session["intake_status"] == intake.S_TEST_UNLOCKED:
+        await update.message.reply_text(
+            "Your interview quiz is ready. Please use your invite link to begin the test.\n\n"
+            "ការធ្វើតេស្តរបស់ប្អូនបានបើក។ សូមប្រើតំណផ្ញើអញ្ជើញ ដើម្បីចាប់ផ្ដើម។"
+        )

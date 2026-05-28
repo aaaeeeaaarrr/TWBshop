@@ -585,8 +585,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_TYPE,
                                   session: dict) -> None:
     text = update.message.text or update.message.caption or ""
+    has_media = bool(update.message.document or update.message.photo)
     intake_id = session["id"]
     lang = session["language"]
+
+    # Photo/document sent before any text — skip language check, process as CV directly
+    if has_media:
+        _update(intake_id, intake_status=S_CV_PENDING)
+        await _handle_cv_pending(update, context, dict(session, intake_status=S_CV_PENDING))
+        return
 
     if _is_khmer(text):
         if _implies_cant_english(text):

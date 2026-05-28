@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 19c)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz. Intake code quality fixes done + "cook have?" routing fix.
+**Last updated:** 2026-05-28 (session 19d)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz. Intake edge cases fixed: photo-as-first-message, blocked reapply, test_unlocked silence.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
@@ -261,7 +261,12 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   3. Intake funnel (hire_bot/intake.py) BUILT — all migrations run on server, 39 unit tests pass
      "cook have?" fix: hire_bot/bot.py handle_text now starts intake on ANY first message (no session),
        not just keyword matches. Bot is ad-linked — all first contacts are applicants.
-     6/6 integration test scenarios pass: run_test_intake.py on server
+     Edge case fixes (session 19d):
+       - Photo/doc as first message: _handle_language_check detects has_media → skips to cv_pending
+         _handle_document_or_photo: no-session → start_intake then handle_message (photo processed in 1 flow)
+       - Blocked session + new text: start_intake handles cooldown; expired → reset to language_check
+       - test_unlocked + new text: replies "quiz ready, use invite link" — does NOT reset session
+     9/9 integration test scenarios pass: run_test_intake.py on server
      Next: add HIRE_BOT_TOKEN → start bot → run live Telegram test with real phone
      DESIGN NOTE: hiring_intake_sessions has flat UNIQUE (telegram_chat_id) — upsert overwrites old row
        on re-apply, no audit history. Future fix: partial unique index (active attempts only) or
