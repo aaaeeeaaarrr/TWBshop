@@ -204,8 +204,11 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - Strengths: quiet-time instinct, problem chain detection (D2), customer/product awareness
   - map_confidence() added: medium_high → medium for per-finding field (assessment level retains 4-value scale)
 - hiring_assessment_evidence table added: audit trail of photos/scans per assessment
-  - file_hash (SHA-256 for tamper/compression detection) + storage_status (local_only/server/cloud/missing/deleted)
-  - Vannary evidence_id=1: placeholder row inserted, storage_status='missing' — real filenames needed (see below)
+  - file_hash (SHA-256, auto-computed when file available) + storage_status (8 precise values, not vague 'local_only')
+  - storage_status: local_to_owner_phone | local_to_pc | server | cloud | telegram_file | chatgpt_only | missing | deleted
+  - hash_file() helper in import scripts: fills file_hash automatically when path is known, NULL otherwise
+  - Placeholder rule: update row #1 to photo #1 when filing — never mix NULL file_name with real file_name rows
+  - Vannary evidence_id=1: storage_status='chatgpt_only' (photos uploaded to ChatGPT, not saved elsewhere)
 **EVIDENCE FILENAMES NEEDED (storage_status='missing' — update when located):**
   - assessment_id=2 (Vannary, leadership_audit): paper questionnaire photos uploaded to ChatGPT — how many pages/photos?
     UPDATE hiring_assessment_evidence SET file_name='...', storage_status='local_only' WHERE id=1;
