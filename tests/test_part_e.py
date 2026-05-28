@@ -11,9 +11,11 @@ from hire_bot.questions import (
     evaluate_e_triggers,
     get_next_part_e_question,
     get_part_e_progress,
+    filter_shareable_answers,
     PART_E_ALWAYS,
     PART_E_CONDITIONAL,
     PART_E_FINAL,
+    OWNER_ONLY_QUESTION_IDS,
 )
 
 
@@ -202,3 +204,37 @@ def test_progress_e_final_no_triggers():
 
 def test_progress_unknown_qid():
     assert get_part_e_progress("X-UNKNOWN", []) == "E"
+
+
+# ── Owner-only salary privacy ─────────────────────────────────────────────────
+
+def test_e_t2_in_owner_only_set():
+    assert "E-T2" in OWNER_ONLY_QUESTION_IDS
+
+
+def test_filter_removes_e_t2():
+    answers = {
+        "E-A1a": "A",
+        "E-A1": "Tomorrow",
+        "E-T2": "Base: $250, bonus: $20, food: $10, 8h/day, 6 days/week",
+        "E-Final": "On time, do my section without being told",
+    }
+    safe = filter_shareable_answers(answers)
+    assert "E-T2" not in safe
+    assert "E-A1a" in safe
+    assert "E-Final" in safe
+
+
+def test_filter_keeps_non_sensitive():
+    answers = {"E-A1": "Monday", "E-A3a": "B", "E-T1": "A"}
+    safe = filter_shareable_answers(answers)
+    assert safe == answers
+
+
+def test_filter_empty_input():
+    assert filter_shareable_answers({}) == {}
+
+
+def test_filter_only_sensitive():
+    answers = {"E-T2": "salary details here"}
+    assert filter_shareable_answers(answers) == {}

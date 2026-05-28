@@ -92,6 +92,21 @@ PART_E_CONDITIONAL: list[str] = ["E-T1", "E-T2", "E-T3"]
 # Always the last Part E question
 PART_E_FINAL: str = "E-Final"
 
+# Questions whose answers contain salary/compensation data — must never appear in group/
+# management summaries. Matches answer_sensitivity='owner_only' in hiring_quiz_questions.
+# Keep in sync with any new owner_only DB seeds.
+OWNER_ONLY_QUESTION_IDS: frozenset[str] = frozenset({"E-T2"})
+
+
+def filter_shareable_answers(answers: dict) -> dict:
+    """
+    Remove owner_only answers from a {question_id: answer_value} dict.
+    Call this before sending any answer set to a group chat or non-owner report.
+    """
+    return {qid: val for qid, val in answers.items()
+            if qid not in OWNER_ONLY_QUESTION_IDS}
+
+
 # E-T1: exam keywords in E-A4 free-text (E-A3a=Yes already triggers E-T1 directly)
 _STUDY_KEYWORDS = {"school", "university", "study", "studying", "class", "classes",
                    "lecture", "exam", "exams", "college", "institute",
