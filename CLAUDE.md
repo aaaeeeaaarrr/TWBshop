@@ -135,7 +135,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 18)
+**Last updated:** 2026-05-28 (session 18b)
 **Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E hiring-facts added to hire_bot. Seth attendance assessment imported.
 **Last completed:**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
@@ -209,15 +209,22 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - hash_file() helper in import scripts: fills file_hash automatically when path is known, NULL otherwise
   - Placeholder rule: update row #1 to photo #1 when filing — never mix NULL file_name with real file_name rows
   - Vannary evidence_id=1: storage_status='chatgpt_only' (photos uploaded to ChatGPT, not saved elsewhere)
-- Part E hiring-facts added to hire_bot (session 18):
-  - hire_bot/questions.py: PART_E_ALWAYS (E-A1…E-A5), trigger keyword sets, evaluate_e_triggers(), get_next_part_e_question(), get_part_e_progress(), is_part_e_question()
-  - hire_bot/bot.py: _send_part_e_question(), _advance_part_e(), _enter_part_e(), _after_main_quiz(); all 5 post-111 call sites updated
+- Part E hiring-facts added + structural fixes (sessions 18 + 18b):
+  - hire_bot/questions.py: PART_E_ALWAYS (6 questions: E-A1, E-A2, E-A3a, E-A3b, E-A4, E-A5)
+    E-A3 split into E-A3a (studying? Yes/No) + E-A3b (working? Yes/No) — no more keyword guessing
+    evaluate_e_triggers() rewritten: structured answers + E-A4 exam check + E-A1 delay check
+    _DELAY_KEYWORDS added; triggers evaluated after E-A5 (all inputs available)
+  - hire_bot/sessions.py: get_answered_part_e_ids(), store_part_e_triggers(), load_part_e_triggers()
+  - hire_bot/bot.py: cb_answer validates Part E questions correctly (was silently rejecting E-A3a/E-T1)
+    _advance_part_e: triggers computed after E-A5, stored in DB immediately
+    _after_main_quiz: reads DB for Part E answers — handles bot restarts without relying on user_data
   - Part E answers stored in hiring_quiz_answers (same table, E-* question IDs as FK)
-  - Triggers are rule-based keyword match on E-A3 — no AI
-  - Migration: migrations/2026_05_28_part_e_and_ops_assessment.sql
-    - Expands assessment_source CHECK: adds 'ops_messages'
-    - Expands assessment_context CHECK: adds 'attendance_review'
-    - Inserts 8 Part E questions (E-A1…E-A5, E-T1, E-T2, E-Final) into hiring_quiz_questions
+  - migrations/2026_05_28_part_e_and_ops_assessment.sql: original (8 questions, CHECK expansions)
+  - migrations/2026_05_28_part_e_v2.sql: v2 structural fixes
+    - E-A3 deactivated; E-A3a, E-A3b, E-T3 inserted with ON CONFLICT DO UPDATE
+    - answer_sensitivity column: normal/owner_only (E-T2 = owner_only for salary data)
+    - part_e_triggered text[] on hiring_quiz_attempts for DB-persisted trigger state
+    - hiring_assessment_message_refs table: links findings to specific ops_messages rows
 - Seth (Phan Piseth) attendance assessment imported (session 18):
   - run_import_seth_assessment.py: creates candidate + ops_messages/attendance_review assessment + 6 findings
   - candidate: existing_staff, alias=Seth, day-shift service
@@ -236,9 +243,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
-  1. Run migration on server: `ssh twbshop "psql \$DATABASE_URL -f /root/TWBshop/migrations/2026_05_28_part_e_v2.sql"`
-  2. Run Seth message refs on server: `ssh twbshop "cd /root/TWBshop && python3 run_import_seth_message_refs.py"`
-  3. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
+  1. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
+  2. Create staff_identity_aliases table: candidate_id, alias_text, telegram_sender_name, telegram_user_id, chat_id, confidence, confirmed_by
   4. Wire up Phase 2 async scoring: after complete_session(), kick off draft_rubric_scores + detect_semantic_contradictions + build_risk_profile (background job or webhook)
   5. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
   6. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
