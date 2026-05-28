@@ -166,11 +166,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - run_backfill_clarifications.py: one-time script to import staff replies to historical clarification questions into DB
 - Proposal conflict resolution: added [✏️ Explain...] button — owner can type free-text instruction to Opus instead of choosing preset buttons
 - Global CLAUDE.md push protocol updated: any push/commit wording triggers full protocol (CLAUDE.md update + commit all + push)
-- Hiring scoring engine built and tested: hire_bot/scorer.py + hire_bot/followups.py + hire_bot/readtime.py
-  - auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile — all match real DB schema
-  - 13 curated bilingual follow-up questions, capped at 5 per session, priority-ordered
-  - Per-language read-time: EN button compares elapsed vs EN word count, KH button vs KH word count
-  - 3 fake-attempt tests passed: perfect / half-answer / contradictory — all assertions green
+- Hiring scoring engine built, tested, and refined: hire_bot/scorer.py + followups.py + readtime.py
+  - auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile — match real DB schema
+  - Contradiction logic fixed: _should_flag() only stores real contradictions (tick actually wrong).
+    Perfect candidate = 0 contradiction rows. Table stays clean for future prediction analytics.
+  - Contradiction pairs revised: A4-Q38→C-Q12 (direct quiet-time test), A5-Q42→C-Q10 (team-feeling)
+  - Risk profile: category-gated overrides — A2-Q13 wrong = honesty 'weak' regardless of score;
+    A4-Q38 wrong = quiet 'weak'; A2-Q20 wrong = experience 'red_flag'; schedule questions gate schedule
+  - Follow-up priority: eligibility blockers first (current_job, start_date) → safety/honesty → operational
+  - 13 curated bilingual follow-ups, capped at 5 per session, priority-ordered
+  - Per-language read-time: EN button vs EN words, KH button vs KH words
+  - 6 repeatable tests in tests/test_hire_scorer.py: 24/24 passed
 - Schema additions: hiring_contradictions table, risk_profile+score_summary on quiz_attempts, quiet_time_behavior+schedule_story_match on trial_outcomes
 - Quiz bank live + reproducible: 111 questions in DB + migrations/2026_05_28_load_final_v3_quiz_questions.sql seed
 - migrations/2026_05_28_scoring_schema.sql preserved — idempotent, safe to re-run
