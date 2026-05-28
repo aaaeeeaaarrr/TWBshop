@@ -166,9 +166,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - run_backfill_clarifications.py: one-time script to import staff replies to historical clarification questions into DB
 - Proposal conflict resolution: added [✏️ Explain...] button — owner can type free-text instruction to Opus instead of choosing preset buttons
 - Global CLAUDE.md push protocol updated: any push/commit wording triggers full protocol (CLAUDE.md update + commit all + push)
-- Hiring scoring engine built: hire_bot/scorer.py (auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile) + hire_bot/followups.py (13 curated bilingual follow-up questions, no AI freestyling)
-- Schema additions: hiring_contradictions table, risk_profile+score_summary JSONB on hiring_quiz_attempts, quiet_time_behavior+schedule_story_match on hiring_trial_outcomes
-- Quiz bank live: 111 questions (60 Part A + 22 Part B + 24 Part C + 5 Part D) in hiring_quiz_questions
+- Hiring scoring engine built and tested: hire_bot/scorer.py + hire_bot/followups.py + hire_bot/readtime.py
+  - auto_grade, detect_contradictions, draft_rubric_scores, build_risk_profile — all match real DB schema
+  - 13 curated bilingual follow-up questions, capped at 5 per session, priority-ordered
+  - Per-language read-time: EN button compares elapsed vs EN word count, KH button vs KH word count
+  - 3 fake-attempt tests passed: perfect / half-answer / contradictory — all assertions green
+- Schema additions: hiring_contradictions table, risk_profile+score_summary on quiz_attempts, quiet_time_behavior+schedule_story_match on trial_outcomes
+- Quiz bank live + reproducible: 111 questions in DB + migrations/2026_05_28_load_final_v3_quiz_questions.sql seed
+- migrations/2026_05_28_scoring_schema.sql preserved — idempotent, safe to re-run
+- Server stash list cleared (3 stale stashes dropped — all work already in main)
+- Quiz bank audit passed: 0 duplicates, 0 missing answers, 23 critical tags correct, 8 verbal retest flags correct, D1 order correct
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
@@ -176,8 +183,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
   5. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
-  1. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
-  2. Build the actual Telegram hiring bot: hire_bot/bot.py — token-based invite, disappearing questions, bilingual stacked buttons, minimum read-time enforcement
+  1. Build hire_bot/bot.py — token-based invite, disappearing questions, bilingual stacked buttons, read-time enforcement
+  2. Insert Norin's 24-point bilingual feedback into hiring_feedback_points
   3. Link the 47 draft feedback_points to quiz question IDs (update source_ref, evidence_status from draft_unlinked to linked)
 **Next task (new systems):** ChatGPT export ZIP pending (hiring bot questionnaire). Facebook Messenger export pending (Sara Bologna account).
 **Known issues:** None
