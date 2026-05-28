@@ -13,6 +13,20 @@ import psycopg2
 
 # ── Mapping helpers ───────────────────────────────────────────────────────────
 
+def hash_file(path: str):
+    """SHA-256 of a local file. Returns hex string or None if file not found."""
+    import hashlib
+    import pathlib
+    p = pathlib.Path(path)
+    if not p.exists():
+        return None
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def map_staff_level(expectation: str, severity: str) -> str:
     """
     ChatGPT uses 'senior_expected' as a shorthand.
@@ -83,6 +97,27 @@ ASSESSMENT = {
         "import_version": "v1.0",
     }),
 }
+
+# Evidence rows for this assessment.
+# When you know the actual filenames:
+#   - Update evidence row #1 to photo #1 (file_name, file_path_or_url, storage_status, page_or_photo_number=1)
+#   - Insert extra rows for photos #2, #3, etc.
+#   - hash_file(path) computes SHA-256 automatically if the file is on this machine
+# Never leave file_name=None alongside rows that have real file names.
+EVIDENCE = [
+    {
+        "evidence_type": "photo",
+        "file_name": None,          # ← fill in: e.g. "IMG_1234.jpg"
+        "file_path_or_url": None,   # ← fill in: local path or cloud URL
+        "page_or_photo_number": None,
+        "storage_status": "chatgpt_only",
+        "description": (
+            "Paper questionnaire photos uploaded to ChatGPT for visual review. "
+            "Not saved elsewhere. Update this row to photo #1 when filenames are known; "
+            "insert additional rows for photos #2, #3, etc."
+        ),
+    },
+]
 
 FINDINGS = [
     {
@@ -353,7 +388,22 @@ def run():
         assessment_id = cur.fetchone()[0]
         print(f"Created assessment: id={assessment_id}")
 
-        # 4. Insert findings
+        # 4. Insert evidence rows
+        for ev in EVIDENCE:
+            fhash = hash_file(ev["file_path_or_url"]) if ev.get("file_path_or_url") else None
+            cur.execute("""
+                INSERT INTO hiring_assessment_evidence
+                    (assessment_id, evidence_type, file_name, file_path_or_url,
+                     page_or_photo_number, description, file_hash, storage_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                assessment_id, ev["evidence_type"], ev["file_name"],
+                ev.get("file_path_or_url"), ev.get("page_or_photo_number"),
+                ev["description"], fhash, ev["storage_status"],
+            ))
+        print(f"  {len(EVIDENCE)} evidence row(s) inserted")
+
+        # 5. Insert findings
         for i, f in enumerate(FINDINGS, 1):
             staff_lvl = map_staff_level(f["staff_level_expectation"], f["severity"])
             source_t = map_source_type(f["source_type"])
