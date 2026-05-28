@@ -197,10 +197,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
   - staff_level_expectation, confidence, interpretation columns added to hiring_feedback_points
   - severity + source_type CHECKs expanded
 - Vannary imported: candidate_id=24, assessment_id=2, 14 findings (leadership_audit, senior_staff)
-  - Most critical: A2-Q13 risk_critical (appears to mark No on hiding=worse); verbal retest required
-  - Training method gap (D3): worker_acceptable answer, chef/senior expected gap
+  - Most critical: A2-Q13 risk_critical PENDING VERBAL RETEST (not confirmed dishonesty; tick position ambiguous)
+    Retest Q stored in interpretation: "if you make a mistake and nobody sees it, what do you do first, and why?"
+    If correct in person → downgrade to gap_medium. If defends hiding → escalate.
+  - Training method gap (D3): corrected to senior_expected_gap (worker-level answer, senior-level gap)
   - Strengths: quiet-time instinct, problem chain detection (D2), customer/product awareness
   - map_confidence() added: medium_high → medium for per-finding field (assessment level retains 4-value scale)
+- hiring_assessment_evidence table added: audit trail of photos/scans per assessment
+  (replaces source_photos placeholder in hiring_assessments.notes; add filenames when photos are named)
 **Next task (immediate):**
   1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
   2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
