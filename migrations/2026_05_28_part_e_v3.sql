@@ -125,8 +125,17 @@ ON CONFLICT (id) DO UPDATE SET
 -- Add telegram_message_id to store Telegram's actual message_id separately.
 -- New unique constraint includes finding_id so one message can link to many findings.
 
-ALTER TABLE hiring_assessment_message_refs
-    RENAME COLUMN message_id TO ops_message_row_id;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'hiring_assessment_message_refs'
+          AND column_name = 'message_id'
+    ) THEN
+        ALTER TABLE hiring_assessment_message_refs
+            RENAME COLUMN message_id TO ops_message_row_id;
+    END IF;
+END $$;
 
 ALTER TABLE hiring_assessment_message_refs
     ADD COLUMN IF NOT EXISTS telegram_message_id bigint;
