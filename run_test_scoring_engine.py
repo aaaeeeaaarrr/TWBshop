@@ -52,18 +52,19 @@ def make_attempt(cid, vid):
 
 
 def insert_answer(attempt_id, question_id, response, skipped=False):
+    raw = json.dumps(response) if response else None
     cur.execute("""
-        INSERT INTO hiring_quiz_answers (attempt_id, question_id, response_raw, skipped)
+        INSERT INTO hiring_quiz_answers (attempt_id, question_id, raw_answer, skipped)
         VALUES (%s, %s, %s, %s)
-    """, (attempt_id, question_id, json.dumps(response) if response else None, skipped))
+    """, (attempt_id, question_id, raw, skipped))
 
 
 def cleanup(candidate_ids):
     # FK ON DELETE CASCADE handles attempts → answers → contradictions
-    cur.execute("""
-        DELETE FROM hiring_candidates
-        WHERE id = ANY(%s) AND name LIKE '\_\_TEST\_%'
-    """, (candidate_ids,))
+    cur.execute(
+        "DELETE FROM hiring_candidates WHERE id = ANY(%s) AND name LIKE %s",
+        (candidate_ids, r'__TEST_%')
+    )
     conn.commit()
     print("\nCleanup done — all test data removed.")
 
