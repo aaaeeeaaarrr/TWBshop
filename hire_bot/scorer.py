@@ -188,18 +188,18 @@ def _build_triggers(summary: dict, attempt_id: int, cur) -> dict:
     if summary["d1_priority_score"] is not None and summary["d1_priority_score"] < 2:
         triggers.append({"type": "d1_wrong_priority"})
 
-    # Check for schedule risk from candidate profile
+    # Check for schedule risk from candidate notes (current_job info lives in notes field)
     cur.execute("""
-        SELECT c.current_job, c.notes
+        SELECT c.notes
         FROM hiring_quiz_attempts a
         JOIN hiring_candidates c ON c.id = a.candidate_id
         WHERE a.id = %s
     """, (attempt_id,))
     row = cur.fetchone()
-    if row:
-        current_job, notes = row
-        if current_job:
-            triggers.append({"type": "current_job_conflict", "job": current_job})
+    if row and row[0]:
+        notes = (row[0] or "").lower()
+        if "current job" in notes or "other job" in notes or "still working" in notes:
+            triggers.append({"type": "current_job_conflict"})
 
     return {"attempt_id": attempt_id, "triggers": triggers, "summary": summary}
 
