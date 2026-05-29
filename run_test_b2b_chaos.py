@@ -937,7 +937,7 @@ async def run():
     if not a_orders_shown_in_b:
         ok("Group A's order not visible in Group B's SEE YOUR ORDERS"); passed += 1
     else:
-        fail(f"ISOLATION BUG: Group A order visible in Group B: {CAP.text!r[:80]}"); failed += 1
+        fail(f"ISOLATION BUG: Group A order visible in Group B: {repr(str(CAP.text)[:80])}"); failed += 1
 
     # ── X03: Location change in Group A doesn't affect Group B ───────────────
     head("X03: Location pin in Group A → Group B delivery_cost unchanged")
