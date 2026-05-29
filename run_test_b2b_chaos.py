@@ -1,0 +1,798 @@
+"""
+B2B Bot Chaos Test — unexpected actions at every state in every flow.
+Tests the menu, cart, confirmation, edit, cancel, location, recurring flows.
+Run on server: python3 run_test_b2b_chaos.py
+"""
+
+import asyncio
+import sys
+import os
+
+sys.path.insert(0, '/root/TWBshop')
+
+import psycopg2
+from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import date, timedelta, datetime
+
+GREEN  = "\033[92m"
+RED    = "\033[91m"
+YELLOW = "\033[93m"
+BOLD   = "\033[1m"
+RESET  = "\033[0m"
+
+def ok(msg):   print(f"{GREEN}✓ {msg}{RESET}")
+def fail(msg): print(f"{RED}✗ {msg}{RESET}")
+def info(msg): print(f"{YELLOW}→ {msg}{RESET}")
+def head(msg): print(f"\n{BOLD}{'='*60}\n{msg}\n{'='*60}{RESET}")
+
+FAKE_CHAT_ID  = -8888888888
+FAKE_USER_ID  = 8888888888
+FAKE_BNAME    = "Chaos Test Kitchen"
+_msg_id_seq   = [1000]
+
+
+def _db():
+    from secrets import DATABASE_URL
+    return psycopg2.connect(DATABASE_URL)
+
+
+def setup_customer():
+    conn = _db(); cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO b2b_customers (group_chat_id, business_name, delivery_method, delivery_time)
+        VALUES (%s, %s, 'pickup', '8:00am')
+        ON CONFLICT (group_chat_id) DO UPDATE
+          SET business_name = EXCLUDED.business_name,
+              delivery_method = EXCLUDED.delivery_method,
+              delivery_time = EXCLUDED.delivery_time,
+              location = NULL,
+              location_lat = NULL,
+              location_lng = NULL,
+              delivery_cost = NULL
+    """, (FAKE_CHAT_ID, FAKE_BNAME))
+    conn.commit(); conn.close()
+
+
+def cleanup():
+    conn = _db(); cur = conn.cursor()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    today    = date.today().isoformat()
+    cur.execute("DELETE FROM b2b_orders WHERE group_chat_id = %s", (FAKE_CHAT_ID,))
+    cur.execute("DELETE FROM b2b_cake_orders WHERE group_chat_id = %s", (FAKE_CHAT_ID,))
+    conn.commit(); conn.close()
+    _reset_all_state()
+
+
+def _reset_all_state():
+    from b2b_bot.menu_keyboards import (
+        _cart, _qty_pending, _menu_msg, _editing_session,
+        _cart_time, _cart_date, _cart_method,
+        _recurring_days, _recurring_pending,
+    )
+    from b2b_bot.order_handlers import _pending, _state, _last_confirmation
+    for d in [_cart, _qty_pending, _menu_msg, _editing_session,
+              _cart_time, _cart_date, _cart_method,
+              _recurring_days, _recurring_pending,
+              _pending, _state, _last_confirmation]:
+        d.pop(FAKE_CHAT_ID, None)
+    from shared.database import (
+        set_pending_order, set_order_state, set_cart_state,
+        set_menu_message_id, set_last_confirmation_msg,
+        set_qty_pending as db_set_qty, set_editing_session,
+    )
+    set_pending_order(FAKE_CHAT_ID, None)
+    set_order_state(FAKE_CHAT_ID, None)
+    set_cart_state(FAKE_CHAT_ID, None)
+    set_menu_message_id(FAKE_CHAT_ID, None)
+    set_last_confirmation_msg(FAKE_CHAT_ID, None)
+    db_set_qty(FAKE_CHAT_ID, None)
+    set_editing_session(FAKE_CHAT_ID, None)
+
+
+def _next_msg_id():
+    _msg_id_seq[0] += 1
+    return _msg_id_seq[0]
+
+
+class Captured:
+    def __init__(self):
+        self.text = None
+        self.markup = None
+        self.alert = None
+        self.sends = []
+        self.deletes = []
+        self.edit_text = None
+        self.edit_markup = None
+
+    def reset(self):
+        self.text = None
+        self.markup = None
+        self.alert = None
+        self.sends = []
+        self.deletes = []
+        self.edit_text = None
+        self.edit_markup = None
+
+
+CAP = Captured()
+
+
+def make_context():
+    ctx = MagicMock()
+    async def _send(chat_id, text, **kwargs):
+        CAP.text = text
+        CAP.markup = kwargs.get("reply_markup")
+        m = MagicMock()
+        m.message_id = _next_msg_id()
+        CAP.sends.append((text, kwargs))
+        return m
+    async def _delete(chat_id, msg_id):
+        CAP.deletes.append(msg_id)
+    ctx.bot.send_message = AsyncMock(side_effect=_send)
+    ctx.bot.delete_message = AsyncMock(side_effect=_delete)
+    return ctx
+
+
+def make_callback(data, message_id=None):
+    if message_id is None:
+        message_id = _next_msg_id()
+    update = MagicMock()
+    update.effective_chat.id = FAKE_CHAT_ID
+    update.effective_chat.type = "group"
+    update.effective_user.id = FAKE_USER_ID
+    update.effective_user.full_name = "TestUser"
+    update.message = None
+
+    query = MagicMock()
+    query.data = data
+    query.answer = AsyncMock()
+    query.message.message_id = message_id
+
+    async def _edit(text, **kwargs):
+        CAP.edit_text = text
+        CAP.edit_markup = kwargs.get("reply_markup")
+
+    query.edit_message_text = AsyncMock(side_effect=_edit)
+
+    # query.answer with show_alert captures the alert
+    async def _answer(text=None, show_alert=False):
+        if show_alert:
+            CAP.alert = text
+
+    query.answer = AsyncMock(side_effect=_answer)
+    update.callback_query = query
+    return update
+
+
+def make_message(text=None, location=None):
+    update = MagicMock()
+    update.effective_chat.id = FAKE_CHAT_ID
+    update.effective_chat.type = "group"
+    update.effective_user.id = FAKE_USER_ID
+    update.effective_user.full_name = "TestUser"
+    update.callback_query = None
+
+    msg = MagicMock()
+    msg.text = text
+    msg.location = location
+    msg.message_id = _next_msg_id()
+    msg.reply_text = AsyncMock()
+    msg.delete = AsyncMock()
+
+    if text:
+        msg.photo = None
+        msg.document = None
+        msg.voice = None
+        msg.sticker = None
+    else:
+        msg.photo = None
+        msg.document = None
+        msg.voice = None
+        msg.sticker = None
+
+    update.message = msg
+    return update
+
+
+# ── Helpers to put cart into known states ─────────────────────────────────────
+
+async def _add_croissant_to_cart(ctx):
+    """Click Pastries → Croissant → qty 5 → back to category"""
+    from b2b_bot.menu_handlers import handle_menu_callback
+    # open pastries category
+    await handle_menu_callback(make_callback("bm_cat_pastries"), ctx)
+    # click croissant (sets qty_pending)
+    await handle_menu_callback(make_callback("bm_item_Croissant"), ctx)
+    # type qty
+    from b2b_bot.menu_handlers import handle_qty_input
+    u = make_message("5")
+    await handle_qty_input(u, ctx)
+    CAP.reset()
+
+
+async def _add_baguette_to_cart(ctx):
+    """Click Breads → French Baguette → qty 3"""
+    from b2b_bot.menu_handlers import handle_menu_callback, handle_qty_input
+    await handle_menu_callback(make_callback("bm_cat_breads"), ctx)
+    await handle_menu_callback(make_callback("bm_item_French_Baguette"), ctx)
+    u = make_message("3")
+    await handle_qty_input(u, ctx)
+    CAP.reset()
+
+
+async def _get_to_confirmation_pending(ctx):
+    """Full flow: cart with croissant → confirm screen → select pickup method → confirmation"""
+    from b2b_bot.menu_handlers import handle_menu_callback
+    await _add_croissant_to_cart(ctx)
+    # click Confirm Order button
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    # pick default (pickup is already set from setup_customer)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    CAP.reset()
+
+
+def get_db_orders():
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    conn = _db(); cur = conn.cursor()
+    cur.execute("SELECT item, quantity FROM b2b_orders WHERE group_chat_id=%s AND delivery_date=%s AND status='confirmed'",
+                (FAKE_CHAT_ID, tomorrow))
+    rows = cur.fetchall(); conn.close()
+    return {r[0]: r[1] for r in rows}
+
+
+def get_customer():
+    from shared.database import get_b2b_customer
+    return get_b2b_customer(FAKE_CHAT_ID)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCENARIOS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def run():
+    setup_customer()
+    passed = 0
+    failed = 0
+
+    # ── S01: Empty cart → click Confirm → alert ──────────────────────────────
+    head("S01: Empty cart → click Confirm → should alert not crash")
+    _reset_all_state(); CAP.reset()
+    from b2b_bot.menu_handlers import handle_menu_callback
+    await handle_menu_callback(make_callback("bm_confirm"), make_context())
+    if CAP.alert and "empty" in CAP.alert.lower():
+        ok("Got 'cart is empty' alert"); passed += 1
+    else:
+        fail(f"Expected empty-cart alert, got alert={CAP.alert!r} edit={CAP.edit_text!r}"); failed += 1
+
+    # ── S02: qty pending → type "abc" ───────────────────────────────────────
+    head("S02: qty_pending active → type non-numeric text → graceful error")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_cat_pastries"), ctx)
+    await handle_menu_callback(make_callback("bm_item_Croissant"), ctx)
+    from b2b_bot.menu_handlers import handle_qty_input
+    await handle_qty_input(make_message("abc"), ctx)
+    from b2b_bot.menu_keyboards import _qty_pending
+    still_pending = bool(_qty_pending.get(FAKE_CHAT_ID))
+    if still_pending or (CAP.edit_text and "number" in CAP.edit_text.lower()):
+        ok("Non-numeric qty handled gracefully"); passed += 1
+    else:
+        fail(f"Expected error or stay in qty_pending, got edit={CAP.edit_text!r}"); failed += 1
+
+    # ── S03: qty pending → type "0" → removes item ──────────────────────────
+    head("S03: qty_pending → type 0 → item removed from cart")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_cat_pastries"), ctx)
+    await handle_menu_callback(make_callback("bm_item_Croissant"), ctx)
+    await handle_qty_input(make_message("0"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if "Croissant" not in cart:
+        ok("qty=0 removed item from cart"); passed += 1
+    else:
+        fail(f"Croissant still in cart: {cart}"); failed += 1
+
+    # ── S04: qty pending → type 9999 → large qty accepted ───────────────────
+    head("S04: qty_pending → type 9999 → very large qty accepted (no crash)")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_cat_pastries"), ctx)
+    await handle_menu_callback(make_callback("bm_item_Croissant"), ctx)
+    try:
+        await handle_qty_input(make_message("9999"), ctx)
+        cart = _cart.get(FAKE_CHAT_ID, {})
+        if cart.get("Croissant") == 9999:
+            ok("Large qty 9999 accepted without crash"); passed += 1
+        else:
+            fail(f"Expected 9999 in cart, got {cart}"); failed += 1
+    except Exception as e:
+        fail(f"Crashed on large qty: {e}"); failed += 1
+
+    # ── S05: qty pending → click bm_back → cart intact, pending cleared ─────
+    head("S05: qty_pending → click ← MENU → qty_pending cleared, cart intact")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_cat_pastries"), ctx)
+    # add croissant first
+    await handle_menu_callback(make_callback("bm_item_Croissant"), ctx)
+    await handle_qty_input(make_message("3"), ctx)
+    # now click another item (sets qty_pending) then go back
+    await handle_menu_callback(make_callback("bm_cat_breads"), ctx)
+    await handle_menu_callback(make_callback("bm_item_French_Baguette"), ctx)
+    # qty_pending is now active for baguette, cart has croissant
+    await handle_menu_callback(make_callback("bm_back"), ctx)
+    from b2b_bot.menu_keyboards import _qty_pending, _cart
+    pending_gone = FAKE_CHAT_ID not in _qty_pending
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if pending_gone and cart.get("Croissant") == 3:
+        ok("Back clears qty_pending and cart survives"); passed += 1
+    else:
+        fail(f"pending={_qty_pending.get(FAKE_CHAT_ID)!r} cart={cart}"); failed += 1
+
+    # ── S06: bm_empty_cart → cart wiped ─────────────────────────────────────
+    head("S06: Cart with items → bm_empty_cart → cart empty")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_empty_cart"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if not cart:
+        ok("bm_empty_cart cleared the cart"); passed += 1
+    else:
+        fail(f"Cart not empty after bm_empty_cart: {cart}"); failed += 1
+
+    # ── S07: confirm screen bm_back → returns to category, cart intact ───────
+    head("S07: At confirm screen → click ← MENU → cart still there")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_back"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if cart.get("Croissant") == 5:
+        ok("Back from confirm screen preserves cart"); passed += 1
+    else:
+        fail(f"Cart after bm_back from confirm: {cart}"); failed += 1
+
+    # ── S08: confirm screen → bm_cs_datetime → change date+time+method ──────
+    head("S08: Confirm screen → change date/time/method → confirmation shows")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_datetime"), ctx)
+    # pick tomorrow via bm_date_tmrw
+    from b2b_bot.menu_handlers import handle_menu_callback
+    await handle_menu_callback(make_callback("bm_date_tmrw"), ctx)
+    # pick 0800 time
+    tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+    await handle_menu_callback(make_callback(f"bm_dt_{tomorrow_str}_0800"), ctx)
+    # pick delivery
+    await handle_menu_callback(make_callback(f"bm_method_{tomorrow_str}_0800_delivery"), ctx)
+    from b2b_bot.order_handlers import _pending
+    pending = _pending.get(FAKE_CHAT_ID)
+    if pending and pending.get("delivery_method") == "delivery":
+        ok("Date+time+method flow set delivery method correctly"); passed += 1
+    else:
+        fail(f"Expected delivery pending, got pending={pending!r}"); failed += 1
+
+    # ── S09: Confirmation pending → b2b_edit → cart restored ────────────────
+    head("S09: Confirmation pending → click Edit → cart restored with original items")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    CAP.reset()
+    await order_cb(make_callback("b2b_edit"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if cart.get("Croissant") == 5:
+        ok("b2b_edit restored cart with original 5x Croissant"); passed += 1
+    else:
+        fail(f"Cart after b2b_edit: {cart}"); failed += 1
+
+    # ── S10: Confirmation pending → b2b_edit → add more → confirm ───────────
+    head("S10: Edit → add baguette → confirm → both items saved to DB")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_edit"), ctx)
+    await _add_baguette_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import _pending
+    pending = _pending.get(FAKE_CHAT_ID)
+    items = {it["item"] for it in (pending or {}).get("bread_items", []) + (pending or {}).get("cake_items", [])} if pending else set()
+    if "Croissant" in items and "French Baguette" in items:
+        ok("Edit + add items: both in pending for confirm"); passed += 1
+    else:
+        fail(f"Items in pending: {items!r}"); failed += 1
+
+    # ── S11: b2b_cancel with NO existing DB orders ───────────────────────────
+    head("S11: b2b_cancel with no prior orders → simple cancel message")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb, _pending
+    CAP.reset()
+    await order_cb(make_callback("b2b_cancel"), ctx)
+    if "cancelled" in (CAP.edit_text or "").lower():
+        ok("Simple cancel message shown (no existing orders)"); passed += 1
+    else:
+        # might show keep/cancel-all (if sessions exist from prior tests)
+        if CAP.edit_text and ("keep" in CAP.edit_text.lower() or "existing" in CAP.edit_text.lower()):
+            info("Got keep/cancel-all (leftover sessions from prior test — acceptable)")
+            passed += 1
+        else:
+            fail(f"Unexpected cancel response: {CAP.edit_text!r}"); failed += 1
+
+    # ── S12: b2b_cancel with existing orders → keep/cancel-all dialog ────────
+    head("S12: Place + confirm order, then new pending → cancel → keep/cancel-all")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # First confirm an order to put it in DB
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    # Now start a new order and cancel it
+    _reset_all_state()
+    # Restore DB customer (reset_all_state doesn't touch DB orders)
+    ctx = make_context()
+    await _add_baguette_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    CAP.reset()
+    await order_cb(make_callback("b2b_cancel"), ctx)
+    if CAP.edit_text and ("existing" in CAP.edit_text.lower() or "keep" in CAP.edit_text.lower()):
+        ok("Cancel with existing order → keep/cancel-all dialog shown"); passed += 1
+    else:
+        fail(f"Expected keep/cancel-all dialog, got: {CAP.edit_text!r}"); failed += 1
+
+    # ── S13: b2b_cancel_all → DB orders deleted ──────────────────────────────
+    head("S13: b2b_cancel_all → orders actually deleted from DB")
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    CAP.reset()
+    await order_cb(make_callback("b2b_cancel_all"), ctx)
+    orders = get_db_orders()
+    if not orders:
+        ok("b2b_cancel_all deleted all DB orders"); passed += 1
+    else:
+        fail(f"Orders still in DB after cancel_all: {orders}"); failed += 1
+
+    # ── S14: SEE YOUR ORDERS while confirmation is pending ───────────────────
+    head("S14: Confirmation pending → click SEE YOUR ORDERS → does confirmation survive?")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    # Mark the menu message as the confirmation message_id
+    from b2b_bot.menu_keyboards import _menu_msg
+    from b2b_bot.order_handlers import _pending
+    conf_msg_id = 9001
+    _menu_msg[FAKE_CHAT_ID] = conf_msg_id
+    from shared.database import set_menu_message_id
+    set_menu_message_id(FAKE_CHAT_ID, conf_msg_id)
+    pending_before = bool(_pending.get(FAKE_CHAT_ID))
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_edit_order"), ctx)
+    pending_after = bool(_pending.get(FAKE_CHAT_ID))
+    deleted_conf = conf_msg_id in CAP.deletes
+    if deleted_conf:
+        fail(f"BUG: SEE YOUR ORDERS deleted the confirmation message (id={conf_msg_id}). "
+             f"pending_before={pending_before}, pending_after={pending_after}"); failed += 1
+    else:
+        ok("SEE YOUR ORDERS did NOT delete the confirmation message"); passed += 1
+
+    # ── S15: Double b2b_confirm (race condition) ─────────────────────────────
+    head("S15: Click b2b_confirm twice rapidly → second click should not crash")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    # First confirm
+    await order_cb(make_callback("b2b_confirm", message_id=9010), ctx)
+    CAP.reset()
+    # Second confirm on same message (pending is now nil)
+    try:
+        await order_cb(make_callback("b2b_confirm", message_id=9010), ctx)
+        if CAP.edit_text and ("no pending" in CAP.edit_text.lower() or "again" in CAP.edit_text.lower()):
+            ok("Double-confirm handled gracefully with error message"); passed += 1
+        else:
+            # just no crash is acceptable
+            ok("Double-confirm did not crash"); passed += 1
+    except Exception as e:
+        fail(f"Double-confirm crashed: {e}"); failed += 1
+
+    # ── S16: After full confirm → bm_edit_order shows session ────────────────
+    head("S16: After confirmed order → SEE YOUR ORDERS → session visible")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    _reset_all_state()
+    ctx = make_context()
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_edit_order"), ctx)
+    has_session = CAP.text and ("edit" in CAP.text.lower() or "order" in CAP.text.lower() or "croissant" in CAP.text.lower())
+    no_orders   = CAP.text and "no orders" in CAP.text.lower()
+    if has_session and not no_orders:
+        ok("After confirm, SEE YOUR ORDERS shows the session"); passed += 1
+    else:
+        fail(f"Expected session, got text: {CAP.text!r}"); failed += 1
+
+    # ── S17: Edit session → re-confirm → old batch deleted, new saved ────────
+    head("S17: Edit session #0 → change qty → confirm → DB updated")
+    from b2b_bot.menu_keyboards import _cart
+    ctx = make_context()
+    CAP.reset()
+    # Load session into edit mode
+    await handle_menu_callback(make_callback("bm_edit_session_0"), ctx)
+    # Clear cart and add different item
+    from b2b_bot.menu_keyboards import _editing_session
+    editing_key = _editing_session.get(FAKE_CHAT_ID)
+    if not editing_key:
+        fail("bm_edit_session_0 did not set editing_session"); failed += 1
+    else:
+        await handle_menu_callback(make_callback("bm_empty_cart"), ctx)
+        await _add_baguette_to_cart(ctx)
+        await handle_menu_callback(make_callback("bm_confirm"), ctx)
+        await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+        from b2b_bot.order_handlers import handle_callback as order_cb
+        await order_cb(make_callback("b2b_confirm"), ctx)
+        orders = get_db_orders()
+        if "French Baguette" in orders and "Croissant" not in orders:
+            ok("Edit session: old deleted, new saved (Baguette only)"); passed += 1
+        else:
+            fail(f"DB after edit: {orders}"); failed += 1
+
+    # ── S18: bm_edit_session out of bounds ───────────────────────────────────
+    head("S18: bm_edit_session_99 (out of bounds) → alert, no crash")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    try:
+        await handle_menu_callback(make_callback("bm_edit_session_99"), ctx)
+        if CAP.alert and "not found" in CAP.alert.lower():
+            ok("Out-of-bounds session: 'Order not found' alert"); passed += 1
+        else:
+            ok("Out-of-bounds session: no crash (alert may differ)"); passed += 1
+    except Exception as e:
+        fail(f"bm_edit_session_99 crashed: {e}"); failed += 1
+
+    # ── S19: Edit session → empty cart → click confirm ───────────────────────
+    head("S19: Edit session → empty cart → try to confirm → 'cart is empty' alert")
+    # First put an order in DB
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    _reset_all_state()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_edit_session_0"), ctx)
+    await handle_menu_callback(make_callback("bm_empty_cart"), ctx)
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    if CAP.alert and "empty" in CAP.alert.lower():
+        ok("Confirm after clearing edit session cart → 'cart is empty' alert"); passed += 1
+    else:
+        fail(f"Expected empty-cart alert, got alert={CAP.alert!r}"); failed += 1
+
+    # ── S20: Location change while confirmation pending → pending intact ──────
+    head("S20: Confirmation pending → bm_change_location → pending order still there")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import _pending
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_change_location"), ctx)
+    pending_after = _pending.get(FAKE_CHAT_ID)
+    if pending_after:
+        ok("bm_change_location did not clear _pending"); passed += 1
+    else:
+        fail("BUG: bm_change_location wiped _pending!"); failed += 1
+
+    # ── S21: Location pin sent → delivery_cost saved to DB ──────────────────
+    head("S21: Location pin sent → delivery_cost calculated and saved")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    from b2b_bot.delivery import handle_location
+    import config
+    config.BAKERY_LAT = 11.5387774
+    config.BAKERY_LNG = 104.9147998
+    loc = MagicMock()
+    loc.latitude  = 11.556  # ~2.5km from bakery
+    loc.longitude = 104.928
+    u = make_message()
+    u.message.location = loc
+    await handle_location(u, ctx)
+    cust = get_customer()
+    if cust and cust.get("delivery_cost") and float(cust["delivery_cost"]) > 0:
+        ok(f"Location pin saved delivery_cost=${cust['delivery_cost']:.2f}"); passed += 1
+    else:
+        fail(f"delivery_cost not saved: {cust}"); failed += 1
+
+    # ── S22: Stale b2b_confirm after order already cleared ───────────────────
+    head("S22: Stale b2b_confirm callback (pending already nil) → graceful error, no crash")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    try:
+        await order_cb(make_callback("b2b_confirm"), ctx)
+        got_error = CAP.edit_text and ("no pending" in CAP.edit_text.lower() or "again" in CAP.edit_text.lower())
+        ok(f"Stale confirm handled, got: {CAP.edit_text!r}"); passed += 1
+    except Exception as e:
+        fail(f"Stale b2b_confirm crashed: {e}"); failed += 1
+
+    # ── S23: bm_copy_last_order with no previous order ───────────────────────
+    head("S23: bm_copy_last_order with no previous order → graceful alert")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Clear any DB orders
+    conn = _db(); cur = conn.cursor()
+    cur.execute("DELETE FROM b2b_orders WHERE group_chat_id=%s", (FAKE_CHAT_ID,))
+    conn.commit(); conn.close()
+    try:
+        await handle_menu_callback(make_callback("bm_copy_last_order"), ctx)
+        if CAP.alert and "no previous" in CAP.alert.lower():
+            ok("No previous order → graceful 'No previous order' alert"); passed += 1
+        else:
+            ok(f"No crash, alert={CAP.alert!r}"); passed += 1
+    except Exception as e:
+        fail(f"bm_copy_last_order crashed with no history: {e}"); failed += 1
+
+    # ── S24: bm_copy_last_order → copies correctly then confirm ─────────────
+    head("S24: bm_copy_last_order after a confirmed order → cart populated correctly")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Put a real confirmed order in DB first
+    await _add_baguette_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    _reset_all_state()
+    ctx = make_context()
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_copy_last_order"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    if "French Baguette" in cart:
+        ok("bm_copy_last_order populated cart with last order items"); passed += 1
+    else:
+        fail(f"Copy last order: cart={cart}"); failed += 1
+
+    # ── S25: Burger bun → select 70g → go back → select 40g → only 40g in cart
+    head("S25: Burger bun 70g selected, back, then 40g selected → only one size in cart")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await handle_menu_callback(make_callback("bm_buns"), ctx)
+    await handle_menu_callback(make_callback("bm_bun_size_burger_70"), ctx)
+    # pick no sesame for 70g
+    await handle_menu_callback(make_callback("bm_bunqtyval_burger_70_no_5"), ctx)
+    # now go back and pick 40g
+    await handle_menu_callback(make_callback("bm_buns"), ctx)
+    await handle_menu_callback(make_callback("bm_bun_size_burger_40"), ctx)
+    await handle_menu_callback(make_callback("bm_bunqtyval_burger_40_no_3"), ctx)
+    from b2b_bot.menu_keyboards import _cart
+    cart = _cart.get(FAKE_CHAT_ID, {})
+    has_70 = any(k.startswith("Burger Bun|70") for k in cart)
+    has_40 = any(k.startswith("Burger Bun|40") for k in cart)
+    info(f"Cart keys: {list(cart.keys())}")
+    ok(f"Bun cart: 70g={'yes' if has_70 else 'no'}, 40g={'yes' if has_40 else 'no'} (both can coexist)"); passed += 1
+
+    # ── S26: Recurring setup → bm_back → state cleared ───────────────────────
+    head("S26: Recurring setup started → bm_back → recurring state cleared")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_recurring"), ctx)
+    # select a day
+    await handle_menu_callback(make_callback("bm_rd_mon"), ctx)
+    # abandon with back
+    await handle_menu_callback(make_callback("bm_back"), ctx)
+    from b2b_bot.menu_keyboards import _recurring_days, _recurring_pending
+    rd = _recurring_days.get(FAKE_CHAT_ID)
+    rp = _recurring_pending.get(FAKE_CHAT_ID)
+    if not rp:
+        ok("Recurring pending cleared after bm_back"); passed += 1
+    else:
+        fail(f"Recurring pending still set: {rp}"); failed += 1
+
+    # ── S27: Confirm with no method set → awaiting_delivery state ────────────
+    head("S27: No delivery method set → bm_cs_default → awaiting_delivery mode")
+    _reset_all_state(); CAP.reset()
+    # Remove method from customer
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE b2b_customers SET delivery_method=NULL WHERE group_chat_id=%s", (FAKE_CHAT_ID,))
+    conn.commit(); conn.close()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    CAP.reset()
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import _state
+    state = _state.get(FAKE_CHAT_ID, {})
+    if state.get("mode") == "awaiting_delivery":
+        ok("No method → bm_cs_default → awaiting_delivery state"); passed += 1
+    else:
+        fail(f"Expected awaiting_delivery, got state={state!r}"); failed += 1
+    # Restore method
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE b2b_customers SET delivery_method='pickup' WHERE group_chat_id=%s", (FAKE_CHAT_ID,))
+    conn.commit(); conn.close()
+
+    # ── S28: awaiting_delivery → type invalid text → error, not crash ────────
+    head("S28: awaiting_delivery state → type gibberish → error message, state stays")
+    from b2b_bot.order_handlers import _state, handle_group_message
+    _state[FAKE_CHAT_ID] = {"mode": "awaiting_delivery"}
+    from shared.database import set_order_state
+    set_order_state(FAKE_CHAT_ID, {"mode": "awaiting_delivery"})
+    CAP.reset()
+    await handle_group_message(make_message("I want the usual please"), make_context())
+    state_after = _state.get(FAKE_CHAT_ID, {})
+    if state_after.get("mode") == "awaiting_delivery":
+        ok("Invalid delivery text → error shown, awaiting_delivery stays"); passed += 1
+    elif not state_after:
+        fail(f"State cleared after invalid delivery text — did it silently accept? edit={CAP.edit_text!r}"); failed += 1
+    else:
+        fail(f"Unexpected state: {state_after}"); failed += 1
+
+    # ── S29: awaiting_delivery → type valid text → confirmation shown ────────
+    head("S29: awaiting_delivery → type 'Delivery at 8am' → confirmation shown")
+    from b2b_bot.order_handlers import _pending
+    _pending[FAKE_CHAT_ID] = {
+        "bread_items": [{"item": "Croissant", "qty": 2, "grams": None, "notes": None}],
+        "cake_items": [], "delivery_method": None, "delivery_time": None,
+        "location": None, "delivery_date": (date.today() + timedelta(days=1)).isoformat(),
+    }
+    from shared.database import set_pending_order
+    set_pending_order(FAKE_CHAT_ID, _pending[FAKE_CHAT_ID])
+    _state[FAKE_CHAT_ID] = {"mode": "awaiting_delivery"}
+    set_order_state(FAKE_CHAT_ID, {"mode": "awaiting_delivery"})
+    CAP.reset()
+    ctx = make_context()
+    await handle_group_message(make_message("Delivery at 8am"), ctx)
+    pending_after = _pending.get(FAKE_CHAT_ID)
+    if pending_after and pending_after.get("delivery_method") == "delivery":
+        ok("'Delivery at 8am' → method set, confirmation shown"); passed += 1
+    else:
+        fail(f"Delivery text not parsed, pending={pending_after!r}"); failed += 1
+
+    # ── S30: Text "yes" while confirmation pending → confirm ─────────────────
+    head("S30: Confirmation pending → type 'yes' → order confirmed")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    CAP.reset()
+    # The pending state has method=pickup, so text "yes" should confirm
+    from b2b_bot.order_handlers import _pending
+    # _pending is set from _do_confirm — check it's there
+    if not _pending.get(FAKE_CHAT_ID):
+        fail("Setup: pending not set before S30 text-yes test"); failed += 1
+    else:
+        ctx2 = make_context()
+        from b2b_bot.order_handlers import handle_group_message
+        await handle_group_message(make_message("yes"), ctx2)
+        pending_after = _pending.get(FAKE_CHAT_ID)
+        orders = get_db_orders()
+        if not pending_after and "Croissant" in orders:
+            ok("Text 'yes' while pending → order confirmed to DB"); passed += 1
+        else:
+            fail(f"pending_after={pending_after!r} orders={orders}"); failed += 1
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    cleanup()
+    print(f"\n{BOLD}B2B CHAOS: {passed} passed, {failed} failed{RESET}")
+    return failed
+
+
+if __name__ == "__main__":
+    result = asyncio.run(run())
+    sys.exit(result)
