@@ -28,7 +28,7 @@ _LOCK_HOUR_UTC    = 15
 _LOCK_MINUTE_UTC  = 10
 
 # How long (seconds) before the menu nudge fires again for the same chat
-_MENU_PROMPT_COOLDOWN_SEC = 6 * 3600
+_MENU_PROMPT_COOLDOWN_SEC = 30 * 60
 
 # 6:00am–6:00pm in 15-minute steps, stored as "HHMM" for compact callback data
 _DELIVERY_TIME_CODES: list[str] = [
