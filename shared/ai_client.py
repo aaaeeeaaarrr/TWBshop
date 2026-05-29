@@ -683,10 +683,10 @@ async def check_staff_message_ai(text: str, prior_context: list) -> dict:
 # Max 2 cheap calls per applicant: intent check + CV extraction.
 # No analysis of photos/files before TEST_UNLOCKED — store only.
 
-_INTAKE_HAIKU = "claude-haiku-4-5-20251001"
-_INTENT_PROMPT_VERSION = "v1"
-_CV_EXTRACT_PROMPT_VERSION = "v1"
-_DEFLECTION_PROMPT_VERSION = "v1"
+INTAKE_HAIKU_MODEL            = "claude-haiku-4-5-20251001"
+INTAKE_INTENT_PROMPT_VERSION  = "v1"
+INTAKE_CV_PROMPT_VERSION      = "v1"
+INTAKE_DEFLECTION_PROMPT_VERSION = "v1"
 
 _INTENT_SYSTEM = """\
 You classify the intent of someone who just messaged a bakery's hiring chatbot.
@@ -756,7 +756,7 @@ async def classify_intake_intent(text: str) -> dict:
     """
     try:
         resp = await _get_client().messages.create(
-            model=_INTAKE_HAIKU,
+            model=INTAKE_HAIKU_MODEL,
             max_tokens=128,
             system=_INTENT_SYSTEM,
             messages=[{"role": "user", "content": text[:1000]}],
@@ -782,7 +782,7 @@ async def extract_cv_content(text: str) -> dict:
     """
     try:
         resp = await _get_client().messages.create(
-            model=_INTAKE_HAIKU,
+            model=INTAKE_HAIKU_MODEL,
             max_tokens=256,
             system=_CV_EXTRACT_SYSTEM,
             messages=[{"role": "user", "content": text[:2000]}],
@@ -813,7 +813,7 @@ async def check_deflection_intent(messages: list[str]) -> dict:
     try:
         combined = "\n---\n".join(m[:500] for m in messages[-5:])
         resp = await _get_client().messages.create(
-            model=_INTAKE_HAIKU,
+            model=INTAKE_HAIKU_MODEL,
             max_tokens=64,
             system=_DEFLECTION_SYSTEM,
             messages=[{"role": "user", "content": combined}],

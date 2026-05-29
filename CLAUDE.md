@@ -42,7 +42,7 @@ All Claude API calls go through `shared/ai_client.py`. No other module imports t
 difflib).
 **AI usage rules by system:**
 - Retail/B2B bots: photo analysis, staff message monitoring, receipt clarity
-- Hire bot intake: max 2 cheap Haiku calls per applicant — intent classification + CV extraction (text only). No media/photo analysis before TEST_UNLOCKED. No expensive scoring before arrival.
+- Hire bot intake: max 2 normal Haiku calls per applicant (intent classification + CV extraction, text only). Optional 3rd call (deflection_check) only after 3 CV deflections. No media/photo analysis before TEST_UNLOCKED. No expensive scoring before arrival. Every Haiku call = exactly one row in hiring_intake_ai_events.
 - Hire bot scoring: Opus/Sonnet after TEST_UNLOCKED only
 - All AI decisions during intake are logged to `hiring_intake_ai_events` for audit
 When ANTHROPIC_API_KEY is empty the system falls back to manual-review mode automatically.

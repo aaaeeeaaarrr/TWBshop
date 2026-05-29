@@ -763,26 +763,24 @@ async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     # ── Haiku intent classification ───────────────────────────────────────────
-    from shared.ai_client import classify_intake_intent, _INTAKE_HAIKU, _INTENT_PROMPT_VERSION
+    from shared.ai_client import classify_intake_intent, INTAKE_HAIKU_MODEL, INTAKE_INTENT_PROMPT_VERSION
     result = await classify_intake_intent(text)
     intent     = result["intent"]
     confidence = result["confidence"]
     ai_lang    = result["language"]
-
-    _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
-                  text, result, intent, confidence, "")
 
     # Detect language from Haiku result (supplement existing rule-based detection)
     if ai_lang == "km" or _is_khmer(text):
         _update(intake_id, language="km")
         lang = "km"
 
-    # ── Route by intent ───────────────────────────────────────────────────────
+    # ── Route by intent — log ONCE after action is known ─────────────────────
+    from shared.ai_client import INTAKE_HAIKU_MODEL, INTAKE_INTENT_PROMPT_VERSION
     if intent in ("clear_refusal", "wrong_number") and confidence >= 0.75:
         _update(intake_id, intake_status=S_BLOCKED,
                 intake_blocked_reason=f"ai_{intent}")
         _flag(intake_id, f"ai_{intent}", "gap_low")
-        _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+        _log_ai_event(intake_id, "intent_check", INTAKE_HAIKU_MODEL, INTAKE_INTENT_PROMPT_VERSION,
                       text, result, intent, confidence, "close")
         await update.message.reply_text(_t(lang,
             en="Thank you for your message. We don't think you are looking for a job "
@@ -794,7 +792,7 @@ async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if intent == "confused":
-        _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+        _log_ai_event(intake_id, "intent_check", INTAKE_HAIKU_MODEL, INTAKE_INTENT_PROMPT_VERSION,
                       text, result, intent, confidence, "reprompt")
         await update.message.reply_text(_t(lang,
             en="Please leave your CV here to apply for joining The Wine Bakery.\n\n"
@@ -804,8 +802,8 @@ async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_T
         ))
         return
 
-    # intent == "applying" (or fallback from error) — move to CV step
-    _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+    # intent == "applying" (or error fallback) — move to CV step
+    _log_ai_event(intake_id, "intent_check", INTAKE_HAIKU_MODEL, INTAKE_INTENT_PROMPT_VERSION,
                   text, result, intent, confidence, "continue")
     _update(intake_id, intake_status=S_CV_PENDING)
     await update.message.reply_text(_t(lang,
@@ -886,21 +884,18 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
             ), reply_markup=kb_media_done(lang))
         return
 
-    # ── Text: Haiku CV extraction ─────────────────────────────────────────────
+    # ── Text: Haiku CV extraction — log ONCE after action is known ───────────
     if text and text.strip():
         from shared.ai_client import (extract_cv_content, check_deflection_intent,
-                                       _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
-                                       _DEFLECTION_PROMPT_VERSION)
+                                       INTAKE_HAIKU_MODEL, INTAKE_CV_PROMPT_VERSION,
+                                       INTAKE_DEFLECTION_PROMPT_VERSION)
         cv_result = await extract_cv_content(text)
-        _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
-                      text, cv_result, None, None, "")
 
         if cv_result["has_work_history"]:
-            # Accept — move to fulltime gate
             _update(intake_id, cv_submitted=True, cv_format="text",
                     intake_status=S_FULLTIME_GATE)
             _flag(intake_id, "cv_submitted_as_text", "gap_low")
-            _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
+            _log_ai_event(intake_id, "cv_extraction", INTAKE_HAIKU_MODEL, INTAKE_CV_PROMPT_VERSION,
                           text, cv_result, "has_work_history", None, "continue")
             await message.reply_text(_t(lang,
                 en="Thank you. We have received your application.\n\n"
@@ -920,11 +915,11 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
         new_count = (session.get("cv_deflection_count") or 0) + 1
         _update(intake_id, cv_deflection_count=new_count)
         _flag(intake_id, "cv_deflection", "gap_low")
-        _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
-                      text, cv_result, "no_work_history", None, f"deflect_{new_count}")
 
         # Hard close after max deflections
         if new_count >= _DEFLECT_MAX:
+            _log_ai_event(intake_id, "cv_extraction", INTAKE_HAIKU_MODEL, INTAKE_CV_PROMPT_VERSION,
+                          text, cv_result, "no_work_history", None, f"close_max_deflections")
             _update(intake_id, intake_status=S_BLOCKED,
                     intake_blocked_reason="max_deflections")
             await message.reply_text(_t(lang,
@@ -939,16 +934,12 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
         if new_count == _DEFLECT_AI_CHECK:
             recent_msgs = _get_recent_deflection_messages(intake_id, limit=5)
             deflect_result = await check_deflection_intent(recent_msgs)
-            _log_ai_event(intake_id, "deflection_check", _INTAKE_HAIKU, _DEFLECTION_PROMPT_VERSION,
-                          " | ".join(recent_msgs), deflect_result,
-                          deflect_result.get("status"), deflect_result.get("confidence"),
-                          "")
             if deflect_result["status"] == "refusing" and deflect_result["confidence"] >= 0.75:
+                _log_ai_event(intake_id, "deflection_check", INTAKE_HAIKU_MODEL, INTAKE_DEFLECTION_PROMPT_VERSION,
+                              " | ".join(recent_msgs), deflect_result,
+                              "refusing", deflect_result.get("confidence"), "close")
                 _update(intake_id, intake_status=S_BLOCKED,
                         intake_blocked_reason="ai_refusing")
-                _log_ai_event(intake_id, "deflection_check", _INTAKE_HAIKU, _DEFLECTION_PROMPT_VERSION,
-                              text, deflect_result, "refusing", deflect_result.get("confidence"),
-                              "close")
                 await message.reply_text(_t(lang,
                     en="Thank you for your time. If you decide to apply in the future, "
                        "feel free to message us again.",
@@ -956,6 +947,15 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
                        "សូមមកទំនាក់ទំនងយើងម្តងទៀត។"
                 ))
                 return
+            else:
+                _log_ai_event(intake_id, "deflection_check", INTAKE_HAIKU_MODEL, INTAKE_DEFLECTION_PROMPT_VERSION,
+                              " | ".join(recent_msgs), deflect_result,
+                              deflect_result.get("status"), deflect_result.get("confidence"), "reprompt")
+
+        # Log cv_extraction with final action (deflect or reprompt)
+        action = f"deflect_{new_count}"
+        _log_ai_event(intake_id, "cv_extraction", INTAKE_HAIKU_MODEL, INTAKE_CV_PROMPT_VERSION,
+                      text, cv_result, "no_work_history", None, action)
 
     # Re-prompt (struggling, confused, or vague)
     count = session.get("cv_deflection_count") or 0

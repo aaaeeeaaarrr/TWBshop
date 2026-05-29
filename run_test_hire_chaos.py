@@ -721,6 +721,48 @@ async def run():
         except Exception as e:
             fail(f"I09: fallback crashed instead of returning safe default: {e}"); failed += 1
 
+    # ── I10: One Haiku call = exactly one ai_events row ──────────────────────
+    head("I10: classify_intake_intent call → exactly 1 row in hiring_intake_ai_events")
+    reset_intake()
+    intake_id = force_create_intake("language_check")
+    ctx = make_context()
+    from hire_bot.intake import handle_message, get_intake_session
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(text="hi i want to apply for cook")
+    try:
+        await handle_message(u, ctx, session)
+        conn = _db(); cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM hiring_intake_ai_events WHERE intake_id=%s AND stage='intent_check'",
+                    (intake_id,))
+        count = cur.fetchone()[0]; conn.close()
+        if count == 1:
+            ok("intent_check call → exactly 1 ai_events row"); passed += 1
+        else:
+            fail(f"Expected 1 ai_events row for intent_check, got {count}"); failed += 1
+    except Exception as e:
+        fail(f"I10 crashed: {e}"); failed += 1
+
+    # ── I11: CV accepted → exactly 1 cv_extraction row ───────────────────────
+    head("I11: CV text accepted → exactly 1 cv_extraction row in ai_events")
+    reset_intake()
+    intake_id = force_create_intake("cv_pending")
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(text="My name is Dara, I worked at Lucky Mart as cashier for 2 years")
+    try:
+        await handle_message(u, ctx, session)
+        conn = _db(); cur = conn.cursor()
+        cur.execute("SELECT COUNT(*), action_taken FROM hiring_intake_ai_events WHERE intake_id=%s AND stage='cv_extraction' GROUP BY action_taken",
+                    (intake_id,))
+        rows = cur.fetchall(); conn.close()
+        total_rows = sum(r[0] for r in rows)
+        if total_rows == 1:
+            ok(f"CV accepted → 1 cv_extraction row, action={rows[0][1] if rows else 'none'}"); passed += 1
+        else:
+            fail(f"Expected 1 cv_extraction row, got {total_rows}: {rows}"); failed += 1
+    except Exception as e:
+        fail(f"I11 crashed: {e}"); failed += 1
+
     # ══════════════════════════════════════════════════════════════════════════
     # MULTI-FILE CV SCENARIOS
     # ══════════════════════════════════════════════════════════════════════════
