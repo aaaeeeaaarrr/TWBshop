@@ -135,9 +135,24 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-28 (session 19d)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live and in active use. Hiring system scoring engine built. Legacy paper import system live. Part E v3 complete. Intake funnel built (hire_bot/intake.py) — public-ad front door before quiz. Intake edge cases fixed: photo-as-first-message, blocked reapply, test_unlocked silence.
-**Last completed:**
+**Last updated:** 2026-05-29 (session 20)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Chaos tests built and passing. Multi-file CV storage live. 5 bugs found and fixed this session.
+**Last completed (session 20):**
+- B2B chaos test: 38/38 pass. 5 bugs found and fixed:
+  1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
+  2. FIXED: bm_back didn't clear _recurring_pending/_days — state leaked into next session
+  3. FIXED: b2b_cancel keep/cancel-all dialog was dead code (existing_bread/cake never set) — replaced with live DB query
+  4. FIXED: handle_menu_callback didn't call _restore_cart — cart lost after bot restart
+  5. Hire chaos test: 33/33 pass
+- Multi-file CV storage built: hiring_intake_media table, "Done sending files" button flow, 10-file limit
+  - Applicants can send 5+ CV photos/certificates before tapping Done
+  - All files stored in hiring_intake_media (one row per file)
+  - No AI analysis before TEST_UNLOCKED — store first, analyse later
+  - Photos at any state (fulltime_gate, appt_set) also stored silently
+  - Migration: migrations/2026_05_29_hiring_intake_media.sql (run on server)
+- Added new chaos tests: restart/resume (R01-R03), cross-group isolation (X01-X03), Telegram failure (T01), S12 fix verification (T02), multi-file CV (M01-M08)
+- Run tests: python3 run_test_b2b_chaos.py (38/38) && python3 run_test_hire_chaos.py (33/33)
+**Last completed (session 19d):**
 - GM Manager bot fully live: privacy mode disabled, re-added to Stock Checks group, correct chat_id=-1003952029131
 - Stock Checks Nov1–May27 2026 imported: 5,276 messages under correct chat_id
 - 411 concerns analyzed; historical ones re-sent via local script run_send_historical_photos.py
