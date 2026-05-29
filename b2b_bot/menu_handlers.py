@@ -456,26 +456,39 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
-            await query.answer()
-            await _delete_old_menu(chat_id, context.bot)
             text = f"📋 Select a category:\n\n{_cart_block(chat_id)}"
-            sent = await context.bot.send_message(chat_id, text, reply_markup=_category_keyboard(chat_id))
-            _menu_msg[chat_id] = sent.message_id
-            set_menu_message_id(chat_id, sent.message_id)
+            kb   = _category_keyboard(chat_id)
+            try:
+                # Edit in place — menu appears where the user tapped, no scrolling needed
+                await query.edit_message_text(text, reply_markup=kb)
+                _menu_msg[chat_id] = query.message.message_id
+                set_menu_message_id(chat_id, query.message.message_id)
+            except Exception:
+                # Fallback: message too old to edit, send new one at bottom
+                await _delete_old_menu(chat_id, context.bot)
+                sent = await context.bot.send_message(chat_id, text, reply_markup=kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
 
         elif data == "bm_edit_order":
-            await query.answer()
-            await _delete_old_menu(chat_id, context.bot)
             delivery_date    = _get_cart_date(chat_id)
             sessions         = get_b2b_order_sessions(chat_id, delivery_date)
             recurring_orders = get_b2b_recurring_orders(chat_id)
             if not sessions and not recurring_orders:
-                sent = await context.bot.send_message(chat_id, "No orders to edit yet. Use OPEN MENU to place a new order.")
+                text = "No orders to edit yet. Use OPEN MENU to place a new order."
+                kb   = None
             else:
-                text, keyboard = _menu_state(chat_id)
-                sent = await context.bot.send_message(chat_id, text, reply_markup=keyboard)
-            _menu_msg[chat_id] = sent.message_id
-            set_menu_message_id(chat_id, sent.message_id)
+                text, kb = _menu_state(chat_id)
+            try:
+                # Edit in place — orders screen appears where the user tapped
+                await query.edit_message_text(text, reply_markup=kb)
+                _menu_msg[chat_id] = query.message.message_id
+                set_menu_message_id(chat_id, query.message.message_id)
+            except Exception:
+                await _delete_old_menu(chat_id, context.bot)
+                sent = await context.bot.send_message(chat_id, text, reply_markup=kb)
+                _menu_msg[chat_id] = sent.message_id
+                set_menu_message_id(chat_id, sent.message_id)
 
         elif data == "bm_change_location":
             await query.answer()
