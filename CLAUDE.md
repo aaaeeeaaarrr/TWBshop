@@ -135,8 +135,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-29 (session 20)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Chaos tests built and passing. Multi-file CV storage live. 5 bugs found and fixed this session.
+**Last updated:** 2026-05-29 (session 20 final)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Chaos tests: B2B 42/42, Hire 33/33. Multi-file CV storage live. 5 bugs found and fixed. Actor logging live. Order lock boundary tested.
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:
   1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
@@ -263,12 +263,24 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
     Path: C:\Users\Papa\Documents\Bluetooth\Staff Assessments\Vannary\2026-05-13 leadership audit\
     storage_status=local_to_pc. Move to cloud/server when convenient.
   - Every future import: provide zip/photos at import time and evidence rows are inserted automatically
+**MANUAL TEST CHECKLIST (before heavy B2B rollout / public hiring ads):**
+  B2B:
+  - [ ] True restart test: build cart → `systemctl stop twbshop-b2b` → start → tap old Confirm/Edit/Cancel/See Orders from Telegram
+  - [ ] Live two-group test: two real B2B groups, verify carts/orders/locations never cross
+  - [ ] Check actor logging is appearing in logs: `journalctl -u twbshop-b2b | grep 'b2b_confirm\|b2b_edit\|b2b_cancel\|Location set'`
+  Hiring:
+  - [ ] Live Telegram test with 5+ photos/files (send each separately, tap Done, verify count in message)
+  - [ ] Verify `SELECT * FROM hiring_intake_media WHERE intake_id=X` shows all rows after live test
+  - [ ] Confirm no AI call before TEST_UNLOCKED: `grep -i 'anthropic\|claude' logs/hire_bot.log` should be empty during intake
+  - [ ] Start hire bot: `systemctl start twbshop-hire`
+  - [ ] /create Test Candidate → full quiz flow
 **Next task (immediate):**
-  1. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
-  2. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
-  3. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
-  4. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
-  5. B2B bot rollout: add bot to all 24+ B2B customer groups
+  1. Run manual test checklist above
+  2. User reviews 383 concern cards in GM chat (tap buttons as they go; /review for anything missed)
+  3. Staff real names mapping: provide real names for aliases (Cat, Nakk, NY, O, Pew, Me Me, Seth, Boss TT, Chan Oun, Roth, por Khmer Bruce PP)
+  4. Supplier price extraction [IN PROGRESS] — run `python run_extract_prices.py` on server
+  5. Customer reactivation: extract names+phones from WOC DELIVERY PICTURES photos
+  6. B2B bot rollout: add bot to all 24+ B2B customer groups
 **Next task (hiring system):**
   1. Add HIRE_BOT_TOKEN to secrets repo, then test /create → deep link → candidate flow end-to-end
      Use this test path: /create Test Candidate → intro → 111 Qs → E-A1a=B (triggers E-T3) + E-A3a=A (triggers E-T1) + E-A3b=A (triggers E-T2) → all 3 triggers fire → E-Final → end screen → owner notify
