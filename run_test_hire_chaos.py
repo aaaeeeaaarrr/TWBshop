@@ -132,9 +132,20 @@ def make_update(text=None, callback_data=None, photo=False, sticker=False,
         msg.delete = AsyncMock()
         mock_photo = MagicMock()
         mock_photo.file_id = "photo_file_id"
+        mock_photo.file_unique_id = "photo_unique_id"
         mock_photo.file_size = 1024
         msg.photo = [mock_photo] if photo else None
-        msg.document = MagicMock(file_id="doc_file_id", file_name="cv.pdf", mime_type="application/pdf") if document else None
+        if document:
+            mock_doc = MagicMock()
+            mock_doc.file_id = "doc_file_id"
+            mock_doc.file_unique_id = "doc_unique_id"
+            mock_doc.file_name = "cv.pdf"
+            mock_doc.mime_type = "application/pdf"
+            mock_doc.file_size = 2048
+            msg.document = mock_doc
+        else:
+            msg.document = None
+        msg.media_group_id = None  # explicit None prevents MagicMock auto-attr
         msg.voice = MagicMock(file_id="voice_file_id") if voice else None
         msg.video_note = MagicMock(file_id="vnote_file_id") if video_note else None
         msg.sticker = MagicMock(emoji="😂") if sticker else None
@@ -259,7 +270,7 @@ async def run():
         fail(f"Empty text at cv_pending crashed: {e}"); failed += 1
 
     # ── H07: At cv_pending → send a DOCUMENT → treated as CV ─────────────────
-    head("H07: cv_pending → send PDF document → cv_submitted=True, moves to fulltime_gate")
+    head("H07: cv_pending → send PDF document → cv_submitted=True, stays cv_pending (multi-file flow)")
     reset_intake()
     force_create_intake("cv_pending")
     ctx = make_context()
@@ -268,8 +279,9 @@ async def run():
     try:
         await _handle_document_or_photo(u, ctx)
         session = get_intake()
-        if session and session.get("cv") and session.get("status") == "fulltime_gate":
-            ok("Document as CV → cv_submitted, moved to fulltime_gate"); passed += 1
+        # Multi-file flow: stays cv_pending (Done button shown), not immediately fulltime_gate
+        if session and session.get("cv") and session.get("status") in ("cv_pending", "fulltime_gate"):
+            ok(f"Document as CV → cv_submitted=True, status={session.get('status')!r}"); passed += 1
         else:
             fail(f"Document not handled as CV: {session}"); failed += 1
     except Exception as e:

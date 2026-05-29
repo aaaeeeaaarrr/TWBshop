@@ -196,22 +196,31 @@ def _store_media(intake_id: int, update) -> None:
 
     if message.photo:
         photo = message.photo[-1]
-        file_id          = photo.file_id
-        file_unique_id   = getattr(photo, "file_unique_id", None)
-        media_type       = "photo"
-        file_size        = getattr(photo, "file_size", None)
+        file_id        = photo.file_id
+        raw_unique     = getattr(photo, "file_unique_id", None)
+        file_unique_id = raw_unique if isinstance(raw_unique, (str, type(None))) else None
+        media_type     = "photo"
+        raw_size       = getattr(photo, "file_size", None)
+        file_size      = raw_size if isinstance(raw_size, (int, type(None))) else None
     elif message.document:
-        doc              = message.document
-        file_id          = doc.file_id
-        file_unique_id   = getattr(doc, "file_unique_id", None)
-        media_type       = "document"
-        filename         = getattr(doc, "file_name", None)
-        mime_type        = getattr(doc, "mime_type", None)
-        file_size        = getattr(doc, "file_size", None)
+        doc            = message.document
+        file_id        = doc.file_id
+        raw_unique     = getattr(doc, "file_unique_id", None)
+        file_unique_id = raw_unique if isinstance(raw_unique, (str, type(None))) else None
+        media_type     = "document"
+        raw_fn         = getattr(doc, "file_name", None)
+        filename       = raw_fn if isinstance(raw_fn, (str, type(None))) else None
+        raw_mime       = getattr(doc, "mime_type", None)
+        mime_type      = raw_mime if isinstance(raw_mime, (str, type(None))) else None
+        raw_size       = getattr(doc, "file_size", None)
+        file_size      = raw_size if isinstance(raw_size, (int, type(None))) else None
     else:
         return
 
-    media_group_id = getattr(message, "media_group_id", None)
+    raw_group_id  = getattr(message, "media_group_id", None)
+    media_group_id = raw_group_id if isinstance(raw_group_id, (str, type(None))) else None
+    raw_caption   = message.caption
+    caption        = raw_caption if isinstance(raw_caption, (str, type(None))) else None
 
     conn = _conn(); cur = conn.cursor()
     try:
@@ -227,7 +236,8 @@ def _store_media(intake_id: int, update) -> None:
               file_id, file_unique_id, media_group_id,
               media_type, filename, mime_type, file_size, caption))
         conn.commit()
-    except Exception:
+    except Exception as exc:
+        logger.error("_store_media failed intake_id=%s: %s", intake_id, exc)
         conn.rollback()
     finally:
         cur.close(); conn.close()
