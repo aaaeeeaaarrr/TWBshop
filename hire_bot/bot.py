@@ -443,14 +443,8 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
         """, (attempt_id,))
         part_e_answers = {r[0]: r[1] for r in cur.fetchall()}
 
-        # Mark as notified before sending (prevents retry race)
-        cur.execute("""
-            UPDATE hiring_quiz_attempts
-            SET quiz_owner_notified_at=now(), quiz_owner_notified_outcome=%s
-            WHERE id=%s
-        """, (outcome, attempt_id))
-        conn.commit()
         conn.close()
+        # (notified_at marked AFTER successful send — see below)
 
         # Safe HTML
         def esc(v): return html.escape(str(v)) if v else ""
@@ -533,6 +527,20 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
             "\n".join(lines),
             parse_mode="HTML",
         )
+        # Send succeeded — now mark as notified
+        try:
+            import psycopg2 as _pg2
+            conn2 = _pg2.connect(DATABASE_URL)
+            cur2  = conn2.cursor()
+            cur2.execute("""
+                UPDATE hiring_quiz_attempts
+                SET quiz_owner_notified_at=now(), quiz_owner_notified_outcome=%s
+                WHERE id=%s
+            """, (outcome, attempt_id))
+            conn2.commit()
+            conn2.close()
+        except Exception as mark_exc:
+            logger.warning("_notify_owner_quiz mark failed: %s", mark_exc)
 
     except Exception as exc:
         logger.error("_notify_owner_quiz failed attempt=%s: %s", attempt_id, exc)
