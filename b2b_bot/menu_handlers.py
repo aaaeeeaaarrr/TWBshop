@@ -305,6 +305,8 @@ async def handle_menu_callback(update: Update, context) -> None:
         if data == "bm_back":
             _qty_pending.pop(chat_id, None)
             set_qty_pending(chat_id, None)
+            _recurring_pending.pop(chat_id, None)
+            _recurring_days.pop(chat_id, None)
             await query.edit_message_text(
                 f"📋 Select a category:\n\n{_cart_block(chat_id)}",
                 reply_markup=_category_keyboard(chat_id),

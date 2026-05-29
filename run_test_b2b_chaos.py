@@ -440,39 +440,53 @@ async def run():
     else:
         fail(f"Unexpected cancel response: {CAP.edit_text!r}"); failed += 1
 
-    # ── S13: b2b_cancel_all → DB orders deleted ──────────────────────────────
-    head("S13: b2b_cancel_all → orders actually deleted from DB")
-    from b2b_bot.order_handlers import handle_callback as order_cb
+    # ── S13: b2b_cancel_all → DB orders deleted (standalone) ────────────────
+    head("S13: b2b_cancel_all with known delivery_date → orders deleted from DB")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Confirm a fresh order so we know it's in DB
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb, _pending
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    orders_before = get_db_orders()
+    # Now simulate pending state for cancel_all (needs delivery_date)
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    _pending[FAKE_CHAT_ID] = {"delivery_date": tomorrow, "bread_items": [], "cake_items": []}
+    from shared.database import set_pending_order
+    set_pending_order(FAKE_CHAT_ID, _pending[FAKE_CHAT_ID])
     CAP.reset()
     await order_cb(make_callback("b2b_cancel_all"), ctx)
-    orders = get_db_orders()
-    if not orders:
+    orders_after = get_db_orders()
+    if orders_before and not orders_after:
         ok("b2b_cancel_all deleted all DB orders"); passed += 1
+    elif not orders_before:
+        fail("Setup issue: no orders in DB before cancel_all"); failed += 1
     else:
-        fail(f"Orders still in DB after cancel_all: {orders}"); failed += 1
+        fail(f"Orders still in DB after cancel_all: {orders_after}"); failed += 1
 
-    # ── S14: SEE YOUR ORDERS while confirmation is pending ───────────────────
-    head("S14: Confirmation pending → click SEE YOUR ORDERS → does confirmation survive?")
+    # ── S14: SEE YOUR ORDERS after _do_confirm → confirmation NOT deleted ────
+    head("S14: After _do_confirm, SEE YOUR ORDERS must NOT delete the confirmation message")
     _reset_all_state(); CAP.reset()
     ctx = make_context()
     await _get_to_confirmation_pending(ctx)
-    # Mark the menu message as the confirmation message_id
+    # At this point _menu_msg should be CLEARED by _do_confirm (our fix)
     from b2b_bot.menu_keyboards import _menu_msg
     from b2b_bot.order_handlers import _pending
-    conf_msg_id = 9001
-    _menu_msg[FAKE_CHAT_ID] = conf_msg_id
-    from shared.database import set_menu_message_id
-    set_menu_message_id(FAKE_CHAT_ID, conf_msg_id)
-    pending_before = bool(_pending.get(FAKE_CHAT_ID))
+    menu_msg_after_confirm = _menu_msg.get(FAKE_CHAT_ID)
+    pending_exists = bool(_pending.get(FAKE_CHAT_ID))
     CAP.reset()
     await handle_menu_callback(make_callback("bm_edit_order"), ctx)
-    pending_after = bool(_pending.get(FAKE_CHAT_ID))
-    deleted_conf = conf_msg_id in CAP.deletes
-    if deleted_conf:
-        fail(f"BUG: SEE YOUR ORDERS deleted the confirmation message (id={conf_msg_id}). "
-             f"pending_before={pending_before}, pending_after={pending_after}"); failed += 1
+    any_deleted = len(CAP.deletes) > 0
+    if not menu_msg_after_confirm and pending_exists and not any_deleted:
+        ok("Fix verified: _menu_msg cleared in _do_confirm → SEE YOUR ORDERS deletes nothing"); passed += 1
+    elif not menu_msg_after_confirm and pending_exists and any_deleted:
+        fail(f"BUG: _menu_msg cleared but something was still deleted: {CAP.deletes}"); failed += 1
+    elif menu_msg_after_confirm:
+        fail(f"BUG NOT FIXED: _menu_msg still set to {menu_msg_after_confirm} after _do_confirm"); failed += 1
     else:
-        ok("SEE YOUR ORDERS did NOT delete the confirmation message"); passed += 1
+        fail(f"Setup issue: pending_exists={pending_exists}, menu_msg={menu_msg_after_confirm}"); failed += 1
 
     # ── S15: Double b2b_confirm (race condition) ─────────────────────────────
     head("S15: Click b2b_confirm twice rapidly → second click should not crash")
