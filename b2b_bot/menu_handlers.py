@@ -1131,6 +1131,10 @@ async def _do_confirm(query, chat_id: int, context) -> None:
 
     _last_confirmation[chat_id] = query.message.message_id
     set_last_confirmation_msg(chat_id, query.message.message_id)
+    # Stop tracking this as a menu message — it's now a confirmation screen.
+    # Without this, bm_edit_order → _delete_old_menu would delete it.
+    _menu_msg.pop(chat_id, None)
+    set_menu_message_id(chat_id, None)
     try:
         await query.edit_message_text(msg, reply_markup=_confirm_keyboard())
     except Exception:
