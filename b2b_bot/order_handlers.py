@@ -277,6 +277,8 @@ async def handle_callback(update: Update, context) -> None:
         from b2b_bot.menu_keyboards import _menu_msg
         _menu_msg.pop(chat_id, None)
         set_menu_message_id(chat_id, None)
+        from b2b_bot.menu_handlers import send_quick_menu
+        await send_quick_menu(context.bot, chat_id)
 
     elif query.data == "b2b_edit":
         logger.info("b2b_edit by %s in chat %s", _actor(query), chat_id)
@@ -356,11 +358,15 @@ async def handle_callback(update: Update, context) -> None:
             _pending.pop(chat_id, None); set_pending_order(chat_id, None)
             _state.pop(chat_id, None); set_order_state(chat_id, None)
             await query.edit_message_text("Order cancelled.")
+            from b2b_bot.menu_handlers import send_quick_menu
+            await send_quick_menu(context.bot, chat_id)
 
     elif query.data == "b2b_keep_existing":
         _pending.pop(chat_id, None); set_pending_order(chat_id, None)
         _state.pop(chat_id, None); set_order_state(chat_id, None)
         await query.edit_message_text("Your existing order remains active. ✓")
+        from b2b_bot.menu_handlers import send_quick_menu
+        await send_quick_menu(context.bot, chat_id)
 
     elif query.data == "b2b_cancel_all":
         pending       = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
@@ -372,6 +378,8 @@ async def handle_callback(update: Update, context) -> None:
             delete_b2b_cake_orders_for_date(chat_id, delivery_date)
         label = _date_label(delivery_date) if delivery_date else "this delivery"
         await query.edit_message_text(f"All orders for {label} have been cancelled.")
+        from b2b_bot.menu_handlers import send_quick_menu
+        await send_quick_menu(context.bot, chat_id)
 
     elif query.data == "b2b_rec_setup_confirm":
         from b2b_bot.menu_keyboards import _cart, _cart_time, _cart_date, _cart_method, _recurring_days, _recurring_pending
@@ -418,6 +426,8 @@ async def handle_callback(update: Update, context) -> None:
         from telegram.constants import ParseMode
         await context.bot.send_message(chat_id, confirmed_text, parse_mode=ParseMode.HTML)
         logger.info("Recurring order #%s saved for %s (%s)", rec_id, business_name, chat_id)
+        from b2b_bot.menu_handlers import send_quick_menu
+        await send_quick_menu(context.bot, chat_id)
 
     elif query.data == "b2b_rec_setup_cancel":
         from b2b_bot.menu_keyboards import _cart, _recurring_days, _recurring_pending, _category_keyboard, _cart_block

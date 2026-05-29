@@ -79,8 +79,23 @@ async def cmd_start(update: Update, context) -> None:
     await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
 
 
+_QUICK_MENU_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("⭐ OPEN MENU ⭐",  callback_data="bm_menu_prompt")],
+    [InlineKeyboardButton("SEE YOUR ORDERS", callback_data="bm_edit_order")],
+    [InlineKeyboardButton("Check Balance",   callback_data="bmc_balance")],
+    [InlineKeyboardButton("Change Location", callback_data="bm_change_location")],
+])
+
+
+async def send_quick_menu(bot, chat_id: int) -> None:
+    """Send the Quick Menu immediately after a completed action."""
+    import time
+    _last_menu_prompt[chat_id] = time.monotonic()  # reset nudge cooldown
+    await bot.send_message(chat_id, "⚡ Quick Menu", reply_markup=_QUICK_MENU_KB)
+
+
 async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
-    """Send a one-button menu nudge if 6+ hours have passed since the last one."""
+    """Send the nudge if 6+ hours have passed since the last prompt."""
     import time
     now = time.monotonic()
     if now - _last_menu_prompt.get(chat_id, 0) < _MENU_PROMPT_COOLDOWN_SEC:
@@ -89,12 +104,7 @@ async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
     await bot.send_message(
         chat_id,
         "Ready to order?",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⭐ OPEN MENU ⭐", callback_data="bm_menu_prompt")],
-            [InlineKeyboardButton("SEE YOUR ORDERS", callback_data="bm_edit_order")],
-            [InlineKeyboardButton("Check Balance", callback_data="bmc_balance")],
-            [InlineKeyboardButton("Change Location", callback_data="bm_change_location")],
-        ]),
+        reply_markup=_QUICK_MENU_KB,
     )
 
 
