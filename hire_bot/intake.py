@@ -734,6 +734,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                "ប្អូនអាចដាក់ពាក្យម្តងទៀតនៅពេលអនាគត។"
         ))
         logger.info("intake blocked (voice) chat=%s", chat_id)
+        await notify_owner_intake_outcome(context.bot, intake_id)
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -799,6 +800,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 km="យើងជ្រើសរើសបុគ្គលិកពេញម៉ោងប៉ុណ្ណោះ (ម៉ោង ៩ ឬ ១២)។ "
                    "អរគុណ — ប្អូនអាចដាក់ពាក្យម្តងទៀតបើកាលវិភាគប្អូនផ្លាស់ប្ដូរ។"
             ))
+            await notify_owner_intake_outcome(context.bot, intake_id)
 
     # intake:slot:YYYY-MM-DDTHH:00
     elif parts[1] == "slot" and len(parts) >= 3:
@@ -823,6 +825,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_location(chat_id, latitude=config.BAKERY_LAT,
                                         longitude=config.BAKERY_LNG)
         logger.info("intake slot set chat=%s slot=%s", chat_id, slot_dt)
+        await notify_owner_intake_outcome(context.bot, intake_id)
 
     # intake:day:YYYY-MM-DD  → show times for that day
     elif parts[1] == "day" and len(parts) == 3:
@@ -905,6 +908,7 @@ async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_T
                "សូមមកទំនាក់ទំនងយើងម្តងទៀត។"
         ))
         logger.info("intake closed by ai intent=%s conf=%.2f chat=%s", intent, confidence, intake_id)
+        await notify_owner_intake_outcome(context.bot, intake_id)
         return
 
     if intent == "confused":
@@ -1044,6 +1048,7 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 km="អរគុណ។ យើងត្រូវការ CV ឬប្រវត្តិការងាររបស់ប្អូន ដើម្បីបន្ត — "
                    "សូមទំនាក់ទំនងយើងម្តងទៀតនៅពេលប្អូនរួចរាល់។"
             ))
+            await notify_owner_intake_outcome(context.bot, intake_id)
             return
 
         # After AI_CHECK deflections — ask Haiku: struggling or refusing?
@@ -1063,6 +1068,7 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
                     km="អរគុណចំពោះពេលវេលារបស់ប្អូន។ បើប្អូនចង់ដាក់ពាក្យនៅពេលអនាគត "
                        "សូមមកទំនាក់ទំនងយើងម្តងទៀត។"
                 ))
+                await notify_owner_intake_outcome(context.bot, intake_id)
                 return
             else:
                 _log_ai_event(intake_id, "deflection_check", INTAKE_HAIKU_MODEL, INTAKE_DEFLECTION_PROMPT_VERSION,
@@ -1183,6 +1189,95 @@ async def _resume_state(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 # ── Arrival confirmation ──────────────────────────────────────────────────────
+
+async def notify_owner_intake_outcome(bot, intake_id: int) -> None:
+    """
+    Send owner a private message when intake ends (appointment set OR blocked).
+    Includes applicant identity, outcome, flags, and last few messages.
+    """
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT s.telegram_chat_id, s.telegram_user_id, s.sender_name,
+                   s.intake_status, s.intake_blocked_reason, s.language,
+                   s.cv_submitted, s.cv_format, s.voice_strike_count,
+                   s.cv_deflection_count, s.appointment_slot
+            FROM hiring_intake_sessions s
+            WHERE s.id = %s
+        """, (intake_id,))
+        row = cur.fetchone()
+        if not row:
+            return
+        (chat_id, user_id, name, status, blocked_reason, lang,
+         cv_submitted, cv_format, voice_strikes, deflections, slot) = row
+
+        # Flags
+        cur.execute("SELECT flag FROM hiring_intake_flags WHERE intake_id=%s ORDER BY id", (intake_id,))
+        flags = [r[0] for r in cur.fetchall()]
+
+        # Last 6 text events for context
+        cur.execute("""
+            SELECT text FROM hiring_intake_events
+            WHERE intake_id=%s AND event_type='text' AND text IS NOT NULL
+            ORDER BY created_at DESC LIMIT 6
+        """, (intake_id,))
+        last_msgs = [r[0] for r in reversed(cur.fetchall())]
+
+        # AI intent result (first intent check)
+        cur.execute("""
+            SELECT intent, confidence, action_taken FROM hiring_intake_ai_events
+            WHERE intake_id=%s AND stage='intent_check' ORDER BY created_at LIMIT 1
+        """, (intake_id,))
+        ai_row = cur.fetchone()
+
+    finally:
+        cur.close(); conn.close()
+
+    # Build message
+    user_ref = f"[{name}](tg://user?id={user_id})" if user_id else name
+    if status == S_APPT_SET and slot:
+        slot_pp = slot.astimezone(PP_TZ)
+        status_line = f"✅ Appointment set — {_fmt_day_long(slot_pp)} at {_fmt_time(slot_pp)}"
+    elif status == S_BLOCKED:
+        reason_display = (blocked_reason or "unknown").replace("_", " ")
+        status_line = f"❌ Blocked — {reason_display}"
+    else:
+        status_line = f"ℹ️ Status: {status}"
+
+    lines = [
+        f"📋 *Intake outcome*",
+        f"Applicant: {user_ref}",
+        f"Chat ID: `{chat_id}`",
+        f"",
+        status_line,
+        f"Language: {'Khmer 🇰🇭' if lang == 'km' else 'English 🇬🇧'}",
+        f"CV submitted: {'Yes (' + (cv_format or '?') + ')' if cv_submitted else 'No'}",
+    ]
+
+    if voice_strikes:
+        lines.append(f"Voice strikes: {voice_strikes}")
+    if deflections:
+        lines.append(f"CV deflections: {deflections}")
+    if ai_row:
+        lines.append(f"AI intent: {ai_row[0]} (conf {ai_row[1]:.0%}) → {ai_row[2]}")
+    if flags:
+        flag_str = ", ".join(f.replace("_", " ") for f in flags[:6])
+        lines.append(f"Flags: {flag_str}")
+
+    if last_msgs:
+        lines += ["", "💬 *Last messages:*"]
+        for m in last_msgs:
+            lines.append(f"› {m[:120]}")
+
+    try:
+        await bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            "\n".join(lines),
+            parse_mode="Markdown",
+        )
+    except TelegramError as e:
+        logger.error("notify_owner_intake_outcome failed: %s", e)
+
 
 async def notify_owner_arrival(bot: Bot, intake_id: int, applicant_chat_id: int,
                                applicant_name: str, slot: datetime) -> None:
