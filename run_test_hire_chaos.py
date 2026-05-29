@@ -710,7 +710,6 @@ async def run():
 
     # ── I09: Haiku error → safe fallback (intent = confused, not close) ──────
     head("I09: Haiku API unavailable → fallback to confused (no close)")
-    from unittest.mock import patch
     with patch("shared.ai_client._get_client") as mock_client:
         mock_client.side_effect = Exception("API timeout")
         try:

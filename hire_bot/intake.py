@@ -887,7 +887,7 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
 
     # ── Text: Haiku CV extraction ─────────────────────────────────────────────
-    if text:
+    if text and text.strip():
         from shared.ai_client import (extract_cv_content, check_deflection_intent,
                                        _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
                                        _DEFLECTION_PROMPT_VERSION)
