@@ -124,13 +124,17 @@ def make_update(text=None, callback_data=None, photo=False, sticker=False,
         update.callback_query = None
         msg = MagicMock()
         msg.text = text
+        msg.caption = None  # must be explicit — MagicMock auto-attr is truthy and breaks DB inserts
         msg.message_id = 8001
         msg.chat.id = FAKE_CHAT_ID
         msg.chat.type = "private"
         msg.reply_text = AsyncMock()
         msg.delete = AsyncMock()
-        msg.photo = [MagicMock()] if photo else None
-        msg.document = MagicMock(file_id="doc_file_id") if document else None
+        mock_photo = MagicMock()
+        mock_photo.file_id = "photo_file_id"
+        mock_photo.file_size = 1024
+        msg.photo = [mock_photo] if photo else None
+        msg.document = MagicMock(file_id="doc_file_id", file_name="cv.pdf", mime_type="application/pdf") if document else None
         msg.voice = MagicMock(file_id="voice_file_id") if voice else None
         msg.video_note = MagicMock(file_id="vnote_file_id") if video_note else None
         msg.sticker = MagicMock(emoji="😂") if sticker else None
@@ -188,8 +192,8 @@ async def run():
     except Exception as e:
         fail(f"start_intake crashed: {e}"); failed += 1
 
-    # ── H03: Voice note at language_check → warning sent (strike 1) ──────────
-    head("H03: Voice note at language_check → warning sent, strike_count=1")
+    # ── H03: Voice note at language_check → warning sent (NOT a strike) ────────
+    head("H03: First voice note → warning sent, voice_warning_sent=True (not yet a strike)")
     reset_intake()
     force_create_intake("language_check")
     ctx = make_context()
@@ -198,30 +202,30 @@ async def run():
     try:
         await handle_voice(u, ctx)
         session = get_intake()
-        if session and session.get("warn") and session.get("strikes", 0) >= 1:
-            ok(f"Voice strike 1 → warning sent, strikes={session['strikes']}"); passed += 1
+        if session and session.get("warn"):
+            ok(f"First voice → warning sent (voice_warning_sent=True), strikes={session.get('strikes',0)}"); passed += 1
         else:
             fail(f"Voice not handled: session={session}"); failed += 1
     except Exception as e:
         fail(f"Voice at language_check crashed: {e}"); failed += 1
 
-    # ── H04: Voice note 3 times → blocked ────────────────────────────────────
-    head("H04: Voice note 3 times → intake_status=blocked")
+    # ── H04: Voice note 4 times → blocked ────────────────────────────────────
+    head("H04: Voice note 4 times → intake_status=blocked (1 warning + 3 strikes)")
     reset_intake()
     force_create_intake("language_check")
     ctx = make_context()
     from hire_bot.intake import handle_voice
-    for i in range(3):
+    for i in range(4):
         u = make_update(voice=True)
         try:
             await handle_voice(u, ctx)
         except Exception as e:
-            fail(f"Voice strike {i+1} crashed: {e}"); failed += 1; break
+            fail(f"Voice call {i+1} crashed: {e}"); failed += 1; break
     session = get_intake()
     if session and session.get("status") == "blocked" and session.get("blocked") == "voice_refusal":
-        ok("3 voice strikes → blocked (voice_refusal)"); passed += 1
+        ok("4 voice calls (1 warning + 3 strikes) → blocked (voice_refusal)"); passed += 1
     else:
-        fail(f"Expected blocked, got session={session}"); failed += 1
+        fail(f"Expected blocked after 4 voice calls, got session={session}"); failed += 1
 
     # ── H05: video_note at language_check → treated same as voice ────────────
     head("H05: Video note at language_check → same voice-strike logic")
@@ -491,7 +495,7 @@ async def run():
         "d1_chosen": ["Option A"],  # already chosen once
     }
     from hire_bot.bot import cb_ranking
-    from hire_bot import questions
+    from hire_bot import questions, sessions
     # Patch get_next_question_id to return D1 question
     with patch.object(questions, 'get_next_question_id', return_value="D1-Q1"), \
          patch.object(questions, 'get_answered_question_ids', return_value=set()):
