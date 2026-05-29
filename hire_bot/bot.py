@@ -431,8 +431,8 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
          cand_name, position,
          tg_username, tg_user_id) = row
 
-        score_summary    = _json.loads(score_summary_raw)  if score_summary_raw  else {}
-        risk_profile     = _json.loads(risk_profile_raw)   if risk_profile_raw   else {}
+        score_summary    = score_summary_raw if isinstance(score_summary_raw, dict) else (_json.loads(score_summary_raw) if score_summary_raw else {})
+        risk_profile     = risk_profile_raw if isinstance(risk_profile_raw, dict) else (_json.loads(risk_profile_raw) if risk_profile_raw else {})
         part_e_triggered = part_e_triggered_raw or []
 
         # Part E answers

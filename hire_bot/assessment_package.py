@@ -383,7 +383,12 @@ def collect_assessment_package(attempt_id: int) -> dict:
 
     # Mechanical scores
     score_summary_raw = attempt.get("score_summary")
-    score_summary = json.loads(score_summary_raw) if score_summary_raw else {}
+    if isinstance(score_summary_raw, dict):
+        score_summary = score_summary_raw
+    elif score_summary_raw:
+        score_summary = json.loads(score_summary_raw)
+    else:
+        score_summary = {}
 
     package = {
         "package_version": "v1",
