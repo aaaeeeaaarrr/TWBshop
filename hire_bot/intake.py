@@ -181,6 +181,82 @@ def _flag(intake_id: int, flag: str, severity: str = "gap_low") -> None:
         conn.close()
 
 
+_MEDIA_LIMIT = 10  # soft cap — politely refuse beyond this
+
+
+def _store_media(intake_id: int, update) -> None:
+    """Insert one row in hiring_intake_media for every photo/document received."""
+    message = update.message
+    chat_id = update.effective_chat.id
+    user_id = getattr(update.effective_user, "id", None)
+
+    file_id = file_unique_id = media_type = filename = mime_type = caption = None
+    file_size = media_group_id = None
+    caption = message.caption
+
+    if message.photo:
+        photo = message.photo[-1]
+        file_id          = photo.file_id
+        file_unique_id   = getattr(photo, "file_unique_id", None)
+        media_type       = "photo"
+        file_size        = getattr(photo, "file_size", None)
+    elif message.document:
+        doc              = message.document
+        file_id          = doc.file_id
+        file_unique_id   = getattr(doc, "file_unique_id", None)
+        media_type       = "document"
+        filename         = getattr(doc, "file_name", None)
+        mime_type        = getattr(doc, "mime_type", None)
+        file_size        = getattr(doc, "file_size", None)
+    else:
+        return
+
+    media_group_id = getattr(message, "media_group_id", None)
+
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO hiring_intake_media
+                (intake_id, telegram_chat_id, telegram_user_id, telegram_message_id,
+                 telegram_file_id, telegram_file_unique_id, media_group_id,
+                 media_type, original_filename, mime_type, file_size, caption,
+                 purpose, include_for_review, received_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'unknown', true, now())
+            ON CONFLICT (intake_id, telegram_message_id) DO NOTHING
+        """, (intake_id, chat_id, user_id, message.message_id,
+              file_id, file_unique_id, media_group_id,
+              media_type, filename, mime_type, file_size, caption))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        cur.close(); conn.close()
+
+
+def get_intake_media_count(intake_id: int) -> int:
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) FROM hiring_intake_media WHERE intake_id = %s", (intake_id,))
+        return cur.fetchone()[0]
+    finally:
+        cur.close(); conn.close()
+
+
+def get_intake_media(intake_id: int) -> list[dict]:
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, media_type, telegram_file_id, original_filename,
+                   mime_type, purpose, received_at
+            FROM hiring_intake_media WHERE intake_id = %s
+            ORDER BY received_at
+        """, (intake_id,))
+        cols = ["id","media_type","file_id","filename","mime_type","purpose","received_at"]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
+    finally:
+        cur.close(); conn.close()
+
+
 def _get_pending_arrivals() -> list[dict]:
     """Return intake sessions with appointment_slot in the next 35 minutes (PP time)."""
     conn = _conn()
@@ -346,6 +422,15 @@ def kb_fulltime(lang: str) -> InlineKeyboardMarkup:
     ])
 
 
+def kb_media_done(lang: str) -> InlineKeyboardMarkup:
+    label = (
+        "✅ Done sending files  /  ផ្ញើរួចហើយ"
+        if lang != "km" else
+        "✅ ផ្ញើ CV រួចហើយ  /  Done sending files"
+    )
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data="intake:media_done")]])
+
+
 def kb_arrived(intake_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("✅ Arrived",        callback_data=f"intake:arrived:{intake_id}"),
@@ -404,6 +489,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE,
                          session: dict) -> None:
     """Route a text/photo/document message within an active intake session."""
     status = session["intake_status"]
+
+    # Store every photo/document silently regardless of state — no AI, just reference.
+    # cv_pending handles the media count + Done-button flow explicitly below.
+    if update.message and (update.message.photo or update.message.document):
+        if status not in (S_CV_PENDING,):  # cv_pending stores inside its handler
+            _store_media(session["id"], update)
 
     if status == S_LANGUAGE_CHECK:
         await _handle_language_check(update, context, session)
@@ -498,6 +589,33 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     intake_id = session["id"]
     lang = session["language"]
     parts = data.split(":")
+
+    # intake:media_done — applicant finished sending CV files
+    if parts[1] == "media_done":
+        if not session.get("cv_submitted"):
+            await query.answer(_t(lang,
+                en="Please send at least one file first.",
+                km="សូមផ្ញើឯកសារមួយជាមុន។"
+            ), show_alert=True)
+            return
+        _update(intake_id, intake_status=S_FULLTIME_GATE)
+        count = get_intake_media_count(intake_id)
+        await query.edit_message_text(_t(lang,
+            en=f"Thank you — received {count} file{'s' if count != 1 else ''}. "
+               "We have received your application.\n\n"
+               "We offer 9-hour or 12-hour shifts — 12 hours earns a higher salary, "
+               "and we prefer staff who are fully committed to one workplace. "
+               "We do not hire part-time.\n\n"
+               "Can you commit to full-time work?",
+            km=f"អរគុណ — បានទទួល {count} ឯកសារ។ "
+               "យើងបានទទួលពាក្យស្នើរបស់ប្អូន។\n\n"
+               "យើងមានម៉ោង ៩ ឬ ១២ ម៉ោងក្នុងមួយថ្ងៃ — ១២ ម៉ោង ប្រាក់ខែខ្ពស់ជាង "
+               "ហើយយើងចូលចិត្តបុគ្គលិកដែលលះបង់ពេញម៉ោងជាមួយយើង។ "
+               "យើងមិនជ្រើសរើស part-time ទេ។\n\n"
+               "ប្អូនអាចធ្វើការពេញម៉ោងបានទេ?"
+        ), reply_markup=kb_fulltime(lang))
+        logger.info("intake media_done chat=%s count=%s", chat_id, count)
+        return
 
     # intake:fulltime:yes / intake:fulltime:no
     if parts[1] == "fulltime" and len(parts) == 3:
@@ -634,7 +752,7 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
     intake_id = session["id"]
     lang = session["language"]
 
-    # Detect language switch (Khmer script OR romanised "ot cheh angkles"-style)
+    # Language switch detection (text messages only)
     if lang == "en" and not has_media:
         if _is_khmer(text) or _implies_cant_english(text):
             _update(intake_id, language="km")
@@ -653,20 +771,48 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
         ))
         return
 
-    # Accept: document, photo, or descriptive text (>30 chars)
-    if has_media or len(text) > 30:
-        cv_format = "document" if message.document else ("photo" if message.photo else "text")
-        cv_file_id = None
-        cv_message_id = message.message_id
-        if message.document:
-            cv_file_id = message.document.file_id
-        elif message.photo:
-            cv_file_id = message.photo[-1].file_id  # highest resolution
-        _update(intake_id, cv_submitted=True, cv_format=cv_format,
-                cv_file_id=cv_file_id, cv_message_id=cv_message_id,
+    # ── Multi-file media handling ─────────────────────────────────────────────
+    if has_media:
+        _store_media(intake_id, update)
+        count = get_intake_media_count(intake_id)
+
+        if count > _MEDIA_LIMIT:
+            await message.reply_text(_t(lang,
+                en="We have received enough documents for your application. "
+                   "Please tap Done to continue.",
+                km="យើងបានទទួលឯកសារគ្រប់គ្រាន់ហើយ។ "
+                   "សូមចុច Done ដើម្បីបន្ត។"
+            ), reply_markup=kb_media_done(lang))
+            return
+
+        if not session["cv_submitted"]:
+            # First file — set primary reference, mark submitted, stay in cv_pending
+            cv_format = "document" if message.document else "photo"
+            cv_file_id = (message.document.file_id if message.document
+                          else message.photo[-1].file_id)
+            _update(intake_id, cv_submitted=True, cv_format=cv_format,
+                    cv_file_id=cv_file_id, cv_message_id=message.message_id)
+            await message.reply_text(_t(lang,
+                en=f"✅ Received file 1.\n\n"
+                   "You can send more CV pages, certificates, or work documents now.\n"
+                   "When you are finished, tap Done.",
+                km=f"✅ បានទទួលឯកសារទី ១។\n\n"
+                   "ប្អូនអាចផ្ញើទំព័រ CV បន្ថែម វិញ្ញាបនបត្រ ឬឯកសារការងារផ្សេងៗ។\n"
+                   "នៅពេលរួចហើយ សូមចុច Done។"
+            ), reply_markup=kb_media_done(lang))
+        else:
+            # Subsequent file
+            await message.reply_text(_t(lang,
+                en=f"✅ Received file {count}. Send more or tap Done when finished.",
+                km=f"✅ បានទទួលឯកសារទី {count}។ ផ្ញើបន្ថែម ឬចុច Done នៅពេលរួចហើយ។"
+            ), reply_markup=kb_media_done(lang))
+        return
+
+    # ── Text CV (long description) ────────────────────────────────────────────
+    if len(text) > 30:
+        _update(intake_id, cv_submitted=True, cv_format="text",
                 intake_status=S_FULLTIME_GATE)
-        if cv_format == "text":
-            _flag(intake_id, "cv_submitted_as_text", "gap_low")
+        _flag(intake_id, "cv_submitted_as_text", "gap_low")
         await message.reply_text(_t(lang,
             en="Thank you. We have received your application.\n\n"
                "We offer 9-hour or 12-hour shifts — 12 hours earns a higher salary, "
@@ -679,14 +825,15 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
                "យើងមិនជ្រើសរើស part-time ទេ។\n\n"
                "ប្អូនអាចធ្វើការពេញម៉ោងបានទេ?"
         ), reply_markup=kb_fulltime(lang))
-    else:
-        # Too short / unclear — ask again
-        _flag(intake_id, "cv_deflection", "gap_low")
-        await message.reply_text(_t(lang,
-            en="Please send your CV, or describe your work experience clearly "
-               "(name, previous jobs, skills).",
-            km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន (ឈ្មោះ ការងារមុន ជំនាញ)។"
-        ))
+        return
+
+    # Too short / unclear — ask again
+    _flag(intake_id, "cv_deflection", "gap_low")
+    await message.reply_text(_t(lang,
+        en="Please send your CV, or describe your work experience clearly "
+           "(name, previous jobs, skills).",
+        km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន (ឈ្មោះ ការងារមុន ជំនាញ)។"
+    ))
 
 
 async def _prompt_button(update: Update, session: dict) -> None:
@@ -725,10 +872,19 @@ async def _resume_state(update: Update, context: ContextTypes.DEFAULT_TYPE,
             km="សូមប្រាប់ឈ្មោះ និងតំណែងដែលប្អូនចាប់អារម្មណ៍។"
         ))
     elif status == S_CV_PENDING:
-        await update.message.reply_text(_t(lang,
-            en="Please send your CV or describe your work experience.",
-            km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងារ។"
-        ))
+        if session.get("cv_submitted"):
+            count = get_intake_media_count(session["id"])
+            await update.message.reply_text(_t(lang,
+                en=f"We have received {count} file{'s' if count != 1 else ''} so far. "
+                   "Send more documents or tap Done when finished.",
+                km=f"យើងបានទទួល {count} ឯកសារ។ "
+                   "ផ្ញើឯកសារបន្ថែម ឬចុច Done នៅពេលរួចហើយ។"
+            ), reply_markup=kb_media_done(lang))
+        else:
+            await update.message.reply_text(_t(lang,
+                en="Please send your CV or describe your work experience.",
+                km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងារ។"
+            ))
     elif status == S_FULLTIME_GATE:
         await update.message.reply_text(_t(lang,
             en="Can you commit to full-time work (9 or 12-hour shifts)?",

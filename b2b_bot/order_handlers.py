@@ -304,14 +304,15 @@ async def handle_callback(update: Update, context) -> None:
         )
 
     elif query.data == "b2b_cancel":
-        pending        = _pending.get(chat_id) or get_pending_order(chat_id) or {}
-        existing_bread = pending.get("existing_bread", [])
-        existing_cake  = pending.get("existing_cake", [])
+        pending       = _pending.get(chat_id) or get_pending_order(chat_id) or {}
+        delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
 
-        if existing_bread or existing_cake:
+        # Check DB for existing confirmed orders on the same date
+        existing_sessions = get_b2b_order_sessions(chat_id, delivery_date)
+
+        if existing_sessions:
             cancelled_bread = pending.get("bread_items", [])
             cancelled_cake  = pending.get("cake_items", [])
-            delivery_date   = pending.get("delivery_date", "")
 
             lines = ["Cancelled:"]
             for it in cancelled_bread:
@@ -323,19 +324,20 @@ async def handle_callback(update: Update, context) -> None:
                 lines.append(f"  ✗ {it['qty']}x {it['item']}")
 
             lines += ["", "─" * 32, "",
-                      f"Your existing order for {_date_label(delivery_date)} is still active:"]
-            for ei in existing_bread + existing_cake:
-                ei_line = f"  • {ei['qty']}x {ei['item']}"
-                if ei.get("grams"):
-                    ei_line += f" — {ei['grams']}g"
-                lines.append(ei_line)
-            lines += ["", "Would you like to keep it or cancel everything?"]
+                      f"You have existing orders for {_date_label(delivery_date)}:"]
+            for s in existing_sessions:
+                for it in s["bread"] + s["cake"]:
+                    ei_line = f"  • {it['qty']}x {it['item']}"
+                    if it.get("grams"):
+                        ei_line += f" — {it['grams']}g"
+                    lines.append(ei_line)
+            lines += ["", "Keep them or cancel everything?"]
 
             await query.edit_message_text(
                 "\n".join(lines),
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("Confirm ✓",    callback_data="b2b_keep_existing"),
-                    InlineKeyboardButton("Cancel all ✗", callback_data="b2b_cancel_all"),
+                    InlineKeyboardButton("Keep existing ✓", callback_data="b2b_keep_existing"),
+                    InlineKeyboardButton("Cancel all ✗",    callback_data="b2b_cancel_all"),
                 ]]),
             )
         else:
