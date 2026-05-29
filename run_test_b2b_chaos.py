@@ -37,19 +37,15 @@ def _db():
 
 
 def setup_customer():
+    from shared.database import upsert_b2b_customer
+    upsert_b2b_customer(FAKE_CHAT_ID, FAKE_BNAME, "pickup", "8:00am", None)
+    # Clear location data so each test starts clean
     conn = _db(); cur = conn.cursor()
     cur.execute("""
-        INSERT INTO b2b_customers (group_chat_id, business_name, delivery_method, delivery_time)
-        VALUES (%s, %s, 'pickup', '8:00am')
-        ON CONFLICT (group_chat_id) DO UPDATE
-          SET business_name = EXCLUDED.business_name,
-              delivery_method = EXCLUDED.delivery_method,
-              delivery_time = EXCLUDED.delivery_time,
-              location = NULL,
-              location_lat = NULL,
-              location_lng = NULL,
-              delivery_cost = NULL
-    """, (FAKE_CHAT_ID, FAKE_BNAME))
+        UPDATE b2b_customers
+        SET location=NULL, location_lat=NULL, location_lng=NULL, delivery_cost=NULL
+        WHERE group_chat_id=%s
+    """, (FAKE_CHAT_ID,))
     conn.commit(); conn.close()
 
 
