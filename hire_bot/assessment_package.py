@@ -27,6 +27,8 @@ CRITICAL_PHRASE_RULES: list[dict] = [
             "before boss see", "without telling",
             "quietly fix", "fix quietly", "fix it without",
             "solve without reporting", "handle without telling",
+            "solved it quietly", "handle it quietly", "resolved it quietly",
+            "dealt with it quietly", "sorted it quietly",
             "nobody need to know", "no one need to know",
         ],
     },
