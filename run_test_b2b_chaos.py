@@ -1011,7 +1011,7 @@ async def run():
     if CAP.edit_text and ("keep" in CAP.edit_text.lower() or "existing" in CAP.edit_text.lower()):
         ok("S12 FIXED: b2b_cancel with existing order → keep/cancel-all dialog shown"); passed += 1
     else:
-        fail(f"S12 still broken: got {CAP.edit_text!r[:80]}"); failed += 1
+        fail(f"S12 still broken: got {repr(str(CAP.edit_text)[:80])}"); failed += 1
 
     # ── Summary ───────────────────────────────────────────────────────────────
     cleanup()
