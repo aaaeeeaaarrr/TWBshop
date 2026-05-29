@@ -301,6 +301,9 @@ async def handle_menu_callback(update: Update, context) -> None:
     if data == "bm_noop":
         return
 
+    # Restore cart from DB if in-memory state was lost (e.g. bot restart mid-session)
+    _restore_cart(chat_id)
+
     try:
         if data == "bm_back":
             _qty_pending.pop(chat_id, None)
