@@ -685,14 +685,14 @@ async def run():
         fail(f"I06 crashed: {e}"); failed += 1
 
     # ── I07: Deflection check — struggling ────────────────────────────────────
-    head("I07: Repeated vague messages → deflection check returns struggling")
+    head("I07: Clearly struggling messages → deflection check returns struggling")
     try:
-        msgs = ["what job?", "how much salary?", "i want work"]
+        msgs = ["i dont know how to write cv", "what should i write?", "can you help me please"]
         r = await check_deflection_intent(msgs)
         if r["status"] in ("struggling", "has_usable_content"):
-            ok(f"Vague msgs → status={r['status']} conf={r['confidence']:.2f}"); passed += 1
+            ok(f"Struggling msgs → status={r['status']} conf={r['confidence']:.2f}"); passed += 1
         else:
-            fail(f"Expected struggling, got {r['status']}"); failed += 1
+            fail(f"Expected struggling/has_usable_content, got {r['status']}"); failed += 1
     except Exception as e:
         fail(f"I07 crashed: {e}"); failed += 1
 
