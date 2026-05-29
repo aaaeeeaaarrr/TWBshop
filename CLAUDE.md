@@ -140,7 +140,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-30 (session 22 — correction + offer flow wired)
+**Last updated:** 2026-05-30 (session 22 — correction + offer flow wired + live test passed)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
 **Correction + offer flow wired (session 22):**
@@ -173,9 +173,20 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - Khmer validation pipeline itself is unreliable (test strings being corrupted in transit)
 - Do not attempt Opus Khmer generation via this pipeline — handle Khmer translation manually
 
+**Live test results (session 22):**
+- Service: twbshop-hire.service active (running) on server
+- Service file: /etc/systemd/system/twbshop-hire.service (systemctl enable if needed)
+- Assessment pipeline: FIRED — hiring_ai_assessments id=1, recommendation=hire, valid=True
+- Owner notification: SENT to Telegram (check phone)
+- Targeted message: id=1, English stored, Khmer validation FAILED (expected — blocked by design)
+- Path A (correction_understood + proceed_to_verbal_retest): PASS
+- Path B (conditional_reporting + reject_unless_owner_override): PASS
+- hiring_offers: None (correct — row only created when applicant taps accept)
+- Bugs found and fixed: JSONB double-decode in assessment_package + bot.py; Opus max_tokens 4096→8192; jsonschema missing from requirements.txt
+
 **Pending (before Opus assessment is truly live):**
 - Opus system prompt calibration with approved examples (waiting on clean samples)
-- Start hire bot service: systemctl start twbshop-hire
+- systemctl enable twbshop-hire (service not auto-start on reboot yet)
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:
   1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
