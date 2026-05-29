@@ -1193,29 +1193,40 @@ async def _resume_state(update: Update, context: ContextTypes.DEFAULT_TYPE,
 async def notify_owner_intake_outcome(bot, intake_id: int) -> None:
     """
     Send owner a private message when intake ends (appointment set OR blocked).
-    Includes applicant identity, outcome, flags, and last few messages.
+    Idempotent: sends once per terminal status. HTML-safe: escapes all user text.
     """
+    import html
     conn = _conn(); cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT s.telegram_chat_id, s.telegram_user_id, s.sender_name,
-                   s.intake_status, s.intake_blocked_reason, s.language,
-                   s.cv_submitted, s.cv_format, s.voice_strike_count,
-                   s.cv_deflection_count, s.appointment_slot
-            FROM hiring_intake_sessions s
-            WHERE s.id = %s
+            SELECT telegram_chat_id, telegram_user_id, sender_name,
+                   intake_status, intake_blocked_reason, language,
+                   cv_submitted, cv_format, voice_strike_count,
+                   cv_deflection_count, appointment_slot,
+                   intake_owner_notified_at, intake_owner_notified_status
+            FROM hiring_intake_sessions WHERE id = %s
         """, (intake_id,))
         row = cur.fetchone()
         if not row:
             return
         (chat_id, user_id, name, status, blocked_reason, lang,
-         cv_submitted, cv_format, voice_strikes, deflections, slot) = row
+         cv_submitted, cv_format, voice_strikes, deflections, slot,
+         notified_at, notified_status) = row
 
-        # Flags
+        # Idempotency: already sent for this exact status
+        if notified_at and notified_status == status:
+            return
+
+        # Counts from event log
+        cur.execute("""
+            SELECT event_type, COUNT(*) FROM hiring_intake_events
+            WHERE intake_id=%s GROUP BY event_type
+        """, (intake_id,))
+        event_counts = {r[0]: r[1] for r in cur.fetchall()}
+
         cur.execute("SELECT flag FROM hiring_intake_flags WHERE intake_id=%s ORDER BY id", (intake_id,))
         flags = [r[0] for r in cur.fetchall()]
 
-        # Last 6 text events for context
         cur.execute("""
             SELECT text FROM hiring_intake_events
             WHERE intake_id=%s AND event_type='text' AND text IS NOT NULL
@@ -1223,58 +1234,82 @@ async def notify_owner_intake_outcome(bot, intake_id: int) -> None:
         """, (intake_id,))
         last_msgs = [r[0] for r in reversed(cur.fetchall())]
 
-        # AI intent result (first intent check)
         cur.execute("""
             SELECT intent, confidence, action_taken FROM hiring_intake_ai_events
             WHERE intake_id=%s AND stage='intent_check' ORDER BY created_at LIMIT 1
         """, (intake_id,))
         ai_row = cur.fetchone()
 
+        total_events = sum(event_counts.values())
+        file_count   = (event_counts.get("photo", 0) + event_counts.get("document", 0))
+        voice_count  = event_counts.get("voice", 0) + event_counts.get("video_note", 0)
+
     finally:
         cur.close(); conn.close()
 
-    # Build message
-    user_ref = f"[{name}](tg://user?id={user_id})" if user_id else name
+    # Safe HTML — escape every user-supplied string
+    safe_name = html.escape(name or "Unknown")
+    if user_id:
+        user_ref = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+    else:
+        user_ref = safe_name
+
     if status == S_APPT_SET and slot:
         slot_pp = slot.astimezone(PP_TZ)
         status_line = f"✅ Appointment set — {_fmt_day_long(slot_pp)} at {_fmt_time(slot_pp)}"
     elif status == S_BLOCKED:
-        reason_display = (blocked_reason or "unknown").replace("_", " ")
+        reason_display = html.escape((blocked_reason or "unknown").replace("_", " "))
         status_line = f"❌ Blocked — {reason_display}"
     else:
-        status_line = f"ℹ️ Status: {status}"
+        status_line = f"ℹ️ Status: {html.escape(status)}"
 
     lines = [
-        f"📋 *Intake outcome*",
+        "<b>📋 Intake outcome</b>",
         f"Applicant: {user_ref}",
-        f"Chat ID: `{chat_id}`",
-        f"",
+        f"Chat ID: <code>{chat_id}</code>",
+        "",
         status_line,
         f"Language: {'Khmer 🇰🇭' if lang == 'km' else 'English 🇬🇧'}",
-        f"CV submitted: {'Yes (' + (cv_format or '?') + ')' if cv_submitted else 'No'}",
+        f"CV submitted: {'Yes (' + html.escape(cv_format or '?') + ')' if cv_submitted else 'No'}",
     ]
-
     if voice_strikes:
         lines.append(f"Voice strikes: {voice_strikes}")
     if deflections:
         lines.append(f"CV deflections: {deflections}")
     if ai_row:
-        lines.append(f"AI intent: {ai_row[0]} (conf {ai_row[1]:.0%}) → {ai_row[2]}")
+        lines.append(f"AI intent: {html.escape(ai_row[0] or '')} ({ai_row[1]:.0%}) → {html.escape(ai_row[2] or '')}")
     if flags:
-        flag_str = ", ".join(f.replace("_", " ") for f in flags[:6])
+        flag_str = html.escape(", ".join(f.replace("_", " ") for f in flags[:6]))
         lines.append(f"Flags: {flag_str}")
 
+    lines += [
+        "",
+        f"Events: {total_events} total | Files: {file_count} | Voice: {voice_count}",
+        f"<i>Use intake_id={intake_id} to query full event trail</i>",
+    ]
+
     if last_msgs:
-        lines += ["", "💬 *Last messages:*"]
+        lines += ["", "💬 <b>Last messages:</b>"]
         for m in last_msgs:
-            lines.append(f"› {m[:120]}")
+            lines.append(f"› {html.escape(m[:150])}")
 
     try:
         await bot.send_message(
             config.OWNER_TELEGRAM_ID,
             "\n".join(lines),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
+        # Mark as notified — prevents duplicate sends
+        conn2 = _conn(); cur2 = conn2.cursor()
+        try:
+            cur2.execute("""
+                UPDATE hiring_intake_sessions
+                SET intake_owner_notified_at=now(), intake_owner_notified_status=%s
+                WHERE id=%s
+            """, (status, intake_id))
+            conn2.commit()
+        finally:
+            cur2.close(); conn2.close()
     except TelegramError as e:
         logger.error("notify_owner_intake_outcome failed: %s", e)
 

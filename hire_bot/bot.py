@@ -388,7 +388,11 @@ async def _send_followup(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
 
 async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
                              outcome: str = "completed") -> None:
-    """Send owner a private message with full quiz outcome, scores, Part E, pros/cons."""
+    """
+    Send owner a private message with full quiz outcome, scores, Part E, pros/cons.
+    Idempotent: sends once per outcome per attempt. HTML-safe: escapes all user text.
+    """
+    import html
     import json as _json
     import psycopg2
     from secrets import DATABASE_URL
@@ -396,6 +400,16 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur  = conn.cursor()
+
+        # Idempotency check
+        cur.execute("""
+            SELECT quiz_owner_notified_at, quiz_owner_notified_outcome
+            FROM hiring_quiz_attempts WHERE id = %s
+        """, (attempt_id,))
+        idem = cur.fetchone()
+        if idem and idem[0] and idem[1] == outcome:
+            conn.close()
+            return
 
         # Attempt + candidate info
         cur.execute("""
@@ -417,11 +431,11 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
          cand_name, position,
          tg_username, tg_user_id) = row
 
-        score_summary  = _json.loads(score_summary_raw)  if score_summary_raw  else {}
-        risk_profile   = _json.loads(risk_profile_raw)   if risk_profile_raw   else {}
+        score_summary    = _json.loads(score_summary_raw)  if score_summary_raw  else {}
+        risk_profile     = _json.loads(risk_profile_raw)   if risk_profile_raw   else {}
         part_e_triggered = part_e_triggered_raw or []
 
-        # Part E answers (practical facts)
+        # Part E answers
         cur.execute("""
             SELECT question_id, raw_answer FROM hiring_quiz_answers
             WHERE attempt_id = %s AND question_id LIKE 'E-%%'
@@ -429,81 +443,95 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
         """, (attempt_id,))
         part_e_answers = {r[0]: r[1] for r in cur.fetchall()}
 
-        # Intake data for this candidate (latest intake session)
+        # Mark as notified before sending (prevents retry race)
         cur.execute("""
-            SELECT id, intake_status, sender_name
-            FROM hiring_intake_sessions
-            WHERE telegram_user_id = %s
-            ORDER BY created_at DESC LIMIT 1
-        """, (tg_user_id,))
-        intake_row = cur.fetchone()
-
+            UPDATE hiring_quiz_attempts
+            SET quiz_owner_notified_at=now(), quiz_owner_notified_outcome=%s
+            WHERE id=%s
+        """, (outcome, attempt_id))
+        conn.commit()
         conn.close()
 
-        # Build message
-        user_ref  = f"@{tg_username}" if tg_username else f"[{cand_name}](tg://user?id={tg_user_id})"
-        icon      = "✅" if outcome == "completed" else "⚠️"
-        abandoned = f" — abandoned at {abandoned_qid}" if abandoned_qid else ""
+        # Safe HTML
+        def esc(v): return html.escape(str(v)) if v else ""
+
+        if tg_username:
+            user_ref = f"@{esc(tg_username)}"
+        elif tg_user_id:
+            user_ref = f'<a href="tg://user?id={tg_user_id}">{esc(cand_name)}</a>'
+        else:
+            user_ref = esc(cand_name)
+
+        icon        = "✅" if outcome == "completed" else "⚠️"
+        abandoned   = f" — abandoned at {esc(abandoned_qid)}" if abandoned_qid else ""
         resume_note = f" (resumed {resume_count}×)" if resume_count else ""
 
         lines = [
-            f"{icon} *Quiz {outcome.title()}* — {user_ref}",
-            f"Candidate: {cand_name} | Position: {position or '?'}",
+            f"{icon} <b>Quiz {outcome.title()}</b> — {user_ref}",
+            f"Candidate: {esc(cand_name)} | Position: {esc(position or '?')}",
             f"Attempt #{attempt_id}{resume_note}{abandoned}",
             "",
         ]
 
         # Scores
         if score_summary:
-            a = score_summary.get("score_a", score_summary.get("a_pct", "?"))
-            b = score_summary.get("score_b", score_summary.get("b_pct", "?"))
-            w = score_summary.get("written_pct", "?")
+            a  = score_summary.get("score_a",    score_summary.get("a_pct",   "?"))
+            b  = score_summary.get("score_b",    score_summary.get("b_pct",   "?"))
+            w  = score_summary.get("written_pct", "?")
             ov = score_summary.get("overall_pct", score_summary.get("overall", "?"))
-            lines += [
-                f"📊 *Scores:* A={a}% B={b}% Written={w}% Overall={ov}%",
-                "",
-            ]
+            lines += [f"📊 <b>Scores:</b> A={a}% B={b}% Written={w}% Overall={ov}%", ""]
 
-        # Risk profile
+        # Risk profile pros/cons
         if risk_profile:
             pros  = risk_profile.get("strengths", risk_profile.get("pros", []))
             cons  = risk_profile.get("red_flags", risk_profile.get("cons", []))
             flags = risk_profile.get("flags", [])
             if pros:
-                lines.append("✅ *Pros:*")
+                lines.append("✅ <b>Pros:</b>")
                 for p in (pros if isinstance(pros, list) else [pros])[:4]:
-                    lines.append(f"  • {p}")
+                    lines.append(f"  • {esc(p)}")
             if cons or flags:
-                lines.append("⚠️ *Flags / Cons:*")
+                lines.append("⚠️ <b>Flags / Cons:</b>")
                 for c in ((cons or []) + (flags or []))[:4]:
-                    lines.append(f"  • {c}")
+                    lines.append(f"  • {esc(c)}")
             lines.append("")
 
-        # Part E practical facts
+        # Part E — corrected labels matching questions.py
+        def _pe(qid, label):
+            ans = part_e_answers.get(qid)
+            if ans:
+                try:
+                    raw = _json.loads(ans)
+                    val = raw.get("answer", ans) if isinstance(raw, dict) else ans
+                except Exception:
+                    val = ans
+                lines.append(f"  • {label}: {esc(val)}")
+
         if part_e_answers or part_e_triggered:
-            lines.append("📋 *Part E — Practical facts:*")
-            def _pe(qid, label):
-                ans = part_e_answers.get(qid)
-                if ans:
-                    raw = _json.loads(ans) if ans.startswith("{") else ans
-                    val = raw.get("answer", raw) if isinstance(raw, dict) else raw
-                    lines.append(f"  • {label}: {val}")
-            _pe("E-A1a", "Can start within 3 days")
-            _pe("E-A3a", "Currently studying")
-            _pe("E-A3b", "Currently working elsewhere")
-            # E-T2 = salary (owner-only trigger)
-            if "E-T2" in part_e_triggered:
-                _pe("E-T2", "Salary discussed")
+            lines.append("📋 <b>Part E — Practical facts:</b>")
+            _pe("E-A1a", "Can start within 3 days?")
+            _pe("E-A1",  "First available start date")
+            _pe("E-A2",  "30-day availability")
+            _pe("E-A3a", "Currently studying?")
             if "E-T1" in part_e_triggered:
-                _pe("E-T1", "Start date")
+                _pe("E-T1", "Study / exam details")
+            _pe("E-A3b", "Currently working elsewhere?")
+            if "E-T2" in part_e_triggered:
+                _pe("E-T2", "Current job / last working day / salary breakdown")
+            if "E-T3" in part_e_triggered:
+                _pe("E-T3", "Delayed start — reason")
+            _pe("E-A4",    "Known leave or exams next 30 days")
+            _pe("E-A5",    "Transport / backup plan")
+            _pe("E-Final", "First-3-days commitment")
             lines.append("")
+            lines.append("<i>(Salary in E-T2 is applicant's current salary, not our offer)</i>")
 
-        lines.append(f"🔗 Attempt ID: `{attempt_id}` | Chat: `{chat_id}`")
+        lines += ["", f"🔗 Attempt ID: <code>{attempt_id}</code> | Chat: <code>{chat_id}</code>"]
 
         await bot.send_message(
             config.OWNER_TELEGRAM_ID,
             "\n".join(lines),
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
 
     except Exception as exc:
