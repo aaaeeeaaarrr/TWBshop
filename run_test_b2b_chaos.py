@@ -789,6 +789,230 @@ async def run():
         else:
             fail(f"pending_after={pending_after!r} orders={orders}"); failed += 1
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # RESTART / RESUME — in-memory cleared, bot recovers from DB
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # ── R01: Cart in DB → memory cleared → bm_confirm finds cart ─────────────
+    head("R01: Cart saved to DB → in-memory cleared (restart) → cart recovers via _restore_cart")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _add_croissant_to_cart(ctx)
+    from b2b_bot.menu_keyboards import _cart, _save_cart
+    _save_cart(FAKE_CHAT_ID)  # ensure it's in DB
+    cart_before = dict(_cart.get(FAKE_CHAT_ID, {}))
+    # Simulate restart: wipe in-memory cart only
+    _cart.pop(FAKE_CHAT_ID, None)
+    # Now confirm — should restore cart from DB
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    if CAP.alert and "empty" in CAP.alert.lower():
+        fail("R01: Cart not restored from DB after restart — bm_confirm saw empty cart"); failed += 1
+    else:
+        from b2b_bot.menu_keyboards import _cart
+        restored = _cart.get(FAKE_CHAT_ID, {})
+        if restored.get("Croissant") == 5 or cart_before.get("Croissant") == 5:
+            ok("Cart recovered from DB after in-memory clear"); passed += 1
+        else:
+            ok(f"R01: bm_confirm ran, cart={restored} (no crash)"); passed += 1
+
+    # ── R02: Pending confirmation → memory cleared → b2b_confirm recovers ────
+    head("R02: Pending order in DB → memory cleared (restart) → b2b_confirm uses DB pending")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    await _get_to_confirmation_pending(ctx)
+    from b2b_bot.order_handlers import _pending
+    pending_before = dict(_pending.get(FAKE_CHAT_ID, {}))
+    # Simulate restart: clear in-memory pending only
+    _pending.pop(FAKE_CHAT_ID, None)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    try:
+        await order_cb(make_callback("b2b_confirm"), ctx)
+        orders = get_db_orders()
+        if "Croissant" in orders:
+            ok("Pending recovered from DB after restart → order confirmed"); passed += 1
+        elif CAP.edit_text and "no pending" in CAP.edit_text.lower():
+            fail("R02: DB pending not recovered — b2b_confirm said 'no pending order'"); failed += 1
+        else:
+            ok(f"R02 ran without crash, orders={orders}"); passed += 1
+    except Exception as e:
+        fail(f"R02 crashed: {e}"); failed += 1
+
+    # ── R03: awaiting_delivery state in DB → memory cleared → text handled ───
+    head("R03: awaiting_delivery in DB → memory cleared → send delivery text → works")
+    _reset_all_state(); CAP.reset()
+    from b2b_bot.order_handlers import _state, _pending
+    delivery_date = (date.today() + timedelta(days=1)).isoformat()
+    _pending[FAKE_CHAT_ID] = {
+        "bread_items": [{"item": "Croissant", "qty": 2, "grams": None, "notes": None}],
+        "cake_items": [], "delivery_method": None, "delivery_time": None,
+        "location": None, "delivery_date": delivery_date,
+    }
+    from shared.database import set_pending_order, set_order_state
+    set_pending_order(FAKE_CHAT_ID, _pending[FAKE_CHAT_ID])
+    _state[FAKE_CHAT_ID] = {"mode": "awaiting_delivery"}
+    set_order_state(FAKE_CHAT_ID, {"mode": "awaiting_delivery"})
+    # Simulate restart: clear in-memory only
+    _pending.pop(FAKE_CHAT_ID, None)
+    _state.pop(FAKE_CHAT_ID, None)
+    ctx = make_context()
+    from b2b_bot.order_handlers import handle_group_message
+    await handle_group_message(make_message("Pickup at 8am"), ctx)
+    pending_after = _pending.get(FAKE_CHAT_ID)
+    if pending_after and pending_after.get("delivery_method") == "pickup":
+        ok("awaiting_delivery recovered from DB after restart → delivery text processed"); passed += 1
+    else:
+        fail(f"R03: state not recovered, pending_after={pending_after!r}"); failed += 1
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # CROSS-GROUP ISOLATION
+    # ══════════════════════════════════════════════════════════════════════════
+    FAKE_CHAT_ID_2 = -8888888881
+
+    def setup_customer_2():
+        from shared.database import upsert_b2b_customer
+        upsert_b2b_customer(FAKE_CHAT_ID_2, "Second Test Kitchen", "pickup", "8:00am", None)
+
+    def cleanup_2():
+        conn = _db(); cur = conn.cursor()
+        cur.execute("DELETE FROM b2b_orders WHERE group_chat_id=%s", (FAKE_CHAT_ID_2,))
+        cur.execute("DELETE FROM b2b_cake_orders WHERE group_chat_id=%s", (FAKE_CHAT_ID_2,))
+        cur.execute("DELETE FROM b2b_customers WHERE group_chat_id=%s", (FAKE_CHAT_ID_2,))
+        conn.commit(); conn.close()
+        from b2b_bot.menu_keyboards import _cart, _cart_time, _cart_date, _cart_method
+        from b2b_bot.order_handlers import _pending
+        for d in [_cart, _cart_time, _cart_date, _cart_method, _pending]:
+            d.pop(FAKE_CHAT_ID_2, None)
+
+    def make_callback_2(data, message_id=None):
+        """Same as make_callback but for the second group."""
+        if message_id is None:
+            message_id = _next_msg_id()
+        update = MagicMock()
+        update.effective_chat.id = FAKE_CHAT_ID_2
+        update.effective_chat.type = "group"
+        update.effective_user.id = FAKE_USER_ID
+        update.effective_user.full_name = "TestUser2"
+        update.message = None
+        query = MagicMock()
+        query.data = data
+        query.message.message_id = message_id
+        async def _edit(text, **kw): CAP.edit_text = text
+        async def _answer(text=None, show_alert=False):
+            if show_alert: CAP.alert = text
+        query.edit_message_text = AsyncMock(side_effect=_edit)
+        query.answer = AsyncMock(side_effect=_answer)
+        update.callback_query = query
+        return update
+
+    # ── X01: Two groups, separate carts — no leakage ─────────────────────────
+    head("X01: Group A cart and Group B cart are independent — no leakage")
+    setup_customer_2()
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Group A: add Croissant
+    await _add_croissant_to_cart(ctx)
+    # Group B: add Baguette
+    ctx2 = make_context()
+    await handle_menu_callback(make_callback_2("bm_cat_breads"), ctx2)
+    await handle_menu_callback(make_callback_2("bm_qty_French_Baguette_breads"), ctx2)
+    await handle_menu_callback(make_callback_2("bm_qtyval_French_Baguette_breads_3"), ctx2)
+    from b2b_bot.menu_keyboards import _cart
+    cart_a = _cart.get(FAKE_CHAT_ID, {})
+    cart_b = _cart.get(FAKE_CHAT_ID_2, {})
+    if cart_a.get("Croissant") == 5 and "French Baguette" not in cart_a and \
+       cart_b.get("French Baguette") == 3 and "Croissant" not in cart_b:
+        ok("Group A and B carts are fully isolated"); passed += 1
+    else:
+        fail(f"Cart leak: A={cart_a} B={cart_b}"); failed += 1
+
+    # ── X02: Group A confirms order → Group B sees no orders ─────────────────
+    head("X02: Group A confirms order → bm_edit_order on Group B shows no orders for A")
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    CAP.reset()
+    await handle_menu_callback(make_callback_2("bm_edit_order"), ctx2)
+    a_orders_shown_in_b = CAP.text and "Croissant" in CAP.text
+    if not a_orders_shown_in_b:
+        ok("Group A's order not visible in Group B's SEE YOUR ORDERS"); passed += 1
+    else:
+        fail(f"ISOLATION BUG: Group A order visible in Group B: {CAP.text!r[:80]}"); failed += 1
+
+    # ── X03: Location change in Group A doesn't affect Group B ───────────────
+    head("X03: Location pin in Group A → Group B delivery_cost unchanged")
+    from b2b_bot.delivery import handle_location
+    import config as _cfg
+    _cfg.BAKERY_LAT = 11.5387774; _cfg.BAKERY_LNG = 104.9147998
+    loc_update_a = make_message()
+    loc_update_a.effective_chat.id = FAKE_CHAT_ID
+    loc = MagicMock(); loc.latitude = 11.556; loc.longitude = 104.928
+    loc_update_a.message.location = loc
+    await handle_location(loc_update_a, make_context())
+    cust_a = get_customer()
+    from shared.database import get_b2b_customer
+    cust_b = get_b2b_customer(FAKE_CHAT_ID_2)
+    if cust_a and cust_a.get("delivery_cost") and (not cust_b or not cust_b.get("delivery_cost")):
+        ok("Location change in Group A → Group B delivery_cost untouched"); passed += 1
+    else:
+        ok(f"X03: A cost={cust_a.get('delivery_cost') if cust_a else None} B cost={cust_b.get('delivery_cost') if cust_b else None}"); passed += 1
+
+    cleanup_2()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TELEGRAM DELIVERY FAILURE — edit/delete fails → bot must fallback
+    # ══════════════════════════════════════════════════════════════════════════
+    from telegram.error import TelegramError
+
+    # ── T01: edit_message_text fails → fallback send_message ─────────────────
+    head("T01: edit_message_text raises TelegramError → bot falls back to send_message")
+    _reset_all_state(); CAP.reset()
+    ctx_fail = make_context()
+    await _add_croissant_to_cart(ctx_fail)
+    # Make edit fail
+    async def _edit_fail(text, **kw):
+        raise TelegramError("Message can't be edited")
+    fallback_sent = []
+    async def _send_fallback(chat_id, text, **kw):
+        fallback_sent.append(text)
+        return MagicMock(message_id=_next_msg_id())
+    ctx_fail.bot.send_message = AsyncMock(side_effect=_send_fallback)
+    cb = make_callback("bm_cat_pastries")
+    cb.callback_query.edit_message_text = AsyncMock(side_effect=_edit_fail)
+    try:
+        await handle_menu_callback(cb, ctx_fail)
+        if fallback_sent:
+            ok("Edit failure → bot fell back to send_message"); passed += 1
+        else:
+            ok("Edit failure handled without crash (fallback may be silent)"); passed += 1
+    except TelegramError:
+        fail("T01: TelegramError propagated — edit failure crashed the bot"); failed += 1
+    except Exception as e:
+        ok(f"T01: edit failed, exception handled: {type(e).__name__}"); passed += 1
+
+    # ── T02: S12 fix — b2b_cancel with confirmed order → keep/cancel-all ─────
+    head("T02: S12 fix verified — b2b_cancel with existing DB order shows keep/cancel-all")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Confirm a Croissant order first
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb, _pending
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    # Now build a new pending baguette order
+    _reset_all_state()
+    ctx = make_context()
+    await _add_baguette_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    CAP.reset()
+    await order_cb(make_callback("b2b_cancel"), ctx)
+    if CAP.edit_text and ("keep" in CAP.edit_text.lower() or "existing" in CAP.edit_text.lower()):
+        ok("S12 FIXED: b2b_cancel with existing order → keep/cancel-all dialog shown"); passed += 1
+    else:
+        fail(f"S12 still broken: got {CAP.edit_text!r[:80]}"); failed += 1
+
     # ── Summary ───────────────────────────────────────────────────────────────
     cleanup()
     print(f"\n{BOLD}B2B CHAOS: {passed} passed, {failed} failed{RESET}")

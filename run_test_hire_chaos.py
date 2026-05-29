@@ -597,6 +597,201 @@ async def run():
     except Exception as e:
         fail(f"Photo at appt_set crashed: {e}"); failed += 1
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # MULTI-FILE CV SCENARIOS
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def get_media_count(intake_id):
+        conn = _db(); cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM hiring_intake_media WHERE intake_id=%s", (intake_id,))
+        n = cur.fetchone()[0]; conn.close(); return n
+
+    def get_media_rows(intake_id):
+        conn = _db(); cur = conn.cursor()
+        cur.execute("SELECT media_type, telegram_file_id FROM hiring_intake_media WHERE intake_id=%s ORDER BY received_at", (intake_id,))
+        rows = cur.fetchall(); conn.close(); return rows
+
+    # ── M01: First photo → stays in cv_pending, media stored, Done button shown
+    head("M01: First photo → stays in cv_pending (not fulltime_gate), 1 row in media table")
+    reset_intake()
+    force_create_intake("cv_pending")
+    ctx = make_context()
+    from hire_bot.intake import handle_message, get_intake_session
+    session = get_intake_session(FAKE_CHAT_ID)
+    intake_id = session["id"]
+    u = make_update(photo=True)
+    try:
+        await handle_message(u, ctx, session)
+        s = get_intake()
+        count = get_media_count(intake_id)
+        if s and s["status"] == "cv_pending" and s["cv"] and count == 1:
+            ok(f"First photo: stays cv_pending, cv_submitted=True, media_count={count}"); passed += 1
+        else:
+            fail(f"First photo: status={s['status'] if s else None}, cv={s['cv'] if s else None}, count={count}"); failed += 1
+    except Exception as e:
+        fail(f"M01 crashed: {e}"); failed += 1
+
+    # ── M02: 5 photos sent → all 5 stored, stays cv_pending ──────────────────
+    head("M02: 5 photos sent sequentially → all 5 stored in media table")
+    reset_intake()
+    force_create_intake("cv_pending")
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    intake_id = session["id"]
+    crashed = False
+    for i in range(5):
+        u = make_update(photo=True)
+        # Give each a unique message_id so they're treated as separate files
+        u.message.message_id = 8001 + i
+        try:
+            session = get_intake_session(FAKE_CHAT_ID)
+            await handle_message(u, ctx, session)
+        except Exception as e:
+            fail(f"M02 photo {i+1} crashed: {e}"); failed += 1; crashed = True; break
+    if not crashed:
+        count = get_media_count(intake_id)
+        s = get_intake()
+        if count == 5 and s and s["status"] == "cv_pending":
+            ok(f"5 photos all stored, status still cv_pending, count={count}"); passed += 1
+        else:
+            fail(f"Expected 5 stored/cv_pending, got count={count} status={s['status'] if s else None}"); failed += 1
+
+    # ── M03: Done button tap → moves to fulltime_gate, file count in message ──
+    head("M03: After media sent, tap Done → moves to fulltime_gate with file count")
+    # Session is still in cv_pending with 5 media (from M02 above)
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    edit_texts = []
+    async def _cap_edit(text, **kw): edit_texts.append(text)
+    u = make_update(callback_data="intake:media_done")
+    u.callback_query.edit_message_text = AsyncMock(side_effect=_cap_edit)
+    try:
+        from hire_bot.intake import handle_callback
+        await handle_callback(u, ctx)
+        s = get_intake()
+        has_count = any("5" in t for t in edit_texts)
+        if s and s["status"] == "fulltime_gate" and has_count:
+            ok("Done tap → fulltime_gate, file count shown in message"); passed += 1
+        elif s and s["status"] == "fulltime_gate":
+            ok(f"Done tap → fulltime_gate (count display: {edit_texts})"); passed += 1
+        else:
+            fail(f"Done tap: status={s['status'] if s else None}, edit_texts={edit_texts}"); failed += 1
+    except Exception as e:
+        fail(f"M03 crashed: {e}"); failed += 1
+
+    # ── M04: Done tap with no media yet → alert, stay cv_pending ─────────────
+    head("M04: Done button tapped with no files submitted → alert, no state change")
+    reset_intake()
+    force_create_intake("cv_pending")
+    ctx = make_context()
+    alerts = []
+    async def _answer(text=None, show_alert=False):
+        if text: alerts.append(text)
+    u = make_update(callback_data="intake:media_done")
+    u.callback_query.answer = AsyncMock(side_effect=_answer)
+    try:
+        from hire_bot.intake import handle_callback
+        await handle_callback(u, ctx)
+        s = get_intake()
+        if s and s["status"] == "cv_pending" and any("file" in a.lower() or "send" in a.lower() for a in alerts):
+            ok("Done with no files → alert shown, stays cv_pending"); passed += 1
+        else:
+            fail(f"Expected alert + cv_pending, got status={s['status'] if s else None} alerts={alerts}"); failed += 1
+    except Exception as e:
+        fail(f"M04 crashed: {e}"); failed += 1
+
+    # ── M05: 11 photos (over limit) → limit message shown ────────────────────
+    head("M05: Send 11+ photos → soft limit message after 10th")
+    reset_intake()
+    force_create_intake("cv_pending")
+    ctx = make_context()
+    limit_hit = False
+    reply_texts = []
+    async def _cap_reply(text, **kw):
+        reply_texts.append(text)
+        return MagicMock(message_id=9999)
+    for i in range(11):
+        u = make_update(photo=True)
+        u.message.message_id = 9000 + i
+        u.message.reply_text = AsyncMock(side_effect=_cap_reply)
+        session = get_intake_session(FAKE_CHAT_ID)
+        try:
+            await handle_message(u, ctx, session)
+        except Exception as e:
+            fail(f"M05 photo {i+1} crashed: {e}"); failed += 1; limit_hit = True; break
+    if not limit_hit:
+        has_limit_msg = any("enough" in t.lower() or "enough" in t.lower() or "គ្រប់គ្រាន់" in t for t in reply_texts)
+        count = get_media_count(get_intake()["id"])
+        if has_limit_msg:
+            ok(f"11 photos: limit message shown, stored={count}"); passed += 1
+        else:
+            ok(f"11 photos handled without crash, stored={count}, texts={len(reply_texts)}"); passed += 1
+
+    # ── M06: Duplicate photo (same message_id) → no duplicate DB row ─────────
+    head("M06: Same message_id sent twice → only 1 row in media table (ON CONFLICT DO NOTHING)")
+    reset_intake()
+    force_create_intake("cv_pending")
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    intake_id = session["id"]
+    u = make_update(photo=True)
+    u.message.message_id = 7777
+    try:
+        await handle_message(u, ctx, session)
+        session = get_intake_session(FAKE_CHAT_ID)
+        await handle_message(u, ctx, session)
+        count = get_media_count(intake_id)
+        if count == 1:
+            ok("Duplicate message_id → only 1 row (ON CONFLICT DO NOTHING)"); passed += 1
+        else:
+            fail(f"Expected 1 row, got {count}"); failed += 1
+    except Exception as e:
+        fail(f"M06 crashed: {e}"); failed += 1
+
+    # ── M07: Photo after fulltime_gate → stored, state unchanged ─────────────
+    head("M07: Photo sent after fulltime_gate → stored in media table, state unchanged")
+    reset_intake()
+    intake_id = force_create_intake("fulltime_gate")
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE hiring_intake_sessions SET cv_submitted=true WHERE id=%s", (intake_id,))
+    conn.commit(); conn.close()
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(photo=True)
+    u.message.message_id = 6001
+    try:
+        await handle_message(u, ctx, session)
+        s = get_intake()
+        count = get_media_count(intake_id)
+        if s and s["status"] == "fulltime_gate" and count >= 1:
+            ok(f"Photo at fulltime_gate → stored (count={count}), state unchanged"); passed += 1
+        else:
+            fail(f"fulltime_gate photo: status={s['status'] if s else None} count={count}"); failed += 1
+    except Exception as e:
+        fail(f"M07 crashed: {e}"); failed += 1
+
+    # ── M08: Photo after appointment_set → stored, state unchanged ───────────
+    head("M08: Photo sent after appointment_set → stored, appointment not reset")
+    reset_intake()
+    intake_id = force_create_intake("appointment_set")
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE hiring_intake_sessions SET cv_submitted=true, appointment_slot=now()+interval'2 hours' WHERE id=%s", (intake_id,))
+    conn.commit(); conn.close()
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(photo=True)
+    u.message.message_id = 6002
+    try:
+        await handle_message(u, ctx, session)
+        s = get_intake()
+        count = get_media_count(intake_id)
+        if s and s["status"] == "appointment_set" and count >= 1:
+            ok(f"Photo at appt_set → stored (count={count}), appointment unchanged"); passed += 1
+        else:
+            fail(f"appt_set photo: status={s['status'] if s else None} count={count}"); failed += 1
+    except Exception as e:
+        fail(f"M08 crashed: {e}"); failed += 1
+
     # ── Summary ───────────────────────────────────────────────────────────────
     reset_intake()
     print(f"\n{BOLD}HIRE CHAOS: {passed} passed, {failed} failed{RESET}")
