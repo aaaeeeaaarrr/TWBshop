@@ -764,6 +764,137 @@ async def run():
         fail(f"I11 crashed: {e}"); failed += 1
 
     # ══════════════════════════════════════════════════════════════════════════
+    # INTAKE EVENT LOG SCENARIOS
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def get_events(intake_id, **filters):
+        conn = _db(); cur = conn.cursor()
+        where = " AND ".join(f"{k}=%s" for k in filters) if filters else "TRUE"
+        cur.execute(f"SELECT event_type, purpose, ai_allowed_stage FROM hiring_intake_events WHERE intake_id=%s AND {where}",
+                    [intake_id] + list(filters.values()))
+        rows = cur.fetchall(); conn.close()
+        return [{"event_type": r[0], "purpose": r[1], "ai_allowed_stage": r[2]} for r in rows]
+
+    # ── E01: appointment_set + "where?" → location replied, event logged ─────
+    head("E01: appointment_set + 'where is the shop?' → location pin sent, stored as location_question")
+    reset_intake()
+    intake_id = force_create_intake("appointment_set")
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE hiring_intake_sessions SET appointment_slot=now()+interval'2 hours' WHERE id=%s", (intake_id,))
+    conn.commit(); conn.close()
+    ctx = make_context()
+    from hire_bot.intake import handle_message, get_intake_session
+    session = get_intake_session(FAKE_CHAT_ID)
+    location_msgs = []
+    async def _send_loc(chat_id, lat=None, lng=None, **kw):
+        location_msgs.append((lat, lng))
+        return MagicMock(message_id=9999)
+    ctx.bot.send_location = AsyncMock(side_effect=_send_loc)
+    u = make_update(text="where is the bakery?")
+    try:
+        await handle_message(u, ctx, session)
+        events = get_events(intake_id, event_type="text", purpose="location_question")
+        if events and location_msgs:
+            ok(f"'where?' → location_question event stored, location pin sent"); passed += 1
+        else:
+            fail(f"E01: events={events}, location_sent={bool(location_msgs)}"); failed += 1
+    except Exception as e:
+        fail(f"E01 crashed: {e}"); failed += 1
+
+    # ── E02: appointment_set + photo → stored as unknown_after_appointment ────
+    head("E02: Photo at appointment_set → stored as unknown_after_appointment, status unchanged")
+    reset_intake()
+    intake_id = force_create_intake("appointment_set")
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(photo=True)
+    u.message.message_id = 6100
+    try:
+        await handle_message(u, ctx, session)
+        events = get_events(intake_id, event_type="photo", purpose="unknown_after_appointment")
+        s = get_intake()
+        if events and s and s["status"] == "appointment_set":
+            ok("Photo at appt_set → unknown_after_appointment event, status unchanged"); passed += 1
+        else:
+            fail(f"E02: events={events}, status={s['status'] if s else None}"); failed += 1
+    except Exception as e:
+        fail(f"E02 crashed: {e}"); failed += 1
+
+    # ── E03: voice note stored as event even when rejected ────────────────────
+    head("E03: Voice note → voice_attempt event stored even if rejected/warned")
+    reset_intake()
+    force_create_intake("language_check")
+    ctx = make_context()
+    from hire_bot.intake import handle_voice
+    u = make_update(voice=True)
+    try:
+        await handle_voice(u, ctx)
+        events = get_events(get_intake()["id"], event_type="voice", purpose="voice_attempt")
+        if events:
+            ok("Voice note → voice_attempt event stored"); passed += 1
+        else:
+            fail(f"E03: no voice_attempt event found"); failed += 1
+    except Exception as e:
+        fail(f"E03 crashed: {e}"); failed += 1
+
+    # ── E04: button tap stored as callback event ──────────────────────────────
+    head("E04: Fulltime 'yes' button tap → callback/button_tap event stored")
+    reset_intake()
+    intake_id = force_create_intake("fulltime_gate")
+    conn = _db(); cur = conn.cursor()
+    cur.execute("UPDATE hiring_intake_sessions SET cv_submitted=true WHERE id=%s", (intake_id,))
+    conn.commit(); conn.close()
+    ctx = make_context()
+    from hire_bot.intake import handle_callback
+    u = make_update(callback_data="intake:fulltime:yes")
+    try:
+        await handle_callback(u, ctx)
+        events = get_events(intake_id, event_type="callback")
+        if events:
+            ok(f"Button tap → callback event stored, callback_data captured"); passed += 1
+        else:
+            fail(f"E04: no callback event found"); failed += 1
+    except Exception as e:
+        fail(f"E04 crashed: {e}"); failed += 1
+
+    # ── E05: text at cv_pending → ai_allowed_stage=text_intake ───────────────
+    head("E05: Text at cv_pending → ai_allowed_stage=text_intake (Haiku may read)")
+    reset_intake()
+    intake_id = force_create_intake("cv_pending")
+    ctx = make_context()
+    session = get_intake_session(FAKE_CHAT_ID)
+    u = make_update(text="I worked at a coffee shop for 2 years")
+    try:
+        await handle_message(u, ctx, session)
+        events = get_events(intake_id, ai_allowed_stage="text_intake")
+        if events:
+            ok(f"cv_pending text → ai_allowed_stage=text_intake"); passed += 1
+        else:
+            fail(f"E05: no text_intake event found"); failed += 1
+    except Exception as e:
+        fail(f"E05 crashed: {e}"); failed += 1
+
+    # ── E06: after TEST_UNLOCKED, get_all_intake_events fetches full trail ────
+    head("E06: get_all_intake_events returns complete evidence trail after TEST_UNLOCKED")
+    reset_intake()
+    intake_id = force_create_intake("test_unlocked")
+    # Inject some fake events directly
+    conn = _db(); cur = conn.cursor()
+    for et, pu in [("text","application_text"), ("photo","cv_photo"), ("voice","voice_attempt")]:
+        cur.execute("""
+            INSERT INTO hiring_intake_events (intake_id, telegram_chat_id, event_type, purpose,
+                current_intake_status, ai_allowed_stage, created_at)
+            VALUES (%s, %s, %s, %s, 'test_unlocked', 'after_arrival', now())
+        """, (intake_id, FAKE_CHAT_ID, et, pu))
+    conn.commit(); conn.close()
+    from hire_bot.intake import get_all_intake_events
+    events = get_all_intake_events(intake_id)
+    if len(events) == 3:
+        ok(f"get_all_intake_events returns {len(events)} events for review after TEST_UNLOCKED"); passed += 1
+    else:
+        fail(f"Expected 3 events, got {len(events)}"); failed += 1
+
+    # ══════════════════════════════════════════════════════════════════════════
     # MULTI-FILE CV SCENARIOS
     # ══════════════════════════════════════════════════════════════════════════
 
