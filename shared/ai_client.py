@@ -677,3 +677,152 @@ async def check_staff_message_ai(text: str, prior_context: list) -> dict:
     except Exception as exc:
         logger.error("Staff message check failed: %s", exc)
         return {"action": "none", "flag": False, "reason": ""}
+
+
+# ── Intake funnel — Haiku classifier/extractor (text-only, no images) ────────
+# Max 2 cheap calls per applicant: intent check + CV extraction.
+# No analysis of photos/files before TEST_UNLOCKED — store only.
+
+_INTAKE_HAIKU = "claude-haiku-4-5-20251001"
+_INTENT_PROMPT_VERSION = "v1"
+_CV_EXTRACT_PROMPT_VERSION = "v1"
+_DEFLECTION_PROMPT_VERSION = "v1"
+
+_INTENT_SYSTEM = """\
+You classify the intent of someone who just messaged a bakery's hiring chatbot.
+The bot greeted them and asked them to leave their CV to apply.
+Their reply follows.
+
+Return ONLY valid JSON — no explanation, no markdown:
+{
+  "intent": "applying" | "clear_refusal" | "wrong_number" | "confused",
+  "confidence": 0.0-1.0,
+  "language": "en" | "km" | "mixed" | "unknown",
+  "reason_code": "short_string"
+}
+
+Rules (read carefully):
+- "I have no job" / "ខ្ញុំគ្មានការងារ" = applying (unemployed, looking for work)
+- "I don't want a job" / "not interested" = clear_refusal
+- "wrong number" / "wrong chat" / "who is this" = wrong_number
+- "hi" / "hello" / single emoji / "?" / very short greeting = confused
+- Any mention of wanting to work, asking about the job, or describing experience = applying
+- If confidence < 0.75 for clear_refusal or wrong_number, use confused instead
+- Never use keyword matching; read full meaning and context
+"""
+
+_CV_EXTRACT_SYSTEM = """\
+You extract work history from a job applicant's message at a bakery.
+The person was asked to leave their CV or describe their work experience.
+
+Return ONLY valid JSON — no explanation, no markdown:
+{
+  "has_work_history": true | false,
+  "name": "string or null",
+  "position_interest": "string or null",
+  "previous_jobs": ["description..."],
+  "years_experience": "string or null",
+  "skills": ["skill..."],
+  "availability_clues": "string or null"
+}
+
+has_work_history = true if the text contains ANY of: name, job history, skills, experience, position interest.
+has_work_history = false if the text is only: greetings, questions, refusals, random text, or unrelated content.
+Be generous — "hi im dara work coffee 2 year" counts as has_work_history = true.
+"""
+
+_DEFLECTION_SYSTEM = """\
+Someone is applying for a job at a bakery. They were asked for their CV or work history multiple times.
+Here are their recent replies (oldest first).
+
+Classify their situation:
+- struggling: trying to apply but does not know what to write or how
+- refusing: clearly not interested or not serious
+- has_usable_content: actually gave work history in a non-standard or messy format
+
+Return ONLY valid JSON — no explanation, no markdown:
+{
+  "status": "struggling" | "refusing" | "has_usable_content",
+  "confidence": 0.0-1.0
+}
+"""
+
+
+async def classify_intake_intent(text: str) -> dict:
+    """
+    Classify the first reply from a job applicant.
+    Returns: {intent, confidence, language, reason_code}
+    On error returns intent=confused so the bot re-prompts rather than closes.
+    """
+    try:
+        resp = await _get_client().messages.create(
+            model=_INTAKE_HAIKU,
+            max_tokens=128,
+            system=_INTENT_SYSTEM,
+            messages=[{"role": "user", "content": text[:1000]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "intent":      result.get("intent", "confused"),
+            "confidence":  float(result.get("confidence", 0.5)),
+            "language":    result.get("language", "unknown"),
+            "reason_code": result.get("reason_code", ""),
+        }
+    except Exception as exc:
+        logger.error("classify_intake_intent failed: %s", exc)
+        return {"intent": "confused", "confidence": 0.0, "language": "unknown",
+                "reason_code": "error"}
+
+
+async def extract_cv_content(text: str) -> dict:
+    """
+    Extract work history fields from applicant text.
+    Returns: {has_work_history, name, position_interest, previous_jobs, years_experience, skills, availability_clues}
+    On error returns has_work_history=False so the deflection counter increments normally.
+    """
+    try:
+        resp = await _get_client().messages.create(
+            model=_INTAKE_HAIKU,
+            max_tokens=256,
+            system=_CV_EXTRACT_SYSTEM,
+            messages=[{"role": "user", "content": text[:2000]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "has_work_history":    bool(result.get("has_work_history", False)),
+            "name":                result.get("name"),
+            "position_interest":   result.get("position_interest"),
+            "previous_jobs":       result.get("previous_jobs", []),
+            "years_experience":    result.get("years_experience"),
+            "skills":              result.get("skills", []),
+            "availability_clues":  result.get("availability_clues"),
+        }
+    except Exception as exc:
+        logger.error("extract_cv_content failed: %s", exc)
+        return {"has_work_history": False, "name": None, "position_interest": None,
+                "previous_jobs": [], "years_experience": None, "skills": [],
+                "availability_clues": None}
+
+
+async def check_deflection_intent(messages: list[str]) -> dict:
+    """
+    After 3+ deflections, determine if applicant is struggling, refusing, or gave usable content.
+    Returns: {status, confidence}
+    On error returns status=struggling so the bot gives one more chance.
+    """
+    try:
+        combined = "\n---\n".join(m[:500] for m in messages[-5:])
+        resp = await _get_client().messages.create(
+            model=_INTAKE_HAIKU,
+            max_tokens=64,
+            system=_DEFLECTION_SYSTEM,
+            messages=[{"role": "user", "content": combined}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "status":     result.get("status", "struggling"),
+            "confidence": float(result.get("confidence", 0.5)),
+        }
+    except Exception as exc:
+        logger.error("check_deflection_intent failed: %s", exc)
+        return {"status": "struggling", "confidence": 0.0}

@@ -181,7 +181,9 @@ def _flag(intake_id: int, flag: str, severity: str = "gap_low") -> None:
         conn.close()
 
 
-_MEDIA_LIMIT = 10  # soft cap — politely refuse beyond this
+_MEDIA_LIMIT = 10          # soft cap on CV files per applicant
+_DEFLECT_AI_CHECK = 3      # Haiku deflection check fires after this many deflections
+_DEFLECT_MAX = 5           # hard close after this many deflections regardless
 
 
 def _store_media(intake_id: int, update) -> None:
@@ -263,6 +265,43 @@ def get_intake_media(intake_id: int) -> list[dict]:
         """, (intake_id,))
         cols = ["id","media_type","file_id","filename","mime_type","purpose","received_at"]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
+    finally:
+        cur.close(); conn.close()
+
+
+def _log_ai_event(intake_id: int, stage: str, model: str, prompt_version: str,
+                  input_text: str, output_json: dict,
+                  intent: str | None, confidence: float | None,
+                  action_taken: str) -> None:
+    import json as _json
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO hiring_intake_ai_events
+                (intake_id, stage, model, prompt_version, input_text,
+                 output_json, intent, confidence, action_taken, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+        """, (intake_id, stage, model, prompt_version, input_text[:2000],
+              _json.dumps(output_json), intent, confidence, action_taken))
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_log_ai_event failed: %s", exc)
+        conn.rollback()
+    finally:
+        cur.close(); conn.close()
+
+
+def _get_recent_deflection_messages(intake_id: int, limit: int = 5) -> list[str]:
+    """Fetch the last N input_text values from ai_events for deflection context."""
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT input_text FROM hiring_intake_ai_events
+            WHERE intake_id = %s AND stage = 'cv_extraction'
+            ORDER BY created_at DESC LIMIT %s
+        """, (intake_id, limit))
+        rows = cur.fetchall()
+        return [r[0] for r in reversed(rows)]
     finally:
         cur.close(); conn.close()
 
@@ -717,41 +756,70 @@ async def _handle_language_check(update: Update, context: ContextTypes.DEFAULT_T
     intake_id = session["id"]
     lang = session["language"]
 
-    # Photo/document sent before any text — skip language check, process as CV directly
+    # Photo/document — they're applying; skip intent check, process as CV directly
     if has_media:
         _update(intake_id, intake_status=S_CV_PENDING)
         await _handle_cv_pending(update, context, dict(session, intake_status=S_CV_PENDING))
         return
 
-    if _is_khmer(text):
-        if _implies_cant_english(text):
-            # Graceful: they told us they can't do English
-            _update(intake_id, language="km", intake_status=S_CV_PENDING)
-            await update.message.reply_text(
-                "យល់ហើយ! យើងនឹងប្រាស្រ័យជាភាសាខ្មែរ។\n\n"
-                "សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន។"
-            )
-        else:
-            # Replied in Khmer without explaining — ask once to try English
-            _flag(intake_id, "language_mismatch_no_acknowledgment", "gap_low")
-            await update.message.reply_text(
-                "We are writing to you in English because English is useful for this role. "
-                "Can you please reply in English?\n\n"
-                "If you cannot, please let us know and we will switch to Khmer.\n\n"
-                "———\n\n"
-                "យើងសរសេរជាអង់គ្លេស ព្រោះអង់គ្លេសសំខាន់សម្រាប់ការងារ។ "
-                "ប្អូនអាចតបជាអង់គ្លេសបានទេ?\n\n"
-                "បើអត់, ប្រាប់យើង ហើយយើងនឹងប្ដូរជាខ្មែរ។"
-            )
-            # Move to CV pending anyway — if they reply Khmer again, we accept it
-            _update(intake_id, intake_status=S_CV_PENDING)
-    else:
-        # English (or close enough) — move to CV
-        _update(intake_id, intake_status=S_CV_PENDING)
+    # ── Haiku intent classification ───────────────────────────────────────────
+    from shared.ai_client import classify_intake_intent, _INTAKE_HAIKU, _INTENT_PROMPT_VERSION
+    result = await classify_intake_intent(text)
+    intent     = result["intent"]
+    confidence = result["confidence"]
+    ai_lang    = result["language"]
+
+    _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+                  text, result, intent, confidence, "")
+
+    # Detect language from Haiku result (supplement existing rule-based detection)
+    if ai_lang == "km" or _is_khmer(text):
+        _update(intake_id, language="km")
+        lang = "km"
+
+    # ── Route by intent ───────────────────────────────────────────────────────
+    if intent in ("clear_refusal", "wrong_number") and confidence >= 0.75:
+        _update(intake_id, intake_status=S_BLOCKED,
+                intake_blocked_reason=f"ai_{intent}")
+        _flag(intake_id, f"ai_{intent}", "gap_low")
+        _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+                      text, result, intent, confidence, "close")
         await update.message.reply_text(_t(lang,
-            en="Thank you. Please send us your CV or describe your work experience.",
-            km="អរគុណ។ សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន។"
+            en="Thank you for your message. We don't think you are looking for a job "
+               "right now — if you change your mind, feel free to message us again.",
+            km="អរគុណសម្រាប់សាររបស់ប្អូន។ ប្រសិនបើប្អូនចង់ដាក់ពាក្យនៅពេលណាមួយ "
+               "សូមមកទំនាក់ទំនងយើងម្តងទៀត។"
         ))
+        logger.info("intake closed by ai intent=%s conf=%.2f chat=%s", intent, confidence, intake_id)
+        return
+
+    if intent == "confused":
+        _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+                      text, result, intent, confidence, "reprompt")
+        await update.message.reply_text(_t(lang,
+            en="Please leave your CV here to apply for joining The Wine Bakery.\n\n"
+               "សូមផ្ញើ CV របស់ប្អូន ដើម្បីដាក់ពាក្យចូលធ្វើការ The Wine Bakery។",
+            km="សូមផ្ញើ CV របស់ប្អូន ដើម្បីដាក់ពាក្យចូលធ្វើការ The Wine Bakery។\n\n"
+               "Please leave your CV here to apply for joining The Wine Bakery."
+        ))
+        return
+
+    # intent == "applying" (or fallback from error) — move to CV step
+    _log_ai_event(intake_id, "intent_check", _INTAKE_HAIKU, _INTENT_PROMPT_VERSION,
+                  text, result, intent, confidence, "continue")
+    _update(intake_id, intake_status=S_CV_PENDING)
+    await update.message.reply_text(_t(lang,
+        en="Please leave your CV here to apply for joining The Wine Bakery.\n\n"
+           "You can send a photo, document, or describe your work experience in writing.\n\n"
+           "———\n\n"
+           "សូមផ្ញើ CV របស់ប្អូន ដើម្បីដាក់ពាក្យចូលធ្វើការ The Wine Bakery។\n\n"
+           "ប្អូនអាចផ្ញើរូបភាព ឯកសារ ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូនជាអក្សរ។",
+        km="សូមផ្ញើ CV របស់ប្អូន ដើម្បីដាក់ពាក្យចូលធ្វើការ The Wine Bakery។\n\n"
+           "ប្អូនអាចផ្ញើរូបភាព ឯកសារ ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូនជាអក្សរ។\n\n"
+           "———\n\n"
+           "Please leave your CV here to apply for joining The Wine Bakery.\n\n"
+           "You can send a photo, document, or describe your work experience in writing."
+    ))
 
 
 async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
@@ -818,32 +886,93 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
             ), reply_markup=kb_media_done(lang))
         return
 
-    # ── Text CV (long description) ────────────────────────────────────────────
-    if len(text) > 30:
-        _update(intake_id, cv_submitted=True, cv_format="text",
-                intake_status=S_FULLTIME_GATE)
-        _flag(intake_id, "cv_submitted_as_text", "gap_low")
-        await message.reply_text(_t(lang,
-            en="Thank you. We have received your application.\n\n"
-               "We offer 9-hour or 12-hour shifts — 12 hours earns a higher salary, "
-               "and we prefer staff who are fully committed to one workplace. "
-               "We do not hire part-time.\n\n"
-               "Can you commit to full-time work?",
-            km="អរគុណ។ យើងបានទទួលពាក្យស្នើរបស់ប្អូន។\n\n"
-               "យើងមានម៉ោង ៩ ឬ ១២ ម៉ោងក្នុងមួយថ្ងៃ — ១២ ម៉ោង ប្រាក់ខែខ្ពស់ជាង "
-               "ហើយយើងចូលចិត្តបុគ្គលិកដែលលះបង់ពេញម៉ោងជាមួយយើង។ "
-               "យើងមិនជ្រើសរើស part-time ទេ។\n\n"
-               "ប្អូនអាចធ្វើការពេញម៉ោងបានទេ?"
-        ), reply_markup=kb_fulltime(lang))
-        return
+    # ── Text: Haiku CV extraction ─────────────────────────────────────────────
+    if text:
+        from shared.ai_client import (extract_cv_content, check_deflection_intent,
+                                       _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
+                                       _DEFLECTION_PROMPT_VERSION)
+        cv_result = await extract_cv_content(text)
+        _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
+                      text, cv_result, None, None, "")
 
-    # Too short / unclear — ask again
-    _flag(intake_id, "cv_deflection", "gap_low")
-    await message.reply_text(_t(lang,
-        en="Please send your CV, or describe your work experience clearly "
-           "(name, previous jobs, skills).",
-        km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន (ឈ្មោះ ការងារមុន ជំនាញ)។"
-    ))
+        if cv_result["has_work_history"]:
+            # Accept — move to fulltime gate
+            _update(intake_id, cv_submitted=True, cv_format="text",
+                    intake_status=S_FULLTIME_GATE)
+            _flag(intake_id, "cv_submitted_as_text", "gap_low")
+            _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
+                          text, cv_result, "has_work_history", None, "continue")
+            await message.reply_text(_t(lang,
+                en="Thank you. We have received your application.\n\n"
+                   "We offer 9-hour or 12-hour shifts — 12 hours earns a higher salary, "
+                   "and we prefer staff who are fully committed to one workplace. "
+                   "We do not hire part-time.\n\n"
+                   "Can you commit to full-time work?",
+                km="អរគុណ។ យើងបានទទួលពាក្យស្នើរបស់ប្អូន។\n\n"
+                   "យើងមានម៉ោង ៩ ឬ ១២ ម៉ោងក្នុងមួយថ្ងៃ — ១២ ម៉ោង ប្រាក់ខែខ្ពស់ជាង "
+                   "ហើយយើងចូលចិត្តបុគ្គលិកដែលលះបង់ពេញម៉ោងជាមួយយើង។ "
+                   "យើងមិនជ្រើសរើស part-time ទេ។\n\n"
+                   "ប្អូនអាចធ្វើការពេញម៉ោងបានទេ?"
+            ), reply_markup=kb_fulltime(lang))
+            return
+
+        # Not usable as CV — increment deflection counter
+        new_count = (session.get("cv_deflection_count") or 0) + 1
+        _update(intake_id, cv_deflection_count=new_count)
+        _flag(intake_id, "cv_deflection", "gap_low")
+        _log_ai_event(intake_id, "cv_extraction", _INTAKE_HAIKU, _CV_EXTRACT_PROMPT_VERSION,
+                      text, cv_result, "no_work_history", None, f"deflect_{new_count}")
+
+        # Hard close after max deflections
+        if new_count >= _DEFLECT_MAX:
+            _update(intake_id, intake_status=S_BLOCKED,
+                    intake_blocked_reason="max_deflections")
+            await message.reply_text(_t(lang,
+                en="Thank you for your interest. We need your CV or work experience "
+                   "to continue — please message us again when you are ready.",
+                km="អរគុណ។ យើងត្រូវការ CV ឬប្រវត្តិការងាររបស់ប្អូន ដើម្បីបន្ត — "
+                   "សូមទំនាក់ទំនងយើងម្តងទៀតនៅពេលប្អូនរួចរាល់។"
+            ))
+            return
+
+        # After AI_CHECK deflections — ask Haiku: struggling or refusing?
+        if new_count == _DEFLECT_AI_CHECK:
+            recent_msgs = _get_recent_deflection_messages(intake_id, limit=5)
+            deflect_result = await check_deflection_intent(recent_msgs)
+            _log_ai_event(intake_id, "deflection_check", _INTAKE_HAIKU, _DEFLECTION_PROMPT_VERSION,
+                          " | ".join(recent_msgs), deflect_result,
+                          deflect_result.get("status"), deflect_result.get("confidence"),
+                          "")
+            if deflect_result["status"] == "refusing" and deflect_result["confidence"] >= 0.75:
+                _update(intake_id, intake_status=S_BLOCKED,
+                        intake_blocked_reason="ai_refusing")
+                _log_ai_event(intake_id, "deflection_check", _INTAKE_HAIKU, _DEFLECTION_PROMPT_VERSION,
+                              text, deflect_result, "refusing", deflect_result.get("confidence"),
+                              "close")
+                await message.reply_text(_t(lang,
+                    en="Thank you for your time. If you decide to apply in the future, "
+                       "feel free to message us again.",
+                    km="អរគុណចំពោះពេលវេលារបស់ប្អូន។ បើប្អូនចង់ដាក់ពាក្យនៅពេលអនាគត "
+                       "សូមមកទំនាក់ទំនងយើងម្តងទៀត។"
+                ))
+                return
+
+    # Re-prompt (struggling, confused, or vague)
+    count = session.get("cv_deflection_count") or 0
+    if count >= 2:
+        # More direct after repeated deflections
+        await message.reply_text(_t(lang,
+            en="Please send your CV as a photo or document, or write:\n"
+               "• Your name\n• Your last job\n• How long you worked there",
+            km="សូមផ្ញើ CV ជារូបភាព ឬឯកសារ ឬសរសេរ:\n"
+               "• ឈ្មោះ\n• ការងារចុងក្រោយ\n• រយៈពេលធ្វើការ"
+        ))
+    else:
+        await message.reply_text(_t(lang,
+            en="Please send your CV, or describe your work experience "
+               "(name, previous jobs, skills).",
+            km="សូមផ្ញើ CV ឬពណ៌នាប្រវត្តិការងាររបស់ប្អូន (ឈ្មោះ ការងារមុន ជំនាញ)។"
+        ))
 
 
 async def _prompt_button(update: Update, session: dict) -> None:
