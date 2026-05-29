@@ -291,6 +291,87 @@ def _log_ai_event(intake_id: int, stage: str, model: str, prompt_version: str,
         cur.close(); conn.close()
 
 
+def _log_event(intake_id: int, session: dict, update,
+               event_type: str, purpose: str = "unknown",
+               ai_allowed_stage: str = "after_arrival",
+               callback_data: str | None = None) -> None:
+    """Insert one row into hiring_intake_events. Called at every inbound message."""
+    message = update.message
+    chat_id  = update.effective_chat.id
+    user_id  = getattr(update.effective_user, "id", None)
+
+    text = caption = file_id = file_unique_id = media_group_id = msg_id = None
+
+    if message:
+        msg_id  = message.message_id
+        raw_text = message.text
+        text    = raw_text if isinstance(raw_text, (str, type(None))) else None
+        raw_cap  = message.caption
+        caption = raw_cap if isinstance(raw_cap, (str, type(None))) else None
+        raw_mg   = getattr(message, "media_group_id", None)
+        media_group_id = raw_mg if isinstance(raw_mg, (str, type(None))) else None
+
+        for attr, src in (("photo", lambda m: m.photo[-1] if m.photo else None),
+                          ("document", lambda m: m.document),
+                          ("voice",    lambda m: m.voice),
+                          ("video_note", lambda m: m.video_note)):
+            obj = src(message)
+            if obj:
+                raw_fid = getattr(obj, "file_id", None)
+                file_id = raw_fid if isinstance(raw_fid, str) else None
+                raw_uid = getattr(obj, "file_unique_id", None)
+                file_unique_id = raw_uid if isinstance(raw_uid, str) else None
+                break
+
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO hiring_intake_events
+                (intake_id, telegram_chat_id, telegram_user_id, telegram_message_id,
+                 event_type, text, caption, file_id, file_unique_id, media_group_id,
+                 callback_data, current_intake_status, purpose,
+                 include_for_review, ai_allowed_stage, created_at)
+            VALUES (%s,%s,%s,%s, %s,%s,%s,%s,%s,%s, %s,%s,%s, true,%s, now())
+        """, (intake_id, chat_id, user_id, msg_id,
+              event_type, text, caption, file_id, file_unique_id, media_group_id,
+              callback_data, session["intake_status"], purpose, ai_allowed_stage))
+        conn.commit()
+    except Exception as exc:
+        logger.warning("_log_event failed: %s", exc)
+        conn.rollback()
+    finally:
+        cur.close(); conn.close()
+
+
+_LOCATION_KEYWORDS = [
+    "where", "location", "address", "direction", "how to get", "the shop",
+    "bakery address", "find you", "map", "google map",
+    "នៅឯណា", "ទីតាំង", "អាសយដ្ឋាន", "រក", "ខ្ញុំរក", "ផ្លូវ",
+]
+
+
+def _is_location_question(text: str) -> bool:
+    t = (text or "").lower()
+    return any(kw in t for kw in _LOCATION_KEYWORDS)
+
+
+def get_all_intake_events(intake_id: int) -> list[dict]:
+    """Return all events for an intake (for human/AI review after arrival)."""
+    conn = _conn(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, event_type, text, caption, file_id, purpose,
+                   ai_allowed_stage, current_intake_status, created_at
+            FROM hiring_intake_events WHERE intake_id = %s
+            ORDER BY created_at
+        """, (intake_id,))
+        cols = ["id","event_type","text","caption","file_id","purpose",
+                "ai_allowed_stage","status","created_at"]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
+    finally:
+        cur.close(); conn.close()
+
+
 def _get_recent_deflection_messages(intake_id: int, limit: int = 5) -> list[str]:
     """Fetch the last N input_text values from ai_events for deflection context."""
     conn = _conn(); cur = conn.cursor()
@@ -537,13 +618,40 @@ async def start_intake(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE,
                          session: dict) -> None:
     """Route a text/photo/document message within an active intake session."""
-    status = session["intake_status"]
+    status    = session["intake_status"]
+    intake_id = session["id"]
+    msg       = update.message
 
-    # Store every photo/document silently regardless of state — no AI, just reference.
-    # cv_pending handles the media count + Done-button flow explicitly below.
-    if update.message and (update.message.photo or update.message.document):
-        if status not in (S_CV_PENDING,):  # cv_pending stores inside its handler
-            _store_media(session["id"], update)
+    # ── Log every inbound event before routing ───────────────────────────────
+    if msg:
+        if msg.photo:
+            purpose = "cv_photo" if status == S_CV_PENDING else "unknown_after_appointment"
+            _log_event(intake_id, session, update, "photo", purpose, "after_arrival")
+            if status not in (S_CV_PENDING,):
+                _store_media(intake_id, update)
+        elif msg.document:
+            purpose = "cv_document" if status == S_CV_PENDING else "unknown_after_appointment"
+            _log_event(intake_id, session, update, "document", purpose, "after_arrival")
+            if status not in (S_CV_PENDING,):
+                _store_media(intake_id, update)
+        elif msg.sticker:
+            _log_event(intake_id, session, update, "sticker", "unknown", "after_arrival")
+        elif msg.location:
+            _log_event(intake_id, session, update, "location", "unknown", "after_arrival")
+        elif msg.text or msg.caption:
+            text = msg.text or msg.caption or ""
+            if status in (S_LANGUAGE_CHECK, S_CV_PENDING):
+                ai_stage = "text_intake"
+                purpose  = "application_text"
+                if _is_salary_schedule(text):
+                    purpose = "salary_question"
+            elif status == S_APPT_SET and _is_location_question(text):
+                ai_stage = "after_arrival"
+                purpose  = "location_question"
+            else:
+                ai_stage = "after_arrival"
+                purpose  = "appointment_question" if status == S_APPT_SET else "unknown"
+            _log_event(intake_id, session, update, "text", purpose, ai_stage)
 
     if status == S_LANGUAGE_CHECK:
         await _handle_language_check(update, context, session)
@@ -554,7 +662,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE,
     elif status == S_APPOINTMENT:
         await _prompt_button(update, session)
     elif status == S_APPT_SET:
-        await _remind_slot(update, session)
+        await _handle_appt_set(update, context, session)
 
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -581,6 +689,10 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     intake_id = session["id"]
     lang = session["language"]
+
+    # Log every voice/video_note attempt — even rejected ones
+    event_type = "video_note" if update.message.video_note else "voice"
+    _log_event(intake_id, session, update, event_type, "voice_attempt", "after_arrival")
 
     if not session["voice_warning_sent"]:
         _update(intake_id, voice_warning_sent=True)
@@ -638,6 +750,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     intake_id = session["id"]
     lang = session["language"]
     parts = data.split(":")
+
+    # Log every button tap as an event
+    _log_event(intake_id, session, update, "callback", "button_tap", "after_arrival",
+               callback_data=data)
 
     # intake:media_done — applicant finished sending CV files
     if parts[1] == "media_done":
@@ -983,6 +1099,33 @@ async def _prompt_button(update: Update, session: dict) -> None:
         en="Please use the buttons to answer.",
         km="សូមប្រើប៊ូតុងដើម្បីឆ្លើយ។"
     ))
+
+
+async def _handle_appt_set(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                           session: dict) -> None:
+    """Handle messages received after appointment is set.
+    Location questions → reply with location pin (no AI).
+    Everything else → remind them of their slot.
+    """
+    text = (update.message.text or update.message.caption or "") if update.message else ""
+    lang = session["language"]
+
+    if _is_location_question(text):
+        await update.message.reply_text(_t(lang,
+            en="Here is our location. We look forward to seeing you! 🙏",
+            km="នេះជាទីតាំងរបស់យើង។ យើងរង់ចាំជួបប្អូន! 🙏"
+        ))
+        try:
+            await context.bot.send_location(
+                update.effective_chat.id,
+                latitude=config.BAKERY_LAT,
+                longitude=config.BAKERY_LNG,
+            )
+        except Exception:
+            pass
+        return
+
+    await _remind_slot(update, session)
 
 
 async def _remind_slot(update: Update, session: dict) -> None:
