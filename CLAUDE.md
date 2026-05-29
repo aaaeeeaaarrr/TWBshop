@@ -140,9 +140,31 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-29 (session 20 — owner notifications + event log)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Haiku intake + owner notifications live. Chaos tests: B2B 42/42, Hire 57/57.
-**Pending (build after live tests):** hiring_offers table (base_salary, bonus, food_allowance, hours, shift, start_date, accepted_at, status) — needed to report "agreed salary" in owner notifications. E-T2 currently shows applicant's current salary, not our offer.
+**Last updated:** 2026-05-30 (session 21 — Opus assessment plumbing)
+**Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
+
+**Assessment plumbing built (session 21):**
+- hiring_ai_assessments, hiring_targeted_messages, hiring_correction_responses, hiring_offers tables
+- assessment_package.py: evidence builder + Sonnet rule detectors (critical signals, partial answers, consistency checks)
+- assessment_runner.py: run_final_hiring_assessment() — configurable model, JSON validator requiring evidence_refs
+- assessment_notify.py: English-only owner notification, idempotent
+- correction_flow.py: agreement buttons, open understanding check, Opus classification, resistance handling
+- offer_flow.py: all gates checked, hiring_offers row only after owner approval
+- assessment_pipeline.py: wired into _end_screen, fails silently (quiz never blocked)
+- Khmer validator: 19/19 tests — catches COENG splits, anusvara/vowel splits, multi-space, box/dash artifacts, Latin adjacency
+
+**Khmer status — BLOCKED permanently until manual solution:**
+- khmer_auto_send = false
+- khmer_status = pending_manual_approval
+- All Khmer stored as NULL until manually reviewed and approved
+- Khmer validation pipeline itself is unreliable (test strings being corrupted in transit)
+- Do not attempt Opus Khmer generation via this pipeline — handle Khmer translation manually
+
+**Pending (before Opus assessment is truly live):**
+- Opus system prompt calibration with approved examples (waiting on clean samples)
+- Wire correction_flow handlers into hire_bot/bot.py (callback handler for correction: prefix)
+- Wire offer approval into hire_bot/bot.py (owner callback for offer:owner_approve)
+- Start hire bot service: systemctl start twbshop-hire
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:
   1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
