@@ -86,26 +86,41 @@ _QUICK_MENU_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("Change Location", callback_data="bm_change_location")],
 ])
 
+# Tracks the last Quick Menu / nudge message per group — separate from _menu_msg
+# (ordering menu) and _last_confirmation (confirm/edit/cancel screen).
+# Only these two message types are ever deleted here — confirmations are never touched.
+_action_menu_msg: dict[int, int] = {}
+
+
+async def _delete_action_menu(chat_id: int, bot) -> None:
+    """Delete the previous Quick Menu or nudge message, if one exists."""
+    old_id = _action_menu_msg.pop(chat_id, None)
+    if old_id:
+        try:
+            await bot.delete_message(chat_id, old_id)
+        except Exception:
+            pass
+
 
 async def send_quick_menu(bot, chat_id: int) -> None:
-    """Send the Quick Menu immediately after a completed action."""
+    """Send Quick Menu after a completed action, replacing any previous one."""
     import time
     _last_menu_prompt[chat_id] = time.monotonic()  # reset nudge cooldown
-    await bot.send_message(chat_id, "⚡ Quick Menu", reply_markup=_QUICK_MENU_KB)
+    await _delete_action_menu(chat_id, bot)
+    sent = await bot.send_message(chat_id, "⚡ Quick Menu", reply_markup=_QUICK_MENU_KB)
+    _action_menu_msg[chat_id] = sent.message_id
 
 
 async def maybe_send_menu_prompt(chat_id: int, bot) -> None:
-    """Send the nudge if 6+ hours have passed since the last prompt."""
+    """Send the nudge after 30 min inactivity, replacing any previous Quick Menu/nudge."""
     import time
     now = time.monotonic()
     if now - _last_menu_prompt.get(chat_id, 0) < _MENU_PROMPT_COOLDOWN_SEC:
         return
     _last_menu_prompt[chat_id] = now
-    await bot.send_message(
-        chat_id,
-        "Ready to order?",
-        reply_markup=_QUICK_MENU_KB,
-    )
+    await _delete_action_menu(chat_id, bot)
+    sent = await bot.send_message(chat_id, "Ready to order?", reply_markup=_QUICK_MENU_KB)
+    _action_menu_msg[chat_id] = sent.message_id
 
 
 def _session_summary(session: dict) -> str:
@@ -466,6 +481,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             _cart_time.pop(chat_id, None)
             _cart_date.pop(chat_id, None)
             _cart_method.pop(chat_id, None)
+            # This message is transitioning from Quick Menu/nudge → ordering menu
+            _action_menu_msg.pop(chat_id, None)
             text = f"📋 Select a category:\n\n{_cart_block(chat_id)}"
             kb   = _category_keyboard(chat_id)
             try:
@@ -481,6 +498,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 set_menu_message_id(chat_id, sent.message_id)
 
         elif data == "bm_edit_order":
+            _action_menu_msg.pop(chat_id, None)
             delivery_date    = _get_cart_date(chat_id)
             sessions         = get_b2b_order_sessions(chat_id, delivery_date)
             recurring_orders = get_b2b_recurring_orders(chat_id)
