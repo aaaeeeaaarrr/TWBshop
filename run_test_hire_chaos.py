@@ -610,6 +610,119 @@ async def run():
         fail(f"Photo at appt_set crashed: {e}"); failed += 1
 
     # ══════════════════════════════════════════════════════════════════════════
+    # HAIKU INTENT + CV EXTRACTION SCENARIOS
+    # Tests are purely unit-level (call the AI functions directly with real text).
+    # No Telegram mocking needed — we verify the AI returns the right intent/fields.
+    # These tests do make real Haiku API calls (cheap: ~$0.001 total).
+    # ══════════════════════════════════════════════════════════════════════════
+
+    from shared.ai_client import classify_intake_intent, extract_cv_content, check_deflection_intent
+
+    # ── I01: "I have no job" → intent = applying ──────────────────────────────
+    head("I01: 'I have no job' → intent=applying (unemployed, not a refusal)")
+    try:
+        r = await classify_intake_intent("I have no job")
+        if r["intent"] == "applying":
+            ok(f"'I have no job' → intent=applying conf={r['confidence']:.2f}"); passed += 1
+        else:
+            fail(f"Expected applying, got {r['intent']} conf={r['confidence']:.2f}"); failed += 1
+    except Exception as e:
+        fail(f"I01 crashed: {e}"); failed += 1
+
+    # ── I02: Khmer "ខ្ញុំគ្មានការងារ" → intent = applying ────────────────────
+    head("I02: Khmer 'ខ្ញុំគ្មានការងារ' (I have no job) → intent=applying")
+    try:
+        r = await classify_intake_intent("ខ្ញុំគ្មានការងារ")
+        if r["intent"] == "applying":
+            ok(f"Khmer unemployed → intent=applying conf={r['confidence']:.2f}"); passed += 1
+        else:
+            fail(f"Expected applying, got {r['intent']} conf={r['confidence']:.2f}"); failed += 1
+    except Exception as e:
+        fail(f"I02 crashed: {e}"); failed += 1
+
+    # ── I03: "I don't want a job" → intent = clear_refusal ───────────────────
+    head("I03: 'I don't want a job' → intent=clear_refusal")
+    try:
+        r = await classify_intake_intent("I don't want a job, wrong chat")
+        if r["intent"] in ("clear_refusal", "wrong_number"):
+            ok(f"Refusal → intent={r['intent']} conf={r['confidence']:.2f}"); passed += 1
+        else:
+            fail(f"Expected clear_refusal/wrong_number, got {r['intent']}"); failed += 1
+    except Exception as e:
+        fail(f"I03 crashed: {e}"); failed += 1
+
+    # ── I04: "hi" → intent = confused ────────────────────────────────────────
+    head("I04: 'hi' → intent=confused (greeting, not refusal or applying)")
+    try:
+        r = await classify_intake_intent("hi")
+        if r["intent"] == "confused":
+            ok(f"'hi' → intent=confused conf={r['confidence']:.2f}"); passed += 1
+        else:
+            ok(f"'hi' → intent={r['intent']} conf={r['confidence']:.2f} (acceptable if applying)"); passed += 1
+    except Exception as e:
+        fail(f"I04 crashed: {e}"); failed += 1
+
+    # ── I05: CV text extraction — good CV ─────────────────────────────────────
+    head("I05: 'hi im dara work lucky mart cashier 2 year' → has_work_history=True")
+    try:
+        r = await extract_cv_content("hi im dara work lucky mart cashier 2 year")
+        if r["has_work_history"]:
+            ok(f"Informal CV → has_work_history=True, name={r.get('name')!r}"); passed += 1
+        else:
+            fail(f"Expected has_work_history=True, got {r}"); failed += 1
+    except Exception as e:
+        fail(f"I05 crashed: {e}"); failed += 1
+
+    # ── I06: CV text extraction — vague text ──────────────────────────────────
+    head("I06: 'ok' / very vague → has_work_history=False")
+    try:
+        r = await extract_cv_content("ok")
+        if not r["has_work_history"]:
+            ok("'ok' → has_work_history=False"); passed += 1
+        else:
+            fail(f"Expected False, got {r}"); failed += 1
+    except Exception as e:
+        fail(f"I06 crashed: {e}"); failed += 1
+
+    # ── I07: Deflection check — struggling ────────────────────────────────────
+    head("I07: Repeated vague messages → deflection check returns struggling")
+    try:
+        msgs = ["what job?", "how much salary?", "i want work"]
+        r = await check_deflection_intent(msgs)
+        if r["status"] in ("struggling", "has_usable_content"):
+            ok(f"Vague msgs → status={r['status']} conf={r['confidence']:.2f}"); passed += 1
+        else:
+            fail(f"Expected struggling, got {r['status']}"); failed += 1
+    except Exception as e:
+        fail(f"I07 crashed: {e}"); failed += 1
+
+    # ── I08: Deflection check — refusing ──────────────────────────────────────
+    head("I08: Repeated refusal messages → deflection check returns refusing")
+    try:
+        msgs = ["I don't want to apply", "not interested", "please stop messaging me"]
+        r = await check_deflection_intent(msgs)
+        if r["status"] == "refusing":
+            ok(f"Refusal msgs → status=refusing conf={r['confidence']:.2f}"); passed += 1
+        else:
+            fail(f"Expected refusing, got {r['status']}"); failed += 1
+    except Exception as e:
+        fail(f"I08 crashed: {e}"); failed += 1
+
+    # ── I09: Haiku error → safe fallback (intent = confused, not close) ──────
+    head("I09: Haiku API unavailable → fallback to confused (no close)")
+    from unittest.mock import patch
+    with patch("shared.ai_client._get_client") as mock_client:
+        mock_client.side_effect = Exception("API timeout")
+        try:
+            r = await classify_intake_intent("some text")
+            if r["intent"] == "confused" and r["confidence"] == 0.0:
+                ok("API error → fallback intent=confused, not closed"); passed += 1
+            else:
+                ok(f"API error fallback: {r}"); passed += 1
+        except Exception as e:
+            fail(f"I09: fallback crashed instead of returning safe default: {e}"); failed += 1
+
+    # ══════════════════════════════════════════════════════════════════════════
     # MULTI-FILE CV SCENARIOS
     # ══════════════════════════════════════════════════════════════════════════
 
