@@ -140,8 +140,9 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-29 (session 20 — Haiku intake)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Haiku intake intelligence live. Chaos tests: B2B 42/42, Hire 42/42.
+**Last updated:** 2026-05-29 (session 20 — owner notifications + event log)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Haiku intake + owner notifications live. Chaos tests: B2B 42/42, Hire 57/57.
+**Pending (build after live tests):** hiring_offers table (base_salary, bonus, food_allowance, hours, shift, start_date, accepted_at, status) — needed to report "agreed salary" in owner notifications. E-T2 currently shows applicant's current salary, not our offer.
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:
   1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
