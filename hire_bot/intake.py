@@ -932,7 +932,8 @@ async def _handle_cv_pending(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
         # After AI_CHECK deflections — ask Haiku: struggling or refusing?
         if new_count == _DEFLECT_AI_CHECK:
-            recent_msgs = _get_recent_deflection_messages(intake_id, limit=5)
+            recent_msgs = _get_recent_deflection_messages(intake_id, limit=4)
+            recent_msgs.append(text)  # include current message — not yet logged
             deflect_result = await check_deflection_intent(recent_msgs)
             if deflect_result["status"] == "refusing" and deflect_result["confidence"] >= 0.75:
                 _log_ai_event(intake_id, "deflection_check", INTAKE_HAIKU_MODEL, INTAKE_DEFLECTION_PROMPT_VERSION,
