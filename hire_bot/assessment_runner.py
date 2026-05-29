@@ -205,7 +205,7 @@ async def run_final_hiring_assessment(package: dict, max_retries: int = 2) -> di
             client = _get_client()
             resp = await client.messages.create(
                 model=ASSESSMENT_MODEL,
-                max_tokens=4096,
+                max_tokens=8192,
                 system=_ASSESSMENT_SYSTEM,
                 messages=[{"role": "user", "content": user_msg}],
             )
