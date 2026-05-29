@@ -39,7 +39,7 @@ from telegram.ext import (
 from telegram.error import TelegramError
 
 import config
-from hire_bot import sessions, questions, intake
+from hire_bot import sessions, questions, intake, correction_flow, offer_flow
 from hire_bot.followups import get_followups_for_triggers
 from hire_bot.scorer import auto_grade
 
@@ -575,6 +575,222 @@ async def _end_screen(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
         logger.error("Assessment pipeline failed for attempt %s: %s", attempt_id, e)
 
 
+# ── Correction / offer private helpers ───────────────────────────────────────
+
+async def _handle_correction_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Applicant typed their question after tapping [I have a question]."""
+    attempt_id = context.user_data.get("attempt_id")
+    context.user_data["awaiting_correction_question"] = False
+    try:
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"Applicant correction question (attempt #{attempt_id}):\n\n{update.message.text}",
+        )
+    except Exception as e:
+        logger.error("_handle_correction_question owner fwd failed: %s", e)
+    await update.message.reply_text(
+        "Thank you. We will review your question and get back to you.\n\n"
+        "អរគុណ។ យើងនឹងពិនិត្យ ហើយឆ្លើយតបប្អូន។",
+        reply_markup=correction_flow.AGREE_KEYBOARD,
+    )
+
+
+async def _handle_offer_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Applicant typed a question about the offer."""
+    attempt_id = (context.user_data.get("attempt_id") or
+                  (context.user_data.get("pending_offer") or {}).get("attempt_id"))
+    context.user_data["awaiting_offer_question"] = False
+    try:
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"Applicant offer question (attempt #{attempt_id}):\n\n{update.message.text}",
+        )
+    except Exception as e:
+        logger.error("_handle_offer_question owner fwd failed: %s", e)
+    await update.message.reply_text(
+        "Thank you. We will reply to you directly.\n\n"
+        "អរគុណ។ យើងនឹងឆ្លើយតបប្អូនដោយផ្ទាល់។"
+    )
+
+
+async def _handle_owner_e_t2_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner typed the E-T2 last working day clarification."""
+    attempt_id        = context.user_data.pop("awaiting_e_t2_for_attempt", None)
+    applicant_user_id = context.user_data.pop("pending_approve_applicant_id", None)
+    suggested_offer   = context.user_data.pop("pending_approve_suggested_offer", {})
+    details           = context.user_data.pop("pending_approve_details", {})
+    clarification     = update.message.text.strip()
+
+    if not applicant_user_id or not suggested_offer:
+        await update.message.reply_text("State lost — retry /approve or use the button again.")
+        return
+
+    await offer_flow.send_offer_message(context.bot, applicant_user_id, suggested_offer, start_date=None)
+    context.application.user_data[applicant_user_id]["pending_offer"] = {
+        "suggested_offer": suggested_offer,
+        "candidate_id":    details.get("candidate_id"),
+        "intake_id":       details.get("intake_id"),
+        "attempt_id":      attempt_id,
+        "assessment_id":   details.get("assessment_id"),
+        "e_t2_note":       clarification,
+    }
+    await update.message.reply_text(
+        f"✅ Offer sent to applicant (attempt #{attempt_id}).\nE-T2 note stored: {clarification}"
+    )
+
+
+# ── Correction callbacks ──────────────────────────────────────────────────────
+
+async def cb_correction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle correction:* button taps from the applicant."""
+    await correction_flow.handle_correction_callback(update, context)
+
+
+# ── Owner offer callbacks ─────────────────────────────────────────────────────
+
+async def cb_owner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner taps [Approve trial — send offer]. Checks E-T2 then sends offer."""
+    query = update.callback_query
+    await query.answer()
+
+    attempt_id = int(query.data.split(":", 2)[2])
+
+    if offer_flow.is_already_approved(attempt_id):
+        await query.edit_message_reply_markup(reply_markup=None)
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"Attempt #{attempt_id} was already approved."
+        )
+        return
+
+    offer_flow.approve_trial_in_db(attempt_id)
+    await query.edit_message_reply_markup(reply_markup=None)
+
+    details = offer_flow.get_attempt_details(attempt_id)
+    if not details or not details.get("applicant_user_id"):
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"Could not load applicant for attempt #{attempt_id}."
+        )
+        return
+
+    applicant_user_id = details["applicant_user_id"]
+    suggested_offer   = details["suggested_offer"]
+
+    if offer_flow.check_e_t2_partial(attempt_id):
+        context.user_data["awaiting_e_t2_for_attempt"]      = attempt_id
+        context.user_data["pending_approve_applicant_id"]    = applicant_user_id
+        context.user_data["pending_approve_suggested_offer"] = suggested_offer
+        context.user_data["pending_approve_details"]         = details
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"E-T2 is incomplete — last working day is missing.\n"
+            f"Please type the candidate's last working day (e.g. 'June 15') "
+            f"or 'skip' to proceed without it."
+        )
+        return
+
+    await offer_flow.send_offer_message(context.bot, applicant_user_id, suggested_offer, start_date=None)
+    context.application.user_data[applicant_user_id]["pending_offer"] = {
+        "suggested_offer": suggested_offer,
+        "candidate_id":    details["candidate_id"],
+        "intake_id":       details["intake_id"],
+        "attempt_id":      attempt_id,
+        "assessment_id":   details["assessment_id"],
+    }
+    await context.bot.send_message(
+        config.OWNER_TELEGRAM_ID,
+        f"✅ Offer sent to applicant (attempt #{attempt_id})."
+    )
+    logger.info("cb_owner_approve: offer sent attempt=%s applicant=%s", attempt_id, applicant_user_id)
+
+
+async def cb_owner_reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner taps [Reject — close]. Marks attempt rejected, no offer sent."""
+    query = update.callback_query
+    await query.answer()
+
+    attempt_id = int(query.data.split(":", 2)[2])
+    offer_flow.reject_trial_in_db(attempt_id)
+    await query.edit_message_reply_markup(reply_markup=None)
+    await context.bot.send_message(
+        config.OWNER_TELEGRAM_ID,
+        f"Attempt #{attempt_id} rejected. No offer will be sent."
+    )
+    logger.info("cb_owner_reject: attempt=%s rejected", attempt_id)
+
+
+# ── Applicant offer callbacks ─────────────────────────────────────────────────
+
+async def cb_offer_accept(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Applicant taps [Yes, I accept]. Creates hiring_offers row."""
+    query = update.callback_query
+    await query.answer()
+
+    if context.user_data.get("offer_accepted"):
+        await query.edit_message_reply_markup(reply_markup=None)
+        return
+
+    pending = context.user_data.get("pending_offer")
+    if not pending:
+        await query.edit_message_text(
+            "Something went wrong. Please contact management.\n\n"
+            "មានបញ្ហា។ សូមទំនាក់ទំនងការគ្រប់គ្រង។"
+        )
+        return
+
+    attempt_id = pending.get("attempt_id")
+    try:
+        offer_id = offer_flow.record_offer_accepted(
+            candidate_id   = pending["candidate_id"],
+            intake_id      = pending.get("intake_id"),
+            attempt_id     = attempt_id,
+            assessment_id  = pending.get("assessment_id"),
+            suggested_offer= pending["suggested_offer"],
+            start_date     = None,
+            reason         = "applicant_accepted_via_bot",
+        )
+        context.user_data["offer_accepted"] = True
+        context.user_data.pop("pending_offer", None)
+    except Exception as e:
+        logger.error("cb_offer_accept record_offer_accepted failed attempt=%s: %s", attempt_id, e)
+        await query.edit_message_text(
+            "Error recording acceptance. Please contact management.\n\n"
+            "មានបញ្ហា។ សូមទំនាក់ទំនងការគ្រប់គ្រង។"
+        )
+        return
+
+    await query.edit_message_reply_markup(reply_markup=None)
+    await context.bot.send_message(
+        update.effective_chat.id,
+        "✅ Your acceptance has been recorded.\n"
+        "We will contact you with the next steps shortly.\n\n"
+        "✅ ការយល់ព្រមរបស់ប្អូនត្រូវបានកត់ត្រា។\n"
+        "យើងនឹងទំនាក់ទំនងប្អូន ជាមួយជំហានបន្ទាប់ ក្នុងពេលឆាប់ៗ។"
+    )
+    try:
+        await context.bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            f"✅ <b>Offer accepted</b> — Attempt #{attempt_id} | Offer #{offer_id}",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.error("cb_offer_accept owner notify failed: %s", e)
+
+
+async def cb_offer_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Applicant taps [I have a question] on the offer."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_reply_markup(reply_markup=None)
+    context.user_data["awaiting_offer_question"] = True
+    await context.bot.send_message(
+        update.effective_chat.id,
+        "Please type your question. We will get back to you soon.\n\n"
+        "សូមវាយសំណួររបស់ប្អូន។ យើងនឹងឆ្លើយតបក្នុងពេលឆាប់ៗ។"
+    )
+
+
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -885,6 +1101,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if update.message.chat.type != "private":
         return
 
+    # ── Owner states (before quiz routing — owner has no quiz attempt) ──────────
+    if update.effective_user.id == config.OWNER_TELEGRAM_ID:
+        if context.user_data.get("awaiting_e_t2_for_attempt"):
+            await _handle_owner_e_t2_answer(update, context)
+            return
+
+    # ── Correction / offer free-text states ─────────────────────────────────
+    if context.user_data.get("awaiting_open_check"):
+        attempt_id_for_check = context.user_data.get("attempt_id")
+        result = await correction_flow.handle_open_check_answer(
+            update, context,
+            targeted_message_id=context.user_data.get("correction_message_id"),
+            attempt_id=attempt_id_for_check,
+        )
+        # Path A: send owner the offer approval button (verbal retest happens in person)
+        primary = (result or {}).get("primary", "")
+        if primary in ("correction_understood", "correction_understood_with_qualifier"):
+            try:
+                details = offer_flow.get_attempt_details(attempt_id_for_check)
+                if details:
+                    await offer_flow.request_owner_approval(
+                        bot=context.bot,
+                        attempt_id=attempt_id_for_check,
+                        assessment_id=details.get("assessment_id"),
+                        candidate_name=details.get("candidate_name", "Applicant"),
+                        suggested_offer=details.get("suggested_offer", {}),
+                        correction_classification=primary,
+                        open_check_answer=update.message.text,
+                    )
+            except Exception as e:
+                logger.error("request_owner_approval after open_check failed: %s", e)
+        return
+
+    if context.user_data.get("awaiting_correction_question"):
+        await _handle_correction_question(update, context)
+        return
+
+    if context.user_data.get("awaiting_offer_question"):
+        await _handle_offer_question(update, context)
+        return
+
     attempt_id = context.user_data.get("attempt_id")
     if not attempt_id:
         # Route to intake funnel
@@ -1077,6 +1334,17 @@ def build_application(token: str) -> Application:
     app.add_handler(CallbackQueryHandler(cb_resume, pattern="^do_resume$"))
     app.add_handler(CallbackQueryHandler(cb_ranking, pattern="^rank:"))
     app.add_handler(CallbackQueryHandler(cb_answer, pattern="^ans:"))
+
+    # Correction flow (applicant)
+    app.add_handler(CallbackQueryHandler(cb_correction, pattern="^correction:"))
+
+    # Offer flow — owner approval
+    app.add_handler(CallbackQueryHandler(cb_owner_approve, pattern=r"^offer:owner_approve:\d+$"))
+    app.add_handler(CallbackQueryHandler(cb_owner_reject,  pattern=r"^offer:owner_reject:\d+$"))
+
+    # Offer flow — applicant response
+    app.add_handler(CallbackQueryHandler(cb_offer_accept,   pattern="^offer:accept$"))
+    app.add_handler(CallbackQueryHandler(cb_offer_question, pattern="^offer:question$"))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 

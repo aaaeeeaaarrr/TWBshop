@@ -40,6 +40,18 @@ OWNER_APPROVE_KB = InlineKeyboardMarkup([
 ])
 
 
+def owner_approval_kb(attempt_id: int) -> InlineKeyboardMarkup:
+    """Dynamic keyboard that encodes attempt_id for reliable owner callbacks."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve trial — send offer",
+                              callback_data=f"offer:owner_approve:{attempt_id}")],
+        [InlineKeyboardButton("❌ Reject — close",
+                              callback_data=f"offer:owner_reject:{attempt_id}")],
+        [InlineKeyboardButton("⏸ Hold — need more info",
+                              callback_data=f"offer:owner_hold:{attempt_id}")],
+    ])
+
+
 def _db():
     from secrets import DATABASE_URL
     return psycopg2.connect(DATABASE_URL)
@@ -145,7 +157,7 @@ async def request_owner_approval(
             config.OWNER_TELEGRAM_ID,
             "\n".join(lines),
             parse_mode="HTML",
-            reply_markup=OWNER_APPROVE_KB,
+            reply_markup=owner_approval_kb(attempt_id),
         )
         # Store pending approval
         conn = _db(); cur = conn.cursor()
@@ -162,22 +174,13 @@ async def request_owner_approval(
         logger.error("request_owner_approval failed: %s", e)
 
 
-async def send_offer_to_applicant(
+async def send_offer_message(
     bot,
     chat_id: int,
     suggested_offer: dict,
     start_date: date | None,
-    candidate_id: int,
-    intake_id: int | None,
-    attempt_id: int,
-    assessment_id: int | None,
-    reason: str,
-) -> int:
-    """
-    Send the offer message and create hiring_offers row.
-    Called only after all gates are confirmed open.
-    Returns offer_id.
-    """
+) -> None:
+    """Send offer message to applicant. No DB write — record is created on applicant accept."""
     h     = suggested_offer.get("hours_per_day", 9)
     base  = suggested_offer.get("recommended_base_salary", 0)
     bonus = suggested_offer.get("bonus", 0)
@@ -207,7 +210,25 @@ async def send_offer_to_applicant(
 
     await bot.send_message(chat_id, message, reply_markup=accept_kb)
 
-    # Record offer
+
+def record_offer_accepted(
+    candidate_id: int,
+    intake_id: int | None,
+    attempt_id: int,
+    assessment_id: int | None,
+    suggested_offer: dict,
+    start_date: date | None,
+    reason: str,
+) -> int:
+    """
+    Create hiring_offers row with offer_status='accepted'. Call only after applicant accepts.
+    Also updates attempt_status to 'offer_accepted'. Returns offer_id.
+    """
+    h    = suggested_offer.get("hours_per_day", 9)
+    base = suggested_offer.get("recommended_base_salary", 0)
+    bonus = suggested_offer.get("bonus", 0)
+    food  = suggested_offer.get("food_allowance_daily_riel", 0)
+
     conn = _db(); cur = conn.cursor()
     try:
         cur.execute("""
@@ -216,8 +237,8 @@ async def send_offer_to_applicant(
                  base_salary, bonus, food_allowance_daily_riel,
                  hours_per_day, total_monthly_display,
                  start_date, offer_status, reason_for_offer,
-                 created_by, proposed_at)
-            VALUES (%s,%s,%s,%s, %s,%s,%s, %s,%s, %s,'proposed',%s,'system',now())
+                 created_by, proposed_at, accepted_at)
+            VALUES (%s,%s,%s,%s, %s,%s,%s, %s,%s, %s,'accepted',%s,'system',now(),now())
             RETURNING id
         """, (
             candidate_id, intake_id, attempt_id, assessment_id,
@@ -227,6 +248,9 @@ async def send_offer_to_applicant(
             reason,
         ))
         offer_id = cur.fetchone()[0]
+        cur.execute("""
+            UPDATE hiring_quiz_attempts SET attempt_status = 'offer_accepted' WHERE id = %s
+        """, (attempt_id,))
         conn.commit()
         return offer_id
     except Exception:
@@ -255,3 +279,113 @@ async def mark_offer_accepted(offer_id: int, attempt_id: int) -> None:
         raise
     finally:
         cur.close(); conn.close()
+
+
+# ── Owner approval helpers ────────────────────────────────────────────────────
+
+def approve_trial_in_db(attempt_id: int) -> None:
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE hiring_quiz_attempts
+            SET quiz_owner_notified_outcome = 'owner_approved_trial'
+            WHERE id = %s
+        """, (attempt_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        cur.close(); conn.close()
+
+
+def reject_trial_in_db(attempt_id: int) -> None:
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE hiring_quiz_attempts
+            SET attempt_status = 'rejected',
+                quiz_owner_notified_outcome = 'owner_rejected'
+            WHERE id = %s
+        """, (attempt_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        cur.close(); conn.close()
+
+
+def is_already_approved(attempt_id: int) -> bool:
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT quiz_owner_notified_outcome FROM hiring_quiz_attempts WHERE id = %s
+        """, (attempt_id,))
+        row = cur.fetchone()
+        return bool(row and row[0] == "owner_approved_trial")
+    finally:
+        cur.close(); conn.close()
+
+
+def get_attempt_details(attempt_id: int) -> dict | None:
+    """Load candidate_id, intake_id, suggested_offer, applicant_user_id for an attempt."""
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT a.candidate_id, c.name, s.telegram_user_id,
+                   ast.id, ast.output_json
+            FROM hiring_quiz_attempts a
+            JOIN hiring_sessions s ON s.id = a.session_id
+            JOIN hiring_candidates c ON c.id = a.candidate_id
+            LEFT JOIN hiring_ai_assessments ast
+                   ON ast.attempt_id = a.id AND ast.output_valid = TRUE
+            WHERE a.id = %s
+            ORDER BY ast.created_at DESC NULLS LAST
+            LIMIT 1
+        """, (attempt_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        candidate_id, candidate_name, applicant_user_id, assessment_id, output_json_raw = row
+
+        cur.execute("""
+            SELECT id FROM hiring_intake_sessions
+            WHERE candidate_id = %s ORDER BY created_at DESC LIMIT 1
+        """, (candidate_id,))
+        intake_row = cur.fetchone()
+        intake_id = intake_row[0] if intake_row else None
+
+        output_json = json.loads(output_json_raw) if output_json_raw else {}
+        return {
+            "candidate_id": candidate_id,
+            "candidate_name": candidate_name,
+            "intake_id": intake_id,
+            "assessment_id": assessment_id,
+            "suggested_offer": output_json.get("suggested_offer", {}),
+            "applicant_user_id": applicant_user_id,
+        }
+    finally:
+        cur.close(); conn.close()
+
+
+def check_e_t2_partial(attempt_id: int) -> bool:
+    """Return True if E-T2 was answered but is missing last_working_day."""
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT raw_answer FROM hiring_quiz_answers
+            WHERE attempt_id = %s AND question_id = 'E-T2'
+        """, (attempt_id,))
+        row = cur.fetchone()
+    finally:
+        cur.close(); conn.close()
+
+    if not row or not row[0]:
+        return False  # Not triggered — not partial
+
+    from hire_bot.assessment_package import detect_partial_answers
+    results = detect_partial_answers([{
+        "question_id": "E-T2", "raw_answer": row[0],
+        "is_correct": None, "completeness_score": None, "contradiction_score": None,
+        "time_spent_seconds": None, "skipped": False,
+    }])
+    return bool(results and results[0].get("is_partial"))

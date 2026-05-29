@@ -140,9 +140,22 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-30 (session 21 — Opus assessment plumbing)
+**Last updated:** 2026-05-30 (session 22 — correction + offer flow wired)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
+**Correction + offer flow wired (session 22):**
+- correction:* callbacks registered in hire_bot/bot.py → delegates to correction_flow.handle_correction_callback
+- DB fallbacks added to correction_flow: targeted_message_id and critical_hold loaded from DB on restart
+- _store_correction_response idempotent: SELECT before INSERT, one response per attempt
+- offer_flow refactored: send_offer_message (no DB) + record_offer_accepted (INSERT only on applicant accept)
+- owner_approval_kb(attempt_id) replaces static OWNER_APPROVE_KB — attempt_id encoded in callback_data
+- offer:owner_approve:{id} / offer:owner_reject:{id} registered in bot.py (owner private chat)
+- offer:accept / offer:question registered (applicant side)
+- E-T2 partial check before offer send — pauses and asks owner for last working day
+- Path A open-check → correction_understood → auto-sends owner approval button (request_owner_approval)
+- handle_open_check_answer returns classification dict for Path A detection
+- 6 new tests in tests/test_correction_offer_flow.py — 87/87 pass
+- secrets.py reformatted (was one-liner, local corruption)
 **Assessment plumbing built (session 21):**
 - hiring_ai_assessments, hiring_targeted_messages, hiring_correction_responses, hiring_offers tables
 - assessment_package.py: evidence builder + Sonnet rule detectors (critical signals, partial answers, consistency checks)
@@ -162,8 +175,6 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Pending (before Opus assessment is truly live):**
 - Opus system prompt calibration with approved examples (waiting on clean samples)
-- Wire correction_flow handlers into hire_bot/bot.py (callback handler for correction: prefix)
-- Wire offer approval into hire_bot/bot.py (owner callback for offer:owner_approve)
 - Start hire bot service: systemctl start twbshop-hire
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:

@@ -83,6 +83,34 @@ def _db():
     return psycopg2.connect(DATABASE_URL)
 
 
+def _get_targeted_message_id_for_attempt(attempt_id: int) -> int | None:
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id FROM hiring_targeted_messages
+            WHERE attempt_id = %s ORDER BY created_at DESC LIMIT 1
+        """, (attempt_id,))
+        row = cur.fetchone()
+        return row[0] if row else None
+    finally:
+        cur.close(); conn.close()
+
+
+def _get_critical_hold_for_attempt(attempt_id: int) -> bool:
+    """critical_hold = True when the assessment found at least one critical signal."""
+    conn = _db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT critical_signal_count FROM hiring_ai_assessments
+            WHERE attempt_id = %s AND output_valid = TRUE
+            ORDER BY created_at DESC LIMIT 1
+        """, (attempt_id,))
+        row = cur.fetchone()
+        return bool(row and row[0] and row[0] > 0)
+    finally:
+        cur.close(); conn.close()
+
+
 async def send_targeted_message(
     bot,
     chat_id: int,
@@ -146,9 +174,17 @@ async def handle_correction_callback(update: Update, context: ContextTypes.DEFAU
     data = query.data
     chat_id = update.effective_chat.id
 
-    targeted_message_id = context.user_data.get("correction_message_id")
     attempt_id          = context.user_data.get("attempt_id")
+    targeted_message_id = context.user_data.get("correction_message_id")
     is_critical_hold    = context.user_data.get("correction_critical_hold", False)
+
+    # DB fallback — survive bot restarts
+    if attempt_id and not targeted_message_id:
+        targeted_message_id = _get_targeted_message_id_for_attempt(attempt_id)
+        context.user_data["correction_message_id"] = targeted_message_id
+    if attempt_id and not is_critical_hold:
+        is_critical_hold = _get_critical_hold_for_attempt(attempt_id)
+        context.user_data["correction_critical_hold"] = is_critical_hold
 
     if data in ("correction:agree", "correction:agree_km"):
         if is_critical_hold:
@@ -192,11 +228,14 @@ async def handle_open_check_answer(
     context: ContextTypes.DEFAULT_TYPE,
     targeted_message_id: int,
     attempt_id: int,
-) -> None:
-    """Process the open understanding check answer. Opus classifies it."""
+) -> dict:
+    """
+    Process the open understanding check answer. Opus classifies it.
+    Returns the classification dict so the caller can trigger offer approval on Path A.
+    """
     answer_text = (update.message.text or "").strip()
     if not answer_text:
-        return
+        return {}
 
     context.user_data["awaiting_open_check"] = False
 
@@ -243,6 +282,8 @@ async def handle_open_check_answer(
             f"{RESIST_EN}\n\n{RESIST_KH}"
         )
 
+    return classification
+
 
 async def _classify_correction_response(answer_text: str) -> dict:
     """Second Opus call: classify the applicant's open-check answer."""
@@ -285,6 +326,16 @@ def _store_correction_response(
 ) -> None:
     conn = _db(); cur = conn.cursor()
     try:
+        # Idempotency: one response per attempt
+        cur.execute(
+            "SELECT id FROM hiring_correction_responses WHERE attempt_id = %s LIMIT 1",
+            (attempt_id,)
+        )
+        if cur.fetchone():
+            logger.info("_store_correction_response: already stored for attempt %s — skipping", attempt_id)
+            conn.close()
+            return
+
         cur.execute("""
             INSERT INTO hiring_correction_responses
                 (attempt_id, targeted_message_id, button_tapped,
