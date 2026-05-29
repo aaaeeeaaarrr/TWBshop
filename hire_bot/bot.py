@@ -567,6 +567,13 @@ async def _end_screen(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
 
     await _notify_owner_quiz(context.bot, chat_id, attempt_id, outcome="completed")
 
+    # Run Opus assessment pipeline in background — quiz completion is never blocked
+    try:
+        from hire_bot.assessment_pipeline import run_full_assessment
+        await run_full_assessment(context.bot, attempt_id, session_id)
+    except Exception as e:
+        logger.error("Assessment pipeline failed for attempt %s: %s", attempt_id, e)
+
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 
