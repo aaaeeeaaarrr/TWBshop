@@ -39,7 +39,12 @@ A Telegram-based bakery operations system that handles:
 ### 1. AI API Calls Only via shared/ai_client.py
 All Claude API calls go through `shared/ai_client.py`. No other module imports the
 `anthropic` SDK directly. Natural language order parsing stays rule-based (regex,
-difflib) — AI is used only for photo analysis and staff message monitoring.
+difflib).
+**AI usage rules by system:**
+- Retail/B2B bots: photo analysis, staff message monitoring, receipt clarity
+- Hire bot intake: max 2 cheap Haiku calls per applicant — intent classification + CV extraction (text only). No media/photo analysis before TEST_UNLOCKED. No expensive scoring before arrival.
+- Hire bot scoring: Opus/Sonnet after TEST_UNLOCKED only
+- All AI decisions during intake are logged to `hiring_intake_ai_events` for audit
 When ANTHROPIC_API_KEY is empty the system falls back to manual-review mode automatically.
 
 ### 2. Always Build the Interface First
@@ -135,8 +140,8 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-29 (session 20 final)
-**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Chaos tests: B2B 42/42, Hire 33/33. Multi-file CV storage live. 5 bugs found and fixed. Actor logging live. Order lock boundary tested.
+**Last updated:** 2026-05-29 (session 20 — Haiku intake)
+**Phase:** Retail bot complete. B2B bot Phases 1 + 2 complete. Ops Intelligence Layer 1 complete. GM Manager bot live. Hiring system scoring engine + intake funnel complete. Haiku intake intelligence live. Chaos tests: B2B 42/42, Hire 42/42.
 **Last completed (session 20):**
 - B2B chaos test: 38/38 pass. 5 bugs found and fixed:
   1. FIXED: bm_edit_order (SEE YOUR ORDERS) was deleting the live [Confirm][Edit][Cancel] message — _menu_msg not cleared in _do_confirm
