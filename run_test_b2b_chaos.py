@@ -1013,6 +1013,70 @@ async def run():
     else:
         fail(f"S12 still broken: got {repr(str(CAP.edit_text)[:80])}"); failed += 1
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # ORDER LOCK BOUNDARY — 10:09:59 allowed, 10:10:00 locked (Phnom Penh)
+    # ══════════════════════════════════════════════════════════════════════════
+    from unittest.mock import patch
+    from b2b_bot.menu_keyboards import _orders_locked
+
+    # ── L01: 10:09:59 UTC (= 17:09:59 PP) → NOT locked ──────────────────────
+    head("L01: 10:09:59 UTC (17:09:59 PP) → orders NOT locked")
+    from datetime import timezone as tz
+    just_before = datetime(2026, 5, 29, 15, 9, 59, tzinfo=tz.utc)
+    with patch("b2b_bot.menu_keyboards.datetime") as mock_dt:
+        mock_dt.now.return_value = just_before
+        locked = _orders_locked()
+    if not locked:
+        ok("10:09:59 UTC → not locked"); passed += 1
+    else:
+        fail("10:09:59 UTC should NOT be locked"); failed += 1
+
+    # ── L02: 10:10:00 UTC (= 17:10:00 PP) → locked ───────────────────────────
+    head("L02: 10:10:00 UTC (17:10:00 PP) → orders LOCKED")
+    cutoff = datetime(2026, 5, 29, 15, 10, 0, tzinfo=tz.utc)
+    with patch("b2b_bot.menu_keyboards.datetime") as mock_dt:
+        mock_dt.now.return_value = cutoff
+        locked = _orders_locked()
+    if locked:
+        ok("10:10:00 UTC → locked"); passed += 1
+    else:
+        fail("10:10:00 UTC should be locked"); failed += 1
+
+    # ── L03: 10:10:01 UTC (= 17:10:01 PP) → still locked ────────────────────
+    head("L03: 10:10:01 UTC → still locked")
+    one_after = datetime(2026, 5, 29, 15, 10, 1, tzinfo=tz.utc)
+    with patch("b2b_bot.menu_keyboards.datetime") as mock_dt:
+        mock_dt.now.return_value = one_after
+        locked = _orders_locked()
+    if locked:
+        ok("10:10:01 UTC → locked"); passed += 1
+    else:
+        fail("10:10:01 UTC should still be locked"); failed += 1
+
+    # ── L04: bm_edit_session at lock time → "Orders locked" alert ────────────
+    head("L04: Click bm_edit_session_0 after 10:10pm → blocked with alert")
+    _reset_all_state(); CAP.reset()
+    ctx = make_context()
+    # Put an order in DB to edit
+    await _add_croissant_to_cart(ctx)
+    await handle_menu_callback(make_callback("bm_confirm"), ctx)
+    await handle_menu_callback(make_callback("bm_cs_default"), ctx)
+    from b2b_bot.order_handlers import handle_callback as order_cb
+    await order_cb(make_callback("b2b_confirm"), ctx)
+    _reset_all_state()
+    ctx = make_context()
+    after_cutoff = datetime(2026, 5, 29, 15, 10, 5, tzinfo=tz.utc)
+    with patch("b2b_bot.menu_handlers.datetime") as mock_dt, \
+         patch("b2b_bot.menu_keyboards.datetime") as mock_dt2:
+        mock_dt.now.return_value = after_cutoff
+        mock_dt2.now.return_value = after_cutoff
+        CAP.reset()
+        await handle_menu_callback(make_callback("bm_edit_session_0"), ctx)
+    if CAP.alert and ("locked" in CAP.alert.lower() or "10pm" in CAP.alert.lower() or "10:10" in CAP.alert.lower()):
+        ok("bm_edit_session after lock → 'orders locked' alert"); passed += 1
+    else:
+        fail(f"Expected lock alert, got alert={CAP.alert!r}"); failed += 1
+
     # ── Summary ───────────────────────────────────────────────────────────────
     cleanup()
     print(f"\n{BOLD}B2B CHAOS: {passed} passed, {failed} failed{RESET}")

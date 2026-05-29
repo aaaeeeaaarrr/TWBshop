@@ -238,6 +238,15 @@ async def handle_group_message(update: Update, context) -> None:
     await maybe_send_menu_prompt(chat_id, context.bot)
 
 
+def _actor(query) -> str:
+    """Return 'Name (id)' string for the user who tapped a button."""
+    u = query.from_user
+    if not u:
+        return "unknown"
+    name = u.full_name or u.username or "?"
+    return f"{name} ({u.id})"
+
+
 async def handle_callback(update: Update, context) -> None:
     query = update.callback_query
     await query.answer()
@@ -246,6 +255,7 @@ async def handle_callback(update: Update, context) -> None:
         return
 
     if query.data == "b2b_confirm":
+        logger.info("b2b_confirm by %s in chat %s", _actor(query), chat_id)
         pending = _pending.pop(chat_id, None) or get_pending_order(chat_id)
         _state.pop(chat_id, None); set_order_state(chat_id, None)
         _last_confirmation.pop(chat_id, None); set_last_confirmation_msg(chat_id, None)
@@ -269,6 +279,7 @@ async def handle_callback(update: Update, context) -> None:
         set_menu_message_id(chat_id, None)
 
     elif query.data == "b2b_edit":
+        logger.info("b2b_edit by %s in chat %s", _actor(query), chat_id)
         pending = _pending.pop(chat_id, None) or get_pending_order(chat_id) or {}
         _state.pop(chat_id, None); set_order_state(chat_id, None)
         set_pending_order(chat_id, None)
@@ -304,6 +315,7 @@ async def handle_callback(update: Update, context) -> None:
         )
 
     elif query.data == "b2b_cancel":
+        logger.info("b2b_cancel by %s in chat %s", _actor(query), chat_id)
         pending       = _pending.get(chat_id) or get_pending_order(chat_id) or {}
         delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
 

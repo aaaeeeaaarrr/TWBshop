@@ -372,6 +372,7 @@ Handles wholesale orders from restaurant and bar customers via their own Telegra
 
 ### B2B Design Rules
 - Group chat = the customer. Anyone in the group can order.
+- **Multi-user policy (intentional):** State is keyed by group chat_id, not by individual user_id. Any member of the group can build, edit, confirm, or cancel the group's order. This is by design — B2B customers are businesses where multiple staff may need to interact. Actor (name + user_id) is logged at every confirm/edit/cancel/location-change for audit purposes.
 - Re-order same day: bot asks "is this extra?", then re-confirms full merged order.
 - Gram-required items: pulls from history first, falls back to standard grams (shown in confirmation).
 - Attributes (e.g. sesame type): pulls from history first, falls back to menu standard.

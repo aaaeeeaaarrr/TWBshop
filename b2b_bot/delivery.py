@@ -74,5 +74,7 @@ async def handle_location(update: Update, context) -> None:
         f"Road distance: {km:.1f} km\n"
         f"Grab Express estimate: ${cost:.2f}"
     )
-    logger.info("Location set for %s (chat %s): %.4f,%.4f — %.0fm — $%.2f",
-                business, chat_id, loc.latitude, loc.longitude, distance, cost)
+    actor = update.effective_user
+    actor_str = f"{actor.full_name} ({actor.id})" if actor else "unknown"
+    logger.info("Location set for %s (chat %s) by %s: %.4f,%.4f — %.0fm — $%.2f",
+                business, chat_id, actor_str, loc.latitude, loc.longitude, distance, cost)
