@@ -961,6 +961,40 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
+async def _notify_misrouted(bot, msg, sender: str, group_name: str, reason: str) -> None:
+    """DM owner about a message that looks like it landed in the wrong group."""
+    try:
+        await bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text=f"📍 Possible wrong group\n{sender} in {group_name}\n{reason}",
+        )
+        await bot.forward_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            from_chat_id=msg.chat_id,
+            message_id=msg.message_id,
+        )
+    except Exception as e:
+        logger.error("_notify_misrouted failed: %s", e)
+
+
+async def _check_misrouted_photo(bot, msg, sender: str) -> None:
+    """For photos in non-REPORT groups: check if it looks like a receipt. Notify owner if so."""
+    try:
+        photo_file = await msg.photo[-1].get_file()
+        photo_bytes = bytes(await photo_file.download_as_bytearray())
+        result = await assess_receipt_photo(photo_bytes)
+        if result.get("is_receipt"):
+            group_name = msg.chat.title or "Unknown group"
+            readable = result.get("readable_partial", "")
+            detail = f" Readable: {readable}" if readable else ""
+            await _notify_misrouted(
+                bot, msg, sender, group_name,
+                f"Looks like a receipt or expense — should this be in REPORT?{detail}",
+            )
+    except Exception as e:
+        logger.error("_check_misrouted_photo failed: %s", e)
+
+
 async def _check_report_receipt(msg, context) -> None:
     """Download a TWB REPORT photo, assess clarity, reply in-group if unclear."""
     try:
@@ -969,7 +1003,15 @@ async def _check_report_receipt(msg, context) -> None:
         examples = receipt_get_answered_examples(msg.chat_id)
         result = await assess_receipt_photo(photo_bytes, past_examples=examples)
 
-        if not result["is_receipt"] or result["is_clear"]:
+        if not result["is_receipt"]:
+            sender = msg.from_user.full_name if msg.from_user else "Staff"
+            await _notify_misrouted(
+                context.bot, msg, sender, "REPORT",
+                "Photo doesn't look like a receipt or expense document.",
+            )
+            return
+
+        if result["is_clear"]:
             return
 
         sender = msg.from_user.full_name if msg.from_user else "Staff"
@@ -1075,6 +1117,20 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if msg.photo:
             await _check_report_receipt(msg, context)
             return
+        # Anything else in REPORT (text, document, video) — notify owner, stop here
+        content_type = ("Document" if msg.document else
+                        "Video" if msg.video else
+                        "Text" if text.strip() else "Message")
+        preview = f": {text[:120]}" if text.strip() else ""
+        await _notify_misrouted(
+            context.bot, msg, sender, "REPORT",
+            f"{content_type} in REPORT (not a receipt photo){preview}",
+        )
+        return
+
+    # Non-REPORT groups: check if a photo looks like a receipt
+    if msg.photo:
+        asyncio.create_task(_check_misrouted_photo(context.bot, msg, sender))
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():
