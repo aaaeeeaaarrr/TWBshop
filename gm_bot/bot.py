@@ -1117,15 +1117,14 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if msg.photo:
             await _check_report_receipt(msg, context)
             return
-        # Anything else in REPORT (text, document, video) — notify owner, stop here
-        content_type = ("Document" if msg.document else
-                        "Video" if msg.video else
-                        "Text" if text.strip() else "Message")
-        preview = f": {text[:120]}" if text.strip() else ""
-        await _notify_misrouted(
-            context.bot, msg, sender, "REPORT",
-            f"{content_type} in REPORT (not a receipt photo){preview}",
-        )
+        # Documents/videos in REPORT are unusual — notify owner
+        if msg.document or msg.video:
+            content_type = "Document" if msg.document else "Video"
+            await _notify_misrouted(
+                context.bot, msg, sender, "REPORT",
+                f"{content_type} in REPORT (not a receipt photo)",
+            )
+        # Text in REPORT is normal (staff notes, corrections) — record silently, no DM
         return
 
     # Non-REPORT groups: check if a photo looks like a receipt
