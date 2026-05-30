@@ -137,6 +137,50 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 ---
 
+## REPORT Finance Tracking — Design Notes & Pending Decisions (GM bot)
+> Gathering/design phase (Opus). NO rules built yet. Read this every session and remind the owner of the pending list.
+
+**Group:** TWB REPORT (chat_id -5136886404). Replaced Facebook Messenger daily reports. Live data since 2026-05-27.
+
+**Confirmed business model:**
+- **Business day = 06:00 → 06:00** (24h). Café/bakery trades late.
+- **~05:00:** staff post the final 24h total — deliberately 1h before the 06:00 close so there's a buffer to hunt down any discrepancy.
+- **05:00–06:00:** mistake-hunting hour. If clean, books close.
+- Receipts posted **after the ~05:00 close but before 06:00 roll into the NEXT day.**
+- A final total posted ~05:00 and labelled e.g. "28/05" closes the window that ran 06:00 27th → 06:00 28th. **File it under the day that just closed (the 27th), not the morning-of-writing label.**
+- Two reports per day: **afternoon mid-report (~16:00, ≈ day-shift handover)** + **05:00 final (full 24h).** Keep BOTH, label mid vs final, so a discrepancy can be localised to a shift (night ≈ final − mid).
+
+**Daily total report format (decoded + verified on 3 days):**
+```
+DD/MM/YYYY
+Cash on hand : $ 600        ← starting float (constant)
+cash income  : $ X          ← cash sales
+Aba income   : $ Y          ← bank-app (ABA) sales
+total sales  : $ X+Y        ← revenue
+Cash expense : $ Z          ← cash paid out
+ABA Expense  : $ W          ← bank paid out
+Total        : $ ___        ← expected drawer = 600 + cash income − cash expense
+Cash count   : $ ___        ← physically counted
+Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost = short)
+```
+- ABA money never touches the cash drawer reconciliation (bank-app, tracked separately).
+- **FX margin is BY DESIGN:** peg is 4000 riel = $1, but $1 usually buys a bit more than 4000 riel. Staff are encouraged to pay local riel expenses, so the float more often than not ends with a small surplus. **A small "Over" is EXPECTED and benign — never flag it.** Real signals = "Lost"/shortfall and sales dropping.
+
+**GM behaviour (owner-gated — same pattern as concern cards):**
+- GM parses each report, recomputes the drawer math (600 + cash in − cash out), catches staff arithmetic slips (e.g. May 27 was off by 10¢) and format breaks.
+- For NOW: GM reports computed errors + anomalies **to the OWNER privately only.** Owner reviews daily, we tune over the terminal. GM does **NOT** tell staff about calc errors until owner explicitly says "GM can now inform them."
+- Also wanted: daily/weekly digest (sales, expenses, cumulative Over/Lost trend) + anomaly flags (Lost over threshold, sales drop).
+
+**PENDING DECISIONS (discuss with owner over terminal — remind every session until resolved):**
+1. **Overexpense carryover** — current practice: when a day's cash out > cash in, the deficit is carried into the next day as an expense taken from the $600 float. Owner wants a cleaner model. Opus to propose options.
+2. **Float restoration** — how the drawer returns to $600 after a cash-negative day (top-up source?). Tied to #1.
+3. **Thresholds** — what "Lost" size and what sales-drop % should trigger a flag. Set after baselining more days.
+4. **Shift cutoff** — exact handover time the mid-report represents, so night = final − mid is accurate.
+5. **Dedup prerequisite** — every REPORT message is currently double-stored (historical import overlapped live GM capture: same sender_id + sent_at + text, different message_id). Must dedupe before any aggregation.
+6. **Go-live switch** — owner to confirm when the GM may start informing staff directly about calc errors.
+
+---
+
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
