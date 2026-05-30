@@ -140,8 +140,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-30 (session 22 — correction + offer flow wired + live test passed)
+**Last updated:** 2026-05-30 (session 23 — GM misrouted message detection + GM_BOT_TOKEN restored)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
+
+**GM misrouted message detection (session 23):**
+- `_notify_misrouted()`: DMs owner + forwards the message whenever something lands in the wrong group
+- `_check_misrouted_photo()`: for photos in non-REPORT groups — runs `assess_receipt_photo()` (Haiku, non-blocking via `asyncio.create_task`) — notifies owner if `is_receipt=True`
+- `_check_report_receipt()`: now notifies owner when a non-receipt photo arrives in REPORT (previously silent)
+- REPORT group text/doc/video: notifies owner with content type + preview, then stops (was previously falling through to Stock Checks concern scanner — bug fixed)
+- GM_BOT_TOKEN was missing from secrets.py (lost during session 22 reformatting) — restored to local secrets.py, pushed to twbshop-secrets repo, added to server. GM bot active.
 
 **Correction + offer flow wired (session 22):**
 - correction:* callbacks registered in hire_bot/bot.py → delegates to correction_flow.handle_correction_callback
