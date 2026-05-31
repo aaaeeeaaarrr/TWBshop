@@ -177,7 +177,7 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 3. **Thresholds** — what "Lost" size and what sales-drop % should trigger a flag. Set after baselining more days.
 4. **Shift cutoff** — exact handover time the mid-report represents, so night = final − mid is accurate.
 5. **Dedup prerequisite** — every REPORT message is currently double-stored (historical import overlapped live GM capture: same sender_id + sent_at + text, different message_id). Must dedupe before any aggregation.
-6. **Go-live switch** — owner to confirm when the GM may start informing staff directly about calc errors.
+6. **Go-live switch** — DONE 2026-05-31: gm_state report_corrections_to_staff='true'. GM now posts worked-out math corrections IN-GROUP (tagging the report) and opens a clarification so the ladder records staff reasons.
 
 ---
 
@@ -205,7 +205,14 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - shared/database.py: gm_daily_reports table + init_gm_finance_db + save_daily_report (idempotent on chat+message_id) + get_daily_reports_for_day. init called from run_gm_bot.py.
 - gm_bot/bot.py: REPORT text that is_daily_report -> _store_daily_report_if_any (parse+recompute+store, NO messaging — owner-gated). MISROUTED ROUTING REMOVED per owner (no more wrong-group DMs; pure ingest). Receipt clarity check on REPORT photos unchanged.
 - tests/test_finance.py: 14 tests pass (real reports 27/28/30, math-error catch, day-boundary, 4:55 final, caps/comma/spacing variations).
-- STILL TO DO per owner's design: AI fallback when free-parse fails + learn new aliases; knowledge-brief (built by Opus-me on subscription, not bot API); semantic concern detection (replace 2-keyword); clarification escalation ladder (10/30/120 + in-group tagged "Explain"); stock minimums intake; new /commands. Dedup (#5) before aggregation. See REPORT Finance Tracking section.
+- STILL TO DO per owner's design: AI fallback when free-parse fails + learn new aliases; knowledge-brief (built by Opus-me on subscription, not bot API); semantic concern detection (replace 2-keyword); stock minimums intake; new /commands. Dedup (#5) before aggregation. See REPORT Finance Tracking section.
+
+**Clarification escalation ladder — built + staff-facing ON (session 24):**
+- gm_bot/clarify.py: pure logic — is_checking_phrase + decide_ladder_action (nudge 10min open / 30min checking / escalate at 2h) + nudge_text (hardens after 3) + escalation_text. 9 tests.
+- gm_clarifications table + init_gm_clarifications_db + create/find/nudge/checking/answer/escalate helpers.
+- bot.py: when GM posts a staff-facing math correction it opens a clarification (question_msg_id = the correction msg). _clarification_ladder_job (every 120s) nudges in-group on schedule, escalates to owner at 2h. _resolve_clarification_response records staff reply as the answer (their reason), or backs off to 30min on a "we're checking" phrase.
+- report_corrections_to_staff flipped to 'true' — corrections now go in-group, tagging the report.
+- 26 tests pass (17 finance + 9 clarify). NOTE: receipts not yet wired into the ladder (only report_math); "answer doesn't add up" auto-escalation is a future semantic hook.
 
 **GM misrouted message detection (session 23):**
 - `_notify_misrouted()`: DMs owner + forwards the message whenever something lands in the wrong group

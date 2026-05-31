@@ -29,13 +29,18 @@ from shared.database import (
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, gm_get_state,
+    init_gm_clarifications_db, gm_create_clarification, gm_get_active_clarifications,
+    gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
+    gm_record_clarification_nudge, gm_set_clarification_checking,
+    gm_answer_clarification, gm_escalate_clarification,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
-from gm_bot import finance
+from gm_bot import finance, clarify
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -1002,8 +1007,19 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
     to_staff = gm_get_state("report_corrections_to_staff") == "true"
     try:
         if to_staff:
-            await context.bot.send_message(
+            sent = await context.bot.send_message(
                 chat_id=msg.chat_id, text=body, reply_to_message_id=msg.message_id,
+            )
+            # Open a clarification so the ladder nudges/escalates until staff explain.
+            gm_create_clarification(
+                chat_id=msg.chat_id,
+                chat_title=msg.chat.title,
+                topic="report_math",
+                question_msg_id=sent.message_id,
+                target_msg_id=msg.message_id,
+                question_text=body,
+                sender_name=(msg.from_user.full_name if msg.from_user else None),
+                context_ref=str(full.get("report_id")),
             )
         else:
             await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
@@ -1016,6 +1032,66 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
                 pass
     except Exception as e:
         logger.error("_maybe_correct_report failed: %s", e)
+
+
+def _resolve_clarification_response(chat_id: int, msg, text: str) -> None:
+    """Record a staff response to a GM clarification. Direct reply = answer (or 'checking');
+    a loose 'we're checking' message while any clarification is open backs the ladder off."""
+    now = datetime.now(timezone.utc)
+    if msg.reply_to_message:
+        clar = gm_find_clarification_by_question_msg(chat_id, msg.reply_to_message.message_id)
+        if clar and clar["status"] in ("open", "checking"):
+            if clarify.is_checking_phrase(text):
+                gm_set_clarification_checking(clar["id"], now + clarify.NUDGE_INTERVAL_CHECKING)
+            else:
+                gm_answer_clarification(clar["id"], text.strip())
+                logger.info("Clarification %s answered by %s", clar["id"], clar.get("sender_name"))
+            return
+    # Not a direct reply — but "give us time / checking" while clarifications are open -> back off
+    if clarify.is_checking_phrase(text):
+        for clar in gm_get_active_clarifications_for_chat(chat_id):
+            if clar["status"] == "open":
+                gm_set_clarification_checking(clar["id"], now + clarify.NUDGE_INTERVAL_CHECKING)
+
+
+async def _clarification_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Every couple of minutes: nudge open clarifications on schedule, escalate at 2h."""
+    now = datetime.now(timezone.utc)
+    for clar in gm_get_active_clarifications():
+        action, new_next = clarify.decide_ladder_action(
+            clar["status"], clar["created_at"], now, clar.get("next_action_at"),
+        )
+        try:
+            if action == "nudge":
+                reply_to = clar.get("question_msg_id") or clar.get("target_msg_id")
+                nudge = clarify.nudge_text(clar["topic"], clar.get("nudge_count", 0))
+                try:
+                    await context.bot.send_message(
+                        chat_id=clar["chat_id"], text=nudge, reply_to_message_id=reply_to,
+                    )
+                except Exception:
+                    await context.bot.send_message(chat_id=clar["chat_id"], text=nudge)
+                gm_record_clarification_nudge(clar["id"], new_next)
+                logger.info("Clarification %s nudged (count %s)", clar["id"], clar.get("nudge_count", 0) + 1)
+            elif action == "escalate":
+                body = clarify.escalation_text(
+                    clar["topic"], clar.get("chat_title") or str(clar["chat_id"]),
+                    clar.get("sender_name"), clar.get("question_text") or "",
+                    clar.get("answer_text"),
+                )
+                await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+                if clar.get("target_msg_id"):
+                    try:
+                        await context.bot.forward_message(
+                            chat_id=config.OWNER_TELEGRAM_ID,
+                            from_chat_id=clar["chat_id"], message_id=clar["target_msg_id"],
+                        )
+                    except Exception:
+                        pass
+                gm_escalate_clarification(clar["id"])
+                logger.info("Clarification %s escalated to owner", clar["id"])
+        except Exception as e:
+            logger.error("ladder action %s failed for clar %s: %s", action, clar["id"], e)
 
 
 async def _check_report_receipt(msg, context) -> None:
@@ -1123,6 +1199,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.debug("ops_messages log failed: %s", _e)
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
+
+    # Did staff respond to a GM clarification question? (any group) — records their reason.
+    if text.strip():
+        try:
+            _resolve_clarification_response(chat_id, msg, text)
+        except Exception as e:
+            logger.error("clarification resolve failed: %s", e)
 
     # TWB REPORT group: receipt photos, clarification replies, daily-report parsing
     if chat_id == config.DAILY_REPORT_CHAT_ID:
@@ -1279,6 +1362,13 @@ def build_app() -> Application:
         interval=3600,
         first=300,
         name="gm_auto_skip_proposals",
+    )
+    # Clarification escalation ladder: nudge / escalate on schedule
+    app.job_queue.run_repeating(
+        _clarification_ladder_job,
+        interval=120,
+        first=90,
+        name="gm_clarification_ladder",
     )
 
     return app

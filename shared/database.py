@@ -2447,3 +2447,130 @@ def recompute_all_superseded() -> int:
             for g in groups:
                 _recompute_superseded(cur, str(g["business_day"]), g["report_kind"])
             return len(groups)
+
+
+# ─── GM clarification escalation ladder ───────────────────────────────────────
+
+def init_gm_clarifications_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_clarifications (
+                    id              SERIAL PRIMARY KEY,
+                    chat_id         BIGINT NOT NULL,
+                    chat_title      TEXT,
+                    topic           TEXT NOT NULL,        -- report_math | receipt_clarity
+                    question_msg_id BIGINT,               -- GM's question message (replies detected on this)
+                    target_msg_id   BIGINT,               -- the message being asked about
+                    question_text   TEXT,
+                    context_ref     TEXT,                 -- e.g. report id
+                    sender_name     TEXT,
+                    status          TEXT DEFAULT 'open',  -- open | checking | answered | escalated | closed
+                    nudge_count     INTEGER DEFAULT 0,
+                    created_at      TIMESTAMPTZ DEFAULT NOW(),
+                    last_nudge_at   TIMESTAMPTZ,
+                    next_action_at  TIMESTAMPTZ,
+                    answer_text     TEXT,
+                    answered_at     TIMESTAMPTZ,
+                    escalated_at    TIMESTAMPTZ
+                );
+                CREATE INDEX IF NOT EXISTS idx_gm_clar_active
+                    ON gm_clarifications (status) WHERE status IN ('open','checking');
+                CREATE INDEX IF NOT EXISTS idx_gm_clar_qmsg
+                    ON gm_clarifications (chat_id, question_msg_id);
+            """)
+    logger.info("GM clarifications DB ready")
+
+
+def gm_create_clarification(chat_id: int, chat_title: str | None, topic: str,
+                            question_msg_id: int | None, target_msg_id: int | None,
+                            question_text: str, sender_name: str | None,
+                            context_ref: str | None, first_nudge_after_min: int = 10) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_clarifications
+                    (chat_id, chat_title, topic, question_msg_id, target_msg_id,
+                     question_text, sender_name, context_ref, status,
+                     created_at, next_action_at)
+                VALUES (%s,%s,%s,%s,%s, %s,%s,%s,'open',
+                        NOW(), NOW() + (%s || ' minutes')::interval)
+                RETURNING id
+            """, (chat_id, chat_title, topic, question_msg_id, target_msg_id,
+                  question_text, sender_name, context_ref, str(first_nudge_after_min)))
+            return cur.fetchone()["id"]
+
+
+def gm_get_active_clarifications() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_clarifications
+                WHERE status IN ('open','checking')
+                ORDER BY created_at
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_active_clarifications_for_chat(chat_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_clarifications
+                WHERE chat_id = %s AND status IN ('open','checking')
+                ORDER BY created_at
+            """, (chat_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_find_clarification_by_question_msg(chat_id: int, question_msg_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_clarifications
+                WHERE chat_id = %s AND question_msg_id = %s
+                ORDER BY id DESC LIMIT 1
+            """, (chat_id, question_msg_id))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def gm_record_clarification_nudge(clar_id: int, next_action_at) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_clarifications
+                SET nudge_count = nudge_count + 1, last_nudge_at = NOW(),
+                    next_action_at = %s
+                WHERE id = %s
+            """, (next_action_at, clar_id))
+
+
+def gm_set_clarification_checking(clar_id: int, next_action_at) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_clarifications
+                SET status = 'checking', next_action_at = %s
+                WHERE id = %s AND status = 'open'
+            """, (next_action_at, clar_id))
+
+
+def gm_answer_clarification(clar_id: int, answer_text: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_clarifications
+                SET status = 'answered', answer_text = %s, answered_at = NOW()
+                WHERE id = %s
+            """, (answer_text, clar_id))
+
+
+def gm_escalate_clarification(clar_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_clarifications
+                SET status = 'escalated', escalated_at = NOW()
+                WHERE id = %s
+            """, (clar_id,))
