@@ -14,7 +14,7 @@ from shared.database import (
     gm_get_new_messages, gm_get_new_messages_multi, gm_get_low_stock_history,
     gm_save_concern, gm_set_state, gm_get_state, gm_get_rules,
 )
-from shared.ai_client import _get_client, _encode
+from shared.ai_client import _get_client, _encode, detect_concern_semantic
 
 logger = logging.getLogger(__name__)
 
@@ -138,8 +138,17 @@ def _detect_attendance_concerns(messages: list[dict], rules: list[dict]) -> list
     return concerns
 
 
-def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]:
-    """Detect waste, mistakes from text messages. Returns list of concern dicts."""
+# Human label per concern type for the concern card description.
+_CONCERN_VERB = {
+    "waste":     "reported waste/spoilage",
+    "mistake":   "reported a mistake",
+    "low_stock": "flagged low stock",
+}
+
+
+def _keyword_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]:
+    """Free fallback: detect waste/mistakes by keyword. Used when the API key is
+    empty, semantic detection is disabled, or an AI call errors out."""
     concerns = []
     for msg in messages:
         text = msg.get("text") or ""
@@ -177,11 +186,82 @@ def _detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]
     return concerns
 
 
-def analyze_live_message(chat_id: int, msg_id: int, sender: str, text: str) -> list[dict]:
+def _worth_checking(text: str) -> bool:
+    """Cheap free pre-gate: skip messages not worth an AI call (empty, numbers-only,
+    or trivial one-word noise). Everything else is judged by meaning."""
+    t = (text or "").strip()
+    if len(t) < 6:
+        return False
+    # Numbers / prices / counts only — stock-sheet rows, not prose
+    if not re.search(r"[A-Za-zក-៿]", t):
+        return False
+    words = re.findall(r"\w+", t)
+    if len(words) < 2:
+        return False
+    return True
+
+
+def _semantic_concern_dict(msg: dict, result: dict) -> dict | None:
+    """Shape an AI result into a concern dict, or None if it should be dropped."""
+    ctype = result.get("concern_type")
+    if not result.get("is_concern") or ctype not in ("waste", "mistake", "low_stock"):
+        return None
+    text = msg.get("text") or ""
+    sender = msg.get("sender_name") or "Unknown"
+    chat_id = msg.get("chat_id", STOCK_CHECKS_CHAT)
+    chat_label = CHAT_LABELS.get(chat_id, "")
+    prefix = "[%s] " % chat_label if chat_label else ""
+    verb = _CONCERN_VERB.get(ctype, "flagged an issue")
+    return {
+        "source_msg_key": "msg:%s:%s:%s" % (chat_id, msg["id"], ctype),
+        "concern_type": ctype,
+        "severity": result.get("severity", "info"),
+        "sender_name": sender,
+        "source_chat_id": chat_id,
+        "description": "%s%s %s: %s" % (prefix, sender, verb, text[:200]),
+    }
+
+
+async def _semantic_text_concerns(messages: list[dict], rules: list[dict],
+                                  detector=None) -> list[dict]:
+    """Meaning-based waste/mistake/low-stock detection. `detector` is injectable
+    for tests; defaults to the Haiku semantic detector. Per-message AI errors fall
+    back to the keyword scan so a concern is never silently dropped."""
+    detect = detector or detect_concern_semantic
+    concerns = []
+    for msg in messages:
+        text = msg.get("text") or ""
+        if not _worth_checking(text):
+            continue
+        result = await detect(text)
+        if result.get("_error"):
+            concerns.extend(_keyword_text_concerns([msg], rules))
+            continue
+        concern = _semantic_concern_dict(msg, result)
+        if concern is None:
+            continue
+        if _matches_rules(text, concern["concern_type"], rules) == "ignore":
+            continue
+        concerns.append(concern)
+    return concerns
+
+
+def _semantic_enabled() -> bool:
+    return bool(getattr(config, "GM_SEMANTIC_CONCERNS", True) and config.ANTHROPIC_API_KEY)
+
+
+async def detect_text_concerns(messages: list[dict], rules: list[dict]) -> list[dict]:
+    """Dispatch to semantic detection when enabled, else the free keyword scan."""
+    if _semantic_enabled():
+        return await _semantic_text_concerns(messages, rules)
+    return _keyword_text_concerns(messages, rules)
+
+
+async def analyze_live_message(chat_id: int, msg_id: int, sender: str, text: str) -> list[dict]:
     """Real-time analysis of a single group message. Returns concern dicts (text-based only)."""
     rules = gm_get_rules()
     fake_msg = {"id": str(msg_id), "chat_id": chat_id, "text": text, "sender_name": sender}
-    return _detect_text_concerns([fake_msg], rules)
+    return await detect_text_concerns([fake_msg], rules)
 
 
 def _detect_low_stock_concerns(rules: list[dict]) -> list[dict]:
@@ -233,8 +313,8 @@ async def run_analysis() -> int:
 
     concerns = []
 
-    # Text-based ops concerns (waste, mistakes)
-    concerns.extend(_detect_text_concerns(ops_messages, rules))
+    # Text-based ops concerns (waste, mistakes) — semantic when enabled, else keyword
+    concerns.extend(await detect_text_concerns(ops_messages, rules))
 
     # Attendance concerns (AL, lateness, pay-back)
     concerns.extend(_detect_attendance_concerns(attendance_messages, rules))

@@ -24,6 +24,7 @@ from shared.database import (
     gm_save_proposal, gm_get_proposal, gm_get_draft_proposals,
     gm_approve_proposal, gm_reject_proposal, gm_update_proposal_solution,
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
+    gm_get_approved_policy_for_type,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
     gm_append_refinement_note, save_ops_message,
     init_receipt_clarifications_db, receipt_save_clarification,
@@ -37,6 +38,7 @@ from shared.database import (
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
+    gm_compose_reply,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 from gm_bot import finance, clarify
@@ -1034,6 +1036,55 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
         logger.error("_maybe_correct_report failed: %s", e)
 
 
+def _policy_reply_plan(reply_text: str, to_staff: bool, *,
+                       sender: str, chat_title: str, trigger: str) -> dict:
+    """Decide where a composed policy reply goes and the exact text to send.
+    to_staff True  -> {'destination': 'group', 'text': reply_text} (posted in the group)
+    to_staff False -> {'destination': 'owner', 'text': <preview>} (private to owner only)."""
+    if to_staff:
+        return {"destination": "group", "text": reply_text}
+    preview = (
+        "📋 Policy reply (preview — NOT sent to staff)\n"
+        "Group: %s\n"
+        "%s posted: %s\n\n"
+        "GM would reply:\n%s"
+    ) % (chat_title or "?", sender or "Someone", (trigger or "")[:200], reply_text)
+    return {"destination": "owner", "text": preview}
+
+
+async def _maybe_policy_reply(context, msg, concern_type: str, sender: str, trigger: str) -> None:
+    """Voice an approved correction policy live when a matching concern appears.
+    Owner-gated: previews privately to the owner until gm_state 'policy_replies_to_staff'
+    is 'true', then posts in-group as a reply to the triggering message."""
+    policy = gm_get_approved_policy_for_type(concern_type)
+    if not policy:
+        return
+    reply_text = await gm_compose_reply(
+        solution_intent=policy.get("solution_text", ""),
+        trigger_text=trigger,
+        sender_name=sender,
+        chat_title=msg.chat.title or "",
+    )
+    if not reply_text:
+        return
+    to_staff = gm_get_state("policy_replies_to_staff") == "true"
+    plan = _policy_reply_plan(reply_text, to_staff, sender=sender,
+                              chat_title=msg.chat.title or "", trigger=trigger)
+    try:
+        if plan["destination"] == "group":
+            await context.bot.send_message(
+                chat_id=msg.chat_id, text=plan["text"], reply_to_message_id=msg.message_id,
+            )
+            logger.info("Policy reply posted in %s (policy #%s, %s)",
+                        msg.chat_id, policy.get("id"), concern_type)
+        else:
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=plan["text"])
+            logger.info("Policy reply previewed to owner (policy #%s, %s)",
+                        policy.get("id"), concern_type)
+    except Exception as e:
+        logger.error("_maybe_policy_reply failed: %s", e)
+
+
 def _resolve_clarification_response(chat_id: int, msg, text: str) -> dict | None:
     """Record a staff response to a GM clarification. Direct reply = answer (or 'checking');
     a loose 'we're checking' message while any clarification is open backs the ladder off.
@@ -1300,7 +1351,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not text.strip():
         return
 
-    concerns = analyze_live_message(chat_id, msg_id, sender, text)
+    concerns = await analyze_live_message(chat_id, msg_id, sender, text)
     for c in concerns:
         new_id = gm_save_concern(
             source_chat_id=chat_id,
@@ -1337,6 +1388,9 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 logger.info("Live concern sent: %s from %s in %s", c["concern_type"], sender, chat_id)
             except Exception as e:
                 logger.error("Failed to send live concern: %s", e)
+
+            # Voice a matching approved policy live (owner-gated; preview until enabled).
+            await _maybe_policy_reply(context, msg, c["concern_type"], sender, text)
 
 
 # ─── Application builder ──────────────────────────────────────────────────────

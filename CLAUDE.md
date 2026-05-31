@@ -184,10 +184,17 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-31 (session 24 — Telethon listener restored + secrets durability lesson)
+**Last updated:** 2026-05-31 (session 25 — semantic concern detection + policy-reply wiring, live)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
-**▶ RESUME HERE (GM shop-brain build):** Finance parser + clarification ladder + Sonnet answer-judge are DONE & live (staff-facing). Next, pick one: (a) SEMANTIC concern detection — replace gm_bot/analyzer.py's 2-keyword waste/mistake scan with meaning-based detection (catches "dropped a tray", ignores "no waste today"); or (b) STOCK-MINIMUMS intake — table + /minimums command, then ask owner for each item's minimum so low-stock alerts work. Bigger later item: the KNOWLEDGE BRIEF (digest the 567k-message archive into a rolling summary, built by Opus-on-subscription not bot API). See "REPORT Finance Tracking" section + session-24 notes below for full design + pending decisions.
+**▶ RESUME HERE (GM shop-brain build):** Semantic concern detection + approved-policy live replies are DONE & LIVE. Next, pick one: (b) STOCK-MINIMUMS intake — table + /minimums command, then ask owner for each item's minimum so low-stock alerts work; or harden the policy-reply matcher (semantic policy-picker + per-group cooldown). Bigger later item: the KNOWLEDGE BRIEF (digest the 567k-message archive into a rolling summary, built by Opus-on-subscription not bot API). See "REPORT Finance Tracking" section + session-24/25 notes below for full design + pending decisions.
+
+**Semantic concern detection + policy replies — built & live (session 25):**
+- shared/ai_client.py: detect_concern_semantic (Haiku, GM_CONCERN_MODEL) — meaning-based waste/mistake/low_stock judge. Replaces the 2-keyword scan. Catches zero-keyword reports ("tray slipped, 6 cakes fell"); ignores negations ("no waste today"). Fails flagged (_error) so caller can fall back.
+- gm_bot/analyzer.py: _detect_text_concerns renamed _keyword_text_concerns (kept as FREE fallback). New _worth_checking pre-gate + _semantic_text_concerns (per-msg AI error -> keyword fallback) + detect_text_concerns dispatcher. analyze_live_message now async. run_analysis awaits it. config.GM_SEMANTIC_CONCERNS (default True) + ANTHROPIC_API_KEY gate semantic vs keyword.
+- gm_compose_reply WIRED to approved policies: live concern -> gm_get_approved_policy_for_type(type) [SQL, no AI] -> gm_compose_reply (Haiku) drafts a fresh reply -> _policy_reply_plan routes it. Owner-gated by gm_state 'policy_replies_to_staff' (mirrors report_corrections_to_staff): not 'true' = private preview to owner; 'true' = posts in-group as reply. SET TO 'true' (live) session 25.
+- Matching v1: correction + recipients='group' + concern_type match (or 'mixed'), newest approved wins. Skips individual/recognition proposals. No cooldown yet. NOTE: 0 approved group-correction policies exist today, so nothing fires until owner approves a proposal via /proposals — going live is dormant-safe.
+- Tests: tests/test_semantic_concerns.py (12, injected fake detector) + tests/test_policy_reply.py (4, pure routing). Full GM suite 42/42.
 
 **Telethon listener restored (session 24):**
 - twbshop-listener was DOWN (crash-looping) since the session-22 secrets.py reformatting wiped TELETHON_API_ID/API_HASH/PHONE. Those creds were only ever on the server, never pushed to the repo → not git-recoverable. (Same corruption that killed GM_BOT_TOKEN.)

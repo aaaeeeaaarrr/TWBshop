@@ -88,6 +88,11 @@ GM_TEST_GROUP_ID: int = 0
 # How many days of repeated low-stock alerts before flagging as a concern.
 GM_LOW_STOCK_THRESHOLD_DAYS: int = 3
 
+# Use AI (Haiku) meaning-based concern detection instead of the keyword scan.
+# Falls back to the keyword scan automatically when ANTHROPIC_API_KEY is empty
+# or on a per-message AI error, so the bot always works without the API.
+GM_SEMANTIC_CONCERNS: bool = True
+
 # Telegram display name → real name mapping for GM bot output.
 # Key = exact sender_name from ops_messages. Value = real name from salary sheet.
 # Add unknowns as replies come in from staff.

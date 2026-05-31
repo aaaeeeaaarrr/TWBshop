@@ -1851,6 +1851,25 @@ def gm_get_draft_proposals() -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def gm_get_approved_policy_for_type(concern_type: str) -> dict | None:
+    """Most recently approved group-correction policy matching a concern type.
+    Used to voice an approved policy live when a matching message appears.
+    Matches the exact type or a 'mixed' policy; returns None if none approved."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_proposals
+                WHERE status = 'approved'
+                  AND proposal_type = 'correction'
+                  AND recipients = 'group'
+                  AND (concern_type = %s OR concern_type = 'mixed')
+                ORDER BY approved_at DESC NULLS LAST
+                LIMIT 1
+            """, (concern_type,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
 def gm_approve_proposal(proposal_id: int) -> None:
     with _db() as conn:
         with conn.cursor() as cur:

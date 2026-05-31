@@ -598,6 +598,68 @@ async def gm_compose_reply(solution_intent: str, trigger_text: str,
         return solution_intent
 
 
+# Meaning-based concern detection — one short staff message, called live per message.
+# Haiku: cheap and fast. Replaces the keyword waste/mistake scan in gm_bot/analyzer.py.
+GM_CONCERN_MODEL = "claude-haiku-4-5-20251001"
+
+_GM_CONCERN_SYSTEM = (
+    "You read ONE staff message from a bakery/restaurant operations group in Phnom Penh "
+    "and decide whether it reports an OPERATIONAL CONCERN the manager should see.\n\n"
+    "Concern types:\n"
+    "- waste: food or product thrown away, spoiled, expired, binned, gone off, unsellable.\n"
+    "- mistake: an error or accident happened — dropped/broke something, burnt a batch, "
+    "wrong order, spill, damage, something went wrong.\n"
+    "- low_stock: an item is running out, finished, or needs buying/ordering soon.\n\n"
+    "Judge MEANING, not keywords:\n"
+    "- 'no waste today', 'nothing spoiled', 'we didn't break anything', 'all good' = NOT a concern.\n"
+    "- 'the tray slipped and 6 cakes fell on the floor' = mistake, even with no obvious keyword.\n"
+    "- 'we had to bin a whole batch of croissants' = waste.\n"
+    "- Questions, greetings, schedules, normal coordination, plain photo captions, "
+    "thanks, or routine 'done' updates = NOT a concern.\n"
+    "- A staff member honestly reporting THEIR OWN mistake IS a concern — flag it "
+    "(the bakery rewards transparency separately; your job is only to surface it).\n"
+    "- Negations and reports that a problem did NOT happen are NOT concerns.\n\n"
+    "Severity: 'info' for routine or minor; 'warning' for notable loss, repeat issue, or "
+    "money lost; 'critical' for safety risk or large loss.\n\n"
+    'Return ONLY valid JSON: {"is_concern": true|false, '
+    '"concern_type": "waste"|"mistake"|"low_stock"|null, '
+    '"severity": "info"|"warning"|"critical", "summary": "<one short clause>"}'
+)
+
+
+async def detect_concern_semantic(text: str) -> dict:
+    """Meaning-based concern detection for one staff message (Haiku).
+
+    Returns {is_concern, concern_type, severity, summary}. On API error returns
+    {"is_concern": False, "_error": True} so the caller can fall back to the
+    keyword scan and never silently drop a concern during an outage.
+    """
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_CONCERN_MODEL,
+            max_tokens=150,
+            system=[{"type": "text", "text": _GM_CONCERN_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": text[:1500]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        ctype = result.get("concern_type")
+        if ctype not in ("waste", "mistake", "low_stock"):
+            ctype = None
+        sev = result.get("severity")
+        if sev not in ("info", "warning", "critical"):
+            sev = "info"
+        return {
+            "is_concern":   bool(result.get("is_concern", False)),
+            "concern_type": ctype,
+            "severity":     sev,
+            "summary":      str(result.get("summary", "")),
+        }
+    except Exception as exc:
+        logger.error("detect_concern_semantic failed: %s", exc)
+        return {"is_concern": False, "_error": True}
+
+
 async def assess_receipt_photo(image_bytes: bytes,
                                past_examples: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.
