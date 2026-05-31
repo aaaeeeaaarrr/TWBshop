@@ -184,8 +184,25 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-30 (session 23 — GM misrouted message detection + GM_BOT_TOKEN restored)
-**Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
+**Last updated:** 2026-05-31 (session 24 — Telethon listener restored + secrets durability lesson)
+**Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
+
+**Telethon listener restored (session 24):**
+- twbshop-listener was DOWN (crash-looping) since the session-22 secrets.py reformatting wiped TELETHON_API_ID/API_HASH/PHONE. Those creds were only ever on the server, never pushed to the repo → not git-recoverable. (Same corruption that killed GM_BOT_TOKEN.)
+- Recovered api_id/api_hash from my.telegram.org (app "TWB Listener", id=30110706). Restored to secrets.py LOCAL + SERVER + REPO. Phone +85510655010 also stored everywhere.
+- ops_intelligence/listener.py fixed: connect() + is_user_authorized() first, phone login only as fallback — so a valid session reconnects with NO re-login (start(phone="") used to raise before checking the session).
+- Listener account = TheWineBakery24PP (id=1271537077) — the shop account that posts in groups. Session file ops_listener.session intact (created May 28, valid).
+- ops_messages now holds 567,707 messages / 3,619 chats / 2020-2026 (330,933 text + 210,310 photos). This is the full 6-year business archive — STORED but not yet DIGESTED into a knowledge brief (that is the GM "shop-brain" build, still pending).
+
+**SECRETS DURABILITY RULE (learned the hard way, session 22→24):**
+- EVERY secret must live in the twbshop-secrets REPO, never only on the server. Server-only secrets get silently wiped by any secrets.py reformat/bootstrap and are unrecoverable.
+- After adding/restoring any secret: push secrets.py to the repo via `gh api --method PUT /repos/aaaeeeaaarrr/twbshop-secrets/contents/secrets.py`.
+- secrets.py is multi-line Python ALWAYS (one-line corruption = SyntaxError). Verify with `python -c "import secrets"` after any edit.
+- The dangerous secret for the listener is the SESSION FILE (ops_listener.session = auth_key), NOT api_id/api_hash. Guard the session file. Consider 2FA on the account.
+
+**GM finance parser foundation (session 24, WIP — not yet wired):**
+- gm_bot/finance.py: pure deterministic parser for the REPORT daily total. parse_report_text + recompute (drawer = float + cash in - cash out; Over/Lost = count - expected) + business_day_for (06:00 boundary) + classify_report (final=dawn, mid=daytime). No AI, no DB — testable.
+- Still to do per owner's design: AI fallback when free-parse fails + learn new aliases; wire into ingest; the knowledge-brief; semantic concern detection; clarification escalation ladder; stock minimums. See REPORT Finance Tracking section above.
 
 **GM misrouted message detection (session 23):**
 - `_notify_misrouted()`: DMs owner + forwards the message whenever something lands in the wrong group
