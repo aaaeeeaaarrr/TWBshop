@@ -140,6 +140,33 @@ def test_spacing_and_caps_variation():
     assert p["total_sales"] == 1220.58
 
 
+def test_format_correction_shows_full_working():
+    p = finance.parse_report_text(REPORT_27)
+    c = finance.recompute(p)
+    msg = finance.format_correction(p, c)
+    assert msg is not None
+    # the actual arithmetic must be shown
+    for token in ("600.00", "17.95", "189.34", "428.61", "428.51"):
+        assert token in msg
+
+
+def test_format_correction_none_when_reconciles():
+    p = finance.parse_report_text(REPORT_28)
+    c = finance.recompute(p)
+    assert finance.format_correction(p, c) is None
+
+
+def test_tight_tolerance_catches_one_cent():
+    # 1c discrepancy must now flag (staff count to the cent at fixed 4000:1)
+    text = ("01/06/2026\nCash on hand: $600\ncash income: $100.00\n"
+            "Cash expense: $50.00\nTotal: $649.99\nCash count: $650.00")
+    p = finance.parse_report_text(text)
+    c = finance.recompute(p)
+    assert c["expected_drawer"] == 650.00
+    assert c["math_ok"] is False
+    assert abs(c["total_math_error"] - 0.01) < 1e-9
+
+
 def test_parse_full_end_to_end():
     posted = datetime(2026, 5, 28, 5, 8, tzinfo=PP)
     full = finance.parse_full(REPORT_28, posted)

@@ -28,7 +28,7 @@ from shared.database import (
     gm_append_refinement_note, save_ops_message,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
-    init_gm_finance_db, save_daily_report,
+    init_gm_finance_db, save_daily_report, gm_get_state,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
@@ -963,14 +963,15 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
-def _store_daily_report_if_any(msg, text: str) -> int | None:
-    """If a REPORT text message is a daily books report, parse + store it. Deterministic, no messaging."""
+def _store_daily_report_if_any(msg, text: str) -> dict | None:
+    """If a REPORT text is a daily books report, parse + store it. Returns the parsed
+    'full' dict (with report_id) or None. Deterministic, no messaging here."""
     parsed = finance.parse_report_text(text)
     if not finance.is_daily_report(parsed):
         return None
     posted = msg.date  # tz-aware UTC datetime
     full = finance.parse_full(text, posted)
-    report_id = save_daily_report(
+    full["report_id"] = save_daily_report(
         business_day=full["business_day"],
         report_kind=full["report_kind"],
         source_chat_id=msg.chat_id,
@@ -982,10 +983,39 @@ def _store_daily_report_if_any(msg, text: str) -> int | None:
     )
     logger.info(
         "Daily report stored: id=%s day=%s kind=%s math_ok=%s",
-        report_id, full["business_day"], full["report_kind"],
+        full["report_id"], full["business_day"], full["report_kind"],
         full["computed"].get("math_ok"),
     )
-    return report_id
+    return full
+
+
+async def _maybe_correct_report(context, msg, full: dict) -> None:
+    """On a math error, send the worked-out correction. Owner-gated: goes to the owner
+    privately until gm_state 'report_corrections_to_staff' is 'true', then in-group tagged."""
+    computed = full["computed"]
+    if computed.get("math_ok", True):
+        return
+    correction = finance.format_correction(full["raw"], computed)
+    if not correction:
+        return
+    body = f"📊 Report math check — {full['business_day']} ({full['report_kind']})\n\n{correction}"
+    to_staff = gm_get_state("report_corrections_to_staff") == "true"
+    try:
+        if to_staff:
+            await context.bot.send_message(
+                chat_id=msg.chat_id, text=body, reply_to_message_id=msg.message_id,
+            )
+        else:
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+            try:
+                await context.bot.forward_message(
+                    chat_id=config.OWNER_TELEGRAM_ID,
+                    from_chat_id=msg.chat_id, message_id=msg.message_id,
+                )
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error("_maybe_correct_report failed: %s", e)
 
 
 async def _check_report_receipt(msg, context) -> None:
@@ -1102,10 +1132,12 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if msg.photo:
             await _check_report_receipt(msg, context)
             return
-        # Text: if it's a daily books report, parse + store (no messaging — owner-gated later)
+        # Text: if it's a daily books report, parse + store, and correct math errors
         if text.strip():
             try:
-                _store_daily_report_if_any(msg, text)
+                full = _store_daily_report_if_any(msg, text)
+                if full is not None:
+                    await _maybe_correct_report(context, msg, full)
             except Exception as e:
                 logger.error("daily report parse failed: %s", e)
         # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.

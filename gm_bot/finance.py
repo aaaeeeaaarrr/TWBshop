@@ -29,8 +29,9 @@ from zoneinfo import ZoneInfo
 
 PP_TZ = ZoneInfo("Asia/Phnom_Penh")
 
-# Tolerance for "their arithmetic is internally consistent" (cents-level rounding).
-MATH_TOLERANCE = 0.05
+# Staff count by hand at a fixed 4000 riel = $1, to the cent — so any mismatch >= 1c
+# is a real arithmetic error, not FX noise. Recompute rounds to 2dp before comparing.
+MATH_TOLERANCE = 0.005
 
 # Hour (PP) before which a report is treated as the dawn 'final' close.
 FINAL_CLOSE_BEFORE_HOUR = 6
@@ -225,6 +226,38 @@ def recompute(parsed: dict) -> dict:
             )
 
     return result
+
+
+def format_correction(parsed: dict, computed: dict) -> str | None:
+    """
+    Build a worked-out correction showing the arithmetic, for math errors.
+    Returns None if the report reconciles. Plain ASCII for safe display anywhere.
+    """
+    lines: list[str] = []
+
+    coh = parsed.get("cash_on_hand")
+    ci  = parsed.get("cash_income")
+    ce  = parsed.get("cash_expense")
+    st  = parsed.get("stated_total")
+    exp = computed.get("expected_drawer")
+    terr = computed.get("total_math_error")
+    if None not in (coh, ci, ce, st, exp) and terr is not None and abs(terr) > MATH_TOLERANCE:
+        lines.append(
+            f"Drawer: {coh:.2f} (cash on hand) + {ci:.2f} (cash income) "
+            f"- {ce:.2f} (cash expense) = {exp:.2f}\n"
+            f"You wrote {st:.2f} -> off by {terr:+.2f}"
+        )
+
+    ai = parsed.get("aba_income")
+    ts = parsed.get("total_sales")
+    sc = computed.get("sales_check")
+    if None not in (ci, ai, ts) and sc is not None and abs(sc) > MATH_TOLERANCE:
+        lines.append(
+            f"Total sales: {ci:.2f} (cash) + {ai:.2f} (ABA) = {ci + ai:.2f}\n"
+            f"You wrote {ts:.2f} -> off by {sc:+.2f}"
+        )
+
+    return "\n\n".join(lines) if lines else None
 
 
 def parse_full(text: str, posted: datetime) -> dict:

@@ -2331,8 +2331,26 @@ def init_gm_finance_db() -> None:
                 );
                 CREATE INDEX IF NOT EXISTS idx_gm_daily_reports_day
                     ON gm_daily_reports (business_day, report_kind);
+                ALTER TABLE gm_daily_reports
+                    ADD COLUMN IF NOT EXISTS superseded BOOLEAN DEFAULT FALSE;
             """)
     logger.info("GM finance DB ready")
+
+
+def _recompute_superseded(cur, business_day: str, report_kind: str) -> None:
+    """Mark all but the latest report (by posted_at) for a day+shift as superseded.
+    Handles staff correcting a report and deleting the old one."""
+    cur.execute("""
+        UPDATE gm_daily_reports d
+        SET superseded = (d.id <> latest.id)
+        FROM (
+            SELECT id FROM gm_daily_reports
+            WHERE business_day = %s AND report_kind = %s
+            ORDER BY posted_at DESC NULLS LAST, id DESC
+            LIMIT 1
+        ) latest
+        WHERE d.business_day = %s AND d.report_kind = %s
+    """, (business_day, report_kind, business_day, report_kind))
 
 
 def save_daily_report(
@@ -2401,16 +2419,31 @@ def save_daily_report(
                 computed.get("math_ok", True), notes_text,
             ))
             row = cur.fetchone()
-            return row["id"] if row else None
+            report_id = row["id"] if row else None
+            # Latest report per day+shift wins; older/corrected ones marked superseded.
+            _recompute_superseded(cur, business_day, report_kind)
+            return report_id
 
 
-def get_daily_reports_for_day(business_day: str) -> list[dict]:
-    """All parsed reports for a business day (mid + final), oldest first."""
+def get_daily_reports_for_day(business_day: str, active_only: bool = True) -> list[dict]:
+    """Parsed reports for a business day (mid + final). active_only hides superseded."""
+    where = "business_day = %s" + (" AND NOT superseded" if active_only else "")
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT * FROM gm_daily_reports
-                WHERE business_day = %s
+                WHERE {where}
                 ORDER BY posted_at NULLS LAST, id
             """, (business_day,))
             return [dict(r) for r in cur.fetchall()]
+
+
+def recompute_all_superseded() -> int:
+    """One-shot: recompute superseded flags across every day+shift. Returns groups processed."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT business_day, report_kind FROM gm_daily_reports")
+            groups = cur.fetchall()
+            for g in groups:
+                _recompute_superseded(cur, str(g["business_day"]), g["report_kind"])
+            return len(groups)
