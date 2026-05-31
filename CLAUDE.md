@@ -172,10 +172,10 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - Also wanted: daily/weekly digest (sales, expenses, cumulative Over/Lost trend) + anomaly flags (Lost over threshold, sales drop).
 
 **PENDING DECISIONS (discuss with owner over terminal — remind every session until resolved):**
-1. **Overexpense carryover** — current practice: when a day's cash out > cash in, the deficit is carried into the next day as an expense taken from the $600 float. Owner wants a cleaner model. Opus to propose options.
-2. **Float restoration** — how the drawer returns to $600 after a cash-negative day (top-up source?). Tied to #1.
-3. **Thresholds** — what "Lost" size and what sales-drop % should trigger a flag. Set after baselining more days.
-4. **Shift cutoff** — exact handover time the mid-report represents, so night = final − mid is accurate.
+1. **Overexpense carryover** — OPEN (session 25: owner wants to "think of something" — REMIND next session). Current practice: when a day's cash out > cash in, the deficit is carried into the next day as an expense taken from the $600 float. Owner wants a cleaner model. Opus to propose options when owner is ready.
+2. **Float restoration** — ANSWERED (session 25): owner normally NEVER tops up the float except in extreme cases. The drawer "tops itself" back toward $600 from cash income most days (because of the 4000=$1 FX margin → daily small surplus). So: do NOT model a top-up source; the float self-restores from the FX-margin surplus. Only an extreme/unusual shortfall would involve a manual top-up. Tied to #1.
+3. **Thresholds** — ANSWERED (session 25): flag "Lost" > $2. On a Lost > $2 day the GM should ASK THE GROUP "did you find why this amount is lost?" — framed with the FX context: we always count 4000 riel = $1, so the drawer should normally be a little OVER; a real shortfall over $2 is worth explaining. (BUILD ITEM: wire a Lost>$2 group-ask into the finance flow, opening a clarification via the existing ladder. Not built yet.) Sales-drop % still TBD after more baselining.
+4. **Shift cutoff** — ANSWERED (session 25): confirmed. Mid-report ~16:00 = day-shift handover cutoff. night ≈ final − mid uses the 16:00 boundary.
 5. **Dedup prerequisite** — every REPORT message is currently double-stored (historical import overlapped live GM capture: same sender_id + sent_at + text, different message_id). Must dedupe before any aggregation.
 6. **Go-live switch** — DONE 2026-05-31: gm_state report_corrections_to_staff='true'. GM now posts worked-out math corrections IN-GROUP (tagging the report) and opens a clarification so the ladder records staff reasons.
 
@@ -193,8 +193,22 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - shared/ai_client.py: detect_concern_semantic (Haiku, GM_CONCERN_MODEL) — meaning-based waste/mistake/low_stock judge. Replaces the 2-keyword scan. Catches zero-keyword reports ("tray slipped, 6 cakes fell"); ignores negations ("no waste today"). Fails flagged (_error) so caller can fall back.
 - gm_bot/analyzer.py: _detect_text_concerns renamed _keyword_text_concerns (kept as FREE fallback). New _worth_checking pre-gate + _semantic_text_concerns (per-msg AI error -> keyword fallback) + detect_text_concerns dispatcher. analyze_live_message now async. run_analysis awaits it. config.GM_SEMANTIC_CONCERNS (default True) + ANTHROPIC_API_KEY gate semantic vs keyword.
 - gm_compose_reply WIRED to approved policies: live concern -> gm_get_approved_policy_for_type(type) [SQL, no AI] -> gm_compose_reply (Haiku) drafts a fresh reply -> _policy_reply_plan routes it. Owner-gated by gm_state 'policy_replies_to_staff' (mirrors report_corrections_to_staff): not 'true' = private preview to owner; 'true' = posts in-group as reply. SET TO 'true' (live) session 25.
-- Matching v1: correction + recipients='group' + concern_type match (or 'mixed'), newest approved wins. Skips individual/recognition proposals. No cooldown yet. NOTE: 0 approved group-correction policies exist today, so nothing fires until owner approves a proposal via /proposals — going live is dormant-safe.
-- Tests: tests/test_semantic_concerns.py (12, injected fake detector) + tests/test_policy_reply.py (4, pure routing). Full GM suite 42/42.
+- Matching v1: correction + recipients='group' + concern_type match (or 'mixed'), newest approved wins. Skips individual/recognition proposals. NOTE: 0 approved group-correction policies exist today, so nothing fires until owner approves a proposal via /proposals — going live is dormant-safe.
+- 72h REPEAT-NOTIFY (session 25, replaces the cooldown idea): no suppression. If the same policy/type fires again in the same group within config.GM_POLICY_REPEAT_HOURS (72), GM still replies in-group as usual AND pings the owner privately ("correction not landing") + forwards the triggering message. Tracked via gm_state key 'policy_last_reply:<chat>:<type>' (ISO ts), stamped only on a real in-group post. Pure helpers _repeat_within / _humanize_gap / _repeat_alert_text in bot.py.
+- Tests: tests/test_semantic_concerns.py (12, injected fake detector) + tests/test_policy_reply.py (11: 4 routing + 7 repeat-notify). Full GM suite 49/49.
+
+**Staff alias map — checked (session 25):** Scanned Stock Checks 2026-05-27 roll-call ("my name is X, call me Y"). config.STAFF_ALIAS_MAP already complete for the prior unknowns: Cat=Mon Chenda, Nakk=Doeun Rothanak, NY=Yi Sony, O=Korn Chantrea, Seth 🫵=Phan Piseth, Boss TT=Tyty, por=Por. STILL UNRESOLVED (did not self-ID in roll-call — ASK OWNER): **Pew, Me Me, Chan Oun, Roth** ("Roth" is ambiguous — ~70 B2B senders contain it).
+
+**Owner "remind me later" queue (resurface each session until done):**
+- Finance #1 overexpense carryover model (owner to think of an approach)
+- Finance #3 BUILD: wire the Lost>$2 group-ask into the finance flow
+- Stock minimums intake (#6 — table + /minimums, then owner gives each item's minimum)
+- Provide real names for: Pew, Me Me, Chan Oun, Roth
+- Facebook Messenger export (Sara Bologna account)
+- Bakong/KHQR registration (needs passport on other PC)
+- Hire bot: tap the pending owner Approve/Reject button, then run /create Test Candidate end-to-end
+- Review the 383 concern cards in GM chat (/review for missed)
+- Hiring: owner will send more questionnaire papers to analyze (targeted replies, salaries) → judge+educate via ChatGPT
 
 **Telethon listener restored (session 24):**
 - twbshop-listener was DOWN (crash-looping) since the session-22 secrets.py reformatting wiped TELETHON_API_ID/API_HASH/PHONE. Those creds were only ever on the server, never pushed to the repo → not git-recoverable. (Same corruption that killed GM_BOT_TOKEN.)

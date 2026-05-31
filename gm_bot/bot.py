@@ -29,7 +29,7 @@ from shared.database import (
     gm_append_refinement_note, save_ops_message,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
-    init_gm_finance_db, save_daily_report, gm_get_state,
+    init_gm_finance_db, save_daily_report, gm_get_state, gm_set_state,
     init_gm_clarifications_db, gm_create_clarification, gm_get_active_clarifications,
     gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
     gm_record_clarification_nudge, gm_set_clarification_checking,
@@ -1036,6 +1036,44 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
         logger.error("_maybe_correct_report failed: %s", e)
 
 
+def _humanize_gap(delta: timedelta) -> str:
+    """Short human duration, e.g. '40 min', '12h 5m', '2d 3h'."""
+    mins = int(delta.total_seconds() // 60)
+    if mins < 60:
+        return "%d min" % max(mins, 0)
+    hours = mins // 60
+    if hours < 24:
+        return "%dh %dm" % (hours, mins % 60)
+    days = hours // 24
+    return "%dd %dh" % (days, hours % 24)
+
+
+def _repeat_within(last_iso: str, now: datetime, window_hours: int) -> bool:
+    """True if `last_iso` is a valid timestamp within `window_hours` before `now`."""
+    if not last_iso:
+        return False
+    try:
+        last = datetime.fromisoformat(last_iso)
+    except (ValueError, TypeError):
+        return False
+    return timedelta(0) <= (now - last) <= timedelta(hours=window_hours)
+
+
+def _repeat_alert_text(policy: dict, chat_title: str, concern_type: str,
+                       sender: str, trigger: str, gap: str) -> str:
+    """Owner heads-up when the same policy is triggered again inside the repeat window."""
+    return (
+        "⚠️ Repeat issue — correction not landing\n"
+        "Group: %s\n"
+        "Type: %s\n"
+        "Policy: %s\n"
+        "%s triggered the same policy again, %s after the last time.\n"
+        "Latest message: %s\n"
+        "(GM has replied in-group as usual.)"
+    ) % (chat_title or "?", concern_type, (policy.get("group_name") or "?"),
+         sender or "Someone", gap, (trigger or "")[:200])
+
+
 def _policy_reply_plan(reply_text: str, to_staff: bool, *,
                        sender: str, chat_title: str, trigger: str) -> dict:
     """Decide where a composed policy reply goes and the exact text to send.
@@ -1077,6 +1115,25 @@ async def _maybe_policy_reply(context, msg, concern_type: str, sender: str, trig
             )
             logger.info("Policy reply posted in %s (policy #%s, %s)",
                         msg.chat_id, policy.get("id"), concern_type)
+            # Repeat detection: same policy/group within the window -> ping owner too.
+            rk = "policy_last_reply:%s:%s" % (msg.chat_id, concern_type)
+            now = datetime.now(timezone.utc)
+            last = gm_get_state(rk)
+            if _repeat_within(last, now, config.GM_POLICY_REPEAT_HOURS):
+                gap = _humanize_gap(now - datetime.fromisoformat(last))
+                alert = _repeat_alert_text(policy, msg.chat.title or "", concern_type,
+                                           sender, trigger, gap)
+                try:
+                    await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=alert)
+                    await context.bot.forward_message(
+                        chat_id=config.OWNER_TELEGRAM_ID,
+                        from_chat_id=msg.chat_id, message_id=msg.message_id,
+                    )
+                except Exception as e:
+                    logger.error("repeat-violation owner alert failed: %s", e)
+                logger.info("Repeat policy violation (%s in %s, %s ago) — owner alerted",
+                            concern_type, msg.chat_id, gap)
+            gm_set_state(rk, now.isoformat())
         else:
             await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=plan["text"])
             logger.info("Policy reply previewed to owner (policy #%s, %s)",

@@ -1,7 +1,11 @@
-"""Tests for gm_bot/bot.py _policy_reply_plan — the owner-gate routing for live
-policy replies. Pure: no DB, no Telegram, no AI."""
+"""Tests for gm_bot/bot.py _policy_reply_plan and the 72h repeat-notify helpers.
+Pure: no DB, no Telegram, no AI."""
+
+from datetime import datetime, timedelta, timezone
 
 from gm_bot import bot
+
+NOW = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def test_to_staff_posts_raw_reply_in_group():
@@ -37,6 +41,55 @@ def test_preview_tolerates_missing_fields():
         "reply", to_staff=False, sender="", chat_title="", trigger="")
     assert plan["destination"] == "owner"
     assert "reply" in plan["text"]
+
+
+# ── 72h repeat-notify helpers ─────────────────────────────────────────────────
+
+def test_repeat_within_true_inside_window():
+    last = (NOW - timedelta(hours=10)).isoformat()
+    assert bot._repeat_within(last, NOW, 72) is True
+
+
+def test_repeat_within_false_outside_window():
+    last = (NOW - timedelta(hours=80)).isoformat()
+    assert bot._repeat_within(last, NOW, 72) is False
+
+
+def test_repeat_within_edge_exactly_window():
+    last = (NOW - timedelta(hours=72)).isoformat()
+    assert bot._repeat_within(last, NOW, 72) is True
+
+
+def test_repeat_within_handles_missing_or_bad():
+    assert bot._repeat_within(None, NOW, 72) is False
+    assert bot._repeat_within("", NOW, 72) is False
+    assert bot._repeat_within("not-a-date", NOW, 72) is False
+
+
+def test_repeat_within_ignores_future_timestamp():
+    # A clock-skewed future stamp should not count as a repeat.
+    last = (NOW + timedelta(hours=1)).isoformat()
+    assert bot._repeat_within(last, NOW, 72) is False
+
+
+def test_humanize_gap():
+    assert bot._humanize_gap(timedelta(minutes=40)) == "40 min"
+    assert bot._humanize_gap(timedelta(hours=12, minutes=5)) == "12h 5m"
+    assert bot._humanize_gap(timedelta(days=2, hours=3)) == "2d 3h"
+    assert bot._humanize_gap(timedelta(seconds=-5)) == "0 min"
+
+
+def test_repeat_alert_text_contents():
+    policy = {"group_name": "Log waste before close"}
+    txt = bot._repeat_alert_text(policy, "Stock Checks", "waste",
+                                 "Dara", "binned 3 trays again", "10h 0m")
+    assert "Repeat issue" in txt
+    assert "Stock Checks" in txt
+    assert "waste" in txt
+    assert "Log waste before close" in txt
+    assert "Dara" in txt
+    assert "10h 0m" in txt
+    assert "replied in-group" in txt
 
 
 if __name__ == "__main__":

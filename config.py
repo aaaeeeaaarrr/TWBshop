@@ -93,6 +93,11 @@ GM_LOW_STOCK_THRESHOLD_DAYS: int = 3
 # or on a per-message AI error, so the bot always works without the API.
 GM_SEMANTIC_CONCERNS: bool = True
 
+# Policy-reply repeat window. If the same approved policy is triggered again in
+# the same group within this many hours, the GM still replies in-group as usual
+# AND pings the owner privately ("this correction isn't landing").
+GM_POLICY_REPEAT_HOURS: int = 72
+
 # Telegram display name → real name mapping for GM bot output.
 # Key = exact sender_name from ops_messages. Value = real name from salary sheet.
 # Add unknowns as replies come in from staff.
