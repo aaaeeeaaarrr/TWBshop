@@ -729,6 +729,115 @@ async def extract_payback_day(text: str) -> dict:
         return {"has_payback_day": False, "payback_day": None}
 
 
+# Daily-report fallback parser — Sonnet. Only runs when the free regex parser fails
+# on a report-shaped message (≤2/day). AI READS the fields; recompute() (the money
+# math) stays deterministic. Also surfaces any non-standard labels so we can learn them.
+GM_FINANCE_FALLBACK_MODEL = "claude-sonnet-4-6"  # == config.CLAUDE_MODEL
+
+_GM_FINANCE_EXTRACT_SYSTEM = (
+    "You read ONE daily cash-up report from a bakery in Phnom Penh (English/Khmer, "
+    "handwritten-style typing, odd labels). Extract the canonical fields you can find.\n"
+    "Canonical fields (all USD numbers, no symbols):\n"
+    "  cash_on_hand  = starting float\n"
+    "  cash_income   = cash sales\n"
+    "  aba_income    = bank-app (ABA) sales\n"
+    "  total_sales   = revenue (cash+ABA)\n"
+    "  cash_expense  = cash paid out\n"
+    "  aba_expense   = bank paid out\n"
+    "  stated_total  = the 'Total'/expected drawer staff wrote\n"
+    "  cash_count    = physically counted cash\n"
+    "  over          = surplus stated\n"
+    "  lost          = shortfall stated\n"
+    "Also list, in `aliases`, every non-obvious label you mapped (the exact label text "
+    "the staff used + the canonical field) so the system can learn it.\n"
+    'Return ONLY JSON: {"fields": {"<canonical>": <number>, ...}, '
+    '"aliases": [{"field": "<canonical>", "label": "<exact label text>"}], '
+    '"stated_date": "YYYY-MM-DD"|null}\n'
+    "Omit fields not present. Numbers only (e.g. 612.5), never strings."
+)
+
+
+async def extract_daily_report_ai(text: str) -> dict:
+    """Sonnet fallback when the deterministic parser under-reads a report.
+    Returns {fields: {canonical: number}, aliases: [{field,label}], stated_date}.
+    On error returns empty fields so the caller simply skips (no bad data stored)."""
+    if not config.ANTHROPIC_API_KEY:
+        return {"fields": {}, "aliases": []}
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_FINANCE_FALLBACK_MODEL,
+            max_tokens=500,
+            system=[{"type": "text", "text": _GM_FINANCE_EXTRACT_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": text[:2000]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        fields = result.get("fields") or {}
+        # Keep only numeric values
+        clean = {}
+        for k, v in fields.items():
+            try:
+                clean[k] = float(v)
+            except (TypeError, ValueError):
+                continue
+        return {
+            "fields": clean,
+            "aliases": result.get("aliases") or [],
+            "stated_date": result.get("stated_date"),
+        }
+    except Exception as exc:
+        logger.error("extract_daily_report_ai failed: %s", exc)
+        return {"fields": {}, "aliases": []}
+
+
+# Weekly attendance/AL digest — Opus (cross-week reasoning), owner-facing, scheduled.
+GM_ATTENDANCE_DIGEST_MODEL = GM_PROPOSALS_MODEL  # claude-opus-4-7
+
+_GM_ATTENDANCE_DIGEST_SYSTEM = (
+    "You are the GM of a bakery in Phnom Penh. Write a SHORT weekly attendance digest "
+    "for the OWNER (English). Cover: who was late or absent and how often, pay-back time "
+    "owed or still unanswered, any worsening patterns, and 1-3 concrete suggestions. "
+    "Be factual and concise — bullet points, no fluff, no shaming. If the data is thin, "
+    "say so briefly. Do not invent anything beyond the data given."
+)
+
+
+async def generate_attendance_digest(lateness_cases: list[dict],
+                                     attendance_concerns: list[dict]) -> str:
+    """Opus weekly digest of lateness/pay-back + attendance concerns. Returns text
+    (empty string on error so the job simply skips that week)."""
+    if not config.ANTHROPIC_API_KEY:
+        return ""
+    lines = ["Lateness / pay-back cases this week:"]
+    if lateness_cases:
+        for c in lateness_cases:
+            lines.append(
+                "- %s | late: %s | status: %s | payback: %s | reported by: %s" % (
+                    str(c.get("created_at"))[:10], c.get("late_person") or "?",
+                    c.get("status") or "?", c.get("payback_day") or "(none)",
+                    c.get("reporter_name") or "?"))
+    else:
+        lines.append("- (none)")
+    lines.append("\nOther attendance/staffing notes this week:")
+    if attendance_concerns:
+        for c in attendance_concerns:
+            lines.append("- %s" % (c.get("description") or "")[:160])
+    else:
+        lines.append("- (none)")
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_ATTENDANCE_DIGEST_MODEL,
+            max_tokens=900,
+            system=[{"type": "text", "text": _GM_ATTENDANCE_DIGEST_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": "\n".join(lines)}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("generate_attendance_digest failed: %s", exc)
+        return ""
+
+
 async def assess_receipt_photo(image_bytes: bytes,
                                past_examples: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.
@@ -808,6 +917,9 @@ _CLARIFY_JUDGE_SYSTEM = (
     "ignores it, is evasive, blames vaguely, or makes no sense.\n"
     "- receipt_clarity: the GM asked what an unclear receipt says. A good reply gives the "
     "readable amount/items asked for. A bad reply is unrelated or still unclear.\n"
+    "- cash_lost: the GM flagged the drawer short by more than $2 and asked why. A good "
+    "reply gives a plausible cause (miscount, unrecorded expense, wrong change, FX) or "
+    "says they recounted/will recount. A bad reply ignores it or is evasive.\n"
     "Be fair, not pedantic: a plausible, on-topic explanation counts as resolved. "
     "Only flag replies that truly fail to address the question.\n"
     'Return ONLY JSON: {"resolved": true|false, "reason": "<short>"}'

@@ -98,6 +98,10 @@ GM_SEMANTIC_CONCERNS: bool = True
 # AND pings the owner privately ("this correction isn't landing").
 GM_POLICY_REPEAT_HOURS: int = 72
 
+# Drawer shortfall (USD) above which the GM asks the REPORT group why cash is lost.
+# A small Over is expected (4000 riel = $1 FX margin) and never flagged.
+GM_LOST_FLAG_THRESHOLD: float = 2.0
+
 # Telegram display name → real name mapping for GM bot output.
 # Key = exact sender_name from ops_messages. Value = real name from salary sheet.
 # Add unknowns as replies come in from staff.

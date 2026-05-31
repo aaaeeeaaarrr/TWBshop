@@ -72,10 +72,24 @@ def _parse_number(value_part: str) -> float | None:
         return None
 
 
-def _match_field(label: str) -> str | None:
+def _alias_list(extra_aliases: dict[str, list[str]] | None = None
+                ) -> list[tuple[str, tuple[str, ...]]]:
+    """The canonical alias table, optionally extended with learned label aliases.
+    Learned labels are merged into their field's tuple, preserving the original
+    specificity order (generic 'total' stays last)."""
+    if not extra_aliases:
+        return _FIELD_ALIASES
+    extra = {f: [a.lower() for a in labels] for f, labels in extra_aliases.items()}
+    merged: list[tuple[str, tuple[str, ...]]] = []
+    for field, aliases in _FIELD_ALIASES:
+        merged.append((field, tuple(list(aliases) + extra.get(field, []))))
+    return merged
+
+
+def _match_field(label: str, alias_list: list[tuple[str, tuple[str, ...]]] | None = None) -> str | None:
     """Map a normalised label (lowercased, before ':') to a canonical field."""
     norm = label.strip().lower().rstrip(". ").strip()
-    for field, aliases in _FIELD_ALIASES:
+    for field, aliases in (alias_list or _FIELD_ALIASES):
         for alias in aliases:
             if alias in norm:
                 return field
@@ -97,16 +111,18 @@ def is_daily_report(parsed: dict) -> bool:
     return len(found & _MONEY_FIELDS) >= 3
 
 
-def parse_report_text(text: str) -> dict:
+def parse_report_text(text: str, extra_aliases: dict[str, list[str]] | None = None) -> dict:
     """
     Parse a daily-report message into raw fields.
 
     Returns a dict with any of: stated_date, cash_on_hand, cash_income, aba_income,
     total_sales, cash_expense, aba_expense, stated_total, cash_count, over, lost.
     Missing fields are simply absent. `fields_found` lists what was parsed.
+    `extra_aliases` (field -> [labels]) extends the table with learned labels.
     """
     out: dict = {}
     found: list[str] = []
+    alias_list = _alias_list(extra_aliases)
 
     for line in (text or "").splitlines():
         line = line.strip()
@@ -130,7 +146,7 @@ def parse_report_text(text: str) -> dict:
         if ":" not in line:
             continue
         label, _, value_part = line.partition(":")
-        field = _match_field(label)
+        field = _match_field(label, alias_list)
         if not field or field in out:
             continue
         num = _parse_number(value_part)
@@ -141,6 +157,33 @@ def parse_report_text(text: str) -> dict:
 
     out["fields_found"] = found
     return out
+
+
+def looks_like_report_attempt(text: str, parsed: dict) -> bool:
+    """Report-shaped but the free parser under-read it (< 3 money fields) — worth an
+    AI fallback. True when it has a date plus a couple of 'label: number' lines, or
+    several such lines on their own. Plain chatter returns False."""
+    found = set(parsed.get("fields_found", []))
+    if len(found & _MONEY_FIELDS) >= 3:
+        return False  # free parser already succeeded
+    colon_num_lines = 0
+    for line in (text or "").splitlines():
+        if ":" in line and any(ch.isdigit() for ch in line.partition(":")[2]):
+            colon_num_lines += 1
+    has_date = "stated_date" in parsed or bool(_DATE_RE.search(text or ""))
+    if colon_num_lines >= 4:
+        return True
+    if has_date and colon_num_lines >= 2:
+        return True
+    return False
+
+
+def lost_exceeds(over_lost_computed: float | None, threshold: float) -> bool:
+    """True if the drawer is SHORT by more than `threshold` dollars.
+    over_lost_computed = cash_count - expected (negative = lost). A small Over is benign."""
+    if over_lost_computed is None:
+        return False
+    return over_lost_computed < -abs(threshold)
 
 
 def business_day_for(posted: datetime) -> date:
@@ -260,12 +303,13 @@ def format_correction(parsed: dict, computed: dict) -> str | None:
     return "\n\n".join(lines) if lines else None
 
 
-def parse_full(text: str, posted: datetime) -> dict:
+def parse_full(text: str, posted: datetime,
+               extra_aliases: dict[str, list[str]] | None = None) -> dict:
     """
     Convenience: parse + classify + attribute + recompute in one call.
     Returns a single dict ready to store.
     """
-    parsed = parse_report_text(text)
+    parsed = parse_report_text(text, extra_aliases)
     computed = recompute(parsed)
     bday = business_day_for(posted)
     kind = classify_report(posted)

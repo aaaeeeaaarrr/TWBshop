@@ -174,3 +174,56 @@ def test_parse_full_end_to_end():
     assert full["report_kind"] == "final"
     assert full["raw"]["cash_count"] == 504.00
     assert full["computed"]["math_ok"] is True
+
+
+# ── Lost threshold (Finance #3) ───────────────────────────────────────────────
+
+def test_lost_exceeds_threshold():
+    assert finance.lost_exceeds(-2.50, 2.0) is True      # short $2.50 > $2
+    assert finance.lost_exceeds(-2.00, 2.0) is False     # exactly $2 = not over
+    assert finance.lost_exceeds(-1.99, 2.0) is False     # small short, benign
+    assert finance.lost_exceeds(5.0, 2.0) is False       # Over is never flagged
+    assert finance.lost_exceeds(None, 2.0) is False
+
+
+def test_report_30_lost_below_threshold():
+    # The real 30/05 report is only 42c short -> must NOT flag.
+    p = finance.parse_report_text(REPORT_30)
+    c = finance.recompute(p)
+    assert c["over_lost_computed"] == -0.42
+    assert finance.lost_exceeds(c["over_lost_computed"], 2.0) is False
+
+
+# ── AI-fallback heuristic + learned aliases (Finance fallback) ────────────────
+
+def test_looks_like_report_attempt_true_for_oddly_labelled():
+    # Report-shaped but non-standard labels -> free parser under-reads -> fallback.
+    text = ("02/06/2026\nStart float: $600\nKas chamnoul: $50\n"
+            "Bank in: $120\nKas chetdaiy: $30\nReang: $640")
+    p = finance.parse_report_text(text)
+    assert not finance.is_daily_report(p)
+    assert finance.looks_like_report_attempt(text, p) is True
+
+
+def test_looks_like_report_attempt_false_for_chatter():
+    text = "ok boss thanks, see you tomorrow at 7"
+    p = finance.parse_report_text(text)
+    assert finance.looks_like_report_attempt(text, p) is False
+
+
+def test_looks_like_report_attempt_false_when_free_parse_succeeds():
+    p = finance.parse_report_text(REPORT_27)
+    assert finance.is_daily_report(p)
+    assert finance.looks_like_report_attempt(REPORT_27, p) is False
+
+
+def test_learned_alias_makes_free_parser_read_new_label():
+    text = "03/06/2026\nOpening money: $600\ncash income: $80\nCash expense: $20\nTotal: $660\nCash count: $660"
+    # Without the alias, 'Opening money' is not recognised as cash_on_hand.
+    p0 = finance.parse_report_text(text)
+    assert "cash_on_hand" not in p0
+    # After learning the alias, it parses for free.
+    p1 = finance.parse_report_text(text, extra_aliases={"cash_on_hand": ["opening money"]})
+    assert p1["cash_on_hand"] == 600
+    # And the generic 'total' is still matched last (stated_total, not stolen earlier).
+    assert p1["stated_total"] == 660

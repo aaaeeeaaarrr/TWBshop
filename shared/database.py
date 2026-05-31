@@ -2173,6 +2173,70 @@ def gm_get_staff_uid(display_name: str | None) -> int | None:
             return row["sender_id"] if row else None
 
 
+# ── Finance label aliases (learned from AI fallback) ──────────────────────────
+
+def init_gm_finance_aliases_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_finance_aliases (
+                    id          SERIAL PRIMARY KEY,
+                    field       TEXT NOT NULL,
+                    label       TEXT NOT NULL,
+                    created_at  TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (field, label)
+                );
+            """)
+
+
+def gm_add_finance_alias(field: str, label: str) -> None:
+    """Learn a label→field mapping the deterministic parser missed. Idempotent."""
+    label = (label or "").strip().lower()
+    if not field or not label:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_finance_aliases (field, label) VALUES (%s, %s)
+                ON CONFLICT (field, label) DO NOTHING
+            """, (field, label))
+
+
+def gm_get_finance_aliases() -> dict:
+    """Return {field: [labels]} of all learned aliases."""
+    out: dict = {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT field, label FROM gm_finance_aliases")
+            for r in cur.fetchall():
+                out.setdefault(r["field"], []).append(r["label"])
+    return out
+
+
+def gm_get_lateness_cases_since(days: int = 7) -> list[dict]:
+    """All lateness cases created within the last `days` (any status)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_lateness_cases
+                WHERE created_at >= NOW() - (%s || ' days')::interval
+                ORDER BY created_at
+            """, (days,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_concerns_since(concern_type: str, days: int = 7) -> list[dict]:
+    """Concerns of a given type created within the last `days`."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_concerns
+                WHERE concern_type = %s AND detected_at >= NOW() - (%s || ' days')::interval
+                ORDER BY detected_at
+            """, (concern_type, days))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def gm_get_low_stock_history(chat_id: int, since_days: int = 7) -> list[dict]:
     """Return recent low-stock alert messages grouped by sender and date."""
     with _db() as conn:

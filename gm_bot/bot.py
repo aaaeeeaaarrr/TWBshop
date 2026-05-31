@@ -37,11 +37,14 @@ from shared.database import (
     init_gm_lateness_db, gm_create_lateness_case, gm_get_open_lateness_cases,
     gm_get_open_lateness_in_chat, gm_mark_lateness_group_asked, gm_resolve_lateness,
     gm_escalate_lateness, gm_get_staff_uid,
+    gm_add_finance_alias, gm_get_finance_aliases,
+    gm_get_lateness_cases_since, gm_get_concerns_since,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
+    extract_daily_report_ai, generate_attendance_digest,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 from gm_bot import finance, clarify, lateness, mentions
@@ -974,14 +977,44 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
-def _store_daily_report_if_any(msg, text: str) -> dict | None:
+async def _store_daily_report_if_any(msg, text: str) -> dict | None:
     """If a REPORT text is a daily books report, parse + store it. Returns the parsed
-    'full' dict (with report_id) or None. Deterministic, no messaging here."""
-    parsed = finance.parse_report_text(text)
+    'full' dict (with report_id) or None. Deterministic first; on a report-shaped
+    message the free parser under-reads, Sonnet extracts the fields and we LEARN the
+    new labels. The money math (recompute) is always deterministic — AI only reads."""
+    extra = gm_get_finance_aliases()
+    parsed = finance.parse_report_text(text, extra_aliases=extra)
+
     if not finance.is_daily_report(parsed):
-        return None
+        # AI fallback only when it looks like a report the regex parser missed.
+        if config.ANTHROPIC_API_KEY and finance.looks_like_report_attempt(text, parsed):
+            ai = await extract_daily_report_ai(text)
+            ai_fields = ai.get("fields") or {}
+            money = [k for k in ai_fields if k in finance._MONEY_FIELDS]
+            if len(money) < 3:
+                return None  # AI couldn't read a real report either
+            parsed = {k: v for k, v in ai_fields.items() if k in finance._MONEY_FIELDS}
+            if ai.get("stated_date"):
+                parsed["stated_date"] = ai["stated_date"]
+            parsed["fields_found"] = list(parsed.keys())
+            parsed["_source"] = "ai"
+            # Learn the new labels so the free parser handles them next time.
+            for a in ai.get("aliases") or []:
+                if a.get("field") in finance._MONEY_FIELDS and a.get("label"):
+                    gm_add_finance_alias(a["field"], a["label"])
+            logger.info("Daily report AI-fallback parsed %d fields; learned %d aliases",
+                        len(money), len(ai.get("aliases") or []))
+        else:
+            return None
+
     posted = msg.date  # tz-aware UTC datetime
-    full = finance.parse_full(text, posted)
+    computed = finance.recompute(parsed)
+    full = {
+        "business_day": finance.business_day_for(posted).isoformat(),
+        "report_kind": finance.classify_report(posted),
+        "raw": parsed,
+        "computed": computed,
+    }
     full["report_id"] = save_daily_report(
         business_day=full["business_day"],
         report_kind=full["report_kind"],
@@ -993,9 +1026,9 @@ def _store_daily_report_if_any(msg, text: str) -> dict | None:
         computed=full["computed"],
     )
     logger.info(
-        "Daily report stored: id=%s day=%s kind=%s math_ok=%s",
+        "Daily report stored: id=%s day=%s kind=%s math_ok=%s source=%s",
         full["report_id"], full["business_day"], full["report_kind"],
-        full["computed"].get("math_ok"),
+        full["computed"].get("math_ok"), parsed.get("_source", "free"),
     )
     return full
 
@@ -1038,6 +1071,46 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
                 pass
     except Exception as e:
         logger.error("_maybe_correct_report failed: %s", e)
+
+
+async def _maybe_ask_lost(context, msg, full: dict) -> None:
+    """When the drawer is short by more than GM_LOST_FLAG_THRESHOLD, ask the group why.
+    Frames the FX context (4000 riel = $1 so the drawer should normally run a little
+    OVER). Owner-gated by the same report_corrections_to_staff flag; opens a
+    'cash_lost' clarification so the ladder nudges/escalates until staff explain."""
+    computed = full["computed"]
+    ol = computed.get("over_lost_computed")
+    if not finance.lost_exceeds(ol, config.GM_LOST_FLAG_THRESHOLD):
+        return
+    lost_amt = -ol
+    body = (
+        "📉 Cash short by $%.2f on %s (%s).\n"
+        "Normally the drawer should run a little OVER (we count 4000 riel = $1), "
+        "so a shortfall over $%g is worth checking. "
+        "Does anyone know why this amount is lost?"
+    ) % (lost_amt, full["business_day"], full["report_kind"], config.GM_LOST_FLAG_THRESHOLD)
+    to_staff = gm_get_state("report_corrections_to_staff") == "true"
+    try:
+        if to_staff:
+            sent = await context.bot.send_message(
+                chat_id=msg.chat_id, text=body, reply_to_message_id=msg.message_id,
+            )
+            gm_create_clarification(
+                chat_id=msg.chat_id,
+                chat_title=msg.chat.title,
+                topic="cash_lost",
+                question_msg_id=sent.message_id,
+                target_msg_id=msg.message_id,
+                question_text=body,
+                sender_name=(msg.from_user.full_name if msg.from_user else None),
+                context_ref=str(full.get("report_id")),
+            )
+            logger.info("Cash-lost ask posted for report %s ($%.2f short)",
+                        full.get("report_id"), lost_amt)
+        else:
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+    except Exception as e:
+        logger.error("_maybe_ask_lost failed: %s", e)
 
 
 def _humanize_gap(delta: timedelta) -> str:
@@ -1289,6 +1362,28 @@ async def _lateness_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                          action, case["id"], e)
 
 
+async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Once a week (Monday, Phnom Penh): Opus digests the week's lateness + attendance
+    notes and DMs the owner. Skips quietly when there's nothing to report."""
+    now_pp = datetime.now(finance.PP_TZ)
+    if now_pp.weekday() != 0:  # 0 = Monday
+        return
+    try:
+        cases = gm_get_lateness_cases_since(7)
+        concerns = gm_get_concerns_since("staffing", 7)
+        if not cases and not concerns:
+            logger.info("Weekly attendance digest: no data, skipping")
+            return
+        digest = await generate_attendance_digest(cases, concerns)
+        if digest:
+            header = "🗓️ Weekly attendance digest (%s)\n\n" % now_pp.strftime("%d %b %Y")
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=header + digest)
+            logger.info("Weekly attendance digest sent (%d cases, %d concerns)",
+                        len(cases), len(concerns))
+    except Exception as e:
+        logger.error("weekly attendance digest failed: %s", e)
+
+
 def _resolve_clarification_response(chat_id: int, msg, text: str) -> dict | None:
     """Record a staff response to a GM clarification. Direct reply = answer (or 'checking');
     a loose 'we're checking' message while any clarification is open backs the ladder off.
@@ -1530,12 +1625,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if msg.photo:
             await _check_report_receipt(msg, context)
             return
-        # Text: if it's a daily books report, parse + store, and correct math errors
+        # Text: if it's a daily books report, parse + store, correct math, flag big losses
         if text.strip():
             try:
-                full = _store_daily_report_if_any(msg, text)
+                full = await _store_daily_report_if_any(msg, text)
                 if full is not None:
                     await _maybe_correct_report(context, msg, full)
+                    await _maybe_ask_lost(context, msg, full)
             except Exception as e:
                 logger.error("daily report parse failed: %s", e)
         # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.
@@ -1694,6 +1790,13 @@ def build_app() -> Application:
         interval=120,
         first=100,
         name="gm_lateness_ladder",
+    )
+    # Weekly attendance/AL digest (Opus): runs daily at 08:00 PP (01:00 UTC),
+    # the job itself only fires on Mondays.
+    app.job_queue.run_daily(
+        _weekly_attendance_digest_job,
+        time=__import__("datetime").time(hour=1, minute=30),
+        name="gm_weekly_attendance_digest",
     )
 
     return app
