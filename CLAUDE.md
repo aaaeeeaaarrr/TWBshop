@@ -187,6 +187,8 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 **Last updated:** 2026-05-31 (session 24 — Telethon listener restored + secrets durability lesson)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
+**▶ RESUME HERE (GM shop-brain build):** Finance parser + clarification ladder + Sonnet answer-judge are DONE & live (staff-facing). Next, pick one: (a) SEMANTIC concern detection — replace gm_bot/analyzer.py's 2-keyword waste/mistake scan with meaning-based detection (catches "dropped a tray", ignores "no waste today"); or (b) STOCK-MINIMUMS intake — table + /minimums command, then ask owner for each item's minimum so low-stock alerts work. Bigger later item: the KNOWLEDGE BRIEF (digest the 567k-message archive into a rolling summary, built by Opus-on-subscription not bot API). See "REPORT Finance Tracking" section + session-24 notes below for full design + pending decisions.
+
 **Telethon listener restored (session 24):**
 - twbshop-listener was DOWN (crash-looping) since the session-22 secrets.py reformatting wiped TELETHON_API_ID/API_HASH/PHONE. Those creds were only ever on the server, never pushed to the repo → not git-recoverable. (Same corruption that killed GM_BOT_TOKEN.)
 - Recovered api_id/api_hash from my.telegram.org (app "TWB Listener", id=30110706). Restored to secrets.py LOCAL + SERVER + REPO. Phone +85510655010 also stored everywhere.
