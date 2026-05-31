@@ -209,7 +209,28 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 
 ---
 
-## Delivery System (WOC DELIVERY PICTURES) — design (session 26, NOT built yet)
+## Delivery System (WOC DELIVERY PICTURES) — design (SHELVED session 26, pilot validated)
+> STATUS: SHELVED by owner (parked, not abandoned). Design + pilot findings below; resume when owner asks.
+> PILOT FINDINGS (80 photos downloaded, 22 read by Claude-on-Max at $0 API, then ALL pilot photos+scripts
+> DELETED from server+local for PII hygiene):
+> - Extraction WORKS well. 3 platforms, each distinguishable: Foodpanda (USD, #52xx/#8xxx, pink panda),
+>   GrabFood (RIEL, GF-xxx, green, shows Customer+Driver), E-GetS (#N).
+> - DRIVER EXCLUSION confirmed: Grab app explicitly labels "Customer:" vs "Driver:" with both numbers →
+>   exclude driver by label (e.g. excluded Leang Panharith, Ros Chanthea).
+> - DEVICE-vs-TICKET cross-check corrects misreads (Mali→Matt, Buonn→Bunna, $4.50→$3.50). RULE: device
+>   screen is PRIMARY, dedup by order #, tickets/food confirm. Same order appears 2-3× (device+ticket+food).
+> - Item modifiers captured ("No Tomato/No Raw Onion") for the wrong-food check. Kitchen tickets show ✓ ticks.
+> - 6 brands seen (Café Wine O'clock, Burger 50/50, Paris Croissants, The Wine Bakery, Pasta House, +E-GetS).
+>   Foreign customers exist (+63 PH, +44 UK) — phone-as-ID still holds.
+> - ⚠️ UNRESOLVED PRIVACY/LEGAL FLAG (decide before building any customer-contact DB): Grab app states
+>   verbatim its numbers "can only be used for confirming changes to an order. Saving them or using them for
+>   any other reasons will violate privacy laws and your contract with Grab." Foodpanda likely similar.
+> - COST: ~$0.004/photo Haiku, ~$0.011/photo Sonnet; 22-photo table ≈ $0.28 if API. Full year (64,919) naive
+>   ~$750-850, but dedup-by-order (extract once per order, -40-60% Sonnet) + food-only→Haiku-only →
+>   realistic ~$400-600. Measure real cost-per-order with a true ~50-photo API batch before any full run.
+> - WOC scale: chat_id -715759659, 64,919 photos last 365d. Telethon download works (stop listener ~30s,
+>   run via /root/venv/bin/python with PYTHONPATH=/root/TWBshop, restart — resumes clean).
+
 > The "Delivery System": mine the WOC delivery-photo archive into structured business data.
 > Built the wise way: cheap EXTRACTION (metered API, automated) → structured tables → expensive
 > SYNTHESIS (Opus-on-subscription = Claude-in-terminal, over rows not raw photos). Never loop the
@@ -285,6 +306,59 @@ archive through bot API. WOC structured tables are the first big input to the br
 
 ---
 
+## GM Backlog & Roadmap (session 26 — owner asked for the full list)
+> The remaining GM "shop-brain" work, grouped. "Logic/Haiku/Sonnet/Opus" = which tier does each.
+> KEY THEME (owner): build the GM's KNOWLEDGE via Claude-on-subscription (me, terminal) reading the
+> groups and distilling structured rows — NOT per-message bot API. Live bot stays cheap; depth comes from me.
+
+### A. Finance brain (TWB REPORT)
+- **Sales-drop % flag** (the immediate one) — LOGIC: compare a day's total_sales vs a weekday-aware trailing
+  baseline (weekends differ); if drop > X% → flag the owner/digest. Owner picks X after baselining. Idea:
+  show the drop in the weekly digest with the trend, not just a one-off ping.
+- **Overexpense carryover model** (pending decision #1, owner thinking) — current: cash-out>cash-in deficit
+  carried to next day off the $600 float. Owner wants cleaner model. I propose options when owner's ready.
+- **Daily/weekly finance digest** (wanted, not built) — Opus-me or scheduled: sales, expenses, cumulative
+  Over/Lost trend, anomalies. Pairs with the attendance digest already live.
+
+### B. Attendance brain (Supervisors/Management) — lateness ladder DONE
+- **AL engine** — LOGIC for the math + Haiku to read announcements. Schema: AL balance + accrual ledger +
+  deductions. Accrual +1.5/mo ARREARS (mid-month start confirmed). Deduct on off/AL announcements
+  (Haiku detect → logic). Vague "off tomorrow" → GM asks "Is this AL?" (attendance memory). /al [name]
+  balance cmd; monthly auto-accrual job; low-balance + frequent-short-notice flags. GATED: owner seeds
+  current balances, then says "begin counting from today."
+- **Working-hours-per-staff** (attendance memory "pending") — so GM can judge if a late/absence notice came
+  BEFORE shift start (else ask for screenshot). Needs the per-staff shift times once names are mapped.
+
+### C. Stock/ops brain (Stock Checks) — semantic concern detection DONE
+- **Stock minimums** — stock_minimums table + /minimums cmd; owner gives each item's minimum → low-stock
+  alerts fire when reported below min / not restocked. Idea: auto-SUGGEST minimums from historical usage;
+  reorder reminders; link to supplier price list + the demand data.
+
+### D. Cross-group KNOWLEDGE (built by Claude-on-subscription, NOT bot API) — the "through you" theme
+- **Knowledge Brief** — rolling living summary of ALL groups (3,619 chats, prioritized by importance):
+  cheap classify → targeted extract → me folding distilled rows in incrementally. WOC tables would feed it
+  (WOC shelved). Never re-read raw archive via API.
+- **Staff roster/profiles** — one record per person: real name + call-name + aliases + role + attendance
+  record + error/recognition history. Backbone for tagging, lateness, AL, scorecards. (Partial: alias +
+  call-name maps exist.)
+- **Decisions/policy ledger** (from Management) — distill decisions/announcements so the GM KNOWS settled
+  policy (extends the approved-proposals playbook).
+- **COMMS & Transfers reconciliation** — money/stock transfers between locations: track + reconcile.
+- **Supplier knowledge** — prices over time, issues, who's reliable (ties to the price-list fetcher).
+- **Recurring-issue tracker** — equipment faults, repeated complaints, themes across groups.
+
+### E. My added ideas
+- **"Ask the GM"** — owner asks free-text ("how often was X late last month?", "what did we decide about
+  Y?", "best customers?") answered from the structured knowledge by me/Sonnet. Turns the brain into a tool.
+- **Morning owner briefing** — daily digest: yesterday's sales, any Lost, attendance, open clarifications,
+  new concerns. One message to start the day.
+- **Cross-signal correlation** — combine signals (waste up + sales down + a late key staff) into one flag
+  instead of separate pings.
+- **Proactive supplier price-change alerts** — price fetcher → compare to last → flag increases to owner.
+- **Recognition/morale trend** — extend the points leaderboard into a morale/retention signal.
+
+---
+
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
@@ -298,7 +372,7 @@ archive through bot API. WOC structured tables are the first big input to the br
 - TEST SUITE FIXED (session 26): added repo-root conftest.py that imports the real config.py before collection, so test_intake.py's `sys.modules.setdefault("config", stub)` no longer poisons later GM test modules. `python -m pytest tests/` now runs the WHOLE suite green (232 passed). Run the full suite normally again.
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
-**▶ RESUME HERE:** GM shop-brain is broadly LIVE (semantic concerns, policy replies + 72h repeat, lateness/pay-back ladder, global staff tagging, Lost>$2 ask, finance AI-fallback+alias learning, weekly Opus digest, REPORT dedup done, whole pytest suite green). **NEXT (owner-chosen): the DELIVERY SYSTEM (WOC DELIVERY PICTURES) — see its design section above.** Start = **Phase 0+1 AFTER a mandatory ~400-photo PILOT** (measure accuracy + real cost-per-photo, get owner approval on the full-year ~$500-800 API estimate before the full 64,919-photo run). Extraction runs on the API key as a background batch, NOT Claude Max. Still-open small GM items (on hold per owner): AL engine (needs owner to seed balances), stock-minimums intake, Lost-ask sales-drop %. Bigger: KNOWLEDGE BRIEF (distill→synthesize all groups; WOC tables are its first input).
+**▶ RESUME HERE:** GM shop-brain is broadly LIVE (semantic concerns, policy replies + 72h repeat, lateness/pay-back ladder, global staff tagging, Lost>$2 ask, finance AI-fallback+alias learning, weekly Opus digest, REPORT dedup done, whole pytest suite green). The DELIVERY SYSTEM (WOC) is **SHELVED** by owner (design + pilot findings preserved in its section above — pilot validated the approach at $0; resume when owner asks; ⚠️ Grab "don't save numbers" terms unresolved before any customer-contact DB). **NEXT: await owner direction.** Parked items ready when asked: AL engine (needs owner to seed balances), stock-minimums intake, Lost-ask sales-drop %, the KNOWLEDGE BRIEF (distill→synthesize all groups).
 
 **Semantic concern detection + policy replies — built & live (session 25):**
 - shared/ai_client.py: detect_concern_semantic (Haiku, GM_CONCERN_MODEL) — meaning-based waste/mistake/low_stock judge. Replaces the 2-keyword scan. Catches zero-keyword reports ("tray slipped, 6 cakes fell"); ignores negations ("no waste today"). Fails flagged (_error) so caller can fall back.
