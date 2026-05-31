@@ -243,8 +243,22 @@ on the number BEFORE the full run. Pilot also tunes prompts on real photos.
 - Stage 6 Synthesis — OPUS-ON-SUBSCRIPTION (me, terminal): rolling food catalog+latest prices, off-menu candidates (not ordered in N months → owner confirms), customer intelligence, error/demand trends. Refreshed incrementally.
 - Stage 7 Owner-in-the-loop — off-menu confirm, ambiguous customers, wrong-food disputes (gated like concern cards).
 
-**Customer DB:** phone = permanent ID (names change on app, number doesn't). Driver vs customer = LOGIC
-(number recurring across many distinct orders = driver/platform → exclude; one-order context = customer).
+**COST MODEL — who looks, not where (owner clarified session 26):** API $ is incurred whenever the
+SERVER's code looks at a photo (it calls the API key = metered $). When CLAUDE-IN-TERMINAL (me, on the
+owner's Claude Max subscription) looks at a photo, there is NO extra API charge (Max already paid), but
+it's bounded by the Max window + my context (~dozens of photos per session, not hundreds) and is manual/
+unrepeatable. So: Max-me = piloting/tuning/learning + synthesis (free-ish, small batches); server+API =
+production scale (the only practical engine for the full 64,919). PILOT PLAN (owner: use Max not API):
+Stage 0 download is free (Telethon); I read ~30-40 local photos here per window at ZERO API to validate
+accuracy + tune prompts; then owner decides continue-via-Max (slow, free) vs flip-to-server-API (scale).
+Photos must be downloaded to local disk for me to Read them.
+
+**Customer DB:** phone = permanent ID (names change on app, number doesn't). Customer name/number often
+ALSO appears on the order ticket itself (not just the device) → cross-check (same number on ticket+device
+= high confidence). DRIVER number on the device is labelled with the word "driver" nearby → LOGIC rule:
+exclude any number with "driver" adjacent; we do NOT collect driver numbers for now. Driver vs customer
+also = LOGIC (number recurring across many distinct orders = driver/platform → exclude; one-order context
+= customer).
 Normalize E.164 KH. woc_phone_observations logs every sighting+confidence+source photo for audit before
 promotion. Link per customer: order history, RFM (recency/frequency/monetary → best + LAPSED customers),
 favorite items, preferences/allergies ("no bacon"), delivery brand/app + area, avg spend, peak time, LTV,
