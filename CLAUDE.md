@@ -200,9 +200,12 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - secrets.py is multi-line Python ALWAYS (one-line corruption = SyntaxError). Verify with `python -c "import secrets"` after any edit.
 - The dangerous secret for the listener is the SESSION FILE (ops_listener.session = auth_key), NOT api_id/api_hash. Guard the session file. Consider 2FA on the account.
 
-**GM finance parser foundation (session 24, WIP — not yet wired):**
-- gm_bot/finance.py: pure deterministic parser for the REPORT daily total. parse_report_text + recompute (drawer = float + cash in - cash out; Over/Lost = count - expected) + business_day_for (06:00 boundary) + classify_report (final=dawn, mid=daytime). No AI, no DB — testable.
-- Still to do per owner's design: AI fallback when free-parse fails + learn new aliases; wire into ingest; the knowledge-brief; semantic concern detection; clarification escalation ladder; stock minimums. See REPORT Finance Tracking section above.
+**GM finance parser — wired + storing (session 24):**
+- gm_bot/finance.py: deterministic parser. parse_report_text + is_daily_report + recompute (drawer = float + cash in - cash out; Over/Lost = count - expected; catches staff math slips) + business_day_for (06:00 boundary) + classify_report (final=dawn <06:00, mid=daytime) + parse_full. No AI, no DB.
+- shared/database.py: gm_daily_reports table + init_gm_finance_db + save_daily_report (idempotent on chat+message_id) + get_daily_reports_for_day. init called from run_gm_bot.py.
+- gm_bot/bot.py: REPORT text that is_daily_report -> _store_daily_report_if_any (parse+recompute+store, NO messaging — owner-gated). MISROUTED ROUTING REMOVED per owner (no more wrong-group DMs; pure ingest). Receipt clarity check on REPORT photos unchanged.
+- tests/test_finance.py: 14 tests pass (real reports 27/28/30, math-error catch, day-boundary, 4:55 final, caps/comma/spacing variations).
+- STILL TO DO per owner's design: AI fallback when free-parse fails + learn new aliases; knowledge-brief (built by Opus-me on subscription, not bot API); semantic concern detection (replace 2-keyword); clarification escalation ladder (10/30/120 + in-group tagged "Explain"); stock minimums intake; new /commands. Dedup (#5) before aggregation. See REPORT Finance Tracking section.
 
 **GM misrouted message detection (session 23):**
 - `_notify_misrouted()`: DMs owner + forwards the message whenever something lands in the wrong group

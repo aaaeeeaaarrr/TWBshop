@@ -2291,3 +2291,126 @@ def receipt_upsert_answered(chat_id: int, photo_msg_id: int, bot_msg_id: int,
                 ON CONFLICT (chat_id, photo_msg_id) DO UPDATE
                     SET answer = EXCLUDED.answer, answered_at = NOW()
             """, (chat_id, photo_msg_id, bot_msg_id, question, answer, sender_name))
+
+
+# ─── GM daily finance reports ─────────────────────────────────────────────────
+
+def init_gm_finance_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_daily_reports (
+                    id                 SERIAL PRIMARY KEY,
+                    business_day       DATE NOT NULL,
+                    report_kind        TEXT NOT NULL,            -- mid | final
+                    source_chat_id     BIGINT NOT NULL,
+                    source_message_id  BIGINT NOT NULL,
+                    posted_at          TIMESTAMPTZ,
+                    stated_date        DATE,
+                    raw_text           TEXT,
+                    -- raw fields as written
+                    cash_on_hand       NUMERIC,
+                    cash_income        NUMERIC,
+                    aba_income         NUMERIC,
+                    total_sales        NUMERIC,
+                    cash_expense       NUMERIC,
+                    aba_expense        NUMERIC,
+                    stated_total       NUMERIC,
+                    cash_count         NUMERIC,
+                    over_amount        NUMERIC,
+                    lost_amount        NUMERIC,
+                    -- recomputed
+                    expected_drawer    NUMERIC,
+                    over_lost_computed NUMERIC,
+                    total_math_error   NUMERIC,
+                    sales_check        NUMERIC,
+                    math_ok            BOOLEAN DEFAULT TRUE,
+                    notes              TEXT,
+                    created_at         TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (source_chat_id, source_message_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_gm_daily_reports_day
+                    ON gm_daily_reports (business_day, report_kind);
+            """)
+    logger.info("GM finance DB ready")
+
+
+def save_daily_report(
+    business_day: str,
+    report_kind: str,
+    source_chat_id: int,
+    source_message_id: int,
+    posted_at: str | None,
+    raw_text: str,
+    raw: dict,
+    computed: dict,
+) -> int | None:
+    """
+    Store one parsed daily report. Idempotent on (source_chat_id, source_message_id):
+    re-parsing the same message updates the row rather than duplicating.
+    Returns the row id.
+    """
+    notes = computed.get("notes") or []
+    notes_text = " | ".join(notes) if notes else None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_daily_reports
+                    (business_day, report_kind, source_chat_id, source_message_id,
+                     posted_at, stated_date, raw_text,
+                     cash_on_hand, cash_income, aba_income, total_sales,
+                     cash_expense, aba_expense, stated_total, cash_count,
+                     over_amount, lost_amount,
+                     expected_drawer, over_lost_computed, total_math_error,
+                     sales_check, math_ok, notes)
+                VALUES (%s,%s,%s,%s, %s,%s,%s,
+                        %s,%s,%s,%s, %s,%s,%s,%s, %s,%s,
+                        %s,%s,%s, %s,%s,%s)
+                ON CONFLICT (source_chat_id, source_message_id) DO UPDATE SET
+                    business_day = EXCLUDED.business_day,
+                    report_kind  = EXCLUDED.report_kind,
+                    posted_at    = EXCLUDED.posted_at,
+                    stated_date  = EXCLUDED.stated_date,
+                    raw_text     = EXCLUDED.raw_text,
+                    cash_on_hand = EXCLUDED.cash_on_hand,
+                    cash_income  = EXCLUDED.cash_income,
+                    aba_income   = EXCLUDED.aba_income,
+                    total_sales  = EXCLUDED.total_sales,
+                    cash_expense = EXCLUDED.cash_expense,
+                    aba_expense  = EXCLUDED.aba_expense,
+                    stated_total = EXCLUDED.stated_total,
+                    cash_count   = EXCLUDED.cash_count,
+                    over_amount  = EXCLUDED.over_amount,
+                    lost_amount  = EXCLUDED.lost_amount,
+                    expected_drawer    = EXCLUDED.expected_drawer,
+                    over_lost_computed = EXCLUDED.over_lost_computed,
+                    total_math_error   = EXCLUDED.total_math_error,
+                    sales_check  = EXCLUDED.sales_check,
+                    math_ok      = EXCLUDED.math_ok,
+                    notes        = EXCLUDED.notes
+                RETURNING id
+            """, (
+                business_day, report_kind, source_chat_id, source_message_id,
+                posted_at, raw.get("stated_date"), raw_text,
+                raw.get("cash_on_hand"), raw.get("cash_income"), raw.get("aba_income"),
+                raw.get("total_sales"), raw.get("cash_expense"), raw.get("aba_expense"),
+                raw.get("stated_total"), raw.get("cash_count"),
+                raw.get("over"), raw.get("lost"),
+                computed.get("expected_drawer"), computed.get("over_lost_computed"),
+                computed.get("total_math_error"), computed.get("sales_check"),
+                computed.get("math_ok", True), notes_text,
+            ))
+            row = cur.fetchone()
+            return row["id"] if row else None
+
+
+def get_daily_reports_for_day(business_day: str) -> list[dict]:
+    """All parsed reports for a business day (mid + final), oldest first."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_daily_reports
+                WHERE business_day = %s
+                ORDER BY posted_at NULLS LAST, id
+            """, (business_day,))
+            return [dict(r) for r in cur.fetchall()]

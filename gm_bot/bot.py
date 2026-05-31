@@ -28,12 +28,14 @@ from shared.database import (
     gm_append_refinement_note, save_ops_message,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
+    init_gm_finance_db, save_daily_report,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
+from gm_bot import finance
 
 logger = logging.getLogger(__name__)
 
@@ -961,38 +963,29 @@ async def _conv_interrupt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
-async def _notify_misrouted(bot, msg, sender: str, group_name: str, reason: str) -> None:
-    """DM owner about a message that looks like it landed in the wrong group."""
-    try:
-        await bot.send_message(
-            chat_id=config.OWNER_TELEGRAM_ID,
-            text=f"📍 Possible wrong group\n{sender} in {group_name}\n{reason}",
-        )
-        await bot.forward_message(
-            chat_id=config.OWNER_TELEGRAM_ID,
-            from_chat_id=msg.chat_id,
-            message_id=msg.message_id,
-        )
-    except Exception as e:
-        logger.error("_notify_misrouted failed: %s", e)
-
-
-async def _check_misrouted_photo(bot, msg, sender: str) -> None:
-    """For photos in non-REPORT groups: check if it looks like a receipt. Notify owner if so."""
-    try:
-        photo_file = await msg.photo[-1].get_file()
-        photo_bytes = bytes(await photo_file.download_as_bytearray())
-        result = await assess_receipt_photo(photo_bytes)
-        if result.get("is_receipt"):
-            group_name = msg.chat.title or "Unknown group"
-            readable = result.get("readable_partial", "")
-            detail = f" Readable: {readable}" if readable else ""
-            await _notify_misrouted(
-                bot, msg, sender, group_name,
-                f"Looks like a receipt or expense — should this be in REPORT?{detail}",
-            )
-    except Exception as e:
-        logger.error("_check_misrouted_photo failed: %s", e)
+def _store_daily_report_if_any(msg, text: str) -> int | None:
+    """If a REPORT text message is a daily books report, parse + store it. Deterministic, no messaging."""
+    parsed = finance.parse_report_text(text)
+    if not finance.is_daily_report(parsed):
+        return None
+    posted = msg.date  # tz-aware UTC datetime
+    full = finance.parse_full(text, posted)
+    report_id = save_daily_report(
+        business_day=full["business_day"],
+        report_kind=full["report_kind"],
+        source_chat_id=msg.chat_id,
+        source_message_id=msg.message_id,
+        posted_at=posted.isoformat() if posted else None,
+        raw_text=text,
+        raw=full["raw"],
+        computed=full["computed"],
+    )
+    logger.info(
+        "Daily report stored: id=%s day=%s kind=%s math_ok=%s",
+        report_id, full["business_day"], full["report_kind"],
+        full["computed"].get("math_ok"),
+    )
+    return report_id
 
 
 async def _check_report_receipt(msg, context) -> None:
@@ -1003,15 +996,7 @@ async def _check_report_receipt(msg, context) -> None:
         examples = receipt_get_answered_examples(msg.chat_id)
         result = await assess_receipt_photo(photo_bytes, past_examples=examples)
 
-        if not result["is_receipt"]:
-            sender = msg.from_user.full_name if msg.from_user else "Staff"
-            await _notify_misrouted(
-                context.bot, msg, sender, "REPORT",
-                "Photo doesn't look like a receipt or expense document.",
-            )
-            return
-
-        if result["is_clear"]:
+        if not result["is_receipt"] or result["is_clear"]:
             return
 
         sender = msg.from_user.full_name if msg.from_user else "Staff"
@@ -1109,7 +1094,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
-    # TWB REPORT group: handle receipt photos and clarification replies
+    # TWB REPORT group: receipt photos, clarification replies, daily-report parsing
     if chat_id == config.DAILY_REPORT_CHAT_ID:
         if msg.reply_to_message and text.strip():
             await _report_clarification_reply(msg, context)
@@ -1117,19 +1102,14 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if msg.photo:
             await _check_report_receipt(msg, context)
             return
-        # Documents/videos in REPORT are unusual — notify owner
-        if msg.document or msg.video:
-            content_type = "Document" if msg.document else "Video"
-            await _notify_misrouted(
-                context.bot, msg, sender, "REPORT",
-                f"{content_type} in REPORT (not a receipt photo)",
-            )
-        # Text in REPORT is normal (staff notes, corrections) — record silently, no DM
+        # Text: if it's a daily books report, parse + store (no messaging — owner-gated later)
+        if text.strip():
+            try:
+                _store_daily_report_if_any(msg, text)
+            except Exception as e:
+                logger.error("daily report parse failed: %s", e)
+        # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.
         return
-
-    # Non-REPORT groups: check if a photo looks like a receipt
-    if msg.photo:
-        asyncio.create_task(_check_misrouted_photo(context.bot, msg, sender))
 
     # Photo with no triggering text — check if a recent concern needs it
     if has_media and not text.strip():

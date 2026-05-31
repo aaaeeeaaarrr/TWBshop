@@ -81,6 +81,21 @@ def _match_field(label: str) -> str | None:
     return None
 
 
+_MONEY_FIELDS = {
+    "cash_on_hand", "cash_income", "aba_income", "total_sales", "cash_expense",
+    "aba_expense", "stated_total", "cash_count", "over", "lost",
+}
+
+
+def is_daily_report(parsed: dict) -> bool:
+    """
+    True if a parsed message looks like a daily books report (>= 3 money fields).
+    Casual chatter parses to 0 money fields; a real report has ~9.
+    """
+    found = set(parsed.get("fields_found", []))
+    return len(found & _MONEY_FIELDS) >= 3
+
+
 def parse_report_text(text: str) -> dict:
     """
     Parse a daily-report message into raw fields.
