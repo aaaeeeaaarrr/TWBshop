@@ -337,6 +337,67 @@ def save_ops_message(
                   text, media_type, sent_at, now))
 
 
+def dedup_keeper(ids: list[int], mids: list[int], prefer: set) -> int:
+    """Pure: choose which row to KEEP from a duplicate group. Prefer a row whose
+    message_id is in `prefer` (e.g. referenced by gm_daily_reports), else the
+    smallest id. `ids` and `mids` are aligned (row id, message_id)."""
+    for rid, mid in zip(ids, mids):
+        if mid in prefer:
+            return rid
+    return min(ids)
+
+
+def dedupe_ops_messages(chat_id: int, prefer_message_ids=None,
+                        dry_run: bool = True) -> dict:
+    """Remove duplicate ops_messages rows for one chat where the same content was
+    captured twice (same sender_id + sent_at + text, different message_id — e.g. the
+    Telethon listener and the Bot API both logging the same message).
+
+    Keeper per duplicate group: a row whose message_id is in `prefer_message_ids`
+    (so referenced rows — e.g. gm_daily_reports.source_message_id — are never
+    orphaned), otherwise the row with the smallest id. Only text rows are touched.
+
+    dry_run=True reports what WOULD be deleted without changing anything.
+    Returns {groups, deleted, deleted_ids, kept_ids}.
+    """
+    prefer = set(prefer_message_ids or [])
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT array_agg(id ORDER BY id) AS ids,
+                       array_agg(message_id ORDER BY id) AS mids
+                FROM ops_messages
+                WHERE chat_id = %s AND text IS NOT NULL
+                GROUP BY sender_id, sent_at, text
+                HAVING count(*) > 1
+            """, (chat_id,))
+            groups = cur.fetchall()
+
+            to_delete, kept = [], []
+            for g in groups:
+                keeper = dedup_keeper(g["ids"], g["mids"], prefer)
+                kept.append(keeper)
+                to_delete.extend(rid for rid in g["ids"] if rid != keeper)
+
+            if to_delete and not dry_run:
+                cur.execute("DELETE FROM ops_messages WHERE id = ANY(%s)", (to_delete,))
+
+    return {"groups": len(groups), "deleted": len(to_delete),
+            "deleted_ids": to_delete, "kept_ids": kept}
+
+
+def gm_daily_report_message_ids(chat_id: int) -> list[int]:
+    """All source_message_ids referenced by stored daily reports for a chat —
+    pass to dedupe_ops_messages so those rows are preferred as keepers."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT source_message_id FROM gm_daily_reports
+                WHERE source_chat_id = %s AND source_message_id IS NOT NULL
+            """, (chat_id,))
+            return [r["source_message_id"] for r in cur.fetchall()]
+
+
 # ─── Retail orders ────────────────────────────────────────────────────────────
 
 def save_order(user_id: int, customer_name: str, items: list[tuple[str, int]]) -> None:
