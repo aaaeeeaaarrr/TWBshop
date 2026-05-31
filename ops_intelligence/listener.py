@@ -34,7 +34,17 @@ async def run() -> None:
     init_ops_db()
 
     client = TelegramClient(SESSION_PATH, config.TELETHON_API_ID, config.TELETHON_API_HASH)
-    await client.start(phone=config.TELETHON_PHONE)
+
+    # Connect using the existing session first — no phone needed when already authorised.
+    # Only fall back to an interactive phone login if the session is dead.
+    await client.connect()
+    if not await client.is_user_authorized():
+        if not config.TELETHON_PHONE:
+            raise RuntimeError(
+                "Telethon session is not authorised and TELETHON_PHONE is empty. "
+                "Set the phone in secrets.py and run an interactive login once."
+            )
+        await client.start(phone=config.TELETHON_PHONE)
 
     me = await client.get_me()
     logger.info("Listener started as %s (id=%s)", me.username or me.first_name, me.id)
