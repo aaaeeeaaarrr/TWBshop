@@ -2574,3 +2574,16 @@ def gm_escalate_clarification(clar_id: int) -> None:
                 SET status = 'escalated', escalated_at = NOW()
                 WHERE id = %s
             """, (clar_id,))
+
+
+def gm_resolve_open_clarifications(chat_id: int, topic: str, answer_text: str) -> int:
+    """Resolve all open/checking clarifications of a topic in a chat (e.g. a clear
+    receipt arrived after a 'send again'). Returns how many were resolved."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_clarifications
+                SET status = 'answered', answer_text = %s, answered_at = NOW()
+                WHERE chat_id = %s AND topic = %s AND status IN ('open','checking')
+            """, (answer_text, chat_id, topic))
+            return cur.rowcount

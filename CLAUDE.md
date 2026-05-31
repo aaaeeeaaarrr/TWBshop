@@ -212,7 +212,9 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - gm_clarifications table + init_gm_clarifications_db + create/find/nudge/checking/answer/escalate helpers.
 - bot.py: when GM posts a staff-facing math correction it opens a clarification (question_msg_id = the correction msg). _clarification_ladder_job (every 120s) nudges in-group on schedule, escalates to owner at 2h. _resolve_clarification_response records staff reply as the answer (their reason), or backs off to 30min on a "we're checking" phrase.
 - report_corrections_to_staff flipped to 'true' — corrections now go in-group, tagging the report.
-- 26 tests pass (17 finance + 9 clarify). NOTE: receipts not yet wired into the ladder (only report_math); "answer doesn't add up" auto-escalation is a future semantic hook.
+- 26 tests pass (17 finance + 9 clarify).
+- RECEIPTS now folded into the ladder (topic='receipt_clarity'): unclear receipt opens a clarification; a later clear receipt or a text reply resolves it; same nudge/escalate cadence.
+- "ANSWER DOESN'T ADD UP" judge wired: ai_client.judge_clarification_answer (Sonnet, claude-sonnet-4-6, configurable). On every staff answer the GM asks Sonnet if it genuinely resolves the question; if not -> escalate to owner with the answer + reason. Fails open (no escalation) on AI error. Sonnet chosen over Opus: bounded short Q+A judgment, runs live/API-metered, cheap+fast; Opus reserved for the brief + cross-week reasoning.
 
 **GM misrouted message detection (session 23):**
 - `_notify_misrouted()`: DMs owner + forwards the message whenever something lands in the wrong group

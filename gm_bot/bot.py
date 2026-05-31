@@ -32,11 +32,11 @@ from shared.database import (
     init_gm_clarifications_db, gm_create_clarification, gm_get_active_clarifications,
     gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
     gm_record_clarification_nudge, gm_set_clarification_checking,
-    gm_answer_clarification, gm_escalate_clarification,
+    gm_answer_clarification, gm_escalate_clarification, gm_resolve_open_clarifications,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
-    GM_PROPOSALS_MODEL, assess_receipt_photo,
+    GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 from gm_bot import finance, clarify
@@ -1034,24 +1034,57 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
         logger.error("_maybe_correct_report failed: %s", e)
 
 
-def _resolve_clarification_response(chat_id: int, msg, text: str) -> None:
+def _resolve_clarification_response(chat_id: int, msg, text: str) -> dict | None:
     """Record a staff response to a GM clarification. Direct reply = answer (or 'checking');
-    a loose 'we're checking' message while any clarification is open backs the ladder off."""
+    a loose 'we're checking' message while any clarification is open backs the ladder off.
+    Returns {'clar', 'answer'} when a real answer was recorded (so the caller can AI-judge it)."""
     now = datetime.now(timezone.utc)
     if msg.reply_to_message:
         clar = gm_find_clarification_by_question_msg(chat_id, msg.reply_to_message.message_id)
         if clar and clar["status"] in ("open", "checking"):
             if clarify.is_checking_phrase(text):
                 gm_set_clarification_checking(clar["id"], now + clarify.NUDGE_INTERVAL_CHECKING)
-            else:
-                gm_answer_clarification(clar["id"], text.strip())
-                logger.info("Clarification %s answered by %s", clar["id"], clar.get("sender_name"))
-            return
+                return None
+            gm_answer_clarification(clar["id"], text.strip())
+            logger.info("Clarification %s answered by %s", clar["id"], clar.get("sender_name"))
+            return {"clar": clar, "answer": text.strip()}
     # Not a direct reply — but "give us time / checking" while clarifications are open -> back off
     if clarify.is_checking_phrase(text):
         for clar in gm_get_active_clarifications_for_chat(chat_id):
             if clar["status"] == "open":
                 gm_set_clarification_checking(clar["id"], now + clarify.NUDGE_INTERVAL_CHECKING)
+    return None
+
+
+async def _judge_clarification(context, clar: dict, answer: str) -> None:
+    """Sonnet checks whether the staff reply actually resolves the clarification.
+    If it doesn't add up, escalate to the owner with the answer + the reason."""
+    verdict = await judge_clarification_answer(
+        clar.get("question_text") or "", answer, clar["topic"],
+    )
+    if verdict.get("resolved", True):
+        return
+    body = clarify.escalation_text(
+        clar["topic"], clar.get("chat_title") or str(clar["chat_id"]),
+        clar.get("sender_name"), clar.get("question_text") or "", answer,
+    )
+    reason = verdict.get("reason", "")
+    if reason:
+        body += f"\nWhy flagged: {reason}"
+    try:
+        await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+        if clar.get("target_msg_id"):
+            try:
+                await context.bot.forward_message(
+                    chat_id=config.OWNER_TELEGRAM_ID,
+                    from_chat_id=clar["chat_id"], message_id=clar["target_msg_id"],
+                )
+            except Exception:
+                pass
+        gm_escalate_clarification(clar["id"])
+        logger.info("Clarification %s judged not-resolved -> escalated", clar["id"])
+    except Exception as e:
+        logger.error("_judge_clarification escalate failed: %s", e)
 
 
 async def _clarification_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1102,7 +1135,11 @@ async def _check_report_receipt(msg, context) -> None:
         examples = receipt_get_answered_examples(msg.chat_id)
         result = await assess_receipt_photo(photo_bytes, past_examples=examples)
 
-        if not result["is_receipt"] or result["is_clear"]:
+        if not result["is_receipt"]:
+            return
+        if result["is_clear"]:
+            # A clear receipt arrived — resolves any pending "send again / clarify" in this chat.
+            gm_resolve_open_clarifications(msg.chat_id, "receipt_clarity", "(clear receipt received)")
             return
 
         sender = msg.from_user.full_name if msg.from_user else "Staff"
@@ -1124,12 +1161,25 @@ async def _check_report_receipt(msg, context) -> None:
                 reply = f"Please send this photo again — {issue_text}."
             else:
                 reply = "Please send this photo again — not clear enough to record."
-            await context.bot.send_message(
+            sent = await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=reply,
                 reply_to_message_id=msg.message_id,
             )
+            question = reply
             logger.info("Unclear receipt reply sent for msg %s: %s", msg.message_id, issues)
+
+        # Fold the receipt clarification into the ladder (nudge / escalate / record reason).
+        gm_create_clarification(
+            chat_id=msg.chat_id,
+            chat_title=msg.chat.title,
+            topic="receipt_clarity",
+            question_msg_id=sent.message_id,
+            target_msg_id=msg.message_id,
+            question_text=question,
+            sender_name=sender,
+            context_ref=None,
+        )
     except Exception as exc:
         logger.error("_check_report_receipt failed: %s", exc)
 
@@ -1200,10 +1250,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
-    # Did staff respond to a GM clarification question? (any group) — records their reason.
+    # Did staff respond to a GM clarification question? (any group) — records their reason,
+    # then Sonnet checks whether the answer actually adds up.
     if text.strip():
         try:
-            _resolve_clarification_response(chat_id, msg, text)
+            resolved = _resolve_clarification_response(chat_id, msg, text)
+            if resolved:
+                await _judge_clarification(context, resolved["clar"], resolved["answer"])
         except Exception as e:
             logger.error("clarification resolve failed: %s", e)
 

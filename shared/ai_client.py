@@ -665,6 +665,50 @@ async def assess_receipt_photo(image_bytes: bytes,
         return {"is_receipt": False, "is_clear": True, "issues": []}
 
 
+# Bounded short-context judgment (one question + one reply) — Sonnet is the right tier.
+CLARIFICATION_JUDGE_MODEL = "claude-sonnet-4-6"
+
+_CLARIFY_JUDGE_SYSTEM = (
+    "You are the GM of a bakery in Phnom Penh. The GM asked a staff member to clarify "
+    "or correct something, and they replied. Decide ONLY whether their reply genuinely "
+    "addresses the question.\n"
+    "- report_math: the GM showed a cash-drawer arithmetic error. A good reply explains the "
+    "cause (miscount, a missed expense, a typo) or commits to fixing/recounting. A bad reply "
+    "ignores it, is evasive, blames vaguely, or makes no sense.\n"
+    "- receipt_clarity: the GM asked what an unclear receipt says. A good reply gives the "
+    "readable amount/items asked for. A bad reply is unrelated or still unclear.\n"
+    "Be fair, not pedantic: a plausible, on-topic explanation counts as resolved. "
+    "Only flag replies that truly fail to address the question.\n"
+    'Return ONLY JSON: {"resolved": true|false, "reason": "<short>"}'
+)
+
+
+async def judge_clarification_answer(question: str, answer: str, topic: str) -> dict:
+    """Decide if a staff reply resolves a GM clarification. Returns {'resolved': bool, 'reason': str}.
+    Fails open (resolved=True) so AI outages never spam the owner."""
+    prompt = (
+        f"Topic: {topic}\n\n"
+        f"GM asked:\n{question}\n\n"
+        f"Staff replied:\n{answer}\n\n"
+        "Does the reply genuinely address the question? Return the JSON."
+    )
+    try:
+        resp = await _get_client().messages.create(
+            model=CLARIFICATION_JUDGE_MODEL,
+            max_tokens=150,
+            system=_CLARIFY_JUDGE_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "resolved": bool(result.get("resolved", True)),
+            "reason": str(result.get("reason", "")),
+        }
+    except Exception as exc:
+        logger.error("judge_clarification_answer failed: %s", exc)
+        return {"resolved": True, "reason": "judge unavailable"}
+
+
 async def check_staff_message_ai(text: str, prior_context: list) -> dict:
     try:
         resp = await _get_client().messages.create(
