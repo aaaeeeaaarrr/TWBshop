@@ -151,3 +151,52 @@ def resolve_staff_name(telegram_name: str) -> str:
     """Return real name for a Telegram display name, or the original if unknown."""
     return STAFF_ALIAS_MAP.get(telegram_name, telegram_name)
 
+
+# Telegram display name → the name WE CALL them by (nickname), from the staff
+# self-ID roll-call in Stock Checks 2026-05-27 ("my name is X, call me Y").
+# Used when the GM tags a staff member: it shows this call-name next to the
+# account tag (unless the call-name already matches the account display name).
+STAFF_CALL_NAME: dict[str, str] = {
+    "Rath Phal":                            "Rath",
+    "Hong Vannary":                         "Vannary",
+    "Hong Vanary":                          "Vannary",
+    "Lina So":                              "Lina",
+    "Neat Kheak":                           "Kheak",
+    "Seth 🫵":                              "Seth",
+    "CHUN CHOMREUN":                        "Chomreun",
+    "NY":                                   "Ny",
+    "Nakk":                                 "Nak",
+    "Sachak Anan":                          "Anan",
+    "N. Norin":                             "Norin",
+    "O":                                    "Chantrea",
+    "បាន ឈៀងម៉េង💨":                        "Akalimeng",
+    "Lim soleng 🌚":                        "Soleng",
+    "SAM PHARM":                            "Samphass",
+    "Cat":                                  "Chenda",
+    "FAI LYNN⚕️KAG LYNN":                   "Failin",
+    "Thy Da":                               "Thyda",
+    "An Davy":                              "Davy",
+    "Phêák Trä":                            "Pheak Tra",
+    "Pisey":                                "Sey",
+    'ពិសិដ្ឋ វិណាល់ Piseth Vinal "Hikaru"': "Piseth",
+    "LONG":                                 "Long",
+    "Sao Visal cv":                         "Visal",
+}
+
+
+def call_name_for(telegram_name: str) -> str | None:
+    """Return the nickname we call this staff member by, or None if unknown."""
+    return STAFF_CALL_NAME.get(telegram_name)
+
+
+def display_for_call_name(call_name: str) -> str | None:
+    """Reverse lookup: given a nickname we use (e.g. 'Seth'), return the Telegram
+    display name (e.g. 'Seth 🫵'), so a free-text name can be resolved to an account."""
+    if not call_name:
+        return None
+    cl = call_name.strip().lower()
+    for display, nick in STAFF_CALL_NAME.items():
+        if nick.lower() == cl:
+            return display
+    return None
+

@@ -660,6 +660,75 @@ async def detect_concern_semantic(text: str) -> dict:
         return {"is_concern": False, "_error": True}
 
 
+# Lateness / pay-back detection — Haiku, live per supervisor/management message.
+GM_LATENESS_MODEL = "claude-haiku-4-5-20251001"
+
+_GM_LATENESS_SYSTEM = (
+    "You read ONE message from a bakery's supervisor/management Telegram group in "
+    "Phnom Penh. A senior may be reporting that a team member was LATE, ABSENT, or "
+    "did NOT show up — and may mention a day that person will PAY BACK the missed time.\n"
+    "Judge meaning (English + Khmer), not keywords.\n"
+    "- is_lateness_report: true ONLY if it reports a specific person being late/absent/"
+    "no-show. Normal chat, schedules, approvals, or planned annual leave = false.\n"
+    "- late_person: the reported person's name as written, or null.\n"
+    "- payback_day: the day/time they will make up the missed hours IF stated "
+    "('tomorrow', 'Friday', 'the 5th', 'next week'...), else null.\n"
+    'Return ONLY JSON: {"is_lateness_report": true|false, "late_person": "<name>"|null, '
+    '"payback_day": "<day>"|null, "confidence": 0.0-1.0}'
+)
+
+_GM_PAYBACK_SYSTEM = (
+    "A bakery manager asked when a late staff member will PAY BACK their missed time. "
+    "Read the reply and extract the pay-back day if one is given (English or Khmer).\n"
+    'Return ONLY JSON: {"has_payback_day": true|false, "payback_day": "<day>"|null}'
+)
+
+
+async def detect_lateness_report(text: str) -> dict:
+    """Detect a lateness/absence report and extract the late person + any pay-back day.
+    Returns {is_lateness_report, late_person, payback_day, confidence}. On error returns
+    is_lateness_report False with _error=True so the caller can skip (no false cases)."""
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_LATENESS_MODEL,
+            max_tokens=150,
+            system=[{"type": "text", "text": _GM_LATENESS_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": text[:1500]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "is_lateness_report": bool(result.get("is_lateness_report", False)),
+            "late_person":        result.get("late_person"),
+            "payback_day":        result.get("payback_day"),
+            "confidence":         float(result.get("confidence", 0.0)),
+        }
+    except Exception as exc:
+        logger.error("detect_lateness_report failed: %s", exc)
+        return {"is_lateness_report": False, "_error": True}
+
+
+async def extract_payback_day(text: str) -> dict:
+    """Extract a pay-back day from a reply. Returns {has_payback_day, payback_day}.
+    On error returns has_payback_day False (case stays open) — fails safe."""
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_LATENESS_MODEL,
+            max_tokens=80,
+            system=[{"type": "text", "text": _GM_PAYBACK_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": text[:800]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        return {
+            "has_payback_day": bool(result.get("has_payback_day", False)),
+            "payback_day":     result.get("payback_day"),
+        }
+    except Exception as exc:
+        logger.error("extract_payback_day failed: %s", exc)
+        return {"has_payback_day": False, "payback_day": None}
+
+
 async def assess_receipt_photo(image_bytes: bytes,
                                past_examples: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.

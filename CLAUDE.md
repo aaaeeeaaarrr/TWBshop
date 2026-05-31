@@ -181,10 +181,38 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 
 ---
 
+## Supervisors / Management — Lateness, AL & Tagging (owner spec, session 25)
+> Build spec from owner. Tagging foundation DONE; lateness ladder + AL engine PENDING build.
+
+**Staff tagging convention (GLOBAL — applies to every GM tag everywhere):**
+- When the GM tags a staff member, show the name WE CALL them by next to the account tag.
+- EXCEPTION: if the call-name already matches the account display name (ignoring case/punctuation/emoji), show only the tag.
+- DONE & GLOBAL: config.STAFF_CALL_NAME (display→nickname, 2026-05-27 roll-call) + config.call_name_for() + config.display_for_call_name() (reverse) + gm_bot/mentions.py (format_mention / mention) producing HTML `tg://user?id=<uid>` inline mentions (pings without a @username; send parse_mode=HTML). bot._staff_mention(name,uid) is the canonical resolver — resolves uid via gm_get_staff_uid (latest sender_id in ops_messages) or the reverse call-name map. USE _staff_mention FOR EVERY GM TAG OF A STAFF MEMBER, not just lateness (owner instruction, session 26). Audited: lateness is currently the only pinging path; no other inline-mention code exists. 9 tests test_mentions.py.
+
+**Lateness / pay-back ladder (Supervisors + Management) — BUILT & LIVE (session 26):**
+- shared/ai_client.py: detect_lateness_report (Haiku) → {is_lateness_report, late_person, payback_day, confidence}; extract_payback_day (Haiku) for replies. Both fail safe.
+- gm_bot/lateness.py: PURE ladder logic decide_lateness_action (awaiting_payback 30min→ask_group; group_asked 24h→escalate) + text builders. 10 tests test_lateness.py.
+- shared/database.py: gm_lateness_cases table + init_gm_lateness_db (wired in run_gm_bot.py) + create/get_open/get_open_in_chat/mark_group_asked/resolve/escalate + gm_get_staff_uid.
+- gm_bot/bot.py: _handle_lateness (live, Supervisors+Management) = free pre-gate (len + ATTENDANCE_KW) → Haiku detect (conf≥0.55) → if payback day given, log resolved; else open case + ask senior (tagged). Resolution: a reply to the case msg or GM question with a payback day (extract_payback_day) → resolved. _lateness_ladder_job every 120s drives ask_group/escalate. Staged-model design exactly per owner: logic owns timers, Haiku reads, Sonnet reserved (not needed here), Opus for future weekly digest.
+- Tagging: all tags via _staff_mention (call-name + ping, drops call-name when == account name).
+
+**Annual Leave (AL) tracking — PENDING build (engine now, seed later):**
+- Staff announce off/AL → GM deducts from their AL leftover balance.
+- Accrual: every new month each staff +1.5 days.
+- New-staff rule (CONFIRMED session 25 — arrears): accrual is credited in arrears. A full calendar month worked earns 1.5, credited on the 1st of the NEXT month. Mid-month start → start month is partial (earns 0); the month immediately following the start also shows 0 (they are earning it); the first 1.5 lands the month after the first FULL month. Example: start Mar 15 → Mar 0, Apr full → +1.5 credited May 1. (Existing/active staff: +1.5 on the 1st of every month.)
+- Build schema + accrual/deduction logic + a balance command NOW, but DO NOT start counting until owner fills current AL balances and says "begin counting from today."
+- REMIND OWNER: fill current AL balances.
+- Align with existing attendance memory [[gm-attendance-policies]]: short-notice AL ok if rare, vague "off tomorrow" → GM asks "Is this AL?", sudden sick full-day → suggest 0.5 AL + half-day, all notices must be BEFORE shift start (else ask for screenshot of when staff told their senior).
+
+**Hiring papers + Khmer refinement workflow (owner, session 25 — re #7/#12):**
+- Owner will send more hiring questionnaire papers. GM/Opus generates ALL outputs (replies, analysis, targeted messages, salaries). Owner + ChatGPT review/judge → corrections saved into GM "knowledge" (examples store). Over time, accumulated approved examples refine the Khmer output AND every GM output. This is the path that eventually unblocks Khmer (#12) — manual-approved examples become the training set, not auto-generated Khmer.
+
+---
+
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-05-31 (session 25 — semantic concern detection + policy-reply wiring, live)
+**Last updated:** 2026-06-01 (session 26 — lateness/pay-back ladder + global staff tagging, live)
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
 **▶ RESUME HERE (GM shop-brain build):** Semantic concern detection + approved-policy live replies are DONE & LIVE. Next, pick one: (b) STOCK-MINIMUMS intake — table + /minimums command, then ask owner for each item's minimum so low-stock alerts work; or harden the policy-reply matcher (semantic policy-picker + per-group cooldown). Bigger later item: the KNOWLEDGE BRIEF (digest the 567k-message archive into a rolling summary, built by Opus-on-subscription not bot API). See "REPORT Finance Tracking" section + session-24/25 notes below for full design + pending decisions.

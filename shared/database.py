@@ -2055,6 +2055,124 @@ def gm_get_rules() -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
 
 
+# ── Lateness / pay-back ladder ────────────────────────────────────────────────
+
+def init_gm_lateness_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_lateness_cases (
+                    id                  SERIAL PRIMARY KEY,
+                    chat_id             BIGINT NOT NULL,
+                    chat_title          TEXT,
+                    case_msg_id         BIGINT NOT NULL,       -- senior's report; we reply to this
+                    last_question_msg_id BIGINT,               -- GM's latest question (senior or group)
+                    reporter_name       TEXT,
+                    reporter_uid        BIGINT,
+                    late_person         TEXT,
+                    late_uid            BIGINT,
+                    payback_day         TEXT,
+                    status              TEXT NOT NULL DEFAULT 'awaiting_payback',
+                    asked_senior_at     TIMESTAMPTZ,
+                    asked_group_at      TIMESTAMPTZ,
+                    escalated_at        TIMESTAMPTZ,
+                    resolved_at         TIMESTAMPTZ,
+                    created_at          TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (chat_id, case_msg_id)
+                );
+            """)
+
+
+def gm_create_lateness_case(chat_id: int, chat_title: str | None, case_msg_id: int,
+                            reporter_name: str | None, reporter_uid: int | None,
+                            late_person: str | None, late_uid: int | None,
+                            last_question_msg_id: int | None) -> int | None:
+    """Open a case (status awaiting_payback). Idempotent on (chat_id, case_msg_id).
+    Returns the new id, or None if a case already exists for that message."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_lateness_cases
+                    (chat_id, chat_title, case_msg_id, reporter_name, reporter_uid,
+                     late_person, late_uid, last_question_msg_id, status, asked_senior_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'awaiting_payback', NOW())
+                ON CONFLICT (chat_id, case_msg_id) DO NOTHING
+                RETURNING id
+            """, (chat_id, chat_title, case_msg_id, reporter_name, reporter_uid,
+                  late_person, late_uid, last_question_msg_id))
+            row = cur.fetchone()
+            return row["id"] if row else None
+
+
+def gm_get_open_lateness_cases() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_lateness_cases
+                WHERE status IN ('awaiting_payback', 'group_asked')
+                ORDER BY created_at
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_get_open_lateness_in_chat(chat_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_lateness_cases
+                WHERE chat_id = %s AND status IN ('awaiting_payback', 'group_asked')
+                ORDER BY created_at DESC
+            """, (chat_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_mark_lateness_group_asked(case_id: int, question_msg_id: int | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_lateness_cases
+                SET status = 'group_asked', asked_group_at = NOW(),
+                    last_question_msg_id = COALESCE(%s, last_question_msg_id)
+                WHERE id = %s
+            """, (question_msg_id, case_id))
+
+
+def gm_resolve_lateness(case_id: int, payback_day: str | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_lateness_cases
+                SET status = 'resolved', payback_day = %s, resolved_at = NOW()
+                WHERE id = %s
+            """, (payback_day, case_id))
+
+
+def gm_escalate_lateness(case_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE gm_lateness_cases
+                SET status = 'escalated', escalated_at = NOW()
+                WHERE id = %s
+            """, (case_id,))
+
+
+def gm_get_staff_uid(display_name: str | None) -> int | None:
+    """Latest Telegram user id seen for this exact display name in any group.
+    Used to build a pinging mention. Returns None if never seen."""
+    if not display_name:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender_id FROM ops_messages
+                WHERE sender_name = %s AND sender_id IS NOT NULL
+                ORDER BY sent_at DESC LIMIT 1
+            """, (display_name,))
+            row = cur.fetchone()
+            return row["sender_id"] if row else None
+
+
 def gm_get_low_stock_history(chat_id: int, since_days: int = 7) -> list[dict]:
     """Return recent low-stock alert messages grouped by sender and date."""
     with _db() as conn:

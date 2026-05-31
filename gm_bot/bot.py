@@ -34,14 +34,18 @@ from shared.database import (
     gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
     gm_record_clarification_nudge, gm_set_clarification_checking,
     gm_answer_clarification, gm_escalate_clarification, gm_resolve_open_clarifications,
+    init_gm_lateness_db, gm_create_lateness_case, gm_get_open_lateness_cases,
+    gm_get_open_lateness_in_chat, gm_mark_lateness_group_asked, gm_resolve_lateness,
+    gm_escalate_lateness, gm_get_staff_uid,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
-    gm_compose_reply,
+    gm_compose_reply, detect_lateness_report, extract_payback_day,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
-from gm_bot import finance, clarify
+from gm_bot import finance, clarify, lateness, mentions
+from telegram.constants import ParseMode
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
@@ -1142,6 +1146,149 @@ async def _maybe_policy_reply(context, msg, concern_type: str, sender: str, trig
         logger.error("_maybe_policy_reply failed: %s", e)
 
 
+# ─── Staff tagging (GLOBAL — use for EVERY GM tag of a staff member) ───────────
+
+def _staff_mention(name: str, uid: int | None = None) -> str:
+    """Build a pinging HTML mention for a staff member referenced by free-text name.
+    Shows the call-name next to the account tag (mentions.format_mention rules).
+    Resolves the uid from ops_messages when not supplied. Use this everywhere the GM
+    tags a person so the convention is consistent. Send the message with HTML parse mode."""
+    display = name
+    resolved_uid = uid
+    if resolved_uid is None:
+        resolved_uid = gm_get_staff_uid(name)
+    if resolved_uid is None:
+        disp = config.display_for_call_name(name)
+        if disp:
+            display = disp
+            resolved_uid = gm_get_staff_uid(disp)
+    return mentions.format_mention(resolved_uid, display, config.call_name_for(display))
+
+
+# ─── Lateness / pay-back ladder ───────────────────────────────────────────────
+
+async def _handle_lateness(context, msg, text: str, sender: str) -> None:
+    """Supervisors/Management: detect a lateness report and open the pay-back ladder,
+    or resolve an open case when a reply supplies the pay-back day. Staged AI:
+    free pre-gate -> Haiku detect/extract -> deterministic ladder."""
+    chat_id = msg.chat_id
+
+    # 1) Is this a reply that resolves an open case? (reply to the senior's report
+    #    or to the GM's question)
+    replied = msg.reply_to_message
+    if replied:
+        for case in gm_get_open_lateness_in_chat(chat_id):
+            if replied.message_id in (case.get("case_msg_id"), case.get("last_question_msg_id")):
+                pb = await extract_payback_day(text)
+                if pb.get("has_payback_day"):
+                    gm_resolve_lateness(case["id"], pb.get("payback_day"))
+                    try:
+                        await context.bot.send_message(
+                            chat_id=chat_id, text="Noted, thank you. ✓",
+                            reply_to_message_id=msg.message_id,
+                        )
+                    except Exception:
+                        pass
+                    logger.info("Lateness case %s resolved: payback=%s",
+                                case["id"], pb.get("payback_day"))
+                return  # handled as a reply; don't treat as a new report
+
+    # 2) Free pre-gate: only spend a Haiku call on plausibly-attendance messages.
+    from gm_bot.analyzer import ATTENDANCE_KW
+    t = text.lower()
+    if len(text.strip()) < 6 or not any(kw in t for kw in ATTENDANCE_KW):
+        return
+
+    # 3) Haiku: is this a lateness report? who, and is a pay-back day already given?
+    result = await detect_lateness_report(text)
+    if result.get("_error") or not result.get("is_lateness_report"):
+        return
+    if result.get("confidence", 0.0) < 0.55:
+        return
+    late_person = (result.get("late_person") or "").strip() or None
+    if not late_person:
+        return
+
+    reporter_uid = msg.from_user.id if msg.from_user else None
+    late_uid = gm_get_staff_uid(late_person) or (
+        gm_get_staff_uid(config.display_for_call_name(late_person) or "") or None)
+
+    # 4) If the senior already gave the pay-back day, just record it — no follow-up.
+    if result.get("payback_day"):
+        case_id = gm_create_lateness_case(
+            chat_id, msg.chat.title, msg.message_id, sender, reporter_uid,
+            late_person, late_uid, None)
+        if case_id:
+            gm_resolve_lateness(case_id, result["payback_day"])
+            logger.info("Lateness logged with payback day up-front: %s -> %s",
+                        late_person, result["payback_day"])
+        return
+
+    # 5) No pay-back day -> ask the reporting senior, opening the ladder.
+    case_id = gm_create_lateness_case(
+        chat_id, msg.chat.title, msg.message_id, sender, reporter_uid,
+        late_person, late_uid, None)
+    if not case_id:
+        return  # already tracked
+    reporter_mention = _staff_mention(sender, uid=reporter_uid)
+    late_mention = _staff_mention(late_person, uid=late_uid)
+    body = lateness.ask_senior_text(reporter_mention, late_mention)
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id, text=body, reply_to_message_id=msg.message_id,
+            parse_mode=ParseMode.HTML,
+        )
+        # Store the question msg id so a reply to it resolves the case.
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE gm_lateness_cases SET last_question_msg_id = %s WHERE id = %s",
+                    (sent.message_id, case_id))
+        logger.info("Lateness case %s opened, senior asked re %s", case_id, late_person)
+    except Exception as e:
+        logger.error("lateness ask-senior failed: %s", e)
+
+
+async def _lateness_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Every couple of minutes: 30 min -> ask the group; 24 h -> tell the owner."""
+    now = datetime.now(timezone.utc)
+    for case in gm_get_open_lateness_cases():
+        action = lateness.decide_lateness_action(
+            case["status"], case.get("asked_senior_at"),
+            case.get("asked_group_at"), now,
+        )
+        try:
+            if action == "ask_group":
+                late_mention = _staff_mention(case.get("late_person") or "",
+                                              uid=case.get("late_uid"))
+                body = lateness.ask_group_text(late_mention)
+                sent = await context.bot.send_message(
+                    chat_id=case["chat_id"], text=body,
+                    reply_to_message_id=case.get("case_msg_id"),
+                    parse_mode=ParseMode.HTML,
+                )
+                gm_mark_lateness_group_asked(case["id"], sent.message_id)
+                logger.info("Lateness case %s: asked the group", case["id"])
+            elif action == "escalate":
+                body = lateness.escalation_text(
+                    case.get("chat_title") or str(case["chat_id"]),
+                    case.get("late_person") or "?", case.get("reporter_name"), None)
+                await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+                if case.get("case_msg_id"):
+                    try:
+                        await context.bot.forward_message(
+                            chat_id=config.OWNER_TELEGRAM_ID,
+                            from_chat_id=case["chat_id"], message_id=case["case_msg_id"],
+                        )
+                    except Exception:
+                        pass
+                gm_escalate_lateness(case["id"])
+                logger.info("Lateness case %s escalated to owner", case["id"])
+        except Exception as e:
+            logger.error("lateness ladder action %s failed for case %s: %s",
+                         action, case["id"], e)
+
+
 def _resolve_clarification_response(chat_id: int, msg, text: str) -> dict | None:
     """Record a staff response to a GM clarification. Direct reply = answer (or 'checking');
     a loose 'we're checking' message while any clarification is open backs the ladder off.
@@ -1368,6 +1515,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error("clarification resolve failed: %s", e)
 
+    # Supervisors / Management: lateness reports + pay-back follow-up ladder.
+    if text.strip() and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
+        try:
+            await _handle_lateness(context, msg, text, sender)
+        except Exception as e:
+            logger.error("lateness handling failed: %s", e)
+
     # TWB REPORT group: receipt photos, clarification replies, daily-report parsing
     if chat_id == config.DAILY_REPORT_CHAT_ID:
         if msg.reply_to_message and text.strip():
@@ -1533,6 +1687,13 @@ def build_app() -> Application:
         interval=120,
         first=90,
         name="gm_clarification_ladder",
+    )
+    # Lateness / pay-back ladder: 30 min -> ask group, 24 h -> owner
+    app.job_queue.run_repeating(
+        _lateness_ladder_job,
+        interval=120,
+        first=100,
+        name="gm_lateness_ladder",
     )
 
     return app
