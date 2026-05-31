@@ -209,6 +209,68 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 
 ---
 
+## Delivery System (WOC DELIVERY PICTURES) — design (session 26, NOT built yet)
+> The "Delivery System": mine the WOC delivery-photo archive into structured business data.
+> Built the wise way: cheap EXTRACTION (metered API, automated) → structured tables → expensive
+> SYNTHESIS (Opus-on-subscription = Claude-in-terminal, over rows not raw photos). Never loop the
+> archive through bot API. Same pattern feeds the Knowledge Brief.
+
+**Scale (measured session 26):** WOC DELIVERY PICTURES chat_id = **-715759659**. 120,226 photos total
+(range 2022→now); **64,919 in the last 365 days** (180d=35,015; 90d=18,718). Server: 40G free / 48G.
+**Window to process = last 365 days** (owner: closest to current two-ticket double-check standard;
+older data = weaker past habits, skip).
+
+**Owner decisions (session 26):** (1) process last 1 year, newest. (2) Take ALL customer numbers
+(exclude drivers by logic). (3) Storage = rolling download→extract→DELETE, batch-by-batch, ~1-month
+auto-purge (full year ≈16GB would fit but tight; rolling keeps peak ~1-2GB). (4) Start Phase 0+1.
+
+**COST REALITY (the real budget — NOT Claude Max hours):** the 65k-photo vision extraction runs on the
+ANTHROPIC API KEY as a checkpointed background batch (NOT through Claude Max terminal sessions). Rough
+full-year estimate: Haiku classify 65k (~$80) + Sonnet extract ~60% tickets/devices (~$400) + Opus on a
+SAMPLED few-thousand hard cases (~$250) ≈ **$500-800 API spend**, hours-to-a-day runtime. Claude Max
+(terminal) is only for building code + synthesis over distilled rows — light, fits normal windows.
+**MANDATORY PILOT FIRST:** process a random ~400-photo sample end-to-end (~$5-8) to measure
+classify/extract accuracy + real cost-per-photo, extrapolate the full-year bill, and get owner approval
+on the number BEFORE the full run. Pilot also tunes prompts on real photos.
+
+**Pipeline (staged models/logic per stage):**
+- Stage 0 Inventory/download/dedup — LOGIC: Telethon resumable bulk-download; SHA-256 + pHash dedup.
+- Stage 1 Normalize — CV/LOGIC: EXIF auto-orient, OpenCV deskew/auto-rotate (handles non-90° angles), denoise.
+- Stage 2 Classify photo — HAIKU vision: kitchen_ticket|order_ticket|device_screen|food_plate|receipt|other (skip 'other').
+- Stage 3 Extract — SONNET vision: phones+name+addr+app+items+price (devices/papers), items+addons+TICKS (tickets); food components on a sample.
+- Stage 4 Cross-check/judgment — LOGIC compares kitchen vs order ticks; OPUS (sampled) for blind-tick, wrong-food (e.g. "no bacon" but bacon present), food-looks-right + builds the food-appearance reference library.
+- Stage 5 Aggregate — LOGIC into tables: woc_customers, woc_phone_observations, woc_orders, woc_ticket_items, woc_errors, woc_food_catalog, woc_price_history.
+- Stage 6 Synthesis — OPUS-ON-SUBSCRIPTION (me, terminal): rolling food catalog+latest prices, off-menu candidates (not ordered in N months → owner confirms), customer intelligence, error/demand trends. Refreshed incrementally.
+- Stage 7 Owner-in-the-loop — off-menu confirm, ambiguous customers, wrong-food disputes (gated like concern cards).
+
+**Customer DB:** phone = permanent ID (names change on app, number doesn't). Driver vs customer = LOGIC
+(number recurring across many distinct orders = driver/platform → exclude; one-order context = customer).
+Normalize E.164 KH. woc_phone_observations logs every sighting+confidence+source photo for audit before
+promotion. Link per customer: order history, RFM (recency/frequency/monetary → best + LAPSED customers),
+favorite items, preferences/allergies ("no bacon"), delivery brand/app + area, avg spend, peak time, LTV,
+complaint history, name variants. Export later as phone contacts "Customer — {name}".
+
+**8 development ideas (the "Delivery System" roadmap, owner approved to track):**
+1. Per-staff error scorecards (wrong input / blind-tick / error types + trend) → feeds GM recognition/correction.
+2. Demand forecasting (item velocity by day/time) → prep planning + waste reduction.
+3. Plating/portion drift QC vs reference library.
+4. Price-integrity check (same item sold at inconsistent prices).
+5. Menu lifecycle (new items appear, off-menu detection, seasonality).
+6. Leakage/fraud signal (food photographed but no matching POS/report entry).
+7. Channel timeline (which delivery apps/companies over time → which channels are profitable).
+8. Reactivation campaigns (lapsed-customer lists + their favorite item).
+
+**Build order:** Phase 0 download+dedup → Phase 1 classify+phones+Customer DB (fastest payoff: reactivation)
+→ Phase 2 ticket extract → food catalog + price history + off-menu list → Phase 3 cross-check/wrong-food/
+scorecards (Opus sampled) → Phase 4 fold into Knowledge Brief. **START: Phase 0+1 after the pilot.**
+
+**Knowledge Brief (the big one) — same method, all groups:** apply distill→synthesize to ALL operational
+groups (3,619 chats, prioritized by importance), not just WOC/REPORT: cheap classify → targeted extract →
+Opus-on-subscription folds distilled rows into a rolling living brief incrementally. Never re-read raw
+archive through bot API. WOC structured tables are the first big input to the brief.
+
+---
+
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
@@ -222,7 +284,7 @@ Over / Lost  : $ ___        ← cash count − expected  (Over = surplus, Lost =
 - TEST SUITE FIXED (session 26): added repo-root conftest.py that imports the real config.py before collection, so test_intake.py's `sys.modules.setdefault("config", stub)` no longer poisons later GM test modules. `python -m pytest tests/` now runs the WHOLE suite green (232 passed). Run the full suite normally again.
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
-**▶ RESUME HERE (GM shop-brain build):** Semantic concern detection + approved-policy live replies are DONE & LIVE. Next, pick one: (b) STOCK-MINIMUMS intake — table + /minimums command, then ask owner for each item's minimum so low-stock alerts work; or harden the policy-reply matcher (semantic policy-picker + per-group cooldown). Bigger later item: the KNOWLEDGE BRIEF (digest the 567k-message archive into a rolling summary, built by Opus-on-subscription not bot API). See "REPORT Finance Tracking" section + session-24/25 notes below for full design + pending decisions.
+**▶ RESUME HERE:** GM shop-brain is broadly LIVE (semantic concerns, policy replies + 72h repeat, lateness/pay-back ladder, global staff tagging, Lost>$2 ask, finance AI-fallback+alias learning, weekly Opus digest, REPORT dedup done, whole pytest suite green). **NEXT (owner-chosen): the DELIVERY SYSTEM (WOC DELIVERY PICTURES) — see its design section above.** Start = **Phase 0+1 AFTER a mandatory ~400-photo PILOT** (measure accuracy + real cost-per-photo, get owner approval on the full-year ~$500-800 API estimate before the full 64,919-photo run). Extraction runs on the API key as a background batch, NOT Claude Max. Still-open small GM items (on hold per owner): AL engine (needs owner to seed balances), stock-minimums intake, Lost-ask sales-drop %. Bigger: KNOWLEDGE BRIEF (distill→synthesize all groups; WOC tables are its first input).
 
 **Semantic concern detection + policy replies — built & live (session 25):**
 - shared/ai_client.py: detect_concern_semantic (Haiku, GM_CONCERN_MODEL) — meaning-based waste/mistake/low_stock judge. Replaces the 2-keyword scan. Catches zero-keyword reports ("tray slipped, 6 cakes fell"); ignores negations ("no waste today"). Fails flagged (_error) so caller can fall back.
