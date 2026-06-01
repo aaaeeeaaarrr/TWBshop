@@ -2275,7 +2275,7 @@ _STOCK_SEED = [
     ("Black chocolate", "kg", 10, ["black chocolate"]),
     ("Croissant butter", "kg", 10, ["croissant butter", "srossant butter", "crossant butter"]),
     ("President butter 10g pack", "pc", 2, ["president butter 10g", "president butter"]),
-    ("Eggs", "pc", 500, ["egg", "eggs"]),
+    ("Eggs", "eggs", 500, ["egg", "eggs"]),
     ("Chocolate sticks", "box", 1, ["chocolate sticks", "chocolate stick"]),
     ("Tomato paste", "cans", 5, ["tomato paste"]),
     ("Milk powder", "packs", 2, ["milk powder"]),
@@ -2303,9 +2303,9 @@ _STOCK_SEED = [
     ("Chocolatin Plastic", "packs", 1, ["chocolatin plastic", "chocolatine plastic"]),
     ("Red Velvet", "kg", 8, ["red velvet"]),
     ("Corn Powder", "kg", 5, ["corn powder", "corn flour"]),
-    ("White Sauce", None, 1, ["white sauce"]),
-    ("Red Sauce", None, 1, ["red sauce"]),
-    ("Homemade Jam", None, 1, ["homemade jam"]),
+    ("White Sauce", "pots", 1, ["white sauce"]),
+    ("Red Sauce", "pots", 1, ["red sauce"]),
+    ("Homemade Jam", "jars", 1, ["homemade jam"]),
 ]
 
 

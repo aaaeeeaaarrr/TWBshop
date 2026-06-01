@@ -317,10 +317,14 @@ call-name maps, lateness, AL/leave, points, tagging.
 ex_staff in registry. Effects: (1) loses ALL staff privileges; (2) historical data KEPT (becomes
 history-only); (3) no bot ENGAGES them — GM (and internal bots) ignore an ex-staff/non-staff sender;
 (4) removed from ALL groups, OR GM reports which groups they're still in so owner removes them.
-GM only replies to STAFF (not non-staff, not ex-staff). OPEN Qs (Table 2 sent to owner): how to identify
-the leaver (name/@user/forward); auto-remove vs report groups; engage-scope (GM+internal only vs every
-bot — retail/B2B still serve non-staff customers); block-immediately vs confirm-first. Group membership =
-query ops_messages for recent activity per group + Telethon to check/remove (listener account admin?).
+GM only replies to STAFF (not non-staff, not ex-staff). DECISIONS (owner, session 26): (1) IDENTIFY: owner
+just messages GM that they left. PLUS PROACTIVE — when a known staff member LEAVES an internal group, GM
+DMs owner: "did X leave the company? they left [group(s)]". (2) GROUP REMOVAL: BOTH — auto-remove where
+the bot has rights + report the rest. (3) ENGAGE-SCOPE: GM + all INTERNAL groups only (retail/B2B keep
+serving customers, who aren't staff). (4) NO Telegram-level blocking (not needed). Detect group-leaves via
+GM bot left_chat_member events (covers internal groups) + Telethon. Verify bot admin rights for auto-remove
+at build. REGISTRY SEED: from existing STAFF_CALL_NAME/STAFF_ALIAS_MAP (~30 known) as 'active'; owner
+prunes leavers via the ex-staff flow.
 
 **PAPERLESS /stock OVERHAUL (owner spec, session 26):** staff-only /stock command (GM ignores non/ex-staff)
 → category buttons → item buttons → enter counts. Can add new stock → owner gets a PRIVATE message of the
@@ -335,8 +339,9 @@ usual checker. Replaces the photo-sheet vision flow over time (keep vision as fa
 (min 'per egg/per kg/per piece' but they count racks/blocks/packs). So the spec min CANNOT be the order
 trigger. Readjusted 7 items to count-unit (President butter 50pc->2 packs, plastics 10->1). Right long-term
 fix: bot LEARNS each item's reorder level from the numbers staff write (calibrated by 'almost out'),
-in their own count-unit; unit brackets on names lock it down. Owner-confirm pending: Pilot butter, Red
-Velvet, Corn Powder, Eggs unit; + units for White/Red Sauce, Homemade Jam.
+in their own count-unit; unit brackets on names lock it down. UNITS NOW CONFIRMED (session 26): Pilot
+butter=kg (10 is genuinely LOW vs 25), Red Velvet=kg (low), Corn Powder=kg (low), Eggs=per egg, White/Red
+Sauce=pots (1.5), Homemade Jam=jars. All 50 items now have unit + min in the staff counting unit.
 
 ---
 
