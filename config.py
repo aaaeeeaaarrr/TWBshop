@@ -102,6 +102,11 @@ GM_POLICY_REPEAT_HOURS: int = 72
 # A small Over is expected (4000 riel = $1 FX margin) and never flagged.
 GM_LOST_FLAG_THRESHOLD: float = 2.0
 
+# Group-based attendance (lateness ladder + leave-questioning + their nudges).
+# OFF: being replaced by the private-DM attendance system. When False the GM does
+# NOT post lateness/leave questions or nudges into Supervisors/Management groups.
+GM_ATTENDANCE_GROUP_ACTIVE: bool = False
+
 # Telegram display name → real name mapping for GM bot output.
 # Key = exact sender_name from ops_messages. Value = real name from salary sheet.
 # Add unknowns as replies come in from staff.

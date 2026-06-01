@@ -1329,6 +1329,8 @@ async def _handle_lateness(context, msg, text: str, sender: str) -> None:
 
 async def _lateness_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Every couple of minutes: 30 min -> ask the group; 24 h -> tell the owner."""
+    if not config.GM_ATTENDANCE_GROUP_ACTIVE:
+        return
     now = datetime.now(timezone.utc)
     for case in gm_get_open_lateness_cases():
         action = lateness.decide_lateness_action(
@@ -1781,6 +1783,9 @@ async def _clarification_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Every couple of minutes: nudge open clarifications on schedule, escalate at 2h."""
     now = datetime.now(timezone.utc)
     for clar in gm_get_active_clarifications():
+        # Leave questioning is being replaced by the private-DM flow — don't nudge it.
+        if clar.get("topic") == "leave_clarify" and not config.GM_ATTENDANCE_GROUP_ACTIVE:
+            continue
         action, new_next = clarify.decide_ladder_action(
             clar["status"], clar["created_at"], now, clar.get("next_action_at"),
         )
@@ -1958,7 +1963,9 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             logger.error("stock photo handling failed: %s", e)
 
     # Supervisors / Management: lateness reports + leave/time-off questioning.
-    if text.strip() and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
+    # OFF by default — replaced by the private-DM attendance system (no group spam).
+    if (config.GM_ATTENDANCE_GROUP_ACTIVE and text.strip()
+            and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID)):
         try:
             await _handle_lateness(context, msg, text, sender)
         except Exception as e:
