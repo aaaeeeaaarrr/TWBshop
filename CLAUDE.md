@@ -306,6 +306,40 @@ archive through bot API. WOC structured tables are the first big input to the br
 
 ---
 
+## Staff Registry + Ex-Staff Offboarding + Paperless /stock (owner spec, session 26 — PENDING)
+> Shared foundation: a STAFF REGISTRY with status. Both features below sit on it. Build registry once.
+
+**STAFF REGISTRY (foundation):** one record per person — canonical name, call-name, aliases, telegram
+user_id(s), status (active | ex_staff), groups seen, joined/left dates. Ties together the existing alias +
+call-name maps, lateness, AL/leave, points, tagging.
+
+**EX-STAFF OFFBOARDING (owner priority, session 26):** owner tells GM "X no longer works here" → mark
+ex_staff in registry. Effects: (1) loses ALL staff privileges; (2) historical data KEPT (becomes
+history-only); (3) no bot ENGAGES them — GM (and internal bots) ignore an ex-staff/non-staff sender;
+(4) removed from ALL groups, OR GM reports which groups they're still in so owner removes them.
+GM only replies to STAFF (not non-staff, not ex-staff). OPEN Qs (Table 2 sent to owner): how to identify
+the leaver (name/@user/forward); auto-remove vs report groups; engage-scope (GM+internal only vs every
+bot — retail/B2B still serve non-staff customers); block-immediately vs confirm-first. Group membership =
+query ops_messages for recent activity per group + Telethon to check/remove (listener account admin?).
+
+**PAPERLESS /stock OVERHAUL (owner spec, session 26):** staff-only /stock command (GM ignores non/ex-staff)
+→ category buttons → item buttons → enter counts. Can add new stock → owner gets a PRIVATE message of the
+addition (to confirm unit+min). Later: award staff POINTS for doing checks (+ other checks). Counts flow
+straight into stock_counts (no more paper / 'almost out' report). My ideas to make it easier: pre-fill last
+counts (only change what moved); show UNIT IN BRACKETS per item (kills unit confusion); 'same as
+yesterday' shortcut; only prompt items that move (weekly full audit); photo fallback (vision job reads the
+sheet when rushed); add-new-item -> pending -> owner confirms; implausible-entry validation; remind the
+usual checker. Replaces the photo-sheet vision flow over time (keep vision as fallback).
+
+**STOCK UNIT MISMATCH lesson (session 26):** the sheet's MIN column mixes units vs how staff COUNT
+(min 'per egg/per kg/per piece' but they count racks/blocks/packs). So the spec min CANNOT be the order
+trigger. Readjusted 7 items to count-unit (President butter 50pc->2 packs, plastics 10->1). Right long-term
+fix: bot LEARNS each item's reorder level from the numbers staff write (calibrated by 'almost out'),
+in their own count-unit; unit brackets on names lock it down. Owner-confirm pending: Pilot butter, Red
+Velvet, Corn Powder, Eggs unit; + units for White/Red Sauce, Homemade Jam.
+
+---
+
 ## GM Backlog & Roadmap (session 26 — owner asked for the full list)
 > The remaining GM "shop-brain" work, grouped. "Logic/Haiku/Sonnet/Opus" = which tier does each.
 > KEY THEME (owner): build the GM's KNOWLEDGE via Claude-on-subscription (me, terminal) reading the
