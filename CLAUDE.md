@@ -331,8 +331,13 @@ they're in) -> mark ex_staff (history kept) + ban from internal groups WHERE BOT
 match -> pick buttons. Proactive: known active staff leaving an internal group (left_chat_member) -> GM
 DMs owner with the same confirm. ⚠️ AUTO-REMOVAL OFF: GM bot (@twb_gm_bot 8827684951) is only a MEMBER
 (not admin) in all 5 internal groups, so it CANNOT kick — currently marks ex + REPORTS groups for manual
-removal. TO ENABLE: make the GM bot admin w/ 'Ban users' in those groups, OR route removal via the
-Telethon listener account (TheWineBakery24PP) if it's admin (TBD). 'No bot engages ex-staff' gate
+removal. TO ENABLE (owner chose listener route): CHECKED session 26 — listener account TheWineBakery24PP is also
+NOT admin (admin=False, ban_users=False in Stock Checks/COMMS/REPORT; Supervisors/Management are basic-
+group ids needing different lookup). So NEITHER account can kick yet. OWNER ACTION NEEDED: promote
+TheWineBakery24PP to admin with 'Ban users' in the 5 internal groups. THEN build the removal QUEUE (GM bot
+enqueues -> listener processes via Telethon kick -> reports). Until promoted, ex-staff stays in mark+report
+mode (works). NOTE for build: Telethon entity for basic groups (Supervisors -4980513319, Management
+-865916135) needs PeerChat/dialog resolution, not raw get_entity. 'No bot engages ex-staff' gate
 (staff_get_by_uid/active_uids) ready; apply to future /stock + interactive flows.
 
 **PAPERLESS /stock OVERHAUL (owner spec, session 26):** staff-only /stock command (GM ignores non/ex-staff)
