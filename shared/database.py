@@ -2309,6 +2309,59 @@ _STOCK_SEED = [
 ]
 
 
+def stock_get_items() -> list[dict]:
+    """All active stock items (item, unit, min_n, last_count, usage_per_day, aliases)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT item, unit, min_n, order_qty_override, last_count, last_count_date,
+                       usage_per_day, aliases
+                FROM stock_items WHERE active = TRUE ORDER BY item
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def stock_apply_sheet_reading(readings: list[dict], count_date: str,
+                              source_msg_id: int | None) -> int:
+    """Store a sheet reading: upsert each item's last_count + a stock_counts time-series
+    row. `readings` = [{item, count}] using canonical names. Returns rows applied."""
+    applied = 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for r in readings:
+                item = r.get("item")
+                count = r.get("count")
+                if item is None or count is None:
+                    continue
+                cur.execute("""
+                    UPDATE stock_items
+                    SET last_count = %s, last_count_date = %s, last_seen = NOW()
+                    WHERE item = %s
+                """, (count, count_date, item))
+                if cur.rowcount == 0:
+                    continue  # unknown item — ignore (not in canonical list)
+                cur.execute("""
+                    INSERT INTO stock_counts (item, count, count_date, source_msg_id)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (item, count_date)
+                    DO UPDATE SET count = EXCLUDED.count, source_msg_id = EXCLUDED.source_msg_id
+                """, (item, count, count_date, source_msg_id))
+                applied += 1
+    return applied
+
+
+def stock_days_since_last_count() -> int | None:
+    """Whole days since the most recent stock count, or None if there's never been one."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT max(last_count_date) AS d FROM stock_items WHERE last_count_date IS NOT NULL")
+            row = cur.fetchone()
+            if not row or row["d"] is None:
+                return None
+            from datetime import date as _date
+            return (_date.today() - row["d"]).days
+
+
 def seed_stock_items_default() -> int:
     """One-time seed of the canonical stock items. Idempotent (ON CONFLICT DO NOTHING)
     so it never overwrites later owner edits. Returns rows newly inserted."""

@@ -41,15 +41,17 @@ from shared.database import (
     gm_get_lateness_cases_since, gm_get_concerns_since,
     init_gm_leave_db, gm_create_leave_event, gm_link_leave_clarification,
     gm_get_sales_history,
+    stock_get_items, stock_apply_sheet_reading, stock_days_since_last_count,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
     extract_daily_report_ai, generate_attendance_digest, detect_leave_request,
+    classify_stock_photo, read_stock_sheet,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
-from gm_bot import finance, clarify, lateness, mentions, sales
+from gm_bot import finance, clarify, lateness, mentions, sales, stock
 from telegram.constants import ParseMode
 from datetime import datetime, timezone, timedelta
 
@@ -1458,6 +1460,77 @@ async def _maybe_flag_sales_anomaly(context, full: dict) -> None:
         logger.error("_maybe_flag_sales_anomaly failed: %s", e)
 
 
+async def _handle_stock_photo(context, msg) -> None:
+    """Stock Checks photo: cheap Haiku gate -> if it's a stock-count sheet, Sonnet reads
+    the current counts and we store them (last_count + time-series). Event-driven so the
+    7am job just reads stored data. ~1 cheap classify per photo; 1 Sonnet read per sheet."""
+    try:
+        photo_file = await msg.photo[-1].get_file()
+        photo_bytes = bytes(await photo_file.download_as_bytearray())
+    except Exception as e:
+        logger.error("stock photo download failed: %s", e)
+        return
+    if not (await classify_stock_photo(photo_bytes)).get("is_stock_sheet"):
+        return
+    items = stock_get_items()
+    res = await read_stock_sheet(photo_bytes, [it["item"] for it in items])
+    if not res.get("is_stock_sheet") or not res.get("counts"):
+        return
+    count_date = (finance.business_day_for(msg.date) if msg.date
+                  else datetime.now(timezone.utc).date()).isoformat()
+    applied = stock_apply_sheet_reading(res["counts"], count_date, msg.message_id)
+    logger.info("Stock sheet read: %d/%d counts applied (day %s)",
+                applied, len(res["counts"]), count_date)
+
+
+async def _stock_order_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """7am Phnom Penh: post 'Check if we need to order' for items below minimum.
+    No sheet for 2+ days -> ask the group why. Owner-gated by gm_state
+    'stock_order_to_staff' (preview to owner until 'true')."""
+    days = stock_days_since_last_count()
+    if days is None:
+        logger.info("Stock order job: no stock counts yet")
+        return
+    if stock.no_sheet_decision(days) == "escalate":
+        try:
+            await context.bot.send_message(
+                chat_id=config.STOCK_CHECKS_CHAT_ID,
+                text="No stock sheet has been posted for %d days. Please do the stock "
+                     "check and send the sheet. Thank you." % days)
+            logger.info("Stock: escalated missing sheet (%d days)", days)
+        except Exception as e:
+            logger.error("stock no-sheet escalation failed: %s", e)
+
+    items = stock_get_items()
+    rows_input = [{
+        "item": it["item"], "unit": it["unit"],
+        "min_n": float(it["min_n"]) if it["min_n"] is not None else None,
+        "current_n": float(it["last_count"]) if it["last_count"] is not None else None,
+        "usage_per_day": float(it["usage_per_day"]) if it["usage_per_day"] is not None else None,
+    } for it in items]
+    # Guard: a 0/NULL minimum can never trigger a reorder — surface, never silently skip.
+    no_min = [it["item"] for it in items if it["min_n"] is None or float(it["min_n"]) == 0]
+
+    body = stock.format_order_message(stock.build_order_list(rows_input))
+    if body is None and not no_min:
+        logger.info("Stock order job: nothing below minimum")
+        return
+
+    to_staff = gm_get_state("stock_order_to_staff") == "true"
+    try:
+        if to_staff:
+            if body:
+                await context.bot.send_message(chat_id=config.STOCK_CHECKS_CHAT_ID, text=body)
+        else:
+            preview = "📋 Stock order (preview — NOT sent to staff)\n\n" + (body or "(nothing below minimum)")
+            if no_min:
+                preview += "\n\n⚠️ No minimum set (won't be checked): " + ", ".join(no_min)
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=preview)
+        logger.info("Stock order job posted (to_staff=%s)", to_staff)
+    except Exception as e:
+        logger.error("stock order job send failed: %s", e)
+
+
 async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Once a week (Monday, Phnom Penh): Opus digests the week's lateness + attendance
     notes and DMs the owner. Skips quietly when there's nothing to report."""
@@ -1706,6 +1779,13 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error("clarification resolve failed: %s", e)
 
+    # Stock Checks: a photo might be the daily stock-count sheet -> read + store.
+    if chat_id == config.STOCK_CHECKS_CHAT_ID and msg.photo:
+        try:
+            await _handle_stock_photo(context, msg)
+        except Exception as e:
+            logger.error("stock photo handling failed: %s", e)
+
     # Supervisors / Management: lateness reports + leave/time-off questioning.
     if text.strip() and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
         try:
@@ -1898,6 +1978,12 @@ def build_app() -> Application:
         _weekly_attendance_digest_job,
         time=__import__("datetime").time(hour=1, minute=30),
         name="gm_weekly_attendance_digest",
+    )
+    # Daily stock order list: 07:00 Phnom Penh = 00:00 UTC.
+    app.job_queue.run_daily(
+        _stock_order_job,
+        time=__import__("datetime").time(hour=0, minute=0),
+        name="gm_stock_order",
     )
 
     return app

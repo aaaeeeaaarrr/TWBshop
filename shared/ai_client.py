@@ -838,6 +838,77 @@ async def generate_attendance_digest(lateness_cases: list[dict],
         return ""
 
 
+# Stock-sheet reading — Haiku classifies (cheap pre-filter), Sonnet extracts counts.
+GM_STOCK_CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
+
+_STOCK_CLASSIFY_SYSTEM = (
+    "You see one photo from a bakery's stock group. Decide if it is a STOCK-COUNT "
+    "INVENTORY SHEET — a printed/handwritten form or table listing many ingredient/"
+    "supply items down the side with quantity/count columns. It is NOT a stock sheet if "
+    "it's a food plate, a fridge/display, a cleaning/workstation photo, a receipt, or a "
+    "person. Return ONLY JSON: {\"is_stock_sheet\": true|false}"
+)
+
+_STOCK_READ_SYSTEM = (
+    "You read a bakery STOCK-COUNT SHEET. It lists items down the side with a minimum "
+    "column and one or more dated count columns. Read the CURRENT count for each item — "
+    "the RIGHTMOST/most-recent filled count column. Map each row to the closest name in "
+    "the provided canonical item list; ignore rows you cannot map. A blank/empty count "
+    "means 0. Numbers may be decimals.\n"
+    "Return ONLY JSON: {\"is_stock_sheet\": true|false, "
+    "\"counts\": [{\"item\": \"<canonical name>\", \"count\": <number>}]}"
+)
+
+
+async def classify_stock_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
+    """Cheap Haiku gate: is this photo a stock-count sheet? {is_stock_sheet: bool}.
+    Fails closed (False) so a misread never triggers an expensive read."""
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_STOCK_CLASSIFY_MODEL,
+            max_tokens=30,
+            system=[{"type": "text", "text": _STOCK_CLASSIFY_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": _encode(image_bytes)}},
+                {"type": "text", "text": "Is this a stock-count sheet?"},
+            ]}],
+        )
+        return {"is_stock_sheet": bool(_parse_json(resp.content[0].text).get("is_stock_sheet", False))}
+    except Exception as exc:
+        logger.error("classify_stock_photo failed: %s", exc)
+        return {"is_stock_sheet": False}
+
+
+async def read_stock_sheet(image_bytes: bytes, canonical_items: list[str],
+                           mime_type: str = "image/jpeg") -> dict:
+    """Sonnet: read the latest count per item from a stock sheet, mapped to our
+    canonical names. Returns {is_stock_sheet, counts:[{item, count}]}. Empty on error."""
+    items_str = "\n".join("- " + i for i in canonical_items)
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_FINANCE_FALLBACK_MODEL,   # claude-sonnet-4-6
+            max_tokens=1500,
+            system=[{"type": "text", "text": _STOCK_READ_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": _encode(image_bytes)}},
+                {"type": "text", "text": "Canonical items:\n%s\n\nRead the current counts." % items_str},
+            ]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        counts = []
+        for c in result.get("counts", []):
+            try:
+                counts.append({"item": str(c["item"]), "count": float(c["count"])})
+            except (KeyError, TypeError, ValueError):
+                continue
+        return {"is_stock_sheet": bool(result.get("is_stock_sheet", False)), "counts": counts}
+    except Exception as exc:
+        logger.error("read_stock_sheet failed: %s", exc)
+        return {"is_stock_sheet": False, "counts": []}
+
+
 # Leave / time-off detection — Haiku, live per supervisor/management message.
 _GM_LEAVE_SYSTEM = (
     "You read ONE message from a bakery's supervisor/management Telegram group in "
