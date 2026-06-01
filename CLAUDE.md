@@ -325,6 +325,15 @@ serving customers, who aren't staff). (4) NO Telegram-level blocking (not needed
 GM bot left_chat_member events (covers internal groups) + Telethon. Verify bot admin rights for auto-remove
 at build. REGISTRY SEED: from existing STAFF_CALL_NAME/STAFF_ALIAS_MAP (~30 known) as 'active'; owner
 prunes leavers via the ex-staff flow.
+BUILT & LIVE (session 26): staff_registry seeded (36 people, 33 with telegram ids) + helpers. /exstaff
+<name> OR owner plain-language DM ('X no longer works here') -> confirm card (shows which internal groups
+they're in) -> mark ex_staff (history kept) + ban from internal groups WHERE BOT CAN + report rest. Multi-
+match -> pick buttons. Proactive: known active staff leaving an internal group (left_chat_member) -> GM
+DMs owner with the same confirm. ⚠️ AUTO-REMOVAL OFF: GM bot (@twb_gm_bot 8827684951) is only a MEMBER
+(not admin) in all 5 internal groups, so it CANNOT kick — currently marks ex + REPORTS groups for manual
+removal. TO ENABLE: make the GM bot admin w/ 'Ban users' in those groups, OR route removal via the
+Telethon listener account (TheWineBakery24PP) if it's admin (TBD). 'No bot engages ex-staff' gate
+(staff_get_by_uid/active_uids) ready; apply to future /stock + interactive flows.
 
 **PAPERLESS /stock OVERHAUL (owner spec, session 26):** staff-only /stock command (GM ignores non/ex-staff)
 → category buttons → item buttons → enter counts. Can add new stock → owner gets a PRIVATE message of the
