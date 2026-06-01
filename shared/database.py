@@ -2239,6 +2239,63 @@ def init_staff_registry_db() -> None:
             """)
 
 
+def init_attendance_db() -> None:
+    """Schedule fields on staff_registry + the AL/lateness/attendance tables."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS work_start TEXT;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS work_end TEXT;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS day_off TEXT;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS al_left NUMERIC;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS org TEXT DEFAULT 'TWB';
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS is_senior BOOLEAN DEFAULT FALSE;
+
+                CREATE TABLE IF NOT EXISTS al_requests (
+                    id           SERIAL PRIMARY KEY,
+                    staff_id     INTEGER REFERENCES staff_registry(id),
+                    requested_by_uid BIGINT,
+                    kind         TEXT,            -- 'days' | 'hours'
+                    days         TEXT,            -- JSON list of dates
+                    hours_start  TEXT,
+                    hours_end    TEXT,
+                    reason       TEXT,
+                    status       TEXT DEFAULT 'pending', -- pending | approved | rejected | cancelled
+                    created_at   TIMESTAMPTZ DEFAULT NOW(),
+                    decided_at   TIMESTAMPTZ
+                );
+                CREATE TABLE IF NOT EXISTS al_approvals (
+                    id           SERIAL PRIMARY KEY,
+                    request_id   INTEGER REFERENCES al_requests(id),
+                    senior_id    INTEGER REFERENCES staff_registry(id),
+                    senior_uid   BIGINT,
+                    decision     TEXT,            -- approve | not_approve
+                    decided_at   TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (request_id, senior_uid)
+                );
+                CREATE TABLE IF NOT EXISTS lateness_records (
+                    id           SERIAL PRIMARY KEY,
+                    staff_id     INTEGER REFERENCES staff_registry(id),
+                    minutes_late INTEGER,
+                    for_shift    DATE,
+                    reported_at  TIMESTAMPTZ DEFAULT NOW(),
+                    arrived_at   TIMESTAMPTZ
+                );
+                CREATE TABLE IF NOT EXISTS attendance_sessions (
+                    id            SERIAL PRIMARY KEY,
+                    staff_id      INTEGER REFERENCES staff_registry(id),
+                    shift_date    DATE,
+                    checked_in_at TIMESTAMPTZ,
+                    last_loc_at   TIMESTAMPTZ,
+                    in_zone       BOOLEAN,
+                    outside_min   NUMERIC DEFAULT 0,
+                    left_zone_at  TIMESTAMPTZ,
+                    status        TEXT DEFAULT 'open',
+                    UNIQUE (staff_id, shift_date)
+                );
+            """)
+
+
 def seed_staff_registry() -> int:
     """Seed the registry from config.STAFF_ALIAS_MAP (display->real) + STAFF_CALL_NAME
     (display->nick), grouped by real name, with telegram user_ids pulled from

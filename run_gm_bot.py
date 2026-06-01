@@ -24,7 +24,7 @@ logging.basicConfig(
 from shared.database import (
     init_gm_db, init_receipt_clarifications_db, init_gm_finance_db,
     init_gm_clarifications_db, init_gm_lateness_db, init_gm_finance_aliases_db,
-    init_gm_leave_db, init_stock_db, init_staff_registry_db,
+    init_gm_leave_db, init_stock_db, init_staff_registry_db, init_attendance_db,
 )
 from gm_bot.bot import build_app
 
@@ -37,6 +37,7 @@ init_gm_finance_aliases_db()
 init_gm_leave_db()
 init_stock_db()
 init_staff_registry_db()
+init_attendance_db()
 
 app = build_app()
 logging.info("GM Manager bot starting...")
