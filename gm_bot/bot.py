@@ -42,6 +42,7 @@ from shared.database import (
     init_gm_leave_db, gm_create_leave_event, gm_link_leave_clarification,
     gm_get_sales_history,
     stock_get_items, stock_apply_sheet_reading, stock_days_since_last_count,
+    staff_all, staff_get_by_uid, staff_find_by_name, staff_mark_ex,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
@@ -1531,6 +1532,176 @@ async def _stock_order_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error("stock order job send failed: %s", e)
 
 
+# ─── Staff registry / ex-staff offboarding ────────────────────────────────────
+
+def _internal_groups() -> list[tuple[str, int]]:
+    """(label, chat_id) for the internal groups ex-staff must be removed from."""
+    return [
+        ("Stock Checks", config.STOCK_CHECKS_CHAT_ID),
+        ("Supervisors",  config.SUPERVISORS_CHAT_ID),
+        ("Management",   config.MANAGEMENT_CHAT_ID),
+        ("COMMS",        config.COMMS_CHAT_ID),
+        ("TWB REPORT",   config.DAILY_REPORT_CHAT_ID),
+    ]
+
+_DEPARTURE_PHRASES = [
+    "no longer work", "left the company", "left us", "no longer with us", "quit",
+    "resigned", "fired", "doesn't work here", "does not work here", "is gone",
+    "not working here", "no longer here", "left our company", "has left",
+]
+
+
+async def _staff_current_groups(context, uids: list[int]) -> list[tuple[str, int]]:
+    """Which internal groups any of these user_ids is currently a member of."""
+    present = []
+    for label, chat_id in _internal_groups():
+        for uid in uids:
+            try:
+                m = await context.bot.get_chat_member(chat_id, uid)
+                if m.status not in ("left", "kicked"):
+                    present.append((label, chat_id)); break
+            except Exception:
+                continue
+    return present
+
+
+def _exstaff_kb(staff_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Mark as left + remove", callback_data="exstaff:go:%d" % staff_id),
+        InlineKeyboardButton("✋ No, keep", callback_data="exstaff:no:%d" % staff_id),
+    ]])
+
+
+async def _offer_exstaff(context, staff: dict, why: str = "") -> None:
+    """DM the owner a confirm card for marking someone ex-staff."""
+    groups = await _staff_current_groups(context, staff.get("telegram_ids", []))
+    glist = ", ".join(label for label, _ in groups) or "no internal groups found"
+    name = staff["canonical_name"] + (" (%s)" % staff["call_name"] if staff.get("call_name") else "")
+    body = "%sMark %s as no longer working here?\nCurrently in: %s" % (
+        (why + "\n") if why else "", name, glist)
+    await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body,
+                                   reply_markup=_exstaff_kb(staff["id"]))
+
+
+async def _do_exstaff(context, staff: dict) -> None:
+    """Mark ex-staff + remove from internal groups (where the bot can) + report."""
+    staff_mark_ex(staff["id"], "owner marked departed")
+    removed, failed = [], []
+    for label, chat_id in _internal_groups():
+        gone = False
+        for uid in staff.get("telegram_ids", []):
+            try:
+                m = await context.bot.get_chat_member(chat_id, uid)
+                if m.status in ("left", "kicked"):
+                    gone = True; continue
+                await context.bot.ban_chat_member(chat_id, uid)
+                removed.append(label); gone = True; break
+            except Exception:
+                failed.append(label); gone = True; break
+        # if not seen in group at all, nothing to do
+    name = staff["canonical_name"]
+    lines = ["✓ Marked %s as ex-staff. Historical data kept; no bot will engage them." % name]
+    if removed:
+        lines.append("Removed from: " + ", ".join(sorted(set(removed))))
+    leftover = [g for g in failed if g not in removed]
+    if leftover:
+        lines.append("⚠️ Could NOT remove (please remove manually): " + ", ".join(sorted(set(leftover))))
+    await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text="\n".join(lines))
+    logger.info("Ex-staff %s: removed=%s failed=%s", name, removed, leftover)
+
+
+async def cmd_exstaff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/exstaff <name> — owner marks a staff member as departed."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    name = " ".join(context.args).strip() if context.args else ""
+    if not name:
+        await update.message.reply_text("Usage: /exstaff <name>")
+        return
+    await _resolve_and_offer_exstaff(context, name)
+
+
+async def _resolve_and_offer_exstaff(context, name: str) -> None:
+    matches = staff_find_by_name(name)
+    matches = [m for m in matches if m.get("status") == "active"]
+    if not matches:
+        await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID,
+            text="No active staff matched '%s'. Try their exact name or /exstaff <name>." % name)
+        return
+    if len(matches) == 1:
+        await _offer_exstaff(context, matches[0])
+        return
+    # multiple -> let owner pick
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        m["canonical_name"] + (" (%s)" % m["call_name"] if m.get("call_name") else ""),
+        callback_data="exstaff:pick:%d" % m["id"])] for m in matches[:6]])
+    await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID,
+        text="Which one left?", reply_markup=kb)
+
+
+async def exstaff_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    action, staff_id = parts[1], int(parts[2])
+    staff = next((s for s in staff_all() if s["id"] == staff_id), None)
+    if not staff:
+        await query.edit_message_text("Staff record not found."); return
+    if action == "no":
+        await query.edit_message_text("Okay, keeping %s as active." % staff["canonical_name"]); return
+    if action == "pick":
+        await query.edit_message_text("Selected %s." % staff["canonical_name"])
+        await _offer_exstaff(context, staff); return
+    if action == "go":
+        await query.edit_message_text("Processing %s..." % staff["canonical_name"])
+        await _do_exstaff(context, staff)
+
+
+async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner DMs GM in plain language that someone left -> offer the ex-staff flow.
+    Silent on anything that isn't a clear departure message (won't disturb other flows)."""
+    if not update.message or update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    text = (update.message.text or "").strip()
+    if not text or not any(p in text.lower() for p in _DEPARTURE_PHRASES):
+        return
+    tl = text.lower()
+    hits = [s for s in staff_all("active")
+            if any(a and len(a) >= 3 and a.lower() in tl
+                   for a in [s["canonical_name"], s.get("call_name")] + s.get("aliases", []))]
+    if not hits:
+        await update.message.reply_text("Got it — who left? I couldn't match a name. Use /exstaff <name>.")
+        return
+    # de-dup by id, offer
+    seen, uniq = set(), []
+    for s in hits:
+        if s["id"] not in seen:
+            seen.add(s["id"]); uniq.append(s)
+    if len(uniq) == 1:
+        await _offer_exstaff(context, uniq[0])
+    else:
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            s["canonical_name"], callback_data="exstaff:pick:%d" % s["id"])] for s in uniq[:6]])
+        await update.message.reply_text("Which one left?", reply_markup=kb)
+
+
+async def _left_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """A member left an internal group -> if they're known active staff, ask the owner
+    whether they left the company."""
+    msg = update.message
+    if not msg or not msg.left_chat_member:
+        return
+    if msg.chat_id not in [cid for _, cid in _internal_groups()]:
+        return
+    uid = msg.left_chat_member.id
+    staff = staff_get_by_uid(uid)
+    if not staff or staff.get("status") != "active":
+        return
+    label = next((l for l, c in _internal_groups() if c == msg.chat_id), str(msg.chat_id))
+    await _offer_exstaff(context, staff,
+                         why="%s just left the %s group." % (staff["canonical_name"], label))
+
+
 async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Once a week (Monday, Phnom Penh): Opus digests the week's lateness + attendance
     notes and DMs the owner. Skips quietly when there's nothing to report."""
@@ -1934,8 +2105,15 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("pending",   cmd_pending))
     app.add_handler(CommandHandler("staff",     cmd_staff))
     app.add_handler(CommandHandler("rules",     cmd_rules))
+    app.add_handler(CommandHandler("exstaff",   cmd_exstaff))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
+    app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     app.add_handler(teach_conv)
+    # A known staff member leaving an internal group -> ask the owner if they left.
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, _left_member_handler))
+    # Owner DMs GM in plain language that someone left (silent unless it's a departure).
+    app.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, _owner_private_departure))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)

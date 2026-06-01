@@ -2218,6 +2218,126 @@ def gm_escalate_lateness(case_id: int) -> None:
             """, (case_id,))
 
 
+# ── Staff registry (active/ex-staff) — foundation for ex-staff + staff-only /stock ──
+
+def init_staff_registry_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS staff_registry (
+                    id            SERIAL PRIMARY KEY,
+                    canonical_name TEXT UNIQUE NOT NULL,
+                    call_name     TEXT,
+                    aliases       TEXT DEFAULT '[]',   -- JSON: telegram display names
+                    telegram_ids  TEXT DEFAULT '[]',   -- JSON: user_ids seen for this person
+                    status        TEXT DEFAULT 'active',-- active | ex_staff
+                    left_at       TIMESTAMPTZ,
+                    left_reason   TEXT,
+                    created_at    TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at    TIMESTAMPTZ DEFAULT NOW()
+                );
+            """)
+
+
+def seed_staff_registry() -> int:
+    """Seed the registry from config.STAFF_ALIAS_MAP (display->real) + STAFF_CALL_NAME
+    (display->nick), grouped by real name, with telegram user_ids pulled from
+    ops_messages. Idempotent (ON CONFLICT DO NOTHING). Returns rows inserted."""
+    import json as _json
+    import config as _config
+    displays = set(_config.STAFF_ALIAS_MAP) | set(getattr(_config, "STAFF_CALL_NAME", {}))
+    by_real: dict[str, dict] = {}
+    for disp in displays:
+        real = _config.STAFF_ALIAS_MAP.get(disp, disp)
+        nick = _config.call_name_for(disp) if hasattr(_config, "call_name_for") else None
+        rec = by_real.setdefault(real, {"aliases": set(), "call": None})
+        rec["aliases"].add(disp)
+        if nick and not rec["call"]:
+            rec["call"] = nick
+    inserted = 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for real, rec in by_real.items():
+                uids = []
+                for disp in rec["aliases"]:
+                    cur.execute("""
+                        SELECT DISTINCT sender_id FROM ops_messages
+                        WHERE sender_name = %s AND sender_id IS NOT NULL LIMIT 5
+                    """, (disp,))
+                    uids.extend(r["sender_id"] for r in cur.fetchall())
+                uids = sorted(set(uids))
+                cur.execute("""
+                    INSERT INTO staff_registry (canonical_name, call_name, aliases, telegram_ids)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (canonical_name) DO NOTHING
+                    RETURNING id
+                """, (real, rec["call"], _json.dumps(sorted(rec["aliases"])), _json.dumps(uids)))
+                if cur.fetchone():
+                    inserted += 1
+    return inserted
+
+
+def _staff_row(r: dict) -> dict:
+    import json as _json
+    d = dict(r)
+    for k in ("aliases", "telegram_ids"):
+        try:
+            d[k] = _json.loads(d.get(k) or "[]")
+        except Exception:
+            d[k] = []
+    return d
+
+
+def staff_all(status: str | None = None) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if status:
+                cur.execute("SELECT * FROM staff_registry WHERE status = %s ORDER BY canonical_name", (status,))
+            else:
+                cur.execute("SELECT * FROM staff_registry ORDER BY canonical_name")
+            return [_staff_row(r) for r in cur.fetchall()]
+
+
+def staff_get_by_uid(uid: int) -> dict | None:
+    """The staff record that owns this telegram user_id, or None."""
+    if uid is None:
+        return None
+    for rec in staff_all():
+        if uid in rec.get("telegram_ids", []):
+            return rec
+    return None
+
+
+def staff_find_by_name(name: str) -> list[dict]:
+    """Match a free-text name to staff records (canonical / call-name / alias)."""
+    if not name or not name.strip():
+        return []
+    needle = name.strip().lower()
+    out = []
+    for rec in staff_all():
+        hay = [rec.get("canonical_name", ""), rec.get("call_name", "") or ""] + rec.get("aliases", [])
+        if any(needle in (h or "").lower() or (h or "").lower() in needle for h in hay if h):
+            out.append(rec)
+    return out
+
+
+def staff_mark_ex(staff_id: int, reason: str | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE staff_registry
+                SET status = 'ex_staff', left_at = NOW(), left_reason = %s, updated_at = NOW()
+                WHERE id = %s
+            """, (reason, staff_id))
+
+
+def staff_active_uids() -> set:
+    uids = set()
+    for rec in staff_all("active"):
+        uids.update(rec.get("telegram_ids", []))
+    return uids
+
+
 # ── Stock items knowledge + daily counts (for the 7am order list) ───────────────
 
 def init_stock_db() -> None:
