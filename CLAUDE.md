@@ -312,27 +312,41 @@ archive through bot API. WOC structured tables are the first big input to the br
 > groups and distilling structured rows — NOT per-message bot API. Live bot stays cheap; depth comes from me.
 
 ### A. Finance brain (TWB REPORT)
-- **Sales-drop % flag** (the immediate one) — LOGIC: compare a day's total_sales vs a weekday-aware trailing
-  baseline (weekends differ); if drop > X% → flag the owner/digest. Owner picks X after baselining. Idea:
-  show the drop in the weekly digest with the trend, not just a one-off ping.
+- **Sales-anomaly framework — DONE (session 26), silent until data.** gm_bot/sales.py learns a normal BAND
+  per day-type (weekday + payday month-phase + Cambodia holiday/festival class) and flags a final report's
+  sales only when below the band with enough same-type history (+ likely-reason context, trend-vs-blip).
+  Embodies the owner's 7 ideas. _maybe_flag_sales_anomaly DMs owner. ACTIVATES once the years of Facebook
+  Messenger daily reports are imported (owner exporting to email; ~5 days live data only so far).
 - **Overexpense carryover model** (pending decision #1, owner thinking) — current: cash-out>cash-in deficit
   carried to next day off the $600 float. Owner wants cleaner model. I propose options when owner's ready.
 - **Daily/weekly finance digest** (wanted, not built) — Opus-me or scheduled: sales, expenses, cumulative
   Over/Lost trend, anomalies. Pairs with the attendance digest already live.
 
 ### B. Attendance brain (Supervisors/Management) — lateness ladder DONE
-- **AL engine** — LOGIC for the math + Haiku to read announcements. Schema: AL balance + accrual ledger +
-  deductions. Accrual +1.5/mo ARREARS (mid-month start confirmed). Deduct on off/AL announcements
-  (Haiku detect → logic). Vague "off tomorrow" → GM asks "Is this AL?" (attendance memory). /al [name]
-  balance cmd; monthly auto-accrual job; low-balance + frequent-short-notice flags. GATED: owner seeds
-  current balances, then says "begin counting from today."
+- **Leave QUESTIONING — DONE & LIVE (session 26):** detect_leave_request (Haiku) on Supervisors/Mgmt;
+  logs every leave to gm_leave_events (accumulates now); missing info ('off' w/o 'AL', or no date) opens a
+  'leave_clarify' clarification on the EXISTING ladder (ask→nudge→escalate to owner). _leave_questions pure.
+- **AL engine (math) — PENDING, gated on owner seeding balances + schedules.** LOGIC for the math + the
+  Haiku detection above. Accrual +1.5/mo ARREARS (mid-month start confirmed). Deduct on confirmed leave.
+  /al [name] balance cmd; monthly auto-accrual job; low-balance + frequent-short-notice flags.
+- **AL AMENDMENTS/inconsistency (owner raised session 26):** staff often change their AL dates or are
+  inconsistent. Design: each leave request is a logged event; the AL ledger uses the LATEST confirmed
+  request per person for a pending period and SUPERSEDES the prior (same 'latest wins' pattern as finance
+  reports) — release old dates, book new, never double-count, and only DEDUCT once actually taken. When a
+  change is unclear/conflicting, GM confirms the final dates via the clarification ladder before adjusting.
+  TODO when engine built: add amends_previous detection + supersede link on gm_leave_events.
 - **Working-hours-per-staff** (attendance memory "pending") — so GM can judge if a late/absence notice came
   BEFORE shift start (else ask for screenshot). Needs the per-staff shift times once names are mapped.
 
 ### C. Stock/ops brain (Stock Checks) — semantic concern detection DONE
 - **Stock minimums** — stock_minimums table + /minimums cmd; owner gives each item's minimum → low-stock
-  alerts fire when reported below min / not restocked. Idea: auto-SUGGEST minimums from historical usage;
-  reorder reminders; link to supplier price list + the demand data.
+  alerts fire when reported below min / not restocked.
+- **Draft minimums analysis DONE by Claude (session 26, no API, hold for feeding):** parsed the daily
+  "almost out" reports (Apr1-Jun1, 64 reports). Ranked items by chronic-shortage frequency — top: Almond
+  ground 70%, Black sesame 58%, Tomato ketchup Heinz 55%, White sesame 45%, Dish washing 44%, Vegetable
+  oil 33%. These recur for WEEKS straight → likely a reorder-process gap or under-stock, not just noise.
+  NUMERIC per-item minimums (qty+unit) need the stock-sheet PHOTOS — Claude can read a sample on Max (free)
+  to propose real numbers. Owner will feed final minimums into knowledge later.
 
 ### D. Cross-group KNOWLEDGE (built by Claude-on-subscription, NOT bot API) — the "through you" theme
 - **Knowledge Brief** — rolling living summary of ALL groups (3,619 chats, prioritized by importance):
