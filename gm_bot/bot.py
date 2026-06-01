@@ -39,15 +39,17 @@ from shared.database import (
     gm_escalate_lateness, gm_get_staff_uid,
     gm_add_finance_alias, gm_get_finance_aliases,
     gm_get_lateness_cases_since, gm_get_concerns_since,
+    init_gm_leave_db, gm_create_leave_event, gm_link_leave_clarification,
+    gm_get_sales_history,
 )
 from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
-    extract_daily_report_ai, generate_attendance_digest,
+    extract_daily_report_ai, generate_attendance_digest, detect_leave_request,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
-from gm_bot import finance, clarify, lateness, mentions
+from gm_bot import finance, clarify, lateness, mentions, sales
 from telegram.constants import ParseMode
 from datetime import datetime, timezone, timedelta
 
@@ -1362,6 +1364,100 @@ async def _lateness_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                          action, case["id"], e)
 
 
+def _leave_questions(said_al: bool, leave_type: str, dates) -> list[str]:
+    """Pure: which clarifying questions a leave announcement needs. Empty list = complete.
+    Asks AL-or-not when they said a plain 'off'/'unspecified' without the word AL, and
+    asks for the day(s) when no date was given. Sick leave with a date needs nothing."""
+    qs = []
+    if not said_al and leave_type in ("off", "unspecified"):
+        qs.append("is this annual leave (AL) or another kind of off")
+    if not dates:
+        qs.append("which day(s)")
+    return qs
+
+
+async def _handle_leave(context, msg, text: str, sender: str) -> None:
+    """Supervisors/Management: detect a time-off/leave announcement, record it (to
+    accumulate for AL once balances are seeded), and OPEN A CLARIFICATION when info is
+    missing — 'off' without the word AL, or no date. The clarification rides the existing
+    ladder: GM asks -> nudges -> escalates to the owner. Staged: pre-gate -> Haiku -> logic."""
+    chat_id = msg.chat_id
+    res = await detect_leave_request(text)
+    if res.get("_error") or not res.get("is_leave_request"):
+        return
+    if res.get("confidence", 0.0) < 0.55:
+        return
+
+    person = (res.get("person") or "").strip() or sender
+    reporter_uid = msg.from_user.id if msg.from_user else None
+
+    # What's missing? -> the questions the GM should ask.
+    questions = _leave_questions(res.get("said_al", False),
+                                 res.get("leave_type", "unspecified"), res.get("dates"))
+    needs = bool(questions)
+
+    event_id = gm_create_leave_event(
+        chat_id, msg.chat.title, msg.message_id, sender, reporter_uid,
+        person, res.get("leave_type", "unspecified"), res.get("said_al", False),
+        res.get("dates"), res.get("reason"), needs)
+    if not event_id:
+        return  # already logged this message
+
+    if not needs:
+        logger.info("Leave logged (complete): %s, type=%s, dates=%s",
+                    person, res.get("leave_type"), res.get("dates"))
+        return
+
+    # Ask in-group, tagging the person, and open a clarification so the ladder follows up.
+    person_mention = _staff_mention(person)
+    body = "Quick check on %s's time off — %s? Thanks." % (person_mention, " and ".join(questions))
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id, text=body, reply_to_message_id=msg.message_id,
+            parse_mode=ParseMode.HTML,
+        )
+        clar_id = gm_create_clarification(
+            chat_id=chat_id, chat_title=msg.chat.title, topic="leave_clarify",
+            question_msg_id=sent.message_id, target_msg_id=msg.message_id,
+            question_text=body, sender_name=sender, context_ref=str(event_id),
+        )
+        if clar_id:
+            gm_link_leave_clarification(event_id, clar_id)
+        logger.info("Leave clarification opened for %s (event %s)", person, event_id)
+    except Exception as e:
+        logger.error("leave clarification failed: %s", e)
+
+
+async def _maybe_flag_sales_anomaly(context, full: dict) -> None:
+    """On a FINAL daily report, compare sales to same-day-type history and DM the owner
+    if it's below the normal band. Silent until a day-type has enough samples — so it
+    activates only once the historical Messenger reports are imported."""
+    if full.get("report_kind") != "final":
+        return
+    sales_val = (full.get("raw") or {}).get("total_sales")
+    if sales_val is None:
+        return
+    try:
+        history = gm_get_sales_history()
+        result = sales.anomaly_check(full["business_day"], sales_val, history)
+        if not result or not result.get("is_low"):
+            return
+        leave_n = len(gm_get_concerns_since("staffing", 1))  # rough same-day context
+        reasons = sales.likely_reasons(full["business_day"], leave_count=0, lateness_count=leave_n)
+        body = (
+            "📉 Sales below normal — %s (%s)\n"
+            "Sales $%.2f vs usual ~$%.2f for this day-type (%d samples); down %.1f%%."
+        ) % (full["business_day"], result["day_type"], sales_val,
+             result["median"], result["n"], result["drop_pct"])
+        if reasons:
+            body += "\nPossible context: " + "; ".join(reasons)
+        await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+        logger.info("Sales anomaly flagged for %s (down %.1f%%)",
+                    full["business_day"], result["drop_pct"])
+    except Exception as e:
+        logger.error("_maybe_flag_sales_anomaly failed: %s", e)
+
+
 async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Once a week (Monday, Phnom Penh): Opus digests the week's lateness + attendance
     notes and DMs the owner. Skips quietly when there's nothing to report."""
@@ -1610,12 +1706,16 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error("clarification resolve failed: %s", e)
 
-    # Supervisors / Management: lateness reports + pay-back follow-up ladder.
+    # Supervisors / Management: lateness reports + leave/time-off questioning.
     if text.strip() and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
         try:
             await _handle_lateness(context, msg, text, sender)
         except Exception as e:
             logger.error("lateness handling failed: %s", e)
+        try:
+            await _handle_leave(context, msg, text, sender)
+        except Exception as e:
+            logger.error("leave handling failed: %s", e)
 
     # TWB REPORT group: receipt photos, clarification replies, daily-report parsing
     if chat_id == config.DAILY_REPORT_CHAT_ID:
@@ -1632,6 +1732,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if full is not None:
                     await _maybe_correct_report(context, msg, full)
                     await _maybe_ask_lost(context, msg, full)
+                    await _maybe_flag_sales_anomaly(context, full)
             except Exception as e:
                 logger.error("daily report parse failed: %s", e)
         # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.

@@ -838,6 +838,56 @@ async def generate_attendance_digest(lateness_cases: list[dict],
         return ""
 
 
+# Leave / time-off detection — Haiku, live per supervisor/management message.
+_GM_LEAVE_SYSTEM = (
+    "You read ONE message from a bakery's supervisor/management Telegram group in "
+    "Phnom Penh. Someone may be announcing or requesting TIME OFF for a staff member — "
+    "annual leave (AL), a plain day off, sick leave, or 'want off'. Judge meaning "
+    "(English + Khmer), not keywords. Lateness or 'on the way' is NOT a leave request.\n"
+    "- is_leave_request: true only if it announces/requests time off or an absence.\n"
+    "- person: whose leave (name as written), or null if it's the sender themself.\n"
+    "- leave_type: 'al' if they explicitly say annual leave/AL; 'sick' if sick/not well/"
+    "unwell; 'off' if just day off / want off / not coming with NO type given; "
+    "'unspecified' if unclear.\n"
+    "- said_al: true ONLY if the words 'AL' or 'annual leave' actually appear.\n"
+    "- dates: the day(s) of leave as written ('tomorrow','5th','next Mon'), or null.\n"
+    "- reason: stated reason, or null.\n"
+    'Return ONLY JSON: {"is_leave_request": true|false, "person": "<name>"|null, '
+    '"leave_type": "al"|"sick"|"off"|"unspecified", "said_al": true|false, '
+    '"dates": "<text>"|null, "reason": "<text>"|null, "confidence": 0.0-1.0}'
+)
+
+
+async def detect_leave_request(text: str) -> dict:
+    """Detect a time-off / leave announcement and extract its fields (Haiku).
+    Returns is_leave_request + person/leave_type/said_al/dates/reason/confidence.
+    On error returns is_leave_request False with _error so the caller skips."""
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_LATENESS_MODEL,
+            max_tokens=200,
+            system=[{"type": "text", "text": _GM_LEAVE_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": text[:1500]}],
+        )
+        result = _parse_json(resp.content[0].text)
+        lt = result.get("leave_type")
+        if lt not in ("al", "sick", "off", "unspecified"):
+            lt = "unspecified"
+        return {
+            "is_leave_request": bool(result.get("is_leave_request", False)),
+            "person":     result.get("person"),
+            "leave_type": lt,
+            "said_al":    bool(result.get("said_al", False)),
+            "dates":      result.get("dates"),
+            "reason":     result.get("reason"),
+            "confidence": float(result.get("confidence", 0.0)),
+        }
+    except Exception as exc:
+        logger.error("detect_leave_request failed: %s", exc)
+        return {"is_leave_request": False, "_error": True}
+
+
 async def assess_receipt_photo(image_bytes: bytes,
                                past_examples: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.
@@ -920,6 +970,9 @@ _CLARIFY_JUDGE_SYSTEM = (
     "- cash_lost: the GM flagged the drawer short by more than $2 and asked why. A good "
     "reply gives a plausible cause (miscount, unrecorded expense, wrong change, FX) or "
     "says they recounted/will recount. A bad reply ignores it or is evasive.\n"
+    "- leave_clarify: the GM asked whether a time-off is annual leave (AL) or another "
+    "kind, and/or which day(s). A good reply states the leave type and/or the date(s). "
+    "A bad reply is unrelated or still leaves it unclear.\n"
     "Be fair, not pedantic: a plausible, on-topic explanation counts as resolved. "
     "Only flag replies that truly fail to address the question.\n"
     'Return ONLY JSON: {"resolved": true|false, "reason": "<short>"}'

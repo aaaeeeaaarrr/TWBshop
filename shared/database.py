@@ -2218,6 +2218,77 @@ def gm_escalate_lateness(case_id: int) -> None:
             """, (case_id,))
 
 
+# ── Leave / time-off events (accumulate now; AL deduction once balances seeded) ──
+
+def init_gm_leave_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gm_leave_events (
+                    id              SERIAL PRIMARY KEY,
+                    chat_id         BIGINT NOT NULL,
+                    chat_title      TEXT,
+                    source_msg_id   BIGINT NOT NULL,
+                    reporter_name   TEXT,
+                    reporter_uid    BIGINT,
+                    person          TEXT,
+                    leave_type      TEXT,          -- al | sick | off | unspecified
+                    said_al         BOOLEAN DEFAULT FALSE,
+                    dates_text      TEXT,
+                    reason          TEXT,
+                    needs_clarification BOOLEAN DEFAULT FALSE,
+                    clarification_id    INTEGER,
+                    status          TEXT DEFAULT 'logged',
+                    created_at      TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (chat_id, source_msg_id)
+                );
+            """)
+
+
+def gm_create_leave_event(chat_id: int, chat_title: str | None, source_msg_id: int,
+                          reporter_name: str | None, reporter_uid: int | None,
+                          person: str | None, leave_type: str, said_al: bool,
+                          dates_text: str | None, reason: str | None,
+                          needs_clarification: bool) -> int | None:
+    """Record a detected leave announcement. Idempotent on (chat_id, source_msg_id)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_leave_events
+                    (chat_id, chat_title, source_msg_id, reporter_name, reporter_uid,
+                     person, leave_type, said_al, dates_text, reason, needs_clarification)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chat_id, source_msg_id) DO NOTHING
+                RETURNING id
+            """, (chat_id, chat_title, source_msg_id, reporter_name, reporter_uid,
+                  person, leave_type, said_al, dates_text, reason, needs_clarification))
+            row = cur.fetchone()
+            return row["id"] if row else None
+
+
+def gm_link_leave_clarification(event_id: int, clarification_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE gm_leave_events SET clarification_id = %s WHERE id = %s",
+                        (clarification_id, event_id))
+
+
+def gm_get_sales_history() -> list[dict]:
+    """One total_sales figure per business day (latest FINAL report wins), for the
+    sales-anomaly framework. Falls back to any report for a day with no final."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT ON (business_day) business_day, total_sales
+                FROM gm_daily_reports
+                WHERE superseded = FALSE AND total_sales IS NOT NULL
+                ORDER BY business_day,
+                         CASE WHEN report_kind = 'final' THEN 0 ELSE 1 END,
+                         posted_at DESC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+
 def gm_get_staff_uid(display_name: str | None) -> int | None:
     """Latest Telegram user id seen for this exact display name in any group.
     Used to build a pinging mention. Returns None if never seen."""
