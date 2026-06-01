@@ -2303,10 +2303,9 @@ _STOCK_SEED = [
     ("Chocolatin Plastic", "packs", 10, ["chocolatin plastic", "chocolatine plastic"]),
     ("Red Velvet", "kg", 8, ["red velvet"]),
     ("Corn Powder", "kg", 5, ["corn powder", "corn flour"]),
-    # Min still to set by owner:
-    ("White Sauce", None, None, ["white sauce"]),
-    ("Red Sauce", None, None, ["red sauce"]),
-    ("Homemade Jam", None, None, ["homemade jam"]),
+    ("White Sauce", None, 1, ["white sauce"]),
+    ("Red Sauce", None, 1, ["red sauce"]),
+    ("Homemade Jam", None, 1, ["homemade jam"]),
 ]
 
 
