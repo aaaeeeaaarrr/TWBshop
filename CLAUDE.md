@@ -359,6 +359,54 @@ Sauce=pots (1.5), Homemade Jam=jars. All 50 items now have unit + min in the sta
 
 ---
 
+## Private-DM Attendance Overhaul (AL + Lateness + Live-Location) — owner spec session 26
+> REPLACES the group-based lateness ladder + leave-questioning (both SILENCED:
+> config.GM_ATTENDANCE_GROUP_ACTIVE=False). All attendance now happens in PRIVATE DM with the GM.
+> If anyone posts AL/lateness in a GROUP -> GM replies "Please tell {name} to message me directly."
+
+**WHY (2 photos session 26):** group lateness/leave ladder didn't understand non-threaded replies ->
+re-asked + nudged + threatened escalation repeatedly -> spammed Supervisors, looked broken. Root cause:
+resolution required a Telegram threaded reply. Fix = understand plain messages everywhere + 👍 ack + go private.
+
+**GLOBAL FIXES (apply to ALL cases, not just attendance):**
+- UNDERSTAND-WITHOUT-REPLY: resolve open lateness/AL/clarifications from a plain message (no threaded
+  reply needed) — Haiku extract + Sonnet judge while a case is open in that chat.
+- 👍 ACK: when GM registers any business reply that is NOT a concern, react 👍 so staff know they were heard.
+  If the reply IS a problem/concern -> NO 👍 (so staff don't think it's fine). 👍 never replaces the GM's
+  actual reply/escalation — it's only an acknowledgement.
+
+**AL flow (private):** staff DM GM the AL days/hours + reason (no reason -> GM asks). >=2 of the chosen
+seniors must approve. GM DMs each senior privately: ✅approve/❌not-approve buttons + the request + an
+AVAILABILITY PICTURE — per AL day/window, the staff working those hours that day (EXCLUDING anyone on
+day-off OR on AL themselves that day — don't list people who aren't there). On 2 approvals: the senior
+messages collapse and a fresh message to all seniors restates details tagging who approved/not. Approved ->
+Supervisors group gets a plain notice of the AL days/times (NO availability, NO who-approved). Rejected ->
+nothing to the group, seniors only.
+
+**Lateness flow (private):** staff DM "late X min/hrs". GM assumes their NEXT shift unless the shift already
+started (then: "ok, but please tell us well before your start time next time"). GM posts the lateness to
+the SUPERVISORS group for that shift (so others know he won't be there a while; real time confirmed when he
+checks in via location). If he said e.g. 10 min late -> at 10 min past his start: "Have you arrived yet?
+Share location if you did." No approval. Frequency reminders; negative points LATER.
+
+**Live-location attendance (WHOLE shift):** staff share LIVE location with GM privately as their time-
+attendance. Geofence 200m from TWB (GPS buffer). NOT for Delis staff yet. If live location goes off ->
+"Did you leave work early? If not, share location again." Allowance: 30 min total outside per shift (shop
+errands/food) — once exceeded -> "What are you doing outside the shop?" (10min + 20min = ask). ALSO: any
+staff who hasn't checked in by their start time -> GM reminds them to check in (in case they forgot).
+
+**Foundation BUILT (session 26):** gm_bot/attendance.py (pure: haversine, in_work_zone 200m, to_min,
+overlaps incl overnight, available_staff [excludes day-off + AL], lateness_kind, outside_exceeded) — 9
+tests. Schema: staff_registry +work_start/work_end/day_off/al_left/org/is_senior; al_requests, al_approvals,
+lateness_records, attendance_sessions (init_attendance_db, applied to prod).
+**NEEDS owner before flows can run:** fill C:\Users\Papa\Documents\staff_schedule_template.csv (work times,
+day off, current AL left, TWB/Delis, SENIOR Y/N; suspected dual account flagged: Sao Visal / Sao Visal cv).
+**TODO next:** CSV importer -> staff_registry schedules; then the private DM flows (AL intake+approval,
+lateness intake, live-location handler + reminders, group redirect), understand-without-reply + 👍 ack.
+AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later.
+
+---
+
 ## GM Backlog & Roadmap (session 26 — owner asked for the full list)
 > The remaining GM "shop-brain" work, grouped. "Logic/Haiku/Sonnet/Opus" = which tier does each.
 > KEY THEME (owner): build the GM's KNOWLEDGE via Claude-on-subscription (me, terminal) reading the
