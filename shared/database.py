@@ -2250,6 +2250,7 @@ def init_attendance_db() -> None:
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS al_left NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS org TEXT DEFAULT 'TWB';
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS is_senior BOOLEAN DEFAULT FALSE;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS expertise TEXT DEFAULT '[]';
 
                 CREATE TABLE IF NOT EXISTS al_requests (
                     id           SERIAL PRIMARY KEY,
@@ -2294,6 +2295,132 @@ def init_attendance_db() -> None:
                     UNIQUE (staff_id, shift_date)
                 );
             """)
+
+
+def import_staff_schedule_csv(path: str, year: int = 2026) -> dict:
+    """Rebuild staff_registry from the owner's CSV (the source of truth).
+
+    - matches each CSV row to an existing record by Telegram display name / call / full name
+      (normalised); updates schedule fields. New people are created (uid resolved from
+      ops_messages when possible). Active records NOT in the CSV are marked ex_staff.
+    - 'Upcoming AL to deduct' (e.g. 'Jun 3,5,6,7') is stored as an approved al_requests row
+      so availability/coverage knows those planned absences.
+    Returns a report {updated, created, ex_staffed, planned_al}.
+    """
+    import csv as _csv, json as _json, re as _re
+    from gm_bot.attendance import to_min as _to_min
+
+    def _norm(s):
+        return _re.sub(r"[^a-z0-9ក-៿]", "", (s or "").lower())
+
+    def _fmt(m):
+        return None if m is None else "%02d:%02d" % (m // 60, m % 60)
+
+    def _hours(s):
+        s = (s or "").lower().replace(" ", "")
+        if "to" not in s:
+            return None, None
+        a, b = s.split("to", 1)
+        return _fmt(_to_min(a)), _fmt(_to_min(b))
+
+    _DAY = {"mon": "Mon", "monday": "Mon", "tue": "Tue", "tues": "Tue", "tuesday": "Tue",
+            "wed": "Wed", "wednesday": "Wed", "thu": "Thu", "thur": "Thu", "thurs": "Thu",
+            "thursday": "Thu", "fri": "Fri", "friday": "Fri", "sat": "Sat", "saturday": "Sat",
+            "sun": "Sun", "sunday": "Sun", "never": "Never"}
+    _MON = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8,
+            "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+
+    def _upcoming(s):
+        if not s:
+            return []
+        m = _re.match(r"\s*([A-Za-z]{3,})\s+([\d,\s]+)", s)
+        if not m:
+            return []
+        mon = _MON.get(m.group(1)[:3].lower())
+        if not mon:
+            return []
+        return ["%04d-%02d-%02d" % (year, mon, int(d)) for d in _re.findall(r"\d+", m.group(2))]
+
+    existing = staff_all()
+    by_norm = {}
+    for rec in existing:
+        for a in rec.get("aliases", []):
+            by_norm.setdefault(_norm(a), rec)
+        by_norm.setdefault(_norm(rec["canonical_name"]), rec)
+        if rec.get("call_name"):
+            by_norm.setdefault(_norm(rec["call_name"]), rec)
+
+    with open(path, encoding="utf-8") as f:
+        rows = list(_csv.DictReader(f))
+
+    report = {"updated": [], "created": [], "ex_staffed": [], "planned_al": 0}
+    touched = set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for r in rows:
+                full = (r.get("Full name") or "").strip()
+                if not full:
+                    continue
+                call = (r.get("Short/call name") or "").strip().split(",")[0].strip() or None
+                displays = [d.strip() for d in (r.get("Telegram display name(s)") or "").split(",") if d.strip()]
+                ws, we = _hours(r.get("Work times"))
+                dayoff = _DAY.get((r.get("Day off(s)") or "").strip().lower())
+                al_raw = (r.get("Current AL left (days)") or "").strip()
+                try:
+                    al = float(al_raw) if al_raw and al_raw.lower() != "never" else None
+                except ValueError:
+                    al = None
+                org = (r.get("TWB or Delis") or "TWB").strip().upper()
+                org = org if org in ("TWB", "DELIS") else "TWB"
+                senior = (r.get("Senior approver? (Y/N)") or "").strip().lower().startswith("y")
+                exps = [e.strip().lower() for e in (r.get("Expertise") or "").split(",") if e.strip()]
+
+                rec = None
+                for d in displays + [full, call or ""]:
+                    cand = by_norm.get(_norm(d))
+                    if cand and cand["id"] not in touched:   # don't match one record twice
+                        rec = cand
+                        break
+                if rec:
+                    sid = rec["id"]
+                    aliases = sorted(set(rec.get("aliases", []) + displays))
+                    cur.execute("""UPDATE staff_registry SET canonical_name=%s, call_name=%s, aliases=%s,
+                        work_start=%s, work_end=%s, day_off=%s, al_left=%s, org=%s, is_senior=%s,
+                        expertise=%s, status='active', updated_at=NOW() WHERE id=%s""",
+                        (full, call, _json.dumps(aliases), ws, we, dayoff, al, org, senior,
+                         _json.dumps(exps), sid))
+                    report["updated"].append(full)
+                else:
+                    uids = []
+                    for d in displays:
+                        cur.execute("SELECT DISTINCT sender_id FROM ops_messages WHERE sender_name=%s AND sender_id IS NOT NULL LIMIT 3", (d,))
+                        uids.extend(x["sender_id"] for x in cur.fetchall())
+                    cur.execute("""INSERT INTO staff_registry (canonical_name, call_name, aliases, telegram_ids,
+                        work_start, work_end, day_off, al_left, org, is_senior, expertise, status)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'active')
+                        ON CONFLICT (canonical_name) DO UPDATE SET call_name=EXCLUDED.call_name,
+                        work_start=EXCLUDED.work_start, work_end=EXCLUDED.work_end, day_off=EXCLUDED.day_off,
+                        al_left=EXCLUDED.al_left, org=EXCLUDED.org, is_senior=EXCLUDED.is_senior,
+                        expertise=EXCLUDED.expertise, status='active' RETURNING id""",
+                        (full, call, _json.dumps(sorted(set(displays))), _json.dumps(sorted(set(uids))),
+                         ws, we, dayoff, al, org, senior, _json.dumps(exps)))
+                    sid = cur.fetchone()["id"]
+                    report["created"].append(full)
+                touched.add(sid)
+
+                planned = _upcoming(r.get("Upcoming AL to deduct"))
+                if planned:
+                    cur.execute("DELETE FROM al_requests WHERE staff_id=%s AND reason='imported planned AL'", (sid,))
+                    cur.execute("""INSERT INTO al_requests (staff_id, kind, days, reason, status, decided_at)
+                        VALUES (%s,'days',%s,'imported planned AL','approved',NOW())""", (sid, _json.dumps(planned)))
+                    report["planned_al"] += 1
+
+            cur.execute("SELECT id, canonical_name FROM staff_registry WHERE status='active'")
+            for rr in cur.fetchall():
+                if rr["id"] not in touched:
+                    cur.execute("UPDATE staff_registry SET status='ex_staff', left_at=NOW(), left_reason='not in CSV' WHERE id=%s", (rr["id"],))
+                    report["ex_staffed"].append(rr["canonical_name"])
+    return report
 
 
 def seed_staff_registry() -> int:
