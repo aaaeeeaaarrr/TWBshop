@@ -2109,6 +2109,10 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     app.add_handler(teach_conv)
+    # Paperless /stock entry (owner-only test mode) — conversation, registered before
+    # the loose private-text handler so count entry isn't intercepted.
+    from gm_bot.stock_entry import build_stock_conversation
+    app.add_handler(build_stock_conversation())
     # A known staff member leaving an internal group -> ask the owner if they left.
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, _left_member_handler))
     # Owner DMs GM in plain language that someone left (silent unless it's a departure).

@@ -2368,7 +2368,102 @@ def init_stock_db() -> None:
                     created_at    TIMESTAMPTZ DEFAULT NOW(),
                     UNIQUE (item, count_date)
                 );
+                ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category TEXT;
+                CREATE TABLE IF NOT EXISTS stock_pending_items (
+                    id          SERIAL PRIMARY KEY,
+                    name        TEXT NOT NULL,
+                    added_by    TEXT,
+                    added_uid   BIGINT,
+                    status      TEXT DEFAULT 'pending',
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                );
             """)
+
+
+# Item -> category for the /stock entry flow.
+_STOCK_CATEGORIES = {
+    "Baking & Dry": ["Sugar", "Salt", "Almond ground", "Almond flakes", "Icing sugar",
+        "Milk powder", "Cacao powder 1kg", "Yeast", "Baking powder", "Vanilla essence",
+        "Asian flour", "Eagle flour", "Ireks Rogena 12.5kg", "S500 acbplus bread improver",
+        "Beef gelatin powder", "Instant custard powder", "Black sesame", "White sesame",
+        "Corn Powder", "Red Velvet", "Peanuts", "Strawberry puree", "Passion puree", "Molasses"],
+    "Dairy & Butter": ["Eggs", "Milk condensed", "Fresh milk", "GLF cream", "Pilot butter",
+        "Croissant butter", "President butter 10g pack"],
+    "Chocolate": ["White chocolate", "Black chocolate", "Chocolate sticks"],
+    "Sauces & Condiments": ["Tomato Ketchup Heinz", "Ketchup packs", "Tomato paste",
+        "White Sauce", "Red Sauce", "Homemade Jam", "Baked beans", "Vegetable oil"],
+    "Packaging": ["Loaf Plastic", "Croissant Plastic", "Burger Plastic", "Focaccia Plastic",
+        "Soft Roll Plastic", "Chocolatin Plastic", "Aluminum"],
+    "Cleaning": ["Dish washing"],
+}
+STOCK_CATEGORY_ORDER = ["Baking & Dry", "Dairy & Butter", "Chocolate",
+                        "Sauces & Condiments", "Packaging", "Cleaning"]
+
+
+def categorize_stock_items() -> int:
+    """Assign each seeded item to its category (one-time). Returns rows updated."""
+    n = 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for cat, items in _STOCK_CATEGORIES.items():
+                for it in items:
+                    cur.execute("UPDATE stock_items SET category = %s WHERE item = %s", (cat, it))
+                    n += cur.rowcount
+    return n
+
+
+def stock_categories() -> list[str]:
+    """Categories that have at least one active item, in display order."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT category FROM stock_items WHERE active = TRUE AND category IS NOT NULL")
+            have = {r["category"] for r in cur.fetchall()}
+    return [c for c in STOCK_CATEGORY_ORDER if c in have] + sorted(have - set(STOCK_CATEGORY_ORDER))
+
+
+def stock_items_in_category(category: str) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, item, unit, min_n, last_count FROM stock_items
+                WHERE active = TRUE AND category = %s ORDER BY item
+            """, (category,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def stock_get_item(item_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM stock_items WHERE id = %s", (item_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def stock_record_count(item_id: int, count: float, count_date: str) -> None:
+    """Manual count entry: update last_count + the time-series row."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE stock_items SET last_count = %s, last_count_date = %s, last_seen = NOW()
+                WHERE id = %s RETURNING item
+            """, (count, count_date, item_id))
+            row = cur.fetchone()
+            if not row:
+                return
+            cur.execute("""
+                INSERT INTO stock_counts (item, count, count_date) VALUES (%s, %s, %s)
+                ON CONFLICT (item, count_date) DO UPDATE SET count = EXCLUDED.count
+            """, (row["item"], count, count_date))
+
+
+def stock_add_pending(name: str, added_by: str | None, added_uid: int | None) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO stock_pending_items (name, added_by, added_uid)
+                VALUES (%s, %s, %s) RETURNING id
+            """, (name, added_by, added_uid))
+            return cur.fetchone()["id"]
 
 
 # Canonical stock items transcribed from the Stock Checks sheet (session 26).
