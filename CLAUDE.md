@@ -395,6 +395,19 @@ attendance. Geofence 200m from TWB (GPS buffer). NOT for Delis staff yet. If liv
 errands/food) — once exceeded -> "What are you doing outside the shop?" (10min + 20min = ask). ALSO: any
 staff who hasn't checked in by their start time -> GM reminds them to check in (in case they forgot).
 
+**REGISTRY SOURCE LESSON (session 26):** staff_registry was wrongly seeded from CONVERSATION history
+(ops_messages) -> dragged in ex-staff + a duplicate account (Sao Visal/Sao Visal cv). FIX: the owner's
+filled CSV is the source of truth. Marked 6 ex-staff (Buy Vong Sakada, Morn Putheavy, Ret Det, Sot Somnang,
+Von Vichhka, Sao Visal cv) -> 30 active. When the final CSV is imported, REBUILD registry from it (anyone
+not in CSV -> ex_staff; new people -> add). Refreshed CSV: C:\Users\Papa\Downloads\staff_schedule_REFRESHED.csv
+**Facts from CSV (session 26):** Seniors (Y): Chim Samphass, Met Solina, Tengmarim Chaktopor, Phal Rath,
+Hong Vannary — BUT Met Solina resigns 5 Jun 2026 (pick a replacement senior). Tyty (Boss TT) = CO-OWNER,
+exempt from all rules. DELIS staff (separate location/TEAM, excluded from GM for now, AL TBD): Chea Seavluy,
+Cheata Sok (Delis supervisor), Khil Chantra, Sopheak Nalmonyboth, Chheng Minea, Ouk Sokchea. New TWB staff
+not in any group yet: Yorng Lyhouy, Chuch Pisey. Many TWB shifts are OVERNIGHT (9pm-6am etc.) — attendance
+overlaps() handles overnight. Day-offs still to fill. DELIS = different team; if ever allowed to DM the GM,
+treat as a separate team (its own seniors/availability pool), don't mix with TWB.
+
 **Foundation BUILT (session 26):** gm_bot/attendance.py (pure: haversine, in_work_zone 200m, to_min,
 overlaps incl overnight, available_staff [excludes day-off + AL], lateness_kind, outside_exceeded) — 9
 tests. Schema: staff_registry +work_start/work_end/day_off/al_left/org/is_senior; al_requests, al_approvals,
