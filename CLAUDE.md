@@ -341,12 +341,31 @@ archive through bot API. WOC structured tables are the first big input to the br
 ### C. Stock/ops brain (Stock Checks) — semantic concern detection DONE
 - **Stock minimums** — stock_minimums table + /minimums cmd; owner gives each item's minimum → low-stock
   alerts fire when reported below min / not restocked.
-- **Draft minimums analysis DONE by Claude (session 26, no API, hold for feeding):** parsed the daily
-  "almost out" reports (Apr1-Jun1, 64 reports). Ranked items by chronic-shortage frequency — top: Almond
-  ground 70%, Black sesame 58%, Tomato ketchup Heinz 55%, White sesame 45%, Dish washing 44%, Vegetable
-  oil 33%. These recur for WEEKS straight → likely a reorder-process gap or under-stock, not just noise.
-  NUMERIC per-item minimums (qty+unit) need the stock-sheet PHOTOS — Claude can read a sample on Max (free)
-  to propose real numbers. Owner will feed final minimums into knowledge later.
+- **MINIMUMS ALREADY EXIST on the stock sheet (session 26):** Claude read a sample of Stock Checks photos
+  on Max (free). The daily stock-count SHEET (e.g. msg stk_225) has a "Min.Stock (in each 1)" column +
+  "Order this" column + daily count columns. So minimums are authoritative, not approximated. Transcribed
+  ~48 items (Tomato Ketchup 2 tubs, Almond Ground 2 packs, Eggs 500pc, etc.). OWNER TO CONFIRM blurry ones:
+  Black sesame, Vegetable oil, Pilot butter, Molasses; and set mins for handwritten add-ons (Soft Roll
+  Plastic, Chocolatin Plastic, Red Velvet, Corn Powder). Insight: chronic 'almost out' items hover right
+  at their min (Almond Ground min 2, sheet shows 3,3,3) → raise mins or tighten reordering.
+
+**DAILY STOCK ORDER (7am) — owner spec session 26, foundation built, vision job PENDING:**
+- Goal: 7am message to Stock Checks group: "Check if we need to order:\n- Qty Item\n- Qty Item...".
+- BOT READS THE STOCK SHEET (owner chose this over the text report): daily ~$0.01 vision read (Sonnet) of
+  the latest stock-sheet photo → current count per item → compare to min → below-min items + order qty.
+  (A scheduled job can't use Claude-on-Max, so this one feature does use a small daily API call; owner OK.)
+- ORDER QTY = bot's OWN determination from USAGE HISTORY (depletion rate), NOT the sheet's 'Order this'
+  (many items don't state it). Bot maintains/raises its order-qty as usage grows over time; can suggest
+  updating the sheet's 'Order this'. DECLINING usage (item used less than before) → inform owner (off-menu?).
+- PERSISTENCE: re-list each 7am until the item clears. NO NEW SHEET: reuse last; 2 days in a row no sheet
+  → escalate to the group ("why hasn't the stock check been done?"). Roll out owner-preview first, then live.
+- Order-qty formula + clearing rules: owner deferred ("learn more, ask later") — first-pass default built,
+  tune on real output.
+- BUILT (session 26): gm_bot/stock.py PURE brain (is_low, suggest_order_qty [min+buffer, or usage*lead],
+  build_order_list, format_order_message, no_sheet_decision, usage_trend) — 10 tests. stock_items +
+  stock_counts tables (init_stock_db). NOT YET seeded (await owner confirm of blurry mins).
+- TODO next: ai_client.read_stock_sheet (Sonnet vision) + photo-classify to find the sheet + daily 7am job
+  + count time-series → usage learning + seed stock_items after owner confirms + decline alert.
 
 ### D. Cross-group KNOWLEDGE (built by Claude-on-subscription, NOT bot API) — the "through you" theme
 - **Knowledge Brief** — rolling living summary of ALL groups (3,619 chats, prioritized by importance):

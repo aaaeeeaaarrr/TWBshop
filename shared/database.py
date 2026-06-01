@@ -2218,6 +2218,39 @@ def gm_escalate_lateness(case_id: int) -> None:
             """, (case_id,))
 
 
+# ── Stock items knowledge + daily counts (for the 7am order list) ───────────────
+
+def init_stock_db() -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stock_items (
+                    id                 SERIAL PRIMARY KEY,
+                    item               TEXT UNIQUE NOT NULL,
+                    aliases            TEXT DEFAULT '[]',     -- JSON array (messy report names)
+                    unit               TEXT,                  -- packs | kg | cans | tin | case | pc...
+                    min_n              NUMERIC,               -- minimum stock (number part)
+                    order_qty_override NUMERIC,               -- if set, use instead of computed
+                    last_count         NUMERIC,
+                    last_count_date    DATE,
+                    usage_per_day      NUMERIC,               -- learned depletion rate
+                    active             BOOLEAN DEFAULT TRUE,
+                    first_seen         TIMESTAMPTZ DEFAULT NOW(),
+                    last_seen          TIMESTAMPTZ,
+                    created_at         TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS stock_counts (
+                    id            SERIAL PRIMARY KEY,
+                    item          TEXT NOT NULL,
+                    count         NUMERIC,
+                    count_date    DATE NOT NULL,
+                    source_msg_id BIGINT,
+                    created_at    TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (item, count_date)
+                );
+            """)
+
+
 # ── Leave / time-off events (accumulate now; AL deduction once balances seeded) ──
 
 def init_gm_leave_db() -> None:
