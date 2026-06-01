@@ -2251,6 +2251,84 @@ def init_stock_db() -> None:
             """)
 
 
+# Canonical stock items transcribed from the Stock Checks sheet (session 26).
+# (item, unit, min_n, [aliases for matching the messy daily 'almost out' reports]).
+# min_n None = owner still to set. Seeded once; ON CONFLICT DO NOTHING so it never
+# clobbers later owner edits.
+_STOCK_SEED = [
+    ("Tomato Ketchup Heinz", "tubs (5L)", 2, ["tomato ketchup", "ketchup heinz", "ketchup"]),
+    ("Ketchup packs", "packs", 6, ["ketchup pack"]),
+    ("Aluminum", "full roll", 1, ["aluminium", "foil", "aluminum foil"]),
+    ("White sesame", "kg", 1, ["white sesame"]),
+    ("Black sesame", "kg", 4, ["black sesame"]),
+    ("Sugar", "kg", 5, ["sugar"]),
+    ("Salt", "kg", 5, ["salt"]),
+    ("Milk condensed", "cans", 5, ["condensed milk", "milk condensed"]),
+    ("Peanuts", "tin", 0.25, ["peanut", "peanuts"]),
+    ("Vegetable oil", "tin", 1, ["vegetable oil", "vegetables oil", "veg oil"]),
+    ("Dish washing", "big can", 1, ["dish washing", "dishwashing", "dish wash", "dishwasher"]),
+    ("Baked beans", "cases", 4, ["baked beans"]),
+    ("Fresh milk", "cases", 4, ["fresh milk"]),
+    ("GLF cream", "cases", 4, ["glf cream"]),
+    ("Pilot butter", "kg", 25, ["pilot butter"]),
+    ("White chocolate", "packs", 3, ["white chocolate"]),
+    ("Black chocolate", "kg", 10, ["black chocolate"]),
+    ("Croissant butter", "kg", 10, ["croissant butter", "srossant butter", "crossant butter"]),
+    ("President butter 10g pack", "pc", 50, ["president butter 10g", "president butter"]),
+    ("Eggs", "pc", 500, ["egg", "eggs"]),
+    ("Chocolate sticks", "box", 1, ["chocolate sticks", "chocolate stick"]),
+    ("Tomato paste", "cans", 5, ["tomato paste"]),
+    ("Milk powder", "packs", 2, ["milk powder"]),
+    ("Icing sugar", "packs", 2, ["icing sugar"]),
+    ("Almond flakes", "packs", 2, ["almond flake", "almond flakes"]),
+    ("Almond ground", "packs", 2, ["almond ground"]),
+    ("Beef gelatin powder", "tubs", 2, ["beef gelatin", "beef gelatine"]),
+    ("Instant custard powder", "tubs", 0.25, ["instant custard", "custard powder"]),
+    ("Baking powder", "tub", 1, ["baking powder"]),
+    ("Vanilla essence", "tub", 1, ["vanilla essence"]),
+    ("Molasses", "bottles", 2, ["molasses"]),
+    ("Asian flour", "bags", 2, ["asian flour", "asia flour"]),
+    ("Eagle flour", "bags", 2, ["eagle flour", "eagal flour", "eagel flour"]),
+    ("Cacao powder 1kg", "bags", 3, ["cacao powder", "cacao"]),
+    ("Ireks Rogena 12.5kg", "bag", 0.5, ["ireks", "rogena", "ireks rogena"]),
+    ("Yeast", "packs", 5, ["yeast"]),
+    ("Strawberry puree", "tubs", 2, ["strawberry puree"]),
+    ("Passion puree", "tubs", 2, ["passion puree", "passionfruit puree"]),
+    ("S500 acbplus bread improver", "bags", 2, ["s500", "bread improver", "acbplus"]),
+    ("Loaf Plastic", "pack", 10, ["loaf plastic"]),
+    ("Croissant Plastic", "pack", 10, ["croissant plastic", "crossant plastic"]),
+    ("Burger Plastic", "pack", 10, ["burger plastic"]),
+    ("Focaccia Plastic", "pack", 10, ["focaccia plastic"]),
+    ("Soft Roll Plastic", "packs", 10, ["soft roll plastic"]),
+    ("Chocolatin Plastic", "packs", 10, ["chocolatin plastic", "chocolatine plastic"]),
+    ("Red Velvet", "kg", 8, ["red velvet"]),
+    ("Corn Powder", "kg", 5, ["corn powder", "corn flour"]),
+    # Min still to set by owner:
+    ("White Sauce", None, None, ["white sauce"]),
+    ("Red Sauce", None, None, ["red sauce"]),
+    ("Homemade Jam", None, None, ["homemade jam"]),
+]
+
+
+def seed_stock_items_default() -> int:
+    """One-time seed of the canonical stock items. Idempotent (ON CONFLICT DO NOTHING)
+    so it never overwrites later owner edits. Returns rows newly inserted."""
+    import json as _json
+    inserted = 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for item, unit, min_n, aliases in _STOCK_SEED:
+                cur.execute("""
+                    INSERT INTO stock_items (item, unit, min_n, aliases)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (item) DO NOTHING
+                    RETURNING id
+                """, (item, unit, min_n, _json.dumps(aliases)))
+                if cur.fetchone():
+                    inserted += 1
+    return inserted
+
+
 # ── Leave / time-off events (accumulate now; AL deduction once balances seeded) ──
 
 def init_gm_leave_db() -> None:

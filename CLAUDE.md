@@ -363,9 +363,14 @@ archive through bot API. WOC structured tables are the first big input to the br
   tune on real output.
 - BUILT (session 26): gm_bot/stock.py PURE brain (is_low, suggest_order_qty [min+buffer, or usage*lead],
   build_order_list, format_order_message, no_sheet_decision, usage_trend) — 10 tests. stock_items +
-  stock_counts tables (init_stock_db). NOT YET seeded (await owner confirm of blurry mins).
+  stock_counts tables (init_stock_db).
+- SEEDED (session 26): stock_items has 50 items, 47 with owner-confirmed minimums (seed_stock_items_default,
+  idempotent DO NOTHING — re-run safe, never clobbers edits). Owner confirmed the blurry ones: Black sesame
+  4kg, Vegetable oil 1 tin, Pilot butter 25kg, Molasses 2 bottles, Soft Roll Plastic 10 packs, Chocolatin
+  Plastic 10 packs, Red Velvet 8kg, Corn Powder 5kg. STILL need min from owner: White Sauce, Red Sauce,
+  Homemade Jam. Each item has aliases for matching the messy daily reports.
 - TODO next: ai_client.read_stock_sheet (Sonnet vision) + photo-classify to find the sheet + daily 7am job
-  + count time-series → usage learning + seed stock_items after owner confirms + decline alert.
+  (owner-preview first) + count time-series → usage learning + decline alert. Order-qty formula tune later.
 
 ### D. Cross-group KNOWLEDGE (built by Claude-on-subscription, NOT bot API) — the "through you" theme
 - **Knowledge Brief** — rolling living summary of ALL groups (3,619 chats, prioritized by importance):
