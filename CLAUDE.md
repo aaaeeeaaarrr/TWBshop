@@ -543,7 +543,23 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 - TEST SUITE FIXED (session 26): added repo-root conftest.py that imports the real config.py before collection, so test_intake.py's `sys.modules.setdefault("config", stub)` no longer poisons later GM test modules. `python -m pytest tests/` now runs the WHOLE suite green (232 passed). Run the full suite normally again.
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
-**▶ RESUME HERE:** GM shop-brain is broadly LIVE (semantic concerns, policy replies + 72h repeat, lateness/pay-back ladder, global staff tagging, Lost>$2 ask, finance AI-fallback+alias learning, weekly Opus digest, REPORT dedup done, whole pytest suite green). The DELIVERY SYSTEM (WOC) is **SHELVED** by owner (design + pilot findings preserved in its section above — pilot validated the approach at $0; resume when owner asks; ⚠️ Grab "don't save numbers" terms unresolved before any customer-contact DB). **NEXT: await owner direction.** Parked items ready when asked: AL engine (needs owner to seed balances), stock-minimums intake, Lost-ask sales-drop %, the KNOWLEDGE BRIEF (distill→synthesize all groups).
+**▶ RESUME HERE (session 27 end):** IMMEDIATE NEXT (owner sending TOMORROW): owner's staff are filling the
+full 143-item stock order CSV (C:\Users\Papa\Documents\stock_order_template.csv — 3 sheets: Sheet1 dry/baking
+50, Sheet2 Meats 26 + Cheese 18, Sheet3 frozen/condiments/spices/pasta-delis/packaging 49). When owner sends
+it: IMPORT into stock_items — create the ~93 NEW items + set each item's order_qty_override (fixed "how many
+to order", replaces the bot computing it → no more 748-eggs) + supplier + confirm units/mins (esp. Meats/
+Cheese which had blank units/mins). Watch for [X]=discontinued and [Delis] flags. Then the 7am order list
+reads "Order N {unit} {item} — from {supplier}".
+STRATEGIC (see "STRATEGIC — POS convergence"): stock staff-entry will start on AppSheet (throwaway bridge),
+OUR Postgres stays source of truth; cross-ref the POS repo later. To START AppSheet build, owner must pick:
+own-Google-accounts vs shared-link + by-area counter assignments.
+PAUSED: Private-DM Attendance overhaul (owner planning more — full design in docs/ATTENDANCE_SYSTEM_*.md;
+CSV importer DONE, registry rebuilt 35 active). SHELVED: Delivery System (WOC). Parked: AL engine, Lost-ask
+sales-drop %, Knowledge Brief, stock /stock Telegram flow (owner-test mode).
+GM shop-brain broadly LIVE: semantic concerns, policy replies+72h repeat, Lost>$2 ask, finance AI-fallback,
+weekly digest, REPORT dedup, staff registry + ex-staff offboarding (auto-remove OFF — bot not group admin;
+owner to promote TheWineBakery24PP if wanted), stock minimums seeded + vision-read job + 7am order (owner-
+preview), global staff tagging. Whole pytest suite green (268).
 
 **Semantic concern detection + policy replies — built & live (session 25):**
 - shared/ai_client.py: detect_concern_semantic (Haiku, GM_CONCERN_MODEL) — meaning-based waste/mistake/low_stock judge. Replaces the 2-keyword scan. Catches zero-keyword reports ("tray slipped, 6 cakes fell"); ignores negations ("no waste today"). Fails flagged (_error) so caller can fall back.
