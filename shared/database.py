@@ -2553,6 +2553,7 @@ def init_stock_db() -> None:
                     UNIQUE (item, count_date)
                 );
                 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category TEXT;
+                ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS supplier TEXT;
                 CREATE TABLE IF NOT EXISTS stock_pending_items (
                     id          SERIAL PRIMARY KEY,
                     name        TEXT NOT NULL,

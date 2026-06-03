@@ -360,6 +360,13 @@ Sauce=pots (1.5), Homemade Jam=jars. All 50 items now have unit + min in the sta
 ---
 
 ## Private-DM Attendance Overhaul (AL + Lateness + Live-Location) — owner spec session 26
+> ⏸️ PAUSED (session 27): owner is planning MORE for this — DO NOT build flows until owner returns.
+> SAVED STATE: full design in docs/ATTENDANCE_SYSTEM_MAP.md + docs/ATTENDANCE_SYSTEM_DETAILED.md (every step/
+> branch/edge/message). CSV importer DONE (import_staff_schedule_csv) — registry rebuilt from owner CSV: 35
+> active (29 TWB/6 Delis), 5 seniors, 6 ex-staff, schedules+expertise+5 planned ALs loaded. NEXT when resumed:
+> live-location check-in (which also BINDS each person's real uid on first DM — current telegram_ids are
+> seed-guessed from display names, imperfect for repeated names like 'Pisey') -> lateness -> AL approval ->
+> group redirect -> understand-without-reply + 👍. Coverage analysis built (gm_bot/attendance.py available_staff).
 > REPLACES the group-based lateness ladder + leave-questioning (both SILENCED:
 > config.GM_ATTENDANCE_GROUP_ACTIVE=False). All attendance now happens in PRIVATE DM with the GM.
 > If anyone posts AL/lateness in a GROUP -> GM replies "Please tell {name} to message me directly."
