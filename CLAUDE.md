@@ -427,6 +427,18 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 
 ---
 
+## STRATEGIC — POS convergence (owner, session 27)
+> Owner is building a separate UNIVERSAL CLOUD POS (cloud source-of-truth + local-PC backup so ops don't
+> break when internet is down). Endgame: fold tested features (stock, attendance, GM brain) into the POS.
+> DECISION: stock staff-entry starts on **AppSheet** as a THROWAWAY/BRIDGE front-end (validate workflow fast),
+> NOT the destination. GUARDRAILS: (1) keep OUR Postgres the SOURCE OF TRUTH — sync AppSheet→Postgres; the
+> brain (order list, minimums, suppliers, points) stays in our code, AppSheet is just a data-entry skin →
+> migration = swap front-end only, no rebuild. (2) Shape the data model to POS inventory needs (item id,
+> unit, count, min, order_qty, supplier, counted_by, timestamp). FUTURE: when POS basics exist, cross-
+> reference BOTH repos (add POS as a 2nd working dir / share its design) to design the convergence with both
+> codebases in hand. Keep everything TWBshop-side POS-friendly meanwhile. Custom-own beats AppSheet long-term
+> because inventory IS a POS module and offline-sync is the same hard problem the POS must solve.
+
 ## GM Backlog & Roadmap (session 26 — owner asked for the full list)
 > The remaining GM "shop-brain" work, grouped. "Logic/Haiku/Sonnet/Opus" = which tier does each.
 > KEY THEME (owner): build the GM's KNOWLEDGE via Claude-on-subscription (me, terminal) reading the
