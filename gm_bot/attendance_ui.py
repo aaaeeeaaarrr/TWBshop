@@ -157,9 +157,10 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
 def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMarkup]:
     days = ", ".join(day_label(date.fromisoformat(d)) for d in sorted(picked))
     rows = [_back_row("att:al"),
-            [InlineKeyboardButton("Full day", callback_data="att:al:full")],
-            [InlineKeyboardButton("Choose time", callback_data="att:al:time")]]
-    return _hdr(p, "AL for: %s\nFull day or part of the day?" % days), InlineKeyboardMarkup(rows)
+            [InlineKeyboardButton("Full day · ពេញមួយថ្ងៃ", callback_data="att:al:full")],
+            [InlineKeyboardButton("Choose time · ជ្រើសម៉ោង", callback_data="att:al:time")]]
+    return _hdr(p, "AL for: %s\nFull day or part of the day?\n"
+                   "ឈប់ពេញមួយថ្ងៃ ឬឈប់ត្រឹមតែខ្លះនៃថ្ងៃ?" % days), InlineKeyboardMarkup(rows)
 
 
 def al_time_grid(p: dict, stage: str, from_min: int | None = None) -> tuple[str, InlineKeyboardMarkup]:
