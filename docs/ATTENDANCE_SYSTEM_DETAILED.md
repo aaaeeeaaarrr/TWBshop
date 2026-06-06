@@ -328,8 +328,9 @@
   TIME (owner, session 28):** date → Full day OR hours (15-min from→to; mid-shift → starts at Now, like
   AL); **NIGHT-BEFORE NUDGE replaces re-asking (owner, session 28):** after a family-sick day, GM nudges
   **12h before their next shift** (slid back to 20:00 the prior evening if it lands in the 21:30–08:00
-  quiet window): *"Is your {child} better? If you need tomorrow off too, tell me now."* →
-  `[Again tomorrow — full day]` `[Choose time]` `[👍 better, I'm coming]` — one-tap re-book, day-by-day
+  quiet window): *"Is your {child} better? If you need tomorrow off too, tell me now."* → TWO short
+  buttons (owner: long labels truncate): `[Again tomorrow · ស្អែកទៀត]` (→ the standard Full-day/Choose-time
+  screen) · `[👍 Better · ធូរស្បើយហើយ]` (→ GM replies *"Great news — see you at {shift} 🤍"*). Day-by-day
   control kept. Each day individually consumes the 7-day pool (internal counter — NEVER mention the
   pool/jargon to staff; confirmations stay minimal: "Sick leave for your child — Sa 07/06, full day ✓
   Take care 🤍"). ·
