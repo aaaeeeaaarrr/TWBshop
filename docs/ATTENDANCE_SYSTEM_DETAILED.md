@@ -333,6 +333,16 @@
    seniors, owner, records. The bot's framing is bilingual; the quoted reason is raw.
 5. **Constraint:** swapped days must be in the **same week** 🔒 (define week = Mon–Sun?).
 6. On full approval: both schedules updated for that week, Supervisors group plain notice, records kept.
+7. **SWAP↔AL COLLISION RULES (owner question, session 28):**
+   - **One pending case per day:** a date with an OPEN request (AL/Emergency/swap) is blocked in every
+     other picker until decided — tapping it: *"You already have a pending request for that day."*
+   - **Pickers resolve day-off PER DATE** (schedule + approved swaps + approved ALs), not per weekday —
+     after a swap, "Friday off" is false for that one week.
+   - **AL on a swap-affected day:** allowed (deducts normally), but the senior card adds:
+     *"Note: this day is affected by her day-off swap approved on {date}."* No blind approvals.
+   - Approved-change ripple (§8) re-validates everything else as usual.
+8. **GLOBAL DATE FORMAT (all ladders):** buttons `Tu 23/06` (shared day_label helper) · message text
+   `Tue 23/06` · Khmer `ថ្ងៃពុធ ទី23/06` (Khmer-weekday helper). Identical in every flow.
 
 ## 8. COVERAGE GUARDRAIL + RIPPLE CHECK (standing) ⏳ — LOCKED IN (owner session 28)
 - Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off/swap opens an expertise hole.
