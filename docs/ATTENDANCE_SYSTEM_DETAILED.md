@@ -302,8 +302,14 @@
    whose swap would NOT further bottleneck expertise that day [Logic: schedule similarity + coverage check].
 3. **Reason** — bilingual.
 4. **Approvals:** same 2-senior escalation as AL **PLUS the swap partner must approve** — partner gets a DM
-   with `[✅ I agree]` `[❌ No]`; required even after 2 senior approvals.
-   *(Suggest asking the PARTNER FIRST — if they decline, seniors are never bothered.)* 🔒 owner pick order.
+   with `[✅ I agree]` `[✋ No]`; required even after 2 senior approvals. **PARTNER FIRST** (owner agreed) —
+   if they decline, seniors are never bothered.
+   **PARTNER-DM TEMPLATE (owner-approved Khmer, session 28):**
+   EN: *"{requester} wants to swap their day off with you: {requester} takes {weekday1} {dd/mm} off, you
+   take {weekday2} {dd/mm} — same week. Reason: {reason}"*
+   KH: *"{requester} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ {requester} ឈប់{kh_weekday1} ទី{dd/mm}
+   ហើយអ្នកឈប់{kh_weekday2} ទី{dd/mm} — ក្នុងសប្តាហ៍ដដែល។"*
+   (Khmer weekday helper needed: ច័ន្ទ/អង្គារ/ពុធ/ព្រហស្បតិ៍/សុក្រ/សៅរ៍/អាទិត្យ.)
 5. **Constraint:** swapped days must be in the **same week** 🔒 (define week = Mon–Sun?).
 6. On full approval: both schedules updated for that week, Supervisors group plain notice, records kept.
 
