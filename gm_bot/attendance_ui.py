@@ -94,7 +94,7 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     # Emergency AL REMOVED by owner — weird emergencies will be handled via the points system (TBD).
     # About Work is open to EVERYONE now (owner session 28): Rules for all, Give OT inside for seniors
     rows = [
-        [InlineKeyboardButton("📍 Check in · ចូលវត្តមាន", callback_data="att:ci")],
+        [InlineKeyboardButton("📍 Check in · ចុះវត្តមាន", callback_data="att:ci")],
         [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
         [InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")],
         [InlineKeyboardButton("👤 About Me · របស់ខ្ញុំ", callback_data="att:am")],

@@ -361,7 +361,8 @@
    **REASON IS NEVER TRANSLATED (owner, session 28 — GLOBAL rule for ALL flows):** the staff's typed
    reason is passed VERBATIM in whatever language they wrote it (English or Khmer) — to partners,
    seniors, owner, records. The bot's framing is bilingual; the quoted reason is raw.
-5. **Constraint:** swapped days must be in the **same week** 🔒 (define week = Mon–Sun?).
+5. **Constraint — RESOLVED (owner, session 28):** "same week" = **within 7 days of each other** (rolling,
+   not calendar weeks) — Fri→next-Mon is a legal swap.
 6. On full approval: both schedules updated for that week, Supervisors group plain notice, records kept.
 7. **SWAP↔AL COLLISION RULES (owner question, session 28):**
    - **One pending case per day:** a date with an OPEN request (AL/Emergency/swap) is blocked in every
@@ -407,6 +408,8 @@
 
 - **5-MINUTE FREE WINDOW (owner updated session 28, replaces "no grace"):** late ≤5 min = free; >5 min →
   ALL minutes count from minute one (debt + points), measured by location.
+- **CHECK-IN VERB (ChatGPT decision, owner session 28): ចុះវត្តមាន everywhere** (menu button updated;
+  use in all future check-in strings, never ចូលវត្តមាន).
 
 - config table `points_rules` (cause, value, active=false) — single place for the owner to adjust.
 - **LEADERBOARD RESETS after every 2nd pay (owner, session 28):** when the owner confirms the 2nd pay
