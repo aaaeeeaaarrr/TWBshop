@@ -133,11 +133,170 @@ def about_me_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row(),
         [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
+        [InlineKeyboardButton("🕊 Special Leave · ច្បាប់ពិសេស", callback_data="att:sp")],
         [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
         [InlineKeyboardButton("⏱ OT · ថែមម៉ោង", callback_data="att:ot")],
         [InlineKeyboardButton("📋 My schedule · កាលវិភាគការងាររបស់ខ្ញុំ", callback_data="att:my")],
     ]
     return _hdr(p, "👤 About Me"), InlineKeyboardMarkup(rows)
+
+
+# ---------------------------------------------------------------- special leave (session 28)
+
+def _date_grid_rows(prefix: str, start: date, count: int, back: str) -> list[list[InlineKeyboardButton]]:
+    btns = [InlineKeyboardButton(day_label(start + timedelta(days=i)),
+                                 callback_data="%s:%s" % (prefix, (start + timedelta(days=i)).isoformat()))
+            for i in range(count)]
+    return [_back_row(back)] + grid(btns, 4)
+
+
+def special_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row("att:am"),
+        [InlineKeyboardButton("🤒 Sick", callback_data="att:sp:sick")],
+        [InlineKeyboardButton("💍 Marriage", callback_data="att:sp:mar")],
+        [InlineKeyboardButton("🕊 Family death", callback_data="att:sp:death")],
+        [InlineKeyboardButton("👶 Wife giving birth", callback_data="att:sp:birth")],
+    ]
+    return _hdr(p, "🕊 Special Leave — choose the reason:\n"
+                   "(taken from AL; for marriage / family death / birth the balance can go below zero — "
+                   "never from salary)"), InlineKeyboardMarkup(rows)
+
+
+def sick_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row("att:sp"),
+        [InlineKeyboardButton("Me", callback_data="att:sp:me")],
+        [InlineKeyboardButton("My child", callback_data="att:sp:sickf:child")],
+        [InlineKeyboardButton("My spouse", callback_data="att:sp:sickf:spouse")],
+        [InlineKeyboardButton("My parent", callback_data="att:sp:sickf:parent")],
+    ]
+    return _hdr(p, "🤒 Who is sick?"), InlineKeyboardMarkup(rows)
+
+
+def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    ws = to_min(p.get("work_start"))
+    if ws is None:
+        return _hdr(p, "⚠️ No work times on record."), InlineKeyboardMarkup([_back_row("att:sp:sick")])
+    offs = late_offsets(shift_len_min(p["work_start"], p["work_end"]))
+    btns = [InlineKeyboardButton(fmt12(ws + o), callback_data="att:sp:meo:%d" % o) for o in offs]
+    rows = [_back_row("att:sp:sick")] + grid(btns, 3)
+    rows.append([InlineKeyboardButton("🛌 I really can't come today", callback_data="att:sp:mecant")])
+    return _hdr(p, "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
+                   "What time can you come?"), InlineKeyboardMarkup(rows)
+
+
+def sick_me_time(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
+    ws = to_min(p.get("work_start"))
+    txt = _hdr(p,
+               "Get well — see you ~%s 🤍\n\n"
+               "[TEST PREVIEW → SUPERVISORS group]\n"
+               "“%s is sick, coming ~%s today.”\n\n"
+               "(Missed time becomes pay-back, same as informed late. Doctor papers later wipe it.)\n"
+               "🚧 Next build: arrival watch, papers photo intake → owner tap, frequency dossier."
+               % (fmt12(ws + offset), p.get("call_name") or p["canonical_name"], fmt12(ws + offset)))
+    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"),
+                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    txt = _hdr(p,
+               "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n\n"
+               "(Provisional: the missed shift becomes pay-back time unless papers arrive within 3 days.\n"
+               "Papers → real sick day: no pay-back, no points, AL untouched.)\n"
+               "🚧 Next build: papers intake → owner tap, provisional debt, frequency dossier.")
+    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"),
+                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def sick_family_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
+    rows = _date_grid_rows("att:sp:famd:%s" % who, _today(), 14, "att:sp:sick")
+    return _hdr(p, "🤒 Sick leave for your %s — which day?" % who), InlineKeyboardMarkup(rows)
+
+
+def sick_family_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+    d = day_label(date.fromisoformat(iso))
+    return _hdr(p, "Sick leave for your %s on %s — from the 7-day special-leave pool (AL), "
+                   "no points, no papers needed.\n🚧 Next build: notify seniors (no approval gate) + "
+                   "Supervisors plain notice + pool counter." % (who, d)), \
+        InlineKeyboardMarkup([_back_row("att:sp:sick"),
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def marriage_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row("att:sp"),
+        [InlineKeyboardButton("💍 My marriage (3 days)", callback_data="att:sp:marmy")],
+        [InlineKeyboardButton("👰 My child's marriage (1 day)", callback_data="att:sp:marchild")],
+    ]
+    return _hdr(p, "💍 Whose marriage?"), InlineKeyboardMarkup(rows)
+
+
+def marriage_dates(p: dict, child: bool) -> tuple[str, InlineKeyboardMarkup]:
+    if child:
+        rows = _date_grid_rows("att:sp:marcd", _today() + timedelta(days=1), 28, "att:sp:mar")
+        return _hdr(p, "👰 Your child's marriage — which day? (1 day)"), InlineKeyboardMarkup(rows)
+    # own marriage: dates start at day 31 (owner rule — plan 30+ days ahead)
+    rows = _date_grid_rows("att:sp:mard", _today() + timedelta(days=31), 28, "att:sp:mar")
+    return _hdr(p, "💍 Your marriage — first day of leave? (3 days; "
+                   "must be planned 30+ days ahead)"), InlineKeyboardMarkup(rows)
+
+
+def marriage_stub(p: dict, iso: str, child: bool) -> tuple[str, InlineKeyboardMarkup]:
+    d = date.fromisoformat(iso)
+    if child:
+        detail = "👰 Child's marriage: 1 day on %s." % day_label(d)
+    else:
+        d3 = day_label(d + timedelta(days=2))
+        detail = "💍 Your marriage: 3 days, %s → %s." % (day_label(d), d3)
+    return _hdr(p, detail + "\nFrom AL — balance can go below zero, never from salary. "
+                            "Senior approval like a normal AL.\n🚧 Next build: approval flow + notices."), \
+        InlineKeyboardMarkup([_back_row("att:sp:mar"),
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def death_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row("att:sp"),
+        [InlineKeyboardButton("My child", callback_data="att:sp:deathw:child")],
+        [InlineKeyboardButton("My parent", callback_data="att:sp:deathw:parent")],
+        [InlineKeyboardButton("My spouse", callback_data="att:sp:deathw:spouse")],
+    ]
+    return _hdr(p, "🕊 We're very sorry. Who passed away?"), InlineKeyboardMarkup(rows)
+
+
+def death_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
+    rows = _date_grid_rows("att:sp:deathd:%s" % who, _today(), 8, "att:sp:death")
+    return _hdr(p, "🕊 First day of leave? (3 days)"), InlineKeyboardMarkup(rows)
+
+
+def death_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+    d = date.fromisoformat(iso)
+    d3 = day_label(d + timedelta(days=2))
+    return _hdr(p, "We're very sorry for your loss 🤍\n"
+                   "3 days of leave, %s → %s. No approval needed.\n\n"
+                   "[TEST PREVIEW → SUPERVISORS group]\n"
+                   "“%s on leave %s → %s (family).”  ← reason NEVER in groups\n\n"
+                   "(From AL — balance can go below zero, never from salary. Extra days possible as "
+                   "normal AL.)\n🚧 Next build: instant booking + notices + negative-AL ledger."
+                % (day_label(d), d3, p.get("call_name") or p["canonical_name"], day_label(d), d3)), \
+        InlineKeyboardMarkup([_back_row("att:sp:death"),
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def birth_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = _date_grid_rows("att:sp:birthd", _today(), 8, "att:sp")
+    return _hdr(p, "👶 Congratulations! First day of leave? (2 days)"), InlineKeyboardMarkup(rows)
+
+
+def birth_stub(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+    d = date.fromisoformat(iso)
+    d2 = day_label(d + timedelta(days=1))
+    return _hdr(p, "👶 2 days of leave, %s → %s.\nFrom AL — balance can go below zero, never from "
+                   "salary.\n🚧 Next build: notify seniors + Supervisors plain notice."
+                % (day_label(d), d2)), \
+        InlineKeyboardMarkup([_back_row("att:sp"),
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
 def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -456,6 +615,43 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(main_menu(p))
     if action == "am":
         return await show(about_me_menu(p))
+    if action == "sp":
+        sub = data[2] if len(data) > 2 else ""
+        if sub == "":
+            return await show(special_menu(p))
+        if sub == "sick":
+            return await show(sick_menu(p))
+        if sub == "me":
+            return await show(sick_me_screen(p))
+        if sub == "meo":
+            return await show(sick_me_time(p, int(data[3])))
+        if sub == "mecant":
+            return await show(sick_me_cant(p))
+        if sub == "sickf":
+            return await show(sick_family_dates(p, data[3]))
+        if sub == "famd":
+            return await show(sick_family_stub(p, data[3], data[4]))
+        if sub == "mar":
+            return await show(marriage_menu(p))
+        if sub == "marmy":
+            return await show(marriage_dates(p, child=False))
+        if sub == "marchild":
+            return await show(marriage_dates(p, child=True))
+        if sub == "mard":
+            return await show(marriage_stub(p, data[3], child=False))
+        if sub == "marcd":
+            return await show(marriage_stub(p, data[3], child=True))
+        if sub == "death":
+            return await show(death_menu(p))
+        if sub == "deathw":
+            return await show(death_dates(p, data[3]))
+        if sub == "deathd":
+            return await show(death_stub(p, data[3], data[4]))
+        if sub == "birth":
+            return await show(birth_dates(p))
+        if sub == "birthd":
+            return await show(birth_stub(p, data[3]))
+        return await show(special_menu(p))
     if action == "aw":
         return await show(about_work_menu(p))
     if action == "rules":
