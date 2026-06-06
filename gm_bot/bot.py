@@ -29,7 +29,8 @@ from shared.database import (
     gm_append_refinement_note,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
-    init_gm_finance_db, save_daily_report, gm_get_state, gm_set_state,
+    init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
+    save_report_doc, get_report_docs,
     init_gm_clarifications_db, gm_create_clarification, gm_get_active_clarifications,
     gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
     gm_record_clarification_nudge, gm_set_clarification_checking,
@@ -53,7 +54,7 @@ from shared.ai_client import (
     classify_stock_photo, read_stock_sheet,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
-from gm_bot import finance, clarify, lateness, mentions, sales, stock
+from gm_bot import finance, clarify, lateness, mentions, reconcile, sales, stock
 from telegram.constants import ParseMode
 from datetime import datetime, timezone, timedelta
 
@@ -1043,6 +1044,52 @@ async def _store_daily_report_if_any(msg, text: str) -> dict | None:
     return full
 
 
+async def _send_reconciliation(context, business_day: str) -> None:
+    """Level-1 reconciliation (session 28, owner-preview): photos vs typed report.
+    Sent privately to the OWNER on every final report — he learns the baseline first."""
+    try:
+        rows = get_daily_reports_for_day(business_day)
+        mid = next((r for r in reversed(rows) if r.get("report_kind") == "mid"), None)
+        final = next((r for r in reversed(rows) if r.get("report_kind") == "final"), None)
+        docs = get_report_docs(business_day)
+        checks = reconcile.checks_for_day(mid, final, docs)
+        if not checks:
+            return
+        await context.bot.send_message(
+            chat_id=config.OWNER_TELEGRAM_ID,
+            text=reconcile.format_summary(str(business_day), checks),
+        )
+    except Exception as e:
+        logger.error("reconciliation failed for %s: %s", business_day, e)
+
+
+async def _missing_mid_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """17:30 PP: today's midday report should be in by now (session 28 existence watchdog)."""
+    day = datetime.now(finance.PP_TZ).date().isoformat()
+    try:
+        rows = get_daily_reports_for_day(day)
+        if not any(r.get("report_kind") == "mid" for r in rows):
+            await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="⏰ No midday report in TWB REPORT for %s yet (17:30)." % day)
+    except Exception as e:
+        logger.error("missing-mid check failed: %s", e)
+
+
+async def _missing_final_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """06:30 PP: the business day that just closed must have its final report."""
+    day = (datetime.now(finance.PP_TZ).date() - timedelta(days=1)).isoformat()
+    try:
+        rows = get_daily_reports_for_day(day)
+        if not any(r.get("report_kind") == "final" for r in rows):
+            await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="🚨 No FINAL report stored for business day %s (checked 06:30). "
+                     "The day's books are missing — staff didn't post, or collection is down." % day)
+    except Exception as e:
+        logger.error("missing-final check failed: %s", e)
+
+
 async def _resolve_report_math_if_fixed(context, chat_id: int, full: dict, fixed_msg, via: str) -> None:
     """A now-correct report (edited in place, or re-posted) closes its open report_math
     clarification and gets ACKNOWLEDGED in-group (session 28 — staff must see the fix landed)."""
@@ -1960,6 +2007,16 @@ async def _check_report_receipt(msg, context) -> None:
         result = await assess_receipt_photo(photo_bytes, past_examples=examples,
                                             vendor_rules=vendors)
 
+        # level-1 reconciliation (session 28): expense sheets + POS screens become rows
+        if result.get("doc_type") in ("expense_sheet", "pos_screen"):
+            try:
+                save_report_doc(msg.chat_id, msg.message_id,
+                                finance.business_day_for(msg.date).isoformat(),
+                                result["doc_type"], result.get("fields") or {})
+                logger.info("report doc stored: %s %s", result["doc_type"], result.get("fields"))
+            except Exception as e:
+                logger.error("save_report_doc failed: %s", e)
+
         if not result["is_receipt"]:
             return
         vend = (result.get("vendor") or "").lower()
@@ -2118,6 +2175,9 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await _maybe_flag_sales_anomaly(context, full)
                     # a re-posted CORRECT report closes the open math case + gets thanked
                     await _resolve_report_math_if_fixed(context, chat_id, full, msg, "new report")
+                    # level-1 reconciliation: on the FINAL, compare photos vs the typed numbers
+                    if full["report_kind"] == "final":
+                        await _send_reconciliation(context, full["business_day"])
             except Exception as e:
                 logger.error("daily report parse failed: %s", e)
         # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.
@@ -2308,6 +2368,18 @@ def build_app() -> Application:
         _weekly_attendance_digest_job,
         time=__import__("datetime").time(hour=1, minute=30),
         name="gm_weekly_attendance_digest",
+    )
+    # Report existence watchdog (session 28): mid by 17:30 PP (10:30 UTC),
+    # final for the just-closed day by 06:30 PP (23:30 UTC).
+    app.job_queue.run_daily(
+        _missing_mid_report_job,
+        time=__import__("datetime").time(hour=10, minute=30),
+        name="gm_missing_mid_report",
+    )
+    app.job_queue.run_daily(
+        _missing_final_report_job,
+        time=__import__("datetime").time(hour=23, minute=30),
+        name="gm_missing_final_report",
     )
     # Daily stock order list: 07:00 Phnom Penh = 00:00 UTC.
     app.job_queue.run_daily(

@@ -3399,8 +3399,50 @@ def init_gm_clarifications_db() -> None:
                     rule       TEXT,
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: level-1 reconciliation — key documents extracted from REPORT photos
+                CREATE TABLE IF NOT EXISTS gm_report_docs (
+                    id           SERIAL PRIMARY KEY,
+                    chat_id      BIGINT,
+                    message_id   BIGINT,
+                    business_day DATE,
+                    doc_type     TEXT,                -- expense_sheet | pos_screen
+                    fields       TEXT DEFAULT '{}',   -- JSON: extracted totals
+                    created_at   TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (chat_id, message_id)
+                );
             """)
     logger.info("GM clarifications DB ready")
+
+
+def save_report_doc(chat_id: int, message_id: int, business_day: str,
+                    doc_type: str, fields: dict) -> None:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_report_docs (chat_id, message_id, business_day, doc_type, fields)
+                VALUES (%s,%s,%s,%s,%s)
+                ON CONFLICT (chat_id, message_id)
+                DO UPDATE SET doc_type=EXCLUDED.doc_type, fields=EXCLUDED.fields
+            """, (chat_id, message_id, business_day, doc_type, _json.dumps(fields)))
+
+
+def get_report_docs(business_day: str) -> list[dict]:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_report_docs WHERE business_day = %s ORDER BY id
+            """, (business_day,))
+            out = []
+            for r in cur.fetchall():
+                d = dict(r)
+                try:
+                    d["fields"] = _json.loads(d.get("fields") or "{}")
+                except Exception:
+                    d["fields"] = {}
+                out.append(d)
+            return out
 
 
 def gm_add_clarification_nudge_msg(clar_id: int, msg_id: int) -> None:

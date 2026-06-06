@@ -1006,11 +1006,25 @@ async def assess_receipt_photo(image_bytes: bytes,
         "or handwriting completely illegible). Do NOT flag: missing vendor, missing date, blank columns, "
         "crossed-out entries, 2-digit year formats.\n"
         + vendor_text + examples_text +
+        "\nAlso classify doc_type:\n"
+        "- 'expense_sheet': the shop's printed 'Expense list' form on a clipboard — handwritten "
+        "item lines with totals near the bottom labelled 'Day Cash Expense', 'Night Cash Expense', "
+        "'ABA Expense'. Extract those three numbers into fields (null when blank).\n"
+        "- 'pos_screen': a computer monitor showing SambaPOS reports. Extract into fields: "
+        "pos_kind ('work_period' if it shows a Work Period Report, 'summary' if a Summary Report, "
+        "else 'other') and grand_total (the GRAND TOTAL line; for summary screens use the Total "
+        "line; null if not visible).\n"
+        "- 'receipt': any supplier receipt/invoice/payment document.\n"
+        "- 'other': anything else.\n"
         "\nRespond ONLY with JSON:\n"
         '{"is_receipt": true/false, "is_clear": true/false, "is_handwritten": true/false, '
         '"issues": ["short problem description"], "readable_partial": "any amounts/text you CAN read", '
-        '"vendor": "vendor/company name if visible, else empty string"}\n\n'
-        "issues must be short (5 words max each). If is_clear is true, issues must be []."
+        '"vendor": "vendor/company name if visible, else empty string", '
+        '"doc_type": "expense_sheet|pos_screen|receipt|other", '
+        '"fields": {"day_cash_expense": null, "night_cash_expense": null, "aba_expense": null, '
+        '"pos_kind": null, "grand_total": null}}\n\n'
+        "issues must be short (5 words max each). If is_clear is true, issues must be []. "
+        "fields: only fill keys relevant to the doc_type; numbers as plain numbers, no $ or commas."
     )
     try:
         resp = await _get_client().messages.create(
@@ -1032,10 +1046,13 @@ async def assess_receipt_photo(image_bytes: bytes,
             "issues":           result.get("issues", []),
             "readable_partial": result.get("readable_partial", ""),
             "vendor":           (result.get("vendor") or "").strip(),
+            "doc_type":         (result.get("doc_type") or "other").strip(),
+            "fields":           result.get("fields") or {},
         }
     except Exception as exc:
         logger.error("assess_receipt_photo failed: %s", exc)
-        return {"is_receipt": False, "is_clear": True, "issues": [], "vendor": ""}
+        return {"is_receipt": False, "is_clear": True, "issues": [], "vendor": "",
+                "doc_type": "other", "fields": {}}
 
 
 # Bounded short-context judgment (one question + one reply) — Sonnet is the right tier.
