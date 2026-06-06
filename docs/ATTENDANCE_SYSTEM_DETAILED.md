@@ -334,10 +334,12 @@
   sick = see below.
 - **DEATH PHOTOS (owner question, session 28 — Khmer staff sometimes send photos of the deceased):**
   the death flow NEVER asks for any document or photo. If one arrives anyway in a death context:
-  **NO AI ever touches it** (running vision on someone's dead parent is unconscionable), it is never
-  forwarded anywhere, and the GM replies only with condolence: *"You don't need to send anything —
-  we're so sorry for your loss 🤍"*. Fraud risk is naturally low (funerals are community events; seniors
-  know) — if abuse is ever suspected, it's a human conversation for the owner, not a verification flow.
+  **NO AI ever touches it**, it is never forwarded anywhere (owner confirmed: not even to him), and the
+  GM replies with condolence ONCE: *"You don't need to send anything — we're so sorry for your loss 🤍"*
+  — further photos in the same case get only a quiet 🤍 reaction (no repeated text). File references are
+  STORED SILENTLY on the case (never displayed; retrievable only if the owner explicitly asks later —
+  dignity by default, audit on demand). Fraud risk is naturally low (funerals are community events;
+  seniors know) — suspected abuse is a human conversation for the owner, not a verification flow.
 - **🤒 SICK→ME — THE ANTI-FAKE LADDER (owner practice, session 28):**
   - GM: *"Sorry to hear 😟 Take some medicine and come try — see how you feel at work. What time can you
     come?"* → Late-style time buttons + `[🛌 I really can't come today]`.
