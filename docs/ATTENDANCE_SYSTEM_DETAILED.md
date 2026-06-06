@@ -310,6 +310,9 @@
    KH: *"{requester} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ {requester} ឈប់{kh_weekday1} ទី{dd/mm}
    ហើយអ្នកឈប់{kh_weekday2} ទី{dd/mm} — ក្នុងសប្តាហ៍ដដែល។"*
    (Khmer weekday helper needed: ច័ន្ទ/អង្គារ/ពុធ/ព្រហស្បតិ៍/សុក្រ/សៅរ៍/អាទិត្យ.)
+   **REASON IS NEVER TRANSLATED (owner, session 28 — GLOBAL rule for ALL flows):** the staff's typed
+   reason is passed VERBATIM in whatever language they wrote it (English or Khmer) — to partners,
+   seniors, owner, records. The bot's framing is bilingual; the quoted reason is raw.
 5. **Constraint:** swapped days must be in the **same week** 🔒 (define week = Mon–Sun?).
 6. On full approval: both schedules updated for that week, Supervisors group plain notice, records kept.
 
