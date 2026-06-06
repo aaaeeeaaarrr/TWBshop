@@ -413,9 +413,12 @@
   went out, the points board restarts — every cycle is a fresh start ("courage for the next one").
   Repeat no-showers are an employment question, not a points question.
 - **Informed-then-never-showed:** the informing earns NOTHING — no-show penalties apply in full.
-- 🔒 STILL OPEN: no-show POINTS — money-only (1 day's pay + bonus), or also a FLAT points hit (e.g. −50)?
-  (Owner's monthly reset weakens the "unrecoverable score" objection, but per-minute (−2 × whole shift
-  ≈ −1000) would still nuke the board — recommend money-only or flat.)
+- **NO-SHOW POINTS — RESOLVED (owner, session 28): −2 × every shift minute** (e.g. 9h shift ≈ −1080),
+  on top of 1 day's pay + bonus not earned. Owner's consistency logic: someone 8h late on a 9h shift
+  already eats ~−960, so a no-show MUST cost more or lying-by-absence beats showing up late. Monthly
+  board reset keeps it recoverable.
+- **BONUS LANGUAGE (extends earned/not-earned rule):** NEVER say the bonus is "gone" or "lost" — it was
+  never theirs to lose. Always "no bonus this time" / "not earned".
 - **RULES LIVE IN: About Work → 📜 Rules** (open to ALL staff now) — short, friendly, almost no math;
   the nudge messages stay one-liners and the precise rates live in the Rules screen + launch announcement.
 

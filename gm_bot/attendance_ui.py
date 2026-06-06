@@ -130,8 +130,8 @@ def rules_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p,
                 "📜 Shop rules — the short version\n"
                 "• Check in by sharing live location. Arrive 5+ min early = +10 points ⭐\n"
-                "• Late? Tell us as early as you can — the sooner you tell, the less it costs.\n"
-                "• The first 5 late minutes are free 😊\n"
+                "• Late? Tell us as early as you can — the sooner you tell, the fewer points it costs.\n"
+                "• The first 5 late minutes are free 😊 More than 5 — every minute counts.\n"
                 "• Late minutes become pay-back time — you work them back when the shop needs you.\n"
                 "• No-show = 1 day's pay and no bonus this time.\n"
                 "• AL: ask 7+ days ahead. Day-off swap: same week, your partner agrees first.\n"
