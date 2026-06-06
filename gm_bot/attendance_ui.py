@@ -242,7 +242,9 @@ def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         return _hdr(p, "Your OT bank: 0h 🚧\n\nAs a SENIOR you can grant OT (owner approves)."), \
             InlineKeyboardMarkup(rows)
     return _hdr(p, "Your OT bank: 0h 🚧\n\nOT is given by your seniors when the shop needs extra "
-                   "hours — when you have hours banked, I'll show you the times to take them back."), \
+                   "hours — when you have hours banked, I'll show you the times to take them back.\n"
+                   "OT ត្រូវបានអនុញ្ញាតដោយបងៗ/អ្នកគ្រប់គ្រង ពេលហាងត្រូវការម៉ោងបន្ថែម។ "
+                   "ពេលអ្នកមានម៉ោង OT សន្សំទុក ខ្ញុំនឹងបង្ហាញពេលដែលអ្នកអាចសម្រាកសងម៉ោងវិញបាន។"), \
         InlineKeyboardMarkup([_back_row()])
 
 
