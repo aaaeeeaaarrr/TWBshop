@@ -87,9 +87,13 @@
   4. 🔄 Change day off / ប្ដូរថ្ងៃឈប់
   5. ⏱ OT — **"GIVE OT" MODEL, TIME BANK, NO MONEY (owner FINAL v3, session 28).** Staff do NOT request
      OT. **SENIORS grant it**, owner approves, staff only choose when to take the hours back.
-     - **SENIOR side — `Give OT` button (seniors' menu only):** duration buttons 30min→6h in 30-min steps
-       → pick the staff (name buttons; seniors can pick THEMSELVES — same flow) → when + why (when via
-       date/time buttons for zero-API consistency, why typed) → goes to the OWNER.
+     - **SENIOR side — `Give OT` button (under About Work, seniors only):** duration buttons 30min→6h in
+       30-min steps → pick the staff (name buttons; seniors can pick THEMSELVES — same flow) → **when:
+       day buttons, then START-TIME buttons only** (duration already known → end auto-computed; same
+       insight as payback placement). START-TIME CONSTRAINTS (owner, session 28): never show times inside
+       the receiver's scheduled shift; only starts where start+duration ends BEFORE their next shift
+       begins (gap between shifts; whole day if day-off) → **why: typed** (verbatim rule) → goes to the
+       OWNER. *"Why is this OT needed? / តើ OT នេះត្រូវការសម្រាប់អ្វី?"*
      - **OWNER APPROVAL (always):** GM DMs owner the card — who gives, who gets, duration, when, why,
        receiver's current bank → [✅ Approve] / [❌ No]. Only on ✅ do the hours bank. **NO "stay-now" /
        pending state (owner final):** the grant→approve→bank chain is the whole system; the OT work itself
