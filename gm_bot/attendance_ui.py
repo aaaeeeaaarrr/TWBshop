@@ -281,8 +281,8 @@ def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]
 
 
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    return _hdr(p, "Tap 📎 (attach) → Location → Share Live Location\n"
-                   "ចុច 📎 (ភ្ជាប់) → ទីតាំង (Location) → ចែករំលែកទីតាំងបន្តផ្ទាល់ (Share Live Location)\n\n"
+    return _hdr(p, "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / "
+                   "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
                    "Shift: %s–%s"
                 % (p.get("work_start") or "?", p.get("work_end") or "?")), \
         InlineKeyboardMarkup([_back_row()])
