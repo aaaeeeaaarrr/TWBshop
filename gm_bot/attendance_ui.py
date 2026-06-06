@@ -94,6 +94,82 @@ def grid(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineK
     return [buttons[i:i + per_row] for i in range(0, len(buttons), per_row)]
 
 
+# ---------------------------------------------------------------- day dry-run (owner, session 28)
+
+def staff_day_events(p: dict) -> list[tuple[int, str]]:
+    """The check-in message schedule for ONE staff member's shift (minutes-of-day, label).
+    Pure — the same brain the real scheduler will use at launch."""
+    ws = to_min(p.get("work_start"))
+    ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
+    if ws is None or ln is None:
+        return []
+    end = (ws + ln) % 1440
+    return [
+        ((ws - 10) % 1440, "T−10 pre-reminder"),
+        (ws, "T0 start prompt (only if not checked in)"),
+        ((ws + 5) % 1440, "T+5 free-minutes message (only if still not checked in)"),
+        (end, "check-out request"),
+        ((end + 10) % 1440, "leave-early ask (only if no check-out)"),
+    ]
+
+
+def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
+    """All would-be check-in messages for one date, whole active TWB roster, chronological.
+    Skips: Tyty, Delis, day-off staff, staff on approved AL that date.
+    Returns (minute_of_day, staff_name, label, message_text)."""
+    import json as _json
+
+    from shared.database import _db
+    on_al: set[int] = set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT staff_id, days FROM al_requests WHERE status='approved'")
+            for r in cur.fetchall():
+                try:
+                    if target.isoformat() in _json.loads(r["days"] or "[]"):
+                        on_al.add(r["staff_id"])
+                except Exception:
+                    pass
+    events = []
+    for p in staff_all("active"):
+        if p.get("org") != "TWB" or p.get("canonical_name") == "Tyty" or p["id"] in on_al:
+            continue
+        if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == target.weekday():
+            continue
+        name = p.get("call_name") or p["canonical_name"]
+        for minute, label in staff_day_events(p):
+            if label.startswith("T−10"):
+                text = _ci_msg_pre(p)
+            elif label.startswith("T0"):
+                text = _ci_msg_start()[0]
+            elif label.startswith("T+5"):
+                text = _CI_MSG_PLUS5
+            elif label.startswith("check-out"):
+                text = _CI_MSG_OUT
+            else:
+                text = _CI_MSG_OUT2
+            events.append((minute, name, label, text))
+    events.sort(key=lambda e: (e[0], e[1]))
+    return events
+
+
+async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    events = context.user_data.get("att_dr_events") or []
+    i = context.user_data.get("att_dr_i", 0)
+    chat_id = update.effective_chat.id
+    if i >= len(events):
+        await context.bot.send_message(chat_id, "📅 Dry-run finished — %d messages walked." % len(events))
+        return
+    minute, name, label, text = events[i]
+    context.user_data["att_dr_i"] = i + 1
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        "Next ▶ (%d/%d)" % (i + 2, len(events)), callback_data="att:dr:next")]]) \
+        if i + 1 < len(events) else None
+    await context.bot.send_message(
+        chat_id, "🕘 %s → %s — %s\n────────────\n%s" % (fmt12(minute), name, label, text),
+        reply_markup=kb)
+
+
 # ---------------------------------------------------------------- shell state
 
 def _persona(context) -> dict | None:
@@ -701,8 +777,10 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     staff = [r for r in staff_all("active")]
     chunk = staff[page * 8:(page + 1) * 8]
-    rows = [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
-                                  callback_data="att:persona:%d" % r["id"])] for r in chunk]
+    rows = [[InlineKeyboardButton("📅 Dry-run today's check-in messages (whole roster)",
+                                  callback_data="att:dr:go")]] if page == 0 else []
+    rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
+                                   callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("◀", callback_data="att:pickp:%d" % (page - 1)))
@@ -794,6 +872,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = pair
         await query.edit_message_text(text, reply_markup=kb)
 
+    if action == "dr":
+        if len(data) > 2 and data[2] == "go":
+            events = compute_day_events(_today())
+            context.user_data["att_dr_events"] = events
+            context.user_data["att_dr_i"] = 0
+            await context.bot.send_message(
+                update.effective_chat.id,
+                "📅 Dry-run for %s — %d messages the engine would send today (skipping day-offs, "
+                "AL, Tyty, Delis). Tap through:" % (day_label(_today()), len(events)))
+        await _dryrun_next(update, context)
+        return
     if action == "pick":
         return await show(persona_picker(0))
     if action == "pickp":
