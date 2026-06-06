@@ -177,8 +177,13 @@
    overlaps()); skip if day-off / approved AL / Tyty / Delis / already checked in.
 7. **CHECK-OUT (owner, session 28):** at work_end → DM *"Shift over — share your live location to check
    out."* If their live location has been ON since check-in (forgot it on / left it on) → auto-checked-out,
-   no message needed (we know they were there to the last minute). No response + not in zone → flag
-   *early-leave?* for the digest. Skipped if rest-of-day emergency AL was approved.
+   no message needed (we know they were there to the last minute). No response → ONE gentle ask
+   (*"Did you leave early? If not, share your location to check out."*), then flag *early-leave?* for the
+   digest. Skipped if rest-of-day leave was approved.
+   **"DID YOU LEAVE EARLY" TIMING (clarified session 28):** the question fires ONLY at check-out time,
+   NEVER mid-shift — stopping a voluntary live share mid-shift gets silence (their right; no continuous
+   tracking). The stop-edit signal is silently RECORDED and upgrades the digest flag's evidence quality:
+   "last seen in zone 2:30am, location stopped, no check-out" vs a bare "no check-out".
 8. **CHECK-IN MESSAGE SEQUENCE (owner FINAL, session 28 — pre-reminder REVIVED with a job):**
    skipped entirely on day-off / AL / already-checked-in / Tyty / Delis.
    - **T−10 min:** pre-reminder — shift starts in 10 min, check in via live location, AND advertise the
