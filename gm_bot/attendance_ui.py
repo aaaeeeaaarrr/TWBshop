@@ -580,7 +580,60 @@ def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
                    "Shift: %s–%s"
                 % (p.get("work_start") or "?", p.get("work_end") or "?")), \
-        InlineKeyboardMarkup([_back_row()])
+        InlineKeyboardMarkup([_back_row(),
+                              [InlineKeyboardButton("▶️ Simulate the check-in messages",
+                                                    callback_data="att:cis")]])
+
+
+def ci_sim_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row("att:ci"),
+        [InlineKeyboardButton("① T−10min — pre-reminder", callback_data="att:cis:pre")],
+        [InlineKeyboardButton("② T0 — shift-start prompt", callback_data="att:cis:start")],
+        [InlineKeyboardButton("③ T+5min — free-minutes message", callback_data="att:cis:plus5")],
+        [InlineKeyboardButton("④ 🎯 Arm: judge my next live location", callback_data="att:cis:arm")],
+        [InlineKeyboardButton("⑤ Shift end — check-out request", callback_data="att:cis:out")],
+        [InlineKeyboardButton("⑥ +10min — did-you-leave-early ask", callback_data="att:cis:out2")],
+    ]
+    return _hdr(p, "▶️ Check-in simulator — each button sends the REAL message exactly as %s would "
+                   "receive it (to you only). ④ makes your next shared live location be judged as "
+                   "their check-in (geofence + early/late vs their %s start)."
+                % (p.get("call_name") or p["canonical_name"], p.get("work_start") or "?")), \
+        InlineKeyboardMarkup(rows)
+
+
+def _ci_msg_pre(p: dict) -> str:
+    ws = to_min(p.get("work_start"))
+    t = fmt12(ws) if ws is not None else "?"
+    return ("Your shift starts in 10 minutes (%s). Check in by sharing your live location.\n"
+            "វេនការងាររបស់អ្នកនឹងចាប់ផ្តើមក្នុង 10 នាទីទៀត (%s)។ សូមចុះវត្តមានដោយចែករំលែក"
+            "ទីតាំងបន្តផ្ទាល់។\n\n"
+            "Arrive 5 minutes early and you earn +10 points ⭐\n"
+            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 ពិន្ទុ ⭐" % (t, t))
+
+
+def _ci_msg_start() -> tuple[str, InlineKeyboardMarkup]:
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🕘 I'm late · ខ្ញុំមកយឺត", callback_data="att:late")],
+        [InlineKeyboardButton("📍 How to check in · របៀបចុះវត្តមាន", callback_data="att:ci")],
+    ])
+    return ("Your shift just started. Please share your live location to check in.\n"
+            "វេនការងាររបស់អ្នកទើបតែចាប់ផ្តើមហើយ។ សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមាន។\n\n"
+            "Running late? Tap below.\nកំពុងមកយឺតមែនទេ? សូមចុចខាងក្រោម។"), kb
+
+
+_CI_MSG_PLUS5 = ("We give everyone 5 free late minutes 😊 More than 5 — every late minute counts: "
+                 "as pay-back time, and minus points. The sooner you tell us, the fewer points it "
+                 "costs. See you soon!\n"
+                 "យើងផ្ដល់ឱ្យគ្រប់គ្នា 5 នាទីអនុគ្រោះសម្រាប់ការមកយឺត 😊 បើលើសពី 5 នាទី រាល់នាទីយឺត"
+                 "ទាំងអស់នឹងត្រូវរាប់៖ ជាម៉ោងសងវិញ និងដកពិន្ទុ។ ប្រាប់យើងកាន់តែឆាប់ ពិន្ទុដែលត្រូវដក"
+                 "កាន់តែតិច។ ជួបគ្នាឆាប់ៗ!")
+
+_CI_MSG_OUT = ("Shift over — share your live location to check out.\n"
+               "(KH 🚧 next ChatGPT batch)")
+
+_CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\n"
+                "(KH 🚧 next ChatGPT batch)")
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -627,6 +680,32 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
     if getattr(loc, "live_period", None):
         from gm_bot.attendance import TWB_LAT, TWB_LNG, haversine_m
         dist = haversine_m(loc.latitude, loc.longitude, TWB_LAT, TWB_LNG)
+        # ARMED check-in simulation: judge this live location as the persona's check-in
+        if context.user_data.get("att_ci_armed"):
+            context.user_data["att_ci_armed"] = False
+            p = _persona(context)
+            ws = to_min(p.get("work_start")) if p else None
+            if p and ws is not None:
+                if dist > 200:
+                    await msg.reply_text(
+                        "You're not at the shop yet — it will count when you arrive.\n"
+                        "(KH 🚧)  [test: %dm from TWB]" % round(dist))
+                    return
+                rel = (_now_min() - ws) % 1440
+                early = 1440 - rel if rel > 720 else 0
+                late = rel if rel <= 720 else 0
+                if early >= 5:
+                    await msg.reply_text(
+                        "Checked in ✓ — %d min early. +10 points ⭐ (points pending)\n"
+                        "(KH 🚧)" % early)
+                elif late <= 5:
+                    await msg.reply_text("Checked in ✓\n(KH 🚧)")
+                else:
+                    await msg.reply_text(
+                        "Checked in ✓ — %d min late (counts as pay-back).\n\n"
+                        "Why were you late?\nហេតុអ្វីបានជាមកយឺត? (draft KH — typed answer, "
+                        "stored verbatim)" % late)
+                return
         await msg.reply_text(
             "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"
             % (round(dist), "INSIDE the 200m zone ✅" if dist <= 200 else "outside the zone ❌"))
@@ -789,6 +868,28 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(ot_screen(p))
     if action == "ci":
         return await show(checkin_screen(p))
+    if action == "cis":
+        sub = data[2] if len(data) > 2 else ""
+        chat_id = update.effective_chat.id
+        if sub == "":
+            return await show(ci_sim_menu(p))
+        if sub == "pre":
+            await context.bot.send_message(chat_id, _ci_msg_pre(p))
+        elif sub == "start":
+            text, kb = _ci_msg_start()
+            await context.bot.send_message(chat_id, text, reply_markup=kb)
+        elif sub == "plus5":
+            await context.bot.send_message(chat_id, _CI_MSG_PLUS5)
+        elif sub == "arm":
+            context.user_data["att_ci_armed"] = True
+            await context.bot.send_message(
+                chat_id, "🎯 Armed — share a live location now and I'll judge it as %s's check-in."
+                % (p.get("call_name") or p["canonical_name"]))
+        elif sub == "out":
+            await context.bot.send_message(chat_id, _CI_MSG_OUT)
+        elif sub == "out2":
+            await context.bot.send_message(chat_id, _CI_MSG_OUT2)
+        return
     if action == "my":
         return await show(my_screen(p))
     # att:noop and anything unknown: stay put
