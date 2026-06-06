@@ -436,10 +436,11 @@ async def cmd_addaccount(update: Update, context) -> None:
         return
     await update.message.reply_text(
         "What type of account?",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🏦 Bank account number", callback_data="bmc_acct_bank"),
-            InlineKeyboardButton("🏪 Seller name",         callback_data="bmc_acct_seller"),
-        ]]),
+        # long label gets its own row — truncates side by side (session 28 rule)
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏦 Bank account number", callback_data="bmc_acct_bank")],
+            [InlineKeyboardButton("🏪 Seller name", callback_data="bmc_acct_seller")],
+        ]),
     )
 
 

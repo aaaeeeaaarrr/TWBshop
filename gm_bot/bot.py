@@ -202,6 +202,10 @@ async def _auto_skip_proposals_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        # staff roll-call: pressing Start binds + greets them (silence for strangers)
+        if update.effective_chat and update.effective_chat.type == "private":
+            from gm_bot import rollcall
+            await rollcall.handle_staff_private(update, context)
         return
     await update.message.reply_text(
         "GM Manager active.\n\n"
@@ -1568,10 +1572,11 @@ async def _staff_current_groups(context, uids: list[int]) -> list[tuple[str, int
 
 
 def _exstaff_kb(staff_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Mark as left + remove", callback_data="exstaff:go:%d" % staff_id),
-        InlineKeyboardButton("✋ No, keep", callback_data="exstaff:no:%d" % staff_id),
-    ]])
+    # one button per row — long labels get truncated side by side (owner, session 28)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Mark as left + remove", callback_data="exstaff:go:%d" % staff_id)],
+        [InlineKeyboardButton("✋ No, keep", callback_data="exstaff:no:%d" % staff_id)],
+    ])
 
 
 async def _offer_exstaff(context, staff: dict, why: str = "") -> None:
@@ -1657,6 +1662,18 @@ async def exstaff_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if action == "go":
         await query.edit_message_text("Processing %s..." % staff["canonical_name"])
         await _do_exstaff(context, staff)
+
+
+async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """All loose private text. Owner -> departure detection; anyone else -> roll-call.
+    (One router because PTB lets only the first matching handler in a group fire.)"""
+    if not update.message or not update.effective_user:
+        return
+    if update.effective_user.id == config.OWNER_TELEGRAM_ID:
+        await _owner_private_departure(update, context)
+    else:
+        from gm_bot import rollcall
+        await rollcall.handle_staff_private(update, context)
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2115,6 +2132,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("exstaff",   cmd_exstaff))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
+    from gm_bot import rollcall
+    app.add_handler(CallbackQueryHandler(rollcall.bind_callback, pattern=r"^bind:"))
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.
@@ -2124,7 +2143,7 @@ def build_app() -> Application:
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, _left_member_handler))
     # Owner DMs GM in plain language that someone left (silent unless it's a departure).
     app.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, _owner_private_departure))
+        filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, _private_text_router))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)

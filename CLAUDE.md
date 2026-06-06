@@ -533,7 +533,56 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-06-01 (session 26 — lateness ladder, tagging, Lost>$2 ask, finance AI-fallback, weekly digest, REPORT dedup, test-suite fix — all live)
+**Last updated:** 2026-06-06 (session 28 — attendance v2 design COMPLETE + registry fully bound + roll-call handler built & deployed)
+
+**▶ RESUME HERE (session 28 end): ATTENDANCE BUILD IN PROGRESS.**
+- **DESIGN 100% CLOSED — docs/ATTENDANCE_SYSTEM_DETAILED.md is the build spec.** Owner answered every 🔒
+  over an 8-round brainstorm: button-driven private DM (any text → main menu, one button/row, ←Back first,
+  long labels NEVER side-by-side); check-in at shift start via live location (200m, no continuous tracking,
+  voluntary always-on secretly stored in location_pings); Late ladder (time buttons → reason ON ARRIVAL w/
+  quick-reason buttons → Supervisors notice name+time only) + payback = need-targeted slots (7-day window,
+  need-ranked, tie→closest date, before/after own shift + 1 day-off option in their usual hours, partials,
+  14-day deadline → AL → salary, no payback-of-payback, no +10 during slots); AL days 7–90 (today+6 =
+  Emergency only), balance shown in menu header, cancel until AL TIME starts; Emergency AL 1×/30d from last
+  APPROVED (2nd = bonus-not-earned warning, 3rd = hard block incl. "counts as absence (1 day's pay)" line),
+  mid-shift variant From-now/I'll-be-back with 1-senior-to-leave; Give OT = SENIOR grants 30min–6h →
+  OWNER approves → time bank (cap 14h, no money, no expiry — daily self-deleting reminder) → staff books
+  buyback at business-best slots, no approval; day-off swap (same week, 2 seniors + partner, partner
+  FIRST); no-show = 1 day's pay (never mention the law) + next bonus not earned, cut carries to next
+  month's #1 pay if current already paid; slips named by MONTH OF WORK (May#1=paid Jun 1, May#2=Jun 15,
+  prorated from join date), owner reviews ONE paged editable table message → Approve & send all; bonus
+  language = earned/not-earned ONLY, surprise reveal on #2 payday, approved legal disclaimer auto-appended;
+  points CATALOGUED PENDING owner review (raw events stored now, +10 early/−1/−2 per min etc.); ripple
+  check + coverage heatmap + /whois + /payroll + time-ledger digest line + EN/KH strings as DB table;
+  👍 ALWAYS for owner messages + explicit action confirmations, staff 👍 never on problems; ALL seniors
+  get approval requests even on AL/off-hours. ZERO-API: all flows buttons+logic, Haiku only for group
+  redirect + understand-without-reply.
+- **REGISTRY FULLY BOUND (session 28):** every active staff has a uid. CSV v3 imported (34 upd, day-offs,
+  AL balances, expertise) + 4 planned ALs as approved al_requests (Chun Jun5-7, Kiry Jun4, Soleng Jun4,
+  Visal Jun9/10/12). Salaries+bonuses+first/second pays imported (33). New registry cols: salary_usd,
+  bonus_usd, phone, first_pay_usd, second_pay_usd (migration APPLIED to prod via init_attendance_db).
+  Phones: 9 auto via listener + Khon Visalpisey CONFIRMED=768420022 (+phone), Chuch Pisey=6818934685,
+  Sao Visal=5023909267 (proved 'Sao Visal cv' was a DUP of him — uid stripped from dup), Tyty=1067974900,
+  Thorn Kimheng=6872279388 (@Kingmeow23). Dual-uid left: Rom Sopheaktra, Sen Vathanakthyda (first DM
+  settles). Ex-staffed this week: Met Solina (resigned Jun 5), Lim Soleng (Jun 5), Yorng Lyhouy (owner:
+  gone). 'Cheata Sok' renamed → Sok Cheata (KHMER NAMING: left=surname, right=given; call name = right
+  name or its tail). Rule: store numeric uid always; accept @username/phone as input only.
+- **ROLL-CALL HANDLER BUILT (gm_bot/rollcall.py) — deployed this session:** staff DM /start or hello →
+  known active uid = bilingual greet by call name ONCE (gm_state rollcall_greeted), multi-uid settles to
+  the writing account; unknown uid + name match (difflib/substring, Khmer name order, zero-AI) → owner
+  confirm card [✅ Bind] (callback bind:) , silence to sender; stranger → silence + one-time owner note.
+  staff_bind_uid() in database.py. _private_text_router replaces _owner_private_departure registration
+  (owner → departure detect, others → roll-call). 12 tests test_rollcall.py. OWNER IS TELLING ALL STAFF
+  TO MESSAGE THE GM NOW (roll-call = binding + Start-press collection).
+- **NEXT BUILD (in order):** main-menu button shell → check-in job (+check-out, shift-continuity) → Late
+  ladder + payback slots → AL/Emergency flows → day-off swap → Give OT/time bank → slips/payroll →
+  role-play test with owner (attendance_test_mode: everything to owner only, he plays every role, tweaks
+  wording+Khmer) → go-live WITHOUT live-location until owner explains + ALL staff pressed Start.
+- **Button stacking fixes shipped:** gm _exstaff_kb + b2b Confirm-Recurring ×2 + Bank-account-number.
+- **Still pending from session 27:** 143-item stock order CSV import (owner's staff filling); AppSheet
+  decision (own-Google-accounts vs shared-link). Suite green: 280.
+
+**Previous status (session 26):**
 
 **Session 26 also shipped (finance + digest):**
 - Lost>$2 group-ask: gm_bot/bot._maybe_ask_lost + finance.lost_exceeds + config.GM_LOST_FLAG_THRESHOLD (2.0). Opens 'cash_lost' clarification; judge prompt updated for cash_lost.
@@ -543,7 +592,7 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 - TEST SUITE FIXED (session 26): added repo-root conftest.py that imports the real config.py before collection, so test_intake.py's `sys.modules.setdefault("config", stub)` no longer poisons later GM test modules. `python -m pytest tests/` now runs the WHOLE suite green (232 passed). Run the full suite normally again.
 **Phase:** Retail bot complete. B2B bot Phases 1+2 complete. GM Manager bot live. Ops listener live. Hiring system: intake + quiz + Haiku intake intelligence + Opus assessment plumbing built. Chaos tests: B2B 42/42, Hire 57/57. Assessment decision tests: 17/17.
 
-**▶ RESUME HERE (session 27 end):** IMMEDIATE NEXT (owner sending TOMORROW): owner's staff are filling the
+**(session 27 note, still pending):** owner's staff are filling the
 full 143-item stock order CSV (C:\Users\Papa\Documents\stock_order_template.csv — 3 sheets: Sheet1 dry/baking
 50, Sheet2 Meats 26 + Cheese 18, Sheet3 frozen/condiments/spices/pasta-delis/packaging 49). When owner sends
 it: IMPORT into stock_items — create the ~93 NEW items + set each item's order_qty_override (fixed "how many

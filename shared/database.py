@@ -2251,6 +2251,10 @@ def init_attendance_db() -> None:
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS org TEXT DEFAULT 'TWB';
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS is_senior BOOLEAN DEFAULT FALSE;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS expertise TEXT DEFAULT '[]';
+                -- session 28: payroll (owner-only data — never surfaced in any group) + phone binding
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS salary_usd NUMERIC;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS bonus_usd NUMERIC;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS phone TEXT;
 
                 CREATE TABLE IF NOT EXISTS al_requests (
                     id           SERIAL PRIMARY KEY,
@@ -2376,7 +2380,9 @@ def import_staff_schedule_csv(path: str, year: int = 2026) -> dict:
                 exps = [e.strip().lower() for e in (r.get("Expertise") or "").split(",") if e.strip()]
 
                 rec = None
-                for d in displays + [full, call or ""]:
+                # full name first — it's the CSV's source-of-truth key; display names
+                # can collide across people (e.g. 'Pisey' = Khon Visalpisey vs Chuch Pisey)
+                for d in [full] + displays + [call or ""]:
                     cand = by_norm.get(_norm(d))
                     if cand and cand["id"] not in touched:   # don't match one record twice
                         rec = cand
@@ -2490,6 +2496,15 @@ def staff_get_by_uid(uid: int) -> dict | None:
         if uid in rec.get("telegram_ids", []):
             return rec
     return None
+
+
+def staff_bind_uid(staff_id: int, uid: int) -> None:
+    """Bind a staff record to exactly this telegram uid (roll-call / first-DM settle)."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET telegram_ids=%s, updated_at=NOW() WHERE id=%s",
+                        (_json.dumps([uid]), staff_id))
 
 
 def staff_find_by_name(name: str) -> list[dict]:

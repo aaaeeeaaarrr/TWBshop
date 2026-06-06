@@ -1095,19 +1095,21 @@ async def _show_recurring_preconfirm(query, chat_id: int, context) -> None:
     try:
         await query.edit_message_text(
             "\n".join(lines),
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm"),
-                InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
-            ]]),
+            # long label gets its own row — truncates side by side (session 28 rule)
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm")],
+                [InlineKeyboardButton("✕ Cancel", callback_data="b2b_rec_setup_cancel")],
+            ]),
         )
     except Exception:
         sent = await context.bot.send_message(
             chat_id,
             "\n".join(lines),
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm"),
-                InlineKeyboardButton("✕ Cancel",                 callback_data="b2b_rec_setup_cancel"),
-            ]]),
+            # long label gets its own row — truncates side by side (session 28 rule)
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Confirm Recurring Order", callback_data="b2b_rec_setup_confirm")],
+                [InlineKeyboardButton("✕ Cancel", callback_data="b2b_rec_setup_cancel")],
+            ]),
         )
         _menu_msg[chat_id] = sent.message_id
         set_menu_message_id(chat_id, sent.message_id)

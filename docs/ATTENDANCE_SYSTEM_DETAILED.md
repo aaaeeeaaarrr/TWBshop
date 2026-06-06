@@ -1,117 +1,398 @@
-# Attendance / AL / Lateness — DETAILED Step-by-Step
+# Attendance / AL / Lateness — DETAILED Step-by-Step (v2, session 28 owner spec 2026-06-04)
 
 > Companion to ATTENDANCE_SYSTEM_MAP.md. Every step, branch, message, timer, and edge case.
 > Tags: [Haiku] [Sonnet] [Logic] [Telegram]. Status: ✅ built · ⏳ pending · 🔒 owner input.
-> Confirmed: 2 approvals · lateness→Supervisors group · 30min cumulative/shift · 200m · whole-shift location ·
-> seniors set new-staff day-offs · Tyty exempt · Delis excluded for now.
+> Confirmed: 2 senior approvals · 200m geofence · seniors set new-staff day-offs · Tyty exempt · Delis excluded.
+> **v2 CHANGES (owner 2026-06-04):** whole-shift live location DROPPED → check-in-at-start model;
+> entire private chat becomes BUTTON-DRIVEN; new flows: Late ladder w/ payback, Emergency AL,
+> Change-day-off w/ partner approval; points catalogued but PENDING activation.
 
 ---
 
 ## 0. FOUNDATION — identity & schedule
-- **Source of truth = owner CSV** (not conversations). Importer rebuilds staff_registry from it:
-  - person in CSV → active; person not in CSV → ex_staff; new person → added.
-  - fields loaded: work_start/end, day_off, al_left, org (TWB/Delis), is_senior, expertise.
-  - dual accounts merged to one record (Sao Visal); ex-staff dropped.
-- **Per-person flags that change behaviour:**
-  - `org=DELIS` → excluded from all GM attendance for now (separate team/pool later).
-  - `is_senior=Y` → receives AL approval requests; cannot approve their own AL.
-  - **Tyty (co-owner)** → fully exempt: no check-in, no lateness, no AL rules.
-  - new staff with **no telegram id yet** → in registry but can't DM until added to a group.
-- **Expertise** (cashier/service/kitchen/bar/bakery) stored per person → feeds availability + coverage.
+- **Source of truth = owner CSV** (importer ✅ — registry rebuilt: 35 active, 5 seniors, 6 ex-staff).
+- **Per-person flags:** `org=DELIS` excluded for now · `is_senior=Y` approves ALs (not their own) ·
+  **Tyty co-owner = fully exempt** · staff with no telegram id can't DM until bound.
+- **UID BINDING (step 0 before go-live):** current telegram_ids are seed-guessed from display names
+  (imperfect for repeated names like 'Pisey'). First DM from an unknown/unverified uid → GM shows
+  name-pick buttons ("Who are you?") → staff picks own name → owner confirms unusual/ambiguous binds.
+  Recommended go-live: a roll-call ("everyone DM the GM bot once") binds the whole roster in a day.
+- **Expertise** (cashier/service/kitchen/bar/bakery) per person → availability + coverage guardrail.
+- **KHMER NAMING (owner, session 28):** LEFT name = surname, RIGHT name = given name. Call names = the
+  right name, or a shortened tail of it when long (Chuch Pisey→Pisey, Doeun Rothanak→Nak, Tengmarim
+  Chaktopor→Por, Khon Visalpisey→Sey). GM addresses staff by call_name / right name — never the surname
+  alone. New staff default call name = right name (confirm with owner).
+- **Salary + Bonus ✅ IMPORTED (session 28):** salary_usd + bonus_usd columns on staff_registry, loaded
+  from owner's Salaries 2026 CSV — 33 staff (Met Solina none; resigning). OWNER-ONLY data: never in any
+  group, never in repo files, DB only.
+- **TWO-PAY STRUCTURE ✅ IMPORTED (owner, session 28):** first_pay_usd + second_pay_usd columns loaded
+  (1st+2nd = salary+bonus, verified — only Tyty differs by his $200 overtime). **Pay model:** 1st of the
+  following month = most of the salary; 15th = remainder + bonus. **ALL pay cuts come out of the FIRST
+  pay.** 🔒 timing edge: a cut booked after the 1st but before the 15th → from the 2nd pay, or carried to
+  next month's 1st pay? ⚠️ salary sheet has an unnamed row paying 155/40 — owner to identify.
+- **PHONES ✅ partial (session 28, via listener get_entity):** 9 single-id staff phones auto-stored;
+  Khon Visalpisey almost certainly = uid 768420022 (username VISALPISEY, phone 0963803229 — owner to
+  confirm, then drop his other 4 ids); Rom Sopheaktra 6652936983 / Sen Vathanakthyda 7278651403 each have
+  a phone-bearing candidate. Rest are privacy-hidden → owner adds Phone column to the CSV → listener
+  import_contacts resolves phone→uid (also IDs Sao Visal, Thorn Kimheng, Tyty, Chuch Pisey).
+- **BONUS MESSAGING RULE (owner, session 28 — LEGAL-SAFE wording required):** every time the GM mentions
+  the bonus to staff it MUST auto-append the discretionary disclaimer, worded so the bonus can never be
+  read as expected pay. One canonical string in config (single place to tune). PROPOSED 🔒:
+  *"Reminder: the monthly bonus is a discretionary extra decided by management each month based on
+  performance and conduct. It is not part of salary and is never guaranteed."* (+ Khmer under.)
+  **WORDING APPROVED by owner session 28.**
+- **bonus_eligible (per bonus-pay flag — UPDATED owner session 28):** events (2nd emergency AL in 30 days,
+  no-show) void the **NEXT UNPAID bonus pay**. **LANGUAGE RULE:** never "lost the bonus" (implies
+  entitlement) — always **"earned" / "not earned"**. **REVEAL = SURPRISE on the 2nd pay day (15th):** the
+  payday slip shows *"Bonus: earned ✓ $X"* or *"Bonus: not earned — reason: …"*. No ongoing bonus-status
+  messages (the at-action warning in the emergency flow is the only advance notice).
+- **TYTY PAY RULE (owner):** $1,700 every month on the 1st — single payment, no split, no bonus logic.
+- **Schedule CSV v3 ✅ IMPORTED (session 28):** 34 staff updated (day-offs now filled, AL balances,
+  expertise, work times) + **4 planned ALs** booked as approved al_requests (Chun Chomruen Jun 5-7, Kiry
+  Jun 4, Lim Soleng Jun 4, Sao Visal Jun 9/10/12) — engine deducts as each AL time starts. ⚠️ **Yorng
+  Lyhouy auto-ex_staffed** (absent from CSV) — owner to confirm intentional. Still VERIFY multi-ID: Khon
+  Visalpisey (5 ids), Rom Sopheaktra, Sen Vathanakthyda · MISSING id: Sao Visal, Tyty, Thorn Kimheng,
+  Chuch Pisey → first-DM bind fixes all.
+- **PHONE BINDING (owner idea session 28 — yes, adopted):** registry has a `phone` column ✅. Owner adds a
+  Phone column to the schedule CSV → the LISTENER (Telethon) imports them as contacts and resolves
+  phone → telegram user_id — this nails the multi-candidate/missing IDs without waiting for first DM.
+  Tagging itself always uses the user_id (Telegram bots can't tag by phone); phone is the binding key.
+- **Met Solina resigns 5 Jun 2026** → flip to ex_staff (seniors 5→4; 2-approval quorum unaffected).
+- **PH (Public Holiday): SHELVED** — owner will explain the model later. Keep a placeholder day-type in the
+  schedule model so AL/payback/day filters can exclude PH days when it lands.
 
 ## 1. WHO THE GM TALKS TO (the gate) ⏳
-- Every private message: look up sender `uid` → staff_registry. [Logic]
-  - **active staff** → engage.
-  - **ex-staff / unknown uid** → no engagement (silent, or one-time "I can't help here").
-  - **Delis** → not yet enabled.
-- **Group redirect:** if any AL/lateness topic is posted in a group [Haiku/keyword detect]:
-  - GM replies once: *"Please tell {name} to message me directly about this."* then stops.
-  - does NOT process it as a case (forces the private channel).
+- Private message → uid lookup in staff_registry. [Logic]
+  - active staff → engage · ex-staff/unknown → no engagement · Delis → not yet.
+- **Group redirect (format confirmed owner session 28):** AL/lateness posted in any group → GM replies
+  once, **tagging the GM bot itself** so it's one tap into the DM — English line + Khmer line, each
+  carrying the tag:
+  *"Please message @twb_gm_bot directly about this."*
+  *"សូមផ្ញើសារទៅ @twb_gm_bot ដោយផ្ទាល់អំពីរឿងនេះ។"*
+  Never processed as a case (forces the private channel).
 
-## 2. CROSS-CUTTING FIXES (apply to every case) ⏳
-- **Understand-without-reply:** when a chat has an OPEN case (lateness/AL/finance/receipt), any new message is
-  checked as a possible answer [Haiku extract + Sonnet judge] — a plain message resolves it; no Telegram
-  threaded reply required.
-- **👍 acknowledgement:**
-  - GM registers a reply that is NOT a concern → react 👍 on it (staff know they were heard). [Telegram react]
-  - reply IS a problem/concern → **no 👍** (so it's not read as "all fine").
-  - 👍 **never** replaces the GM's actual reply/escalation — it's only an ack.
+## 2. BUTTON-DRIVEN PRIVATE CHAT (the new UX) ⏳ — owner spec session 28
+- **ANY free text** the staff types (when GM is not explicitly waiting for a reason/answer) → GM responds
+  with the MAIN MENU. Buttons stacked **one per row** (readable), labels padded to a uniform width so the
+  menu renders wide. All labels bilingual (English / Khmer under or beside).
+- **Every submenu's FIRST button = "←Back"** (always returns one level up).
+- **GLOBAL BUTTON RULE (owner, session 28, from live truncation screenshot):** any button with a LONG label
+  gets its OWN ROW — side-by-side only for short labels (dates, times, Yes/No, ✓/✗). Applies to ALL bots,
+  not just attendance. (Live fix already applied: _exstaff_kb confirm card was truncating "Mark as left +
+  remove".)
+- **MAIN MENU (proposed set):**
+  1. 🕐 Late / មកយឺត
+  2. 🏖 Annual Leave (AL) / ច្បាប់ឈប់សម្រាក
+  3. 🚨 Emergency AL / ច្បាប់បន្ទាន់
+  4. 🔄 Change day off / ប្ដូរថ្ងៃឈប់
+  5. ⏱ OT — **"GIVE OT" MODEL, TIME BANK, NO MONEY (owner FINAL v3, session 28).** Staff do NOT request
+     OT. **SENIORS grant it**, owner approves, staff only choose when to take the hours back.
+     - **SENIOR side — `Give OT` button (seniors' menu only):** duration buttons 30min→6h in 30-min steps
+       → pick the staff (name buttons; seniors can pick THEMSELVES — same flow) → when + why (when via
+       date/time buttons for zero-API consistency, why typed) → goes to the OWNER.
+     - **OWNER APPROVAL (always):** GM DMs owner the card — who gives, who gets, duration, when, why,
+       receiver's current bank → [✅ Approve] / [❌ No]. Only on ✅ do the hours bank. **NO "stay-now" /
+       pending state (owner final):** the grant→approve→bank chain is the whole system; the OT work itself
+       happens on the senior's authority, the bot only records it.
+     - **STAFF side — after owner approval:** staff gets the message: hours banked (*"+1h OT — your bank:
+       3.5h"*) + **slot buttons to choose when to take the BUYBACK TIME** (owner's working name): business-
+       safest times ONLY (fattest coverage, never hurting limited expertise — owner: no day-off-adjacency
+       niceness, even for big banks), glued to their shift (come late / leave early), next 7 days, full
+       amount first + partial `Take 1 hour only` buttons — exact inverse of §4.7. **NO senior approval for
+       the take-back**; plain Supervisors notice when booked.
+     - **IGNORED? Daily reminder, clean chat (owner):** if they don't pick, GM reminds ONCE A DAY, during
+       their shift, **deleting the previous reminder message first** (no chat clutter), showing fresh
+       slots for the next 7 days. Repeats until they choose.
+     - **BANK CAP = 14 HOURS (owner):** a grant that would push the bank past 14h is trimmed/blocked at
+       the Give-OT step (duration buttons beyond the remaining headroom hidden). No expiry — the daily
+       reminder is the anti-stale mechanism.
+     - **RESIGNATION with banked hours:** no fixed rule — GM asks the owner in a message at that moment
+       (pay out or expire, case by case).
+     - **SHIFT-CONTINUITY RULE (kept):** payback-before-shift + shift + OT-after-shift = ONE presence
+       window — one check-in at the start, one check-out at the very end; check-in auto-satisfies if
+       location already in zone. Check-out moves to the OT end when OT extends the shift.
+     - **RULES:** open payback debt blocks Give-OT to that person (time settles debt first; debt-hours
+       never banked). No OT-per-day ceiling (owner: not needed — the 6h-per-grant + 14h cap bound it).
+       No payroll column — hours in, hours out.
+  6. 📍 Check in / ចុះវត្តមាន (instructions to share live location)
+  7. 📋 My schedule & AL balance / កាលវិភាគ & សមតុល្យ AL  *(self-service — shows ALL THREE balances:
+     AL left, payback debt, OT bank; plus shift times, day off, upcoming approved ALs)*
+- **AL BALANCE IN HEADERS (owner, session 28):** tapping AL or Emergency AL shows the balance in the
+  message text ABOVE the buttons (*"You have 7.5 AL days left. Choose dates:"*) — replaces the monthly
+  AL-statement DM idea. Monthly accrual stays silent.
+- **ZERO-API PRINCIPLE:** every flow above is buttons + pure logic — no AI parsing, no per-message cost.
+  The ONLY typed text is the reason fields (passed verbatim to seniors, not AI-read). Haiku is needed only
+  for the group-redirect detection and understand-without-reply edges. (Telegram Bot API itself — messages,
+  buttons, edits, reacts — is FREE; "API $" only ever means AI calls.)
+- **👍 ACK RULES (updated session 28):**
+  - **OWNER: ALWAYS 👍** any typed owner message the GM understood — no exceptions. (Born from the Lim
+    Soleng case: owner typed "Yes she's finished", GM acted but never confirmed.) PLUS when an owner
+    message resolves a pending card/action, GM sends an explicit confirmation of what it did
+    (*"Done — Lim Soleng marked as left."*), not just the react.
+  - **STAFF: 👍 only on replies that are NOT a concern/problem** (owner: never thumb up bad behaviour) —
+    lateness notices, bad reports, complaints get the GM's real reply, no 👍. 👍 never replaces the GM's
+    actual reply/escalation.
+- **Free text exceptions:** when a flow is at its "give your reason" step, or an open case is awaiting an
+  answer (understand-without-reply [Haiku extract + Sonnet judge]) → text is captured as the answer, not menu'd.
+- **Later idea (not v1):** Haiku reads the typed text and pre-opens the right submenu with values prefilled
+  (e.g. "late 10 min" → Late flow at the time step).
+- **Date-picker pattern** (used by AL/Emergency/Day-off/Payback): dates in a grid (4–5 per row,
+  `Mo 29/06` style), 30 days per page with `▶ Next 30` pager; multi-select = tap toggles ✓, then **Done**.
+  (Telegram caps ~100 buttons/keyboard; 90 stacked single-row date buttons would be an endless scroll.)
 
-## 3. LATENESS (private) ⏳
-1. Staff DM: *"I'll be 30 min late."* → [Haiku] extract minutes + (optional) which day.
-2. **Which shift?** [Logic] default = their **next shift**; unless that shift already started → "already started".
-   - **before shift:** *"Noted — you'll be ~30 min late for your 1pm shift today. Thanks for telling us."* + 👍
-   - **already started:** *"Ok. Please try to tell us before your start time next time."* + record.
-   - **edge — today is their day off:** *"You're off today — did you mean a different day?"*
-   - **edge — no shift today (not scheduled):** ask which day.
-3. **Record** → lateness_records (minutes, for_shift). [Logic]
-4. **Post to SUPERVISORS group:** *"Heads-up: {name} will be ~30 min late for the {shift} shift today."* [Telegram]
-5. **Arrival check timer:** at (shift start + stated minutes) → DM staff *"Have you arrived? Share your location if you did."*
-   - location shared & in zone → mark arrived, record real time, 👍. [Logic geofence]
-   - still nothing → gentle re-ask; (later) counts toward frequency.
-6. **Frequency:** repeated lateness in a window → remind the staff privately; (later) negative points.
-7. **No approval needed** — lateness is informational, not a request.
+## 3. CHECK-IN (replaces whole-shift tracking) ⏳ — owner spec session 28
+1. **At shift start:** if no live location shows them inside the 200m zone → DM:
+   *"Your shift just started. Please share your **live location** to check in. Running late? Tap below."*
+   `[🕐 I'm late]` `[📍 How to check in]`  (owner's wording: "Are you late? If not, share live location
+   to check in attendance" — refined above).
+2. **Live location received & in zone** → *"Checked in ✓"* + 👍; record checked_in_at. [Logic geofence]
+   - **static location pin** (one-shot, easily faked) → *"Please use Share → Live Location, not a single pin."*
+   - shared but outside zone → *"You're not at the shop yet — it will count when you arrive."* (keep watching)
+3. **EARLY BIRD:** in zone >5 min before start → **+10 points** (points PENDING — record raw arrival time
+   now, points computed later; see §9).
+4. **NO continuous-tracking requirement.** Staff may stop sharing after check-in, no nagging.
+5. **SECRET COLLECTION:** if staff voluntarily keep live location running → silently store every update
+   (location_pings: uid, lat, lon, ts, in_zone). Never mention it to staff. Used as evidence for
+   early-leave, outside-time, payback verification, lateness measurement.
+6. **Check-in scheduling:** per-staff job at their work_start (Asia/Phnom_Penh; overnight shifts handled by
+   overlaps()); skip if day-off / approved AL / Tyty / Delis / already checked in.
+7. **CHECK-OUT (owner, session 28):** at work_end → DM *"Shift over — share your live location to check
+   out."* If their live location has been ON since check-in (forgot it on / left it on) → auto-checked-out,
+   no message needed (we know they were there to the last minute). No response + not in zone → flag
+   *early-leave?* for the digest. Skipped if rest-of-day emergency AL was approved.
+8. ~~Pre-shift reminder~~ REJECTED (owner session 28: no need — check-in prompt at start is enough).
 
-## 4. ANNUAL LEAVE (private) ⏳
-1. Staff DM the AL: full days OR a few hours, with a **reason**. → [Haiku] extract days/hours + reason.
-   - **reason missing** → *"What's the reason for the AL?"* (wait for it).
-   - **dates/hours unclear** → ask to confirm exact day(s)/time(s).
-2. **Validations** [Logic]:
-   - **balance:** enough `al_left`? if not → tell staff + flag owner; still let seniors decide.
-   - **self-approval block:** if requester is a senior, they're excluded from approving their own.
-   - **already-off:** if a requested day is their normal day-off, note it (no AL needed that day).
-3. **Availability picture** [Logic] — for EACH AL day/window:
-   - list staff working the requester's hours that day, **excluding** day-offs + anyone else on AL that day.
-   - line per day, e.g. *"Tue Jun 3 — working her hours: Lina, Nak, Sony."* then next day, etc.
-4. **Coverage guardrail** [Logic] — if the AL leaves an **expertise** uncovered at some hour, add a warning line
-   to the senior message (bakery = production, judged on baking-hours, not hourly).
-5. **Send to each SENIOR (private DM):** the request + reason + availability picture + **[✅ Approve] [❌ Not approve]**.
-6. **Tally** → al_approvals. **On 2 ✅:** [Logic]
-   - delete/collapse the pending DMs to all seniors. [Telegram]
-   - fresh DM to all seniors: same details + *"Approved by {A} and {B}."* (tag them).
-   - **SUPERVISORS group:** plain notice *"{name} on AL: {days/times}."* — NO availability, NO who-approved.
-   - **deduct** the AL days/hours from `al_left`.
-   - confirm to requester: *"Your AL for {days} is approved."* + 👍
-7. **On 2 ❌ (rejected):**
-   - collapse DMs → fresh DM to seniors *"Not approved by {A} and {B}."*
-   - nothing to the Supervisors group.
-   - tell requester: *"Your AL request wasn't approved."*
-8. **Edge — split / no quorum:** if it never reaches 2 either way within a window → escalate to **owner** to decide.
-9. **Owner override** any time. **Accrual** +1.5/mo arrears runs as a monthly job (from the seeded al_left).
-10. **Delis** (when enabled) = its own seniors + its own availability pool; never mixed with TWB.
+## 4. LATE (private, button flow) ⏳ — owner spec session 28
+1. Staff taps **Late** (or gets the check-in prompt and taps `I'm late`).
+2. **Time buttons** — increments after their shift start (example 9pm start):
+   9:05, 9:10, 9:15, 9:20, 9:30, 9:45, 10:00, 10:15, 10:30, 11:00, 11:30, 12:00, then **every 30 min until
+   2 hours before shift end**. (Offsets: +5,10,15,20,30,45,60,75,90,120, then +30 steps.) Generated from
+   their schedule. NO "don't know yet" option (owner: the store team must know a time to manage around).
+   Beyond the 2h-before-end cap = effectively absent → Emergency AL or no-show rules.
+3. **Reason — asked ON ARRIVAL, not at the Late tap (owner, session 28):** the second their location
+   confirms arrival, GM asks the reason with QUICK-REASON BUTTONS (Sick / Family / Traffic / Personal /
+   ✏️ Other) — bilingual. Why on arrival: they're rushing/driving when they tap Late; safer and
+   friction-free. **Late is the ONLY flow with quick-reason buttons** — AL/Emergency/swap/OT reasons stay
+   typed (seniors judge those, real justification needed).
+4. **Posted to SUPERVISORS group instantly** — name + expected time only. **NO reason in-group**
+   (owner confirmed session 28; reasons stay private).
+5. **Arrival watch:** at the selected time, if live location still doesn't show them at the premise →
+   *"Are you there yet? Open Live Location."* — repeat **4× every 15 min** until location confirms.
+6. **TRUTH = LOCATION:** late minutes are computed from when their live location enters the zone,
+   NOT what they said.
+7. **On arrival → settle the debt.** GM: *"Pay back? Or take from AL (you have {X} left)? If not enough AL,
+   it comes from salary."* Buttons:
+   - **Take from AL** — fractional: owed_minutes / shift_hours (e.g. 30 min on 10h = 0.05 AL).
+     If AL hits 0 → remainder from **salary** 🔒 (needs salary columns; recommend owner-approval gate on any
+     salary deduction).
+   - **Pay back → NEED-TARGETED SLOTS, SHIFT-ADJACENT ONLY (v4 FINAL, owner session 28):**
+     NO auto-pay; NO slots far from their shift. Slots are **immediately BEFORE or AFTER their own shift**
+     — except ONE day-off option (see below). [Logic, no AI — §8 engine scores expertise thinness.]
+     - **Primary buttons = the FULL owed amount**, placed at the before/after-shift times that are BEST
+       FOR THE SHOP within the **next 7 days** (owner final: slot window = 1 week; deadline stays 14 days
+       — list refreshes daily). **RANKING (owner):** our most-need first; if needs are identical, the
+       CLOSEST date wins the higher spot. **COMPACT LABELS (owner):** `Fri 06/06 7:30pm-9pm` — date +
+       window only, never sentences (long text truncates on buttons).
+     - **+ ONE DAY-OFF option:** their day off, at the time we need them most **within their regular shift
+       hours** (a 9pm–6am person gets a night window on their day off, never a 5am call).
+     - **Below those: partial buttons** `Pay 1 hour only` / `Pay 2 hours only` / … → each opens the same
+       good before/after-shift (+day-off) times for that partial amount; remainder stays in the balance.
+     - **Booked slots → plain Supervisors notice** (team expects them) — CONFIRMED owner session 28.
+     - **Verification:** live location in zone during the slot; partial attendance = partial credit.
+       **No payback-of-a-payback (owner confirmed).**
+     - **Slot dynamics / stale open menus:** slots are computed when the menu is sent; validity is checked
+       AT TAP TIME. Debtor B's already-open menu is left alone (no delete/resend) — if his tapped slot is
+       still valid it just books (two debtors on one thin hour = fine); if something truly invalidated it
+       (his own schedule changed), the tap is rejected gracefully and the SAME message's buttons are
+       EDITED IN PLACE with fresh slots (Telegram edit_message_reply_markup — Bot API messaging/edits are
+       FREE; only AI reads cost money).
+     - **Ignore the planner / never show:** **14-day deadline (owner CONFIRMED)** auto-settles the
+       remainder from AL → salary past 0 (AL can NEVER go negative — salary catches the overflow).
+     - **+10 early points NEVER fire during a booked payback slot — CONFIRMED owner session 28** ("no
+       reward for running away then paying back").
+     - "My schedule" menu shows the live balance; weekly digest lists open debts.
+8. **NO-SHOW (FINAL, owner session 28):** never arrived during the whole shift (Late tapped or not) →
+   **cut 1 DAY'S PAY** (internally: Cambodian law 1-for-1 — **NEVER mention the law to staff**; owner:
+   staff should think less about the law unless it's against them) + the **next bonus pay is not earned**
+   (bonus_eligible=false on the next unpaid bonus). AL is fully out of the no-show picture. Cut comes from
+   the first UNPAID pay cycle — **if the month's 1st pay already went out, the cut carries to NEXT month's
+   first pay** (owner: it's a pay of a different month). Owner-approval tap before any salary deduction is
+   booked. Edge: arrived very late but before shift end = LATE (payback), not no-show. Owner-override
+   always available (hospital cases etc.).
+9. **POINTS (PENDING, §9):** informed BEFORE shift start → **−1 pt/min late**; informed AFTER start →
+   **−2 pts/min late**; minutes from location, not claim.
+10. **No approval needed** — lateness is informational + settlement, not a request.
 
-## 5. LIVE-LOCATION ATTENDANCE (whole shift) ⏳
-1. **Check-in:** staff share **live location** with the GM at shift start = their time-attendance.
-   - in 200m zone → *"Checked in ✓"* + 👍; record checked_in_at, in_zone. [Logic geofence]
-   - shared but outside zone → *"You're not at the shop yet — share again when you arrive."*
-2. **No check-in by start time** → DM reminder *"Your shift started — please share your live location to check in."*
-   (in case they forgot). Repeat once; if still nothing, it shows as not-checked-in.
-3. **During the shift** (GM watches live-location updates / edited messages) [Logic]:
-   - **location stops / goes off** → *"Did you leave work early? If not, share your location again."*
-   - **leaves the 200m zone** → start timing this excursion.
-   - **cumulative time outside > 30 min** (across ALL trips this shift) → *"What are you doing outside the shop?"*
-   - **returns to zone** → pause the outside-timer (keeps the running total).
-4. **Shift end** → close the session; if location was off and they never returned → flag *left early?*.
-5. **Telegram live-location reality:** a live period maxes ~8h → for longer shifts the GM reminds them to re-share.
-   GPS drifts in dense areas → the 200m buffer absorbs it; very brief edge wobble isn't penalised.
-6. **Delis** staff: not tracked yet.
-- **(Alternative on file: SPOT-CHECKS)** — one-off check-in + random "share location now" pings instead of a
-  continuous feed. Lighter, but gameable. Not chosen; kept as fallback.
+## 5. ANNUAL LEAVE (private, button flow) ⏳ — owner spec session 28
+1. Staff taps **AL**.
+2. **If existing approved/pending ALs** → stacked buttons: `New AL?` + one `Cancel AL {date}` per AL
+   (date only, no time). No existing ALs → straight to date picking.
+   - **Cancel AL {date}** → confirm → release the booking, refund any deducted AL, collapse/refresh senior
+     messages, notify Supervisors group if it had been announced. **Cutoff (owner): cannot cancel once the
+     AL TIME has started** (the window, not the whole day).
+3. **Date selection** — multiple choice, **days 7→90** (`29/06` format; grid+pager per §2).
+   **Today + next 6 days are NOT shown** (owner, session 28) — that range belongs to Emergency AL.
+4. **Full day or Choose Time** → buttons. Choose Time → their work hours in **15-min buttons**
+   (9:00am, 9:15am …), pick **from** then **to**.
+5. **Reason** — bilingual ask (Khmer under).
+6. **Validations [Logic]:** balance check (warn + flag owner if insufficient, seniors still decide) ·
+   senior can't approve own AL · requested day is their day-off → note (no AL needed).
+7. **Approval escalation (unchanged):** each senior gets DM: request + reason + **availability picture**
+   per AL day/window (staff working those hours, excluding day-offs + others on AL) + coverage-guardrail
+   warning if an expertise hour opens + `[✅ Approve]` `[❌ Not approve]`.
+   **ALL SENIORS, ALWAYS (owner, session 28):** approval requests go to every senior even if they're on
+   holiday / AL / off-hours — no reachability filtering; whoever answers, answers. (Kills the need for a
+   senior-pool watch.)
+   **On 2 ✅:** collapse senior DMs → fresh DM to all seniors tagging approvers → Supervisors group plain
+   notice (days/times only) → deduct → confirm to requester + 👍.
+   **On 2 ❌:** collapse → seniors-only recap → tell requester.
+   **Senior-response timers are DYNAMIC (owner question "what if the AL is after 23 hours?"):** timers
+   scale to time-until-the-AL-starts — nudge silent seniors at min(12h, 25% of time-to-start), escalate to
+   owner at min(24h, 50% of time-to-start). Emergency-today requests compress to minutes
+   (nudge ~15min, owner ~45min). The decision always lands BEFORE the AL begins.
+8. **FRACTIONAL DEDUCTION:** hours-based AL deducts proportionally — e.g. 10h shift, 3h AL → **0.3 AL**.
+9. **Accrual** +1.5/mo arrears (monthly job, from seeded al_left). **Latest-wins amendments** via gm_leave_events
+   supersede pattern (Backlog B).
+10. ~~Advance-notice question~~ RESOLVED by §5.3: normal AL starts at day 7; anything sooner = Emergency AL.
 
-## 6. COVERAGE GUARDRAIL (standing) ⏳
-- Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off opens an expertise hole.
-- Used live inside AL approval (step 4.4); also available as an on-demand owner report.
+## 6. EMERGENCY AL (private, button flow) ⏳ — owner spec session 28
+1. Staff taps **Emergency AL** → warning, bilingual:
+   *"You can only do this once every 30 days. Do you understand?"*
+   `[I fully understand]` `[No Emergency AL]` (second = back to main menu).
+   - **Limiter (owner confirmed session 28):** only an **APPROVED** emergency consumes the 30 days; a
+     rejected request burns nothing.
+   - **2nd click within 30 days of the last approved one → NOT blocked, but a BONUS WARNING:**
+     *"No bonus pay for taking many emergency AL leaves in 30 days. Last time you took emergency AL was
+     {date}."* (bilingual) → stacked buttons `[I fully understand]` / `[No Emergency AL]`. Proceeding +
+     approval ⇒ **bonus_eligible=false for the current month** (feeds the month-end payroll report).
+   - **3rd click within 30 days of the last approved one → HARD BLOCK (owner, session 28):** message only,
+     no flow: *"Not allowed — this would be your 3rd emergency AL within 30 days (last approved {date}).
+     Next possible: {date+30}. If you miss your shift it counts as absence (1 day's pay)."* Absence line
+     **CONFIRMED by owner** — transparency so nobody can claim "but I told the bot".
+2. **Date** — multiple choice: `Today` + next **60 days** (grid+pager).
+3. **Full day / Choose Time** → same 15-min from→to pattern.
+4. **Reason** — bilingual.
+5. **Approval escalation = same as AL** (2 seniors, availability picture, Supervisors notice, deduction).
+   Suggest the senior DM is visibly marked 🚨 EMERGENCY for urgency.
+6. Interplay with no-show: Emergency AL for TODAY must be requested **before shift start** to cancel that
+   day's no-show exposure 🔒 (else staff could retro-excuse a no-show).
+7. **MID-SHIFT EMERGENCY (proposed flow 🔒, expanded session 28 — "sometimes it's 2 hours then back"):**
+   staff is AT work and suddenly needs time off NOW:
+   - If currently inside their shift, the Emergency date step shows **`From now`** first. Then:
+     `[Rest of my shift]` or `[I'll be back]` → duration buttons `30m / 1h / 1.5h / 2h / 3h`.
+   - **"I'll be back" variant:** at now+duration → GM checks location / asks *"Are you back?"* — actual
+     away time measured by location when available; back early = smaller deduction, back late = GM asks
+     again and the real gap counts. Deduction stays **fractional** (2h of 10h = 0.2 AL).
+   - Same warning/limiter/bonus-warning, same reason step.
+   - **Approval can't physically block someone walking out**, so: GM instantly DMs seniors (🚨 marked,
+     with availability) + plain notice; staff may leave once **ONE senior approves** (one is usually on
+     shift) — 2nd approval ratifies after the fact. **CONFIRMED owner session 28: 1-senior-to-leave.**
+   - Departure/return times = live location when on; check-out message skipped for rest-of-shift.
+   - **ABUSE-FREE measures (the limiter + bonus hit do the heavy lifting; these add visibility):**
+     - per-staff emergency history shown to seniors at approval time (*"3rd emergency in 60 days"*);
+     - pattern flags to owner: same weekday repeats, emergencies adjacent to day-offs (long-weekend
+       engineering), end-of-month clustering;
+     - monthly per-staff emergency usage in the digest;
+     - same-day emergency only counts if requested BEFORE shift start (no retro-excusing a no-show) —
+       mid-shift variant obviously exempt (they already checked in).
 
-## 7. RECORDS, DIGEST, POINTS
-- Tables ✅: al_requests, al_approvals, lateness_records, attendance_sessions.
-- **Weekly digest** ✅ now reads these (not group keyword scanning).
-- **Points** ⏳ later: negative (short-notice AL, repeat lates, grace for rare) + positive recognition (existing).
+## 7. CHANGE DAY OFF (private, button flow) ⏳ — owner spec session 28
+1. Staff taps **Change day off** → date buttons: next **30 days, excluding today** (`29/06` format).
+2. **Swap-partner buttons:** full names of staff with similar/close (not necessarily exact) shift times
+   whose swap would NOT further bottleneck expertise that day [Logic: schedule similarity + coverage check].
+3. **Reason** — bilingual.
+4. **Approvals:** same 2-senior escalation as AL **PLUS the swap partner must approve** — partner gets a DM
+   with `[✅ I agree]` `[❌ No]`; required even after 2 senior approvals.
+   *(Suggest asking the PARTNER FIRST — if they decline, seniors are never bothered.)* 🔒 owner pick order.
+5. **Constraint:** swapped days must be in the **same week** 🔒 (define week = Mon–Sun?).
+6. On full approval: both schedules updated for that week, Supervisors group plain notice, records kept.
+
+## 8. COVERAGE GUARDRAIL + RIPPLE CHECK (standing) ⏳ — LOCKED IN (owner session 28)
+- Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off/swap opens an expertise hole.
+- Used inside AL approval (§5.7), swap-partner suggestion (§7.2), payback need-slots (§4.7); owner report.
+- **RIPPLE CHECK (locked):** any APPROVED change (AL, swap, cancellation) automatically re-validates every
+  future plan touching those days — payback slots on a vanished shift → cancelled + staff told to re-pick
+  (buttons); availability pictures gone stale → coverage re-checked, seniors/owner warned. 100% automatic,
+  pure logic, zero typing, zero API cost.
+- **Phone-died / senior-vouch fallback: PARKED** (owner: not now, revisit if it becomes a real problem).
+- **PHONE BINDING progress (session 28):** ✅ Khon Visalpisey confirmed = 768420022 (others dropped) ·
+  ✅ Chuch Pisey bound via phone → uid 6818934685 · ✅ Sao Visal bound via phone → uid 5023909267 (which
+  proved 'Sao Visal cv' was a DUPLICATE of him, not ex-staff — uid stripped from the dup record).
+  ✅ Tyty bound via phone → uid 1067974900 · ✅ Thorn Kimheng bound via username @Kingmeow23 → uid
+  6872279388. **EVERY active staff now has a uid.** Remaining: Rom Sopheaktra / Sen Vathanakthyda each
+  have 2 candidate uids to settle (first DM or phone number decides which account is real).
+  **USERNAMES vs IDs (owner asked):** we accept @usernames as INPUT (easy for the owner) but always store
+  the numeric ID — usernames are optional, changeable, and re-assignable; the numeric ID never changes.
+  Any future "bind X = @username" message → GM resolves to uid and stores that.
+
+## 9. POINTS — CATALOGUED, **PENDING ACTIVATION** 🔒 (owner will review all causes/values, then activate)
+> Design: store RAW events now (arrival times, late minutes, no-shows, check-ins) — points are a DERIVED
+> view computed when owner finalizes values. No retroactive unfairness, full history available on activation.
+
+| # | Cause | Points (owner-adjustable) |
+|---|-------|--------------------------|
+| P1 | Arrived >5 min early (live location in zone) | **+10** (not while a payback debt is open 🔒) |
+| P2 | Late, informed BEFORE shift start | **−1 / min late** (location-measured, STRICT from minute 1) |
+| P3 | Late, informed AFTER shift started — incl. silent arrivers who never tapped anything (the check-in prompt at start is their escalation; informing BEFORE start is what earns the cheaper P2 rate) | **−2 / min late** (location-measured, STRICT) |
+| P4 | (existing) recognition/leaderboard points | unchanged |
+| P5 | (future, owner) stock checks done, other duties | TBD |
+
+- **NO grace window (owner: strict)** — lateness counts from minute one, measured by location.
+
+- config table `points_rules` (cause, value, active=false) — single place for the owner to adjust.
+- AL deduction for no-show is an AL/salary action, NOT points (separate ledgers).
+
+## 10. RECORDS, DIGEST
+- Tables ✅: al_requests, al_approvals, lateness_records, attendance_sessions; salary_usd/bonus_usd/phone
+  on staff_registry ✅ (session 28). **NEW needed ⏳:** location_pings (secret feed) · payback_wallets
+  (balance_min, source, deadline) + payback_events (auto-pay / scheduled chunk / AL / salary settlements) ·
+  dayoff_swaps · points_rules/points_events (dormant) · emergency-AL usage stamp + bonus_eligible monthly
+  flags · salary-deduction ledger (owner-gated, feeds month-end payroll).
+- **Weekly digest** ✅ reads these tables. **Salary-touching actions** (pay cut, salary remainder) should be
+  owner-gated + ledgered for month-end payroll.
+- **PAYDAY SLIPS — OWNER-GATED BATCH (owner, session 28):** all money events silently write ledger rows
+  all month; on BOTH pay days (1st + 15th) the GM asks the owner *"Do you want me to send all their payday
+  slips now?"*. Owner may approve same day or days later — slips always show the pay-cycle data, not the
+  approval-day data. Bonus line uses earned/not-earned wording + the approved disclaimer. **No-show ⇒
+  bonus not earned — CONFIRMED.**
+- **OWNER REVIEW = ONE TABLE MESSAGE, NOT 35 DMs (owner, session 28 — "don't rape the chat history"):**
+  the preview is a SINGLE message (paged ~10 staff/page, ◀ ▶ buttons) listing each slip line; tap a name
+  → that slip's detail + EDIT buttons (adjust amount, flip bonus earned/not-earned, add note) → ←Back.
+  All edits update the SAME message in place (edit_message — Bot API, zero AI cost) and are logged for
+  payroll audit. Bottom button: `✅ Approve & send all slips`. Staff each receive ONLY their own slip
+  in private DM. **SLIP NAMING (owner CLARIFIED session 28): named by MONTH OF WORK, not month of
+  payment** — the pay that lands June 1 + June 15 covers MAY's work, so the slips are *"May#1"* and
+  *"May#2"*. **PRORATION:** joined mid-month (e.g. May 13) → that month's pay is calculated May 13–31.
+- **AUTO-AL OFFERING — PARKED FOR LATER TEST (owner, session 28):** for staff with >10 AL, GM suggests
+  full-day(s) AL placed on the FATTEST-coverage days for their expertise, **deliberately ADJACENT to their
+  existing day off** (owner approved) so 2 AL days become a real 3-day break. Test ONE STAFF AT A TIME;
+  owner reviews every pick before anything is sent. (NO auto OT offering — owner rejected.)
+- **LAUNCH PROCEDURE (owner FINAL v2, session 28) — two phases:**
+  1. **STEP-BY-STEP ROLE-PLAY (owner + me, no staff bugged):** GM pushes every flow to the OWNER ONLY,
+     and he walks each LADDER step by step, response by response — first pretending to be the senior doing
+     something, then pretending to be the person the GM pushes to next, and so on through every branch
+     (attendance_test_mode). Owner tweaks wording + Khmer per message as we go.
+  2. **STAGED GO-LIVE:** launch **WITHOUT the share-live-location requirement** until (a) the owner has
+     fully explained it to staff AND (b) **every staff member has pressed START with the GM bot** on
+     Telegram. (Hard Telegram constraint anyway: a bot CANNOT DM someone who never pressed Start — the
+     Start campaign doubles as the uid-binding roll-call.)
+- **KHMER/EN STRINGS AS DB TABLE (approved):** every staff-facing string lives as an editable EN+KH pair
+  (not hardcoded) — role-play tweaks and later wording fixes need no deploy.
+- **TIME-LEDGER DIGEST LINE (approved):** weekly digest carries *"staff owe shop Xh (N debts) · shop owes
+  staff Yh (M banks)"*.
+- **REMINDER HYGIENE (proposed as GLOBAL pattern):** any recurring GM reminder deletes its own previous
+  message before sending the fresh one (born in the OT take-back reminder; owner hates chat clutter —
+  candidate to extend to clarification nudges etc.).
 
 ---
 
 ## OUTPUTS BY DESTINATION (who sees what)
-- **Private to staff:** all back-and-forth, acks (👍), arrival/location prompts, AL approve/reject result.
-- **Private to each senior:** AL approval request + availability + the approved/rejected recap.
-- **Supervisors GROUP (only clean outcomes):** lateness-for-the-shift notice; approved-AL plain notice.
-- **Private to owner:** quorum stand-offs, balance shortfalls, coverage warnings, anything unusual.
-- **Never in any group:** reasons, who-approved, availability details, the questioning back-and-forth.
+- **Private to staff:** all menus/back-and-forth, 👍 acks, check-in & arrival prompts, debt settlement,
+  AL/Emergency/swap results, no-show deduction notice.
+- **Private to each senior:** AL/Emergency/swap approval requests + availability + recaps.
+- **Swap partner:** the swap request needing their personal ✅.
+- **SUPERVISORS group (clean outcomes only):** instant lateness heads-up; approved AL/swap plain notices.
+- **Private to owner:** quorum stand-offs, balance shortfalls, coverage warnings, salary-touching approvals,
+  no-show/2-day-pay confirmations, uid-bind confirmations, anything unusual.
+- **Never in any group:** REASONS (owner confirmed session 28), availability details, who-approved,
+  the questioning back-and-forth.

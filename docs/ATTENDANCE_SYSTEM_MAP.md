@@ -2,6 +2,13 @@
 
 > Private-DM attendance system. All staff↔GM about attendance happens in **private DM**.
 > Status: ✅ built · ⏳ pending · 🔒 gated on owner input. Tweak freely — this is the master picture.
+> **v2 (owner spec 2026-06-04, session 28):** whole-shift live tracking DROPPED → **check-in at shift
+> start** only (live location in 200m zone). If staff voluntarily keep location on → **secretly collect**.
+> Private chat is now fully **BUTTON-DRIVEN** (any text → main menu, one button per row, every submenu
+> starts with "←Back"). New flows: Late ladder + payback/AL/salary settlement, **Emergency AL** (1×/30
+> days), **Change day off** (2 seniors + swap-partner approval, same week). Early >5min = +10 pts;
+> −1/min (informed before) / −2/min (informed after) — ALL points PENDING owner review (raw events stored,
+> points derived later). No-show = −1 AL, else 2 days pay. Full detail: ATTENDANCE_SYSTEM_DETAILED.md.
 
 ---
 
@@ -13,8 +20,9 @@
 - **Rules baked in:** Delis = separate team (excluded for now); **Tyty = co-owner, exempt from all rules**; ex-staff & non-staff get no engagement.
 
 ### LAYER 1 — Channels (how info arrives)
-- **Private DM** staff→GM (AL request, lateness notice). 
-- **Live location** shared with GM for the **whole shift** (time-attendance).
+- **Private DM** staff→GM — BUTTON-DRIVEN menus (Late / AL / Emergency AL / Change day off / Check in). ⏳
+- **Live location** = CHECK-IN at shift start only (no continuous requirement); voluntary always-on feeds
+  are silently stored (location_pings). ⏳
 - **Group messages** → if anyone posts AL/lateness in a group, GM replies *"Please tell {name} to message me directly"* and does nothing else. ⏳
 
 ### LAYER 2 — Reading (AI that understands the message)
@@ -59,10 +67,10 @@ DM AL days/hours (+reason; **Haiku** asks if missing) → **logic** builds the a
 plain AL days/times (no who's-available, no who-approved); rejected: seniors only → **ledger** deducts AL.
 Coverage guardrail warns if it opens a skill gap. **DELIS = separate pool when enabled.**
 
-### 3) LIVE-LOCATION ATTENDANCE (private, whole shift)
-Share live location at shift start = time-attendance → **geofence 200m** → not checked in by start time:
-GM reminds → location goes off: "Did you leave early? If not, share again" → outside zone >30 min total:
-"What are you doing outside the shop?" **Not for Delis yet.**
+### 3) CHECK-IN ATTENDANCE (private, shift start — v2)
+At shift start, no live location in the 200m zone → "Your shift started — share live location to check in.
+Late? Tap below." → in-zone live location = checked in ✓ (+10 pts if >5 min early, PENDING). No continuous
+tracking required; voluntary always-on location silently collected. **Not for Delis yet.**
 
 ### 4) COVERAGE GUARDRAIL (cross-cutting, from expertise + schedules)
 Standing weekly skill-coverage map → proactively warns before an AL/day-off creates a missing-expertise hour.
