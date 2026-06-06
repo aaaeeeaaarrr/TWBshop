@@ -151,19 +151,16 @@ def _date_grid_rows(prefix: str, start: date, count: int, back: str) -> list[lis
 
 
 def special_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    # minimal header (owner: buttons explain themselves); (𝗔𝗟) marks AL-funded reasons —
+    # Sick unmarked (depends on papers/paperless)
     rows = [
         _back_row("att:am"),
         [InlineKeyboardButton("🤒 Sick · ឈឺ", callback_data="att:sp:sick")],
-        [InlineKeyboardButton("💍 Marriage · រៀបការ", callback_data="att:sp:mar")],
-        [InlineKeyboardButton("🕊 Family death · មរណភាពគ្រួសារ", callback_data="att:sp:death")],
-        [InlineKeyboardButton("👶 Wife giving birth · ប្រពន្ធសម្រាលកូន", callback_data="att:sp:birth")],
+        [InlineKeyboardButton("💍 Marriage · រៀបការ (𝗔𝗟)", callback_data="att:sp:mar")],
+        [InlineKeyboardButton("🕊 Family death · មរណភាពគ្រួសារ (𝗔𝗟)", callback_data="att:sp:death")],
+        [InlineKeyboardButton("👶 Wife giving birth · ប្រពន្ធសម្រាលកូន (𝗔𝗟)", callback_data="att:sp:birth")],
     ]
-    return _hdr(p, "🕊 Special Leave — choose the reason:\n"
-                   "🕊 ច្បាប់ពិសេស — ជ្រើសរើសមូលហេតុ៖\n"
-                   "(taken from AL; for marriage / family death / birth the balance can go below zero — "
-                   "never from salary)\n"
-                   "(ដកពី AL; សម្រាប់រៀបការ / មរណភាពគ្រួសារ / ប្រពន្ធសម្រាលកូន AL អាចធ្លាក់ក្រោម 0 — "
-                   "មិនដកពីប្រាក់ខែទេ)"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🕊 Special Leave · ច្បាប់ពិសេស"), InlineKeyboardMarkup(rows)
 
 
 _WHO_KH = {"child": "កូនអ្នក", "spouse": "ប្តី/ប្រពន្ធអ្នក", "parent": "ឪពុក/ម្តាយអ្នក"}
@@ -173,9 +170,9 @@ def sick_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
         [InlineKeyboardButton("Me · ខ្ញុំ", callback_data="att:sp:me")],
-        [InlineKeyboardButton("My child · កូនខ្ញុំ", callback_data="att:sp:sickf:child")],
-        [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ", callback_data="att:sp:sickf:spouse")],
-        [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ", callback_data="att:sp:sickf:parent")],
+        [InlineKeyboardButton("My child · កូនខ្ញុំ (𝗔𝗟)", callback_data="att:sp:sickf:child")],
+        [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ (𝗔𝗟)", callback_data="att:sp:sickf:spouse")],
+        [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ (𝗔𝗟)", callback_data="att:sp:sickf:parent")],
     ]
     return _hdr(p, "🤒 Who is sick?\n🤒 អ្នកណាឈឺ?"), InlineKeyboardMarkup(rows)
 
