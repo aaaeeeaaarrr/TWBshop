@@ -176,11 +176,12 @@
    2 hours before shift end**. (Offsets: +5,10,15,20,30,45,60,75,90,120, then +30 steps.) Generated from
    their schedule. NO "don't know yet" option (owner: the store team must know a time to manage around).
    Beyond the 2h-before-end cap = effectively absent → Emergency AL or no-show rules.
-3. **Reason — asked ON ARRIVAL, not at the Late tap (owner, session 28):** the second their location
-   confirms arrival, GM asks the reason with QUICK-REASON BUTTONS (Sick / Family / Traffic / Personal /
-   ✏️ Other) — bilingual. Why on arrival: they're rushing/driving when they tap Late; safer and
-   friction-free. **Late is the ONLY flow with quick-reason buttons** — AL/Emergency/swap/OT reasons stay
-   typed (seniors judge those, real justification needed).
+3. **Reason — asked ON ARRIVAL, FREE TEXT (owner reversed quick-reasons, session 28):** the second their
+   location confirms arrival, GM asks *"Why were you late?"* (bilingual) — they TYPE the answer, stored
+   verbatim. NO preset reason buttons anywhere ("a menu of excuses is a menu of permission" — presets
+   would teach staff which excuses are acceptable; the reason never changes the penalty, so its only
+   value is honest signal). Categorization happens at ANALYSIS time (digest/Opus-on-subscription), never
+   at confession time. Why on arrival: they're rushing/driving at the Late tap.
 4. **Posted to SUPERVISORS group instantly** — name + expected time only. **NO reason in-group**
    (owner confirmed session 28; reasons stay private).
 5. **Arrival watch:** at the selected time, if live location still doesn't show them at the premise →
