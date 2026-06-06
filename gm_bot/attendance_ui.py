@@ -24,6 +24,7 @@ from gm_bot.attendance import to_min
 from shared.database import staff_all
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+_DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -206,9 +207,13 @@ def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     start = date.today() + timedelta(days=1)
-    btns = [InlineKeyboardButton(day_label(start + timedelta(days=i)),
-                                 callback_data="att:do:d:%s" % (start + timedelta(days=i)).isoformat())
-            for i in range(30)]
+    own_off = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
+    btns = []
+    for i in range(30):
+        d = start + timedelta(days=i)
+        if d.weekday() == own_off:
+            continue  # their current day off — nothing to swap there (owner, session 28)
+        btns.append(InlineKeyboardButton(day_label(d), callback_data="att:do:d:%s" % d.isoformat()))
     rows = [_back_row()] + grid(btns, 4)
     return _hdr(p, "Change day off — pick the NEW day you want off (next 30 days, not today).\n"
                    "Current day off: %s" % (p.get("day_off") or "?")), InlineKeyboardMarkup(rows)

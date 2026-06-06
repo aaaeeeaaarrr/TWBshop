@@ -251,7 +251,18 @@
    holiday / AL / off-hours — no reachability filtering; whoever answers, answers. (Kills the need for a
    senior-pool watch.)
    **On 2 ✅:** collapse senior DMs → fresh DM to all seniors tagging approvers → Supervisors group plain
-   notice (days/times only) → deduct → confirm to requester + 👍.
+   notice → deduct → confirm to requester + 👍.
+   **SUPERVISORS APPROVED-AL NOTICE FORMAT (owner spec, session 28):**
+   - line 1: *"{name} on leave {from} → {to}"* (or *"{hours} on {day1}, {day2}, …"* for hours-AL);
+   - line 2: her NORMAL day off, mentioned whether or not she included it in the request
+     (supervisors see the full absence picture, e.g. AL Wed–Thu + Fri day off = gone till Sat);
+   - line 3 (separate): *"Back at work: {day}, {shift start time}"* — for hours-AL, the return TIME that
+     same day (e.g. "back 12am each night, rest of shift as normal").
+   Example full-day: *"Meng on leave Tue 23/06 → Thu 25/06 (3 days). Normal day off: Friday 26/06.
+   Back at work: Saturday 27/06, 9pm."*
+   Example hours (3 days, 9pm–12am of her 9pm–6am shift): *"Meng on leave 9pm–12am on Tue 23/06,
+   Wed 24/06, Thu 25/06. Normal day off: Friday. Back at work: 12am each of those nights (works the
+   rest of her shift); fully normal from Sat 27/06 9pm."* (deduction: 3×3h of 9h = 1.0 AL)
    **On 2 ❌:** collapse → seniors-only recap → tell requester.
    **Senior-response timers are DYNAMIC (owner question "what if the AL is after 23 hours?"):** timers
    scale to time-until-the-AL-starts — nudge silent seniors at min(12h, 25% of time-to-start), escalate to
