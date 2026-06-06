@@ -960,13 +960,23 @@ async def detect_leave_request(text: str) -> dict:
 
 
 async def assess_receipt_photo(image_bytes: bytes,
-                               past_examples: list[dict] | None = None) -> dict:
+                               past_examples: list[dict] | None = None,
+                               vendor_rules: list[dict] | None = None) -> dict:
     """Check if a receipt/expense photo in TWB REPORT is clear enough to record.
-    Returns {"is_receipt": bool, "is_clear": bool, "issues": list[str]}
+    Returns {"is_receipt": bool, "is_clear": bool, "issues": list[str], "vendor": str}
 
     past_examples: list of {"question": str, "answer": str} from previous clarifications
     in the same group — injected as few-shot context so the AI learns handwriting patterns.
+    vendor_rules: list of {"vendor","mode","rule"} — per-vendor format knowledge
+    ("Atlas: totals handwritten in riel"); same single call, just smarter prompt.
     """
+    vendor_text = ""
+    if vendor_rules:
+        lines = ["- %s: %s" % (v["vendor"], v.get("rule") or "known vendor")
+                 for v in vendor_rules if v.get("mode") != "skip" and v.get("rule")]
+        if lines:
+            vendor_text = ("\n\nKnown vendor formats (apply these when the receipt matches):\n"
+                           + "\n".join(lines) + "\n")
     examples_text = ""
     if past_examples:
         lines = []
@@ -995,10 +1005,11 @@ async def assess_receipt_photo(image_bytes: bytes,
         "Only flag something in issues if it is genuinely unreadable (too blurry, too dark, cut off, "
         "or handwriting completely illegible). Do NOT flag: missing vendor, missing date, blank columns, "
         "crossed-out entries, 2-digit year formats.\n"
-        + examples_text +
+        + vendor_text + examples_text +
         "\nRespond ONLY with JSON:\n"
         '{"is_receipt": true/false, "is_clear": true/false, "is_handwritten": true/false, '
-        '"issues": ["short problem description"], "readable_partial": "any amounts/text you CAN read"}\n\n'
+        '"issues": ["short problem description"], "readable_partial": "any amounts/text you CAN read", '
+        '"vendor": "vendor/company name if visible, else empty string"}\n\n'
         "issues must be short (5 words max each). If is_clear is true, issues must be []."
     )
     try:
@@ -1020,10 +1031,11 @@ async def assess_receipt_photo(image_bytes: bytes,
             "is_handwritten":   bool(result.get("is_handwritten", False)),
             "issues":           result.get("issues", []),
             "readable_partial": result.get("readable_partial", ""),
+            "vendor":           (result.get("vendor") or "").strip(),
         }
     except Exception as exc:
         logger.error("assess_receipt_photo failed: %s", exc)
-        return {"is_receipt": False, "is_clear": True, "issues": []}
+        return {"is_receipt": False, "is_clear": True, "issues": [], "vendor": ""}
 
 
 # Bounded short-context judgment (one question + one reply) — Sonnet is the right tier.

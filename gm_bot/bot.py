@@ -33,6 +33,7 @@ from shared.database import (
     init_gm_clarifications_db, gm_create_clarification, gm_get_active_clarifications,
     gm_get_active_clarifications_for_chat, gm_find_clarification_by_question_msg,
     gm_record_clarification_nudge, gm_set_clarification_checking,
+    gm_add_clarification_nudge_msg, gm_get_vendor_rules, gm_set_vendor_rule,
     gm_answer_clarification, gm_escalate_clarification, gm_resolve_open_clarifications,
     init_gm_lateness_db, gm_create_lateness_case, gm_get_open_lateness_cases,
     gm_get_open_lateness_in_chat, gm_mark_lateness_group_asked, gm_resolve_lateness,
@@ -1042,6 +1043,49 @@ async def _store_daily_report_if_any(msg, text: str) -> dict | None:
     return full
 
 
+async def _resolve_report_math_if_fixed(context, chat_id: int, full: dict, fixed_msg, via: str) -> None:
+    """A now-correct report (edited in place, or re-posted) closes its open report_math
+    clarification and gets ACKNOWLEDGED in-group (session 28 — staff must see the fix landed)."""
+    if not full or not full["computed"].get("math_ok", False):
+        return
+    opens = [c for c in gm_get_active_clarifications_for_chat(chat_id)
+             if c["topic"] == "report_math"]
+    if not opens:
+        return
+    targets = [c for c in opens if c.get("target_msg_id") == fixed_msg.message_id]
+    if not targets and len(opens) == 1:
+        targets = opens  # one open case + one correct report = obviously the fix
+    if not targets:
+        return
+    for c in targets:
+        gm_answer_clarification(c["id"], "(report corrected via %s — math checks out)" % via)
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id, text="✓ Corrected — it checks out now, thank you!",
+            reply_to_message_id=fixed_msg.message_id,
+        )
+    except Exception:
+        pass
+    logger.info("report_math clarification auto-resolved via %s", via)
+
+
+async def _edited_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Staff fix reports by EDITING them (session 28 — edits used to be invisible).
+    Re-parse REPORT edits; a now-correct report closes its clarification + gets thanked."""
+    msg = update.edited_message
+    if not msg or msg.chat_id != config.DAILY_REPORT_CHAT_ID:
+        return
+    text = msg.text or msg.caption or ""
+    if not text.strip():
+        return
+    try:
+        full = await _store_daily_report_if_any(msg, text)  # idempotent update, same message_id
+        if full is not None:
+            await _resolve_report_math_if_fixed(context, msg.chat_id, full, msg, "edit")
+    except Exception as e:
+        logger.error("edited report handling failed: %s", e)
+
+
 async def _maybe_correct_report(context, msg, full: dict) -> None:
     """On a math error, send the worked-out correction. Owner-gated: goes to the owner
     privately until gm_state 'report_corrections_to_staff' is 'true', then in-group tagged."""
@@ -1617,6 +1661,37 @@ async def _do_exstaff(context, staff: dict) -> None:
     logger.info("Ex-staff %s: removed=%s failed=%s", name, removed, leftover)
 
 
+async def cmd_vendor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/vendor — owner manages per-vendor receipt knowledge.
+    /vendor                      -> list
+    /vendor atlas skip           -> never flag this vendor's receipts
+    /vendor atlas <rule text...> -> inject rule into the clarity prompt"""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    args = context.args or []
+    if not args:
+        rules = gm_get_vendor_rules()
+        if not rules:
+            await update.message.reply_text(
+                "No vendor rules yet.\n/vendor <name> <how their receipts look>\n"
+                "/vendor <name> skip — never flag them")
+            return
+        await update.message.reply_text("Receipt vendor knowledge:\n" + "\n".join(
+            "• %s — %s" % (v["vendor"], "SKIP (never flagged)" if v["mode"] == "skip" else v["rule"])
+            for v in rules))
+        return
+    vendor = args[0].lower()
+    rest = " ".join(args[1:]).strip()
+    if rest.lower() == "skip":
+        gm_set_vendor_rule(vendor, "skip", None)
+        await update.message.reply_text("Saved ✓ %s receipts will never be flagged." % vendor)
+    elif rest:
+        gm_set_vendor_rule(vendor, "rule", rest)
+        await update.message.reply_text("Saved ✓ %s: %s" % (vendor, rest))
+    else:
+        await update.message.reply_text("Usage: /vendor %s <rule text or 'skip'>" % vendor)
+
+
 async def cmd_exstaff(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/exstaff <name> — owner marks a staff member as departed."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
@@ -1762,16 +1837,34 @@ def _resolve_clarification_response(chat_id: int, msg, text: str) -> dict | None
         for clar in gm_get_active_clarifications_for_chat(chat_id):
             if clar["status"] == "open":
                 gm_set_clarification_checking(clar["id"], now + clarify.NUDGE_INTERVAL_CHECKING)
+        return None
+    # UNDERSTAND-WITHOUT-REPLY (session 28): exactly ONE open clarification in this chat ->
+    # a plain staff message is its candidate answer (the Sonnet judge validates it next).
+    if len(text.strip()) >= 3 and not finance.is_daily_report(finance.parse_report_text(text)):
+        opens = gm_get_active_clarifications_for_chat(chat_id)
+        if len(opens) == 1:
+            clar = opens[0]
+            gm_answer_clarification(clar["id"], text.strip())
+            logger.info("Clarification %s answered via loose message", clar["id"])
+            return {"clar": clar, "answer": text.strip()}
     return None
 
 
-async def _judge_clarification(context, clar: dict, answer: str) -> None:
+async def _judge_clarification(context, clar: dict, answer: str, answer_msg=None) -> None:
     """Sonnet checks whether the staff reply actually resolves the clarification.
+    Resolved -> acknowledge IN-GROUP (session 28: staff must see their fix landed).
     If it doesn't add up, escalate to the owner with the answer + the reason."""
     verdict = await judge_clarification_answer(
         clar.get("question_text") or "", answer, clar["topic"],
     )
     if verdict.get("resolved", True):
+        try:
+            await context.bot.send_message(
+                chat_id=clar["chat_id"], text="✓ Got it — thank you!",
+                reply_to_message_id=answer_msg.message_id if answer_msg else None,
+            )
+        except Exception:
+            pass
         return
     body = clarify.escalation_text(
         clar["topic"], clar.get("chat_title") or str(clar["chat_id"]),
@@ -1811,11 +1904,16 @@ async def _clarification_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 reply_to = clar.get("question_msg_id") or clar.get("target_msg_id")
                 nudge = clarify.nudge_text(clar["topic"], clar.get("nudge_count", 0))
                 try:
-                    await context.bot.send_message(
+                    sent = await context.bot.send_message(
                         chat_id=clar["chat_id"], text=nudge, reply_to_message_id=reply_to,
                     )
                 except Exception:
-                    await context.bot.send_message(chat_id=clar["chat_id"], text=nudge)
+                    sent = await context.bot.send_message(chat_id=clar["chat_id"], text=nudge)
+                # replies to this nudge must count as answers (session 28 fix)
+                try:
+                    gm_add_clarification_nudge_msg(clar["id"], sent.message_id)
+                except Exception:
+                    pass
                 gm_record_clarification_nudge(clar["id"], new_next)
                 logger.info("Clarification %s nudged (count %s)", clar["id"], clar.get("nudge_count", 0) + 1)
             elif action == "escalate":
@@ -1840,14 +1938,22 @@ async def _clarification_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _check_report_receipt(msg, context) -> None:
-    """Download a TWB REPORT photo, assess clarity, reply in-group if unclear."""
+    """Download a TWB REPORT photo, assess clarity, reply in-group if unclear.
+    Per-vendor knowledge (session 28): known vendor rules ride the same Haiku call;
+    vendors marked 'skip' are never flagged."""
     try:
         photo_file = await msg.photo[-1].get_file()
         photo_bytes = bytes(await photo_file.download_as_bytearray())
         examples = receipt_get_answered_examples(msg.chat_id)
-        result = await assess_receipt_photo(photo_bytes, past_examples=examples)
+        vendors = gm_get_vendor_rules()
+        result = await assess_receipt_photo(photo_bytes, past_examples=examples,
+                                            vendor_rules=vendors)
 
         if not result["is_receipt"]:
+            return
+        vend = (result.get("vendor") or "").lower()
+        if vend and any(v["mode"] == "skip" and v["vendor"] in vend for v in vendors):
+            logger.info("Receipt from skip-listed vendor %r — not flagged", vend)
             return
         if result["is_clear"]:
             # A clear receipt arrived — resolves any pending "send again / clarify" in this chat.
@@ -1910,7 +2016,7 @@ async def _report_clarification_reply(msg, context) -> None:
     receipt_save_answer(clarification["id"], answer.strip())
     await context.bot.send_message(
         chat_id=msg.chat_id,
-        text="Got it, thanks! ✓",
+        text="Saved ✓ — I'll use this to read similar receipts.",
         reply_to_message_id=msg.message_id,
     )
     logger.info("Receipt clarification saved for photo_msg %s: %s", clarification["photo_msg_id"], answer[:60])
@@ -1968,7 +2074,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             resolved = _resolve_clarification_response(chat_id, msg, text)
             if resolved:
-                await _judge_clarification(context, resolved["clar"], resolved["answer"])
+                await _judge_clarification(context, resolved["clar"], resolved["answer"], answer_msg=msg)
         except Exception as e:
             logger.error("clarification resolve failed: %s", e)
 
@@ -2008,6 +2114,8 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await _maybe_correct_report(context, msg, full)
                     await _maybe_ask_lost(context, msg, full)
                     await _maybe_flag_sales_anomaly(context, full)
+                    # a re-posted CORRECT report closes the open math case + gets thanked
+                    await _resolve_report_math_if_fixed(context, chat_id, full, msg, "new report")
             except Exception as e:
                 logger.error("daily report parse failed: %s", e)
         # Everything in REPORT is already in ops_messages — ingest only, no misrouted alerts.
@@ -2130,6 +2238,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("staff",     cmd_staff))
     app.add_handler(CommandHandler("rules",     cmd_rules))
     app.add_handler(CommandHandler("exstaff",   cmd_exstaff))
+    app.add_handler(CommandHandler("vendor",    cmd_vendor))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall
@@ -2151,6 +2260,10 @@ def build_app() -> Application:
     # Owner DMs GM in plain language that someone left (silent unless it's a departure).
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, _private_text_router))
+    # edited REPORT messages (staff fix reports by editing) — must come BEFORE the
+    # generic group handler so the edit isn't swallowed and dropped
+    app.add_handler(MessageHandler(
+        filters.ChatType.GROUPS & filters.UpdateType.EDITED_MESSAGE, _edited_group_handler))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)

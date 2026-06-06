@@ -3389,8 +3389,52 @@ def init_gm_clarifications_db() -> None:
                     ON gm_clarifications (status) WHERE status IN ('open','checking');
                 CREATE INDEX IF NOT EXISTS idx_gm_clar_qmsg
                     ON gm_clarifications (chat_id, question_msg_id);
+                -- session 28: replies to NUDGE messages must also resolve (staff naturally
+                -- reply to whatever nagged them last)
+                ALTER TABLE gm_clarifications ADD COLUMN IF NOT EXISTS nudge_msg_ids TEXT DEFAULT '[]';
+                -- session 28: per-vendor receipt knowledge ("save how Atlas receipts are written")
+                CREATE TABLE IF NOT EXISTS gm_receipt_vendors (
+                    vendor     TEXT PRIMARY KEY,      -- lowercase keyword matched in OCR/vendor text
+                    mode       TEXT DEFAULT 'rule',   -- rule = inject into prompt | skip = never flag
+                    rule       TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
             """)
     logger.info("GM clarifications DB ready")
+
+
+def gm_add_clarification_nudge_msg(clar_id: int, msg_id: int) -> None:
+    """Remember a nudge's message id so replies to it count as answers."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT nudge_msg_ids FROM gm_clarifications WHERE id=%s", (clar_id,))
+            row = cur.fetchone()
+            ids = []
+            try:
+                ids = _json.loads((row or {}).get("nudge_msg_ids") or "[]")
+            except Exception:
+                pass
+            if msg_id not in ids:
+                ids.append(msg_id)
+            cur.execute("UPDATE gm_clarifications SET nudge_msg_ids=%s WHERE id=%s",
+                        (_json.dumps(ids[-20:]), clar_id))
+
+
+def gm_get_vendor_rules() -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT vendor, mode, rule FROM gm_receipt_vendors ORDER BY vendor")
+            return [dict(r) for r in cur.fetchall()]
+
+
+def gm_set_vendor_rule(vendor: str, mode: str, rule: str | None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_receipt_vendors (vendor, mode, rule) VALUES (%s,%s,%s)
+                ON CONFLICT (vendor) DO UPDATE SET mode=EXCLUDED.mode, rule=EXCLUDED.rule
+            """, (vendor.strip().lower(), mode, rule))
 
 
 def gm_create_clarification(chat_id: int, chat_title: str | None, topic: str,
@@ -3435,8 +3479,25 @@ def gm_get_active_clarifications_for_chat(chat_id: int) -> list[dict]:
 
 
 def gm_find_clarification_by_question_msg(chat_id: int, question_msg_id: int) -> dict | None:
+    """Match the GM's question message OR any of its nudges OR the target message itself —
+    staff reply to whichever message is nearest (session 28 fix)."""
+    import json as _json
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("""
+                SELECT * FROM gm_clarifications
+                WHERE chat_id = %s AND status IN ('open','checking')
+                ORDER BY id DESC
+            """, (chat_id,))
+            for r in cur.fetchall():
+                d = dict(r)
+                try:
+                    nudges = _json.loads(d.get("nudge_msg_ids") or "[]")
+                except Exception:
+                    nudges = []
+                if question_msg_id in ([d.get("question_msg_id"), d.get("target_msg_id")] + nudges):
+                    return d
+            # fall back to the original exact match (covers already-answered rows)
             cur.execute("""
                 SELECT * FROM gm_clarifications
                 WHERE chat_id = %s AND question_msg_id = %s
