@@ -88,15 +88,16 @@ def _back_row(target: str = "att:menu") -> list[InlineKeyboardButton]:
 # ---------------------------------------------------------------- screens
 
 def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    # Khmer labels reviewed via ChatGPT, owner-approved session 28
     rows = [
-        [InlineKeyboardButton("🕐 Late · មកយឺត", callback_data="att:late")],
-        [InlineKeyboardButton("🏖 Annual Leave (AL) · ច្បាប់ឈប់សម្រាក", callback_data="att:al")],
-        [InlineKeyboardButton("🚨 Emergency AL · ច្បាប់បន្ទាន់", callback_data="att:em")],
-        [InlineKeyboardButton("🔄 Change day off · ប្ដូរថ្ងៃឈប់", callback_data="att:do")],
+        [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
+        [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
+        [InlineKeyboardButton("🚨 Emergency Leave · ឈប់សម្រាកបន្ទាន់", callback_data="att:em")],
+        [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
         [InlineKeyboardButton("⏱ OT · ថែមម៉ោង", callback_data="att:ot")],
-        [InlineKeyboardButton("📍 Check in · ចុះវត្តមាន", callback_data="att:ci")],
-        [InlineKeyboardButton("📋 My schedule · កាលវិភាគរបស់ខ្ញុំ", callback_data="att:my")],
-        [InlineKeyboardButton("🔁 Switch persona", callback_data="att:pick")],
+        [InlineKeyboardButton("📍 Check in · ចូលវត្តមាន", callback_data="att:ci")],
+        [InlineKeyboardButton("📋 My schedule · កាលវិភាគការងាររបស់ខ្ញុំ", callback_data="att:my")],
+        [InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")],
     ]
     return _hdr(p, "Main menu — what they see when they type anything:"), InlineKeyboardMarkup(rows)
 
@@ -188,7 +189,7 @@ def emergency_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
             [InlineKeyboardButton("I fully understand", callback_data="att:em:ok")],
             [InlineKeyboardButton("No Emergency AL", callback_data="att:menu")]]
     return _hdr(p, "⚠️ You can only do this once every 30 days. Do you understand?\n"
-                   "អ្នកអាចសុំច្បាប់បន្ទាន់បានតែ ១ដងក្នុង ៣០ថ្ងៃ។ យល់ព្រមទេ?"), InlineKeyboardMarkup(rows)
+                   "អ្នកអាចសុំឈប់សម្រាកបន្ទាន់បានតែ ១ដងក្នុង ៣០ថ្ងៃ។ យល់ព្រមទេ?"), InlineKeyboardMarkup(rows)
 
 
 def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
