@@ -126,18 +126,26 @@ def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def rules_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    # DRAFT wording — final EN+KH comes from the owner's ChatGPT pass
+    # FINAL bilingual wording (owner + ChatGPT, session 28, via khmer_inbox)
     return _hdr(p,
                 "📜 Shop rules — the short version\n"
+                "📜 ច្បាប់ហាង — សង្ខេបខ្លីៗ\n\n"
                 "• Check in by sharing live location. Arrive 5+ min early = +10 points ⭐\n"
+                "• ចុះវត្តមានដោយចែករំលែកទីតាំងបន្តផ្ទាល់។ មកដល់មុន 5+ នាទី = +10 Points ⭐\n\n"
                 "• Late? Tell us as early as you can — the sooner you tell, the fewer points it costs.\n"
+                "• មកយឺត? សូមប្រាប់យើងឱ្យបានឆាប់បំផុត — ប្រាប់កាន់តែឆាប់ ពិន្ទុដែលត្រូវដកកាន់តែតិច។\n\n"
                 "• The first 5 late minutes are free 😊 More than 5 — every minute counts.\n"
+                "• 5 នាទីយឺតដំបូង គឺជានាទីអនុគ្រោះ 😊 បើលើសពី 5 នាទី រាល់នាទីយឺតទាំងអស់នឹងត្រូវរាប់។\n\n"
                 "• Late minutes become pay-back time — you work them back when the shop needs you.\n"
+                "• នាទីយឺតនឹងក្លាយជាម៉ោងសងវិញ — អ្នកធ្វើសងពេលហាងត្រូវការអ្នក។\n\n"
                 "• No-show = 1 day's pay and no bonus this time.\n"
-                "• AL: ask 7+ days ahead. Day-off swap: same week, your partner agrees first.\n"
+                "• No-show = ប្រាក់ឈ្នួល 1 ថ្ងៃ និងមិនមាន Bonus លើកនេះ។\n\n"
+                "• AL: ask 7+ days ahead. Day-off swap: within 7 days, your partner agrees first.\n"
+                "• AL៖ សូមស្នើសុំជាមុន 7+ ថ្ងៃ។ ប្តូរថ្ងៃឈប់៖ ក្នុងរយៈពេល 7 ថ្ងៃ ហើយអ្នកប្តូរជាមួយត្រូវយល់ព្រមមុន។\n\n"
                 "• OT: given by seniors, saved as hours — take them back when it's calm.\n"
+                "• OT៖ បងៗ/អ្នកគ្រប់គ្រងជាអ្នកអនុញ្ញាត ហើយសន្សំជាម៉ោង — អាចសម្រាកសងម៉ោងវិញ ពេលហាងស្ងប់។\n\n"
                 "• Points restart after every 2nd pay — every month is a fresh start 🌱\n"
-                "\n(🚧 wording draft — Khmer version after ChatGPT pass)"), \
+                "• Points ចាប់ផ្ដើមឡើងវិញបន្ទាប់ពីការបើកប្រាក់លើកទី 2 — រៀងរាល់ខែគឺជាការចាប់ផ្ដើមថ្មី 🌱"), \
         InlineKeyboardMarkup([_back_row("att:aw")])
 
 

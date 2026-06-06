@@ -184,10 +184,12 @@
    - **T−10 min:** pre-reminder — shift starts in 10 min, check in via live location, AND advertise the
      early-bird reward: arrive 5 min before start = **+10 points**.
    - **T0 (start):** still no in-zone location → the normal check-in prompt (+ I'm-late button).
-   - **T+5 min:** still nothing → the NICE message (short, encouraging, never scolding — owner: "I want
-     them to feel good and encouraged"): we give **5 FREE late minutes**; beyond that ALL late minutes
-     count — they become **payback (buyback) time** AND **points**: −1/min if they informed BEFORE shift
-     start, −2/min if they didn't.
+   - **T+5 min:** still nothing → the NICE message — FINAL bilingual (owner+ChatGPT via khmer_inbox):
+     *"We give everyone 5 free late minutes 😊 More than 5 — every late minute counts: as pay-back time,
+     and minus points. The sooner you tell us, the fewer points it costs. See you soon!"*
+     *"យើងផ្ដល់ឱ្យគ្រប់គ្នា 5 នាទីអនុគ្រោះសម្រាប់ការមកយឺត 😊 បើលើសពី 5 នាទី រាល់នាទីយឺតទាំងអស់នឹងត្រូវរាប់៖
+     ជាម៉ោងសងវិញ និងដកពិន្ទុ។ ប្រាប់យើងកាន់តែឆាប់ ពិន្ទុដែលត្រូវដកកាន់តែតិច។ ជួបគ្នាឆាប់ៗ!"*
+     (Exact rates −1/−2 live in the Rules screen, not in the nudge.)
    - **GRACE RULE (updates the old "strict from minute 1"):** late ≤5 min → totally free (no debt, no
      points). Late >5 min → **ALL minutes count from minute 1** (not minus 5) — debt = actual minutes;
      points rate by informed-before (−1) vs not (−2).
