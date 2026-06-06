@@ -219,16 +219,63 @@ def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def sick_family_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
+    # ONE day at a time (owner): still sick tomorrow -> ask again before the shift / the night before
     rows = _date_grid_rows("att:sp:famd:%s" % who, _today(), 14, "att:sp:sick")
-    return _hdr(p, "🤒 Sick leave for your %s — which day?\n🤒 %sឈឺ — សុំច្បាប់ថ្ងៃណា?"
+    return _hdr(p, "🤒 Sick leave for your %s — which day? (one day at a time)\n"
+                   "🤒 %sឈឺ — សុំច្បាប់ថ្ងៃណា? (ម្ដងមួយថ្ងៃ)"
                 % (who, _WHO_KH.get(who, who))), InlineKeyboardMarkup(rows)
 
 
-def sick_family_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+def sick_family_fulltime(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
     d = day_label(date.fromisoformat(iso))
-    return _hdr(p, "Sick leave for your %s on %s — from the 7-day special-leave pool (AL), "
-                   "no points, no papers needed.\n🚧 Next build: notify seniors (no approval gate) + "
-                   "Supervisors plain notice + pool counter." % (who, d)), \
+    today_running = iso == _today().isoformat() and _shift_running(p)
+    rows = [_back_row("att:sp:sickf:%s" % who)]
+    if not today_running:
+        rows.append([InlineKeyboardButton("Full day · ពេញមួយថ្ងៃ",
+                                          callback_data="att:sp:famf:%s:%s" % (who, iso))])
+    rows.append([InlineKeyboardButton("Choose time · ជ្រើសម៉ោង",
+                                      callback_data="att:sp:famt:%s:%s" % (who, iso))])
+    txt = "Sick leave for your %s — %s\nFull day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" \
+          % (who, d)
+    if today_running:
+        txt += "\n\n(Your shift already started — time starts from NOW.)"
+    return _hdr(p, txt), InlineKeyboardMarkup(rows)
+
+
+def sick_family_time_grid(p: dict, who: str, iso: str, stage: str,
+                          from_min: int | None = None) -> tuple[str, InlineKeyboardMarkup]:
+    ws, length = to_min(p.get("work_start")), shift_len_min(p.get("work_start"), p.get("work_end"))
+    now_floor = None
+    if stage == "from" and iso == _today().isoformat() and _shift_running(p):
+        now_floor = ws + ((_now_min() - ws) % 1440)
+    btns = []
+    if now_floor is not None:
+        btns.append(InlineKeyboardButton("Now (%s)" % fmt12(now_floor),
+                                         callback_data="att:sp:famtf:%s:%s:%d" % (who, iso, now_floor)))
+    for o in range(0, length + 1, 15):
+        m = ws + o
+        if stage == "from" and o == length:
+            continue
+        if stage == "to" and from_min is not None and m <= from_min:
+            continue
+        if now_floor is not None and m <= now_floor:
+            continue
+        cb = ("att:sp:famtf:%s:%s:%d" % (who, iso, m)) if stage == "from" else \
+             ("att:sp:famtt:%s:%s:%d:%d" % (who, iso, from_min, m))
+        btns.append(InlineKeyboardButton(fmt12(m), callback_data=cb))
+    rows = [_back_row("att:sp:famd:%s:%s" % (who, iso))] + grid(btns, 4)
+    q = "From what time?" if stage == "from" else "Until what time?"
+    return _hdr(p, q), InlineKeyboardMarkup(rows)
+
+
+def sick_family_stub(p: dict, who: str, iso: str, window: str = "full day") -> tuple[str, InlineKeyboardMarkup]:
+    d = day_label(date.fromisoformat(iso))
+    return _hdr(p, "Sick leave for your %s on %s (%s) — from the 7-day special-leave pool (AL), "
+                   "no points, no papers needed.\n\n"
+                   "One day at a time: still sick tomorrow? Ask again before your shift — or the night "
+                   "before. (Build: an 'Again today' one-tap shortcut appears after a same-person day.)\n"
+                   "🚧 Next build: notify seniors (no approval gate) + Supervisors plain notice + "
+                   "pool counter." % (who, d, window)), \
         InlineKeyboardMarkup([_back_row("att:sp:sick"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -772,7 +819,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "sickf":
             return await show(sick_family_dates(p, data[3]))
         if sub == "famd":
+            return await show(sick_family_fulltime(p, data[3], data[4]))
+        if sub == "famf":
             return await show(sick_family_stub(p, data[3], data[4]))
+        if sub == "famt":
+            return await show(sick_family_time_grid(p, data[3], data[4], "from"))
+        if sub == "famtf":
+            return await show(sick_family_time_grid(p, data[3], data[4], "to", int(data[5])))
+        if sub == "famtt":
+            window = "%s → %s" % (fmt12(int(data[5])), fmt12(int(data[6])))
+            return await show(sick_family_stub(p, data[3], data[4], window))
         if sub == "mar":
             return await show(marriage_menu(p))
         if sub == "marmy":

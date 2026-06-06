@@ -324,7 +324,11 @@
 ## 6b. SPECIAL LEAVE (About Me → 🕊 Special Leave) — owner spec + Cambodian law, session 28 ⏳
 > Legal basis: Labor Law Art. 169–171 + Prakas 267/2001 — special leave = up to 7 PAID days/yr for
 > immediate-family events; deduct from AL if available, else make-up hours; NEVER salary.
-- **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent · 💍 Marriage → My marriage /
+- **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent — **FAMILY-SICK = ONE DAY AT A
+  TIME (owner, session 28):** date → Full day OR hours (15-min from→to; mid-shift → starts at Now, like
+  AL); still sick tomorrow → ask again before the shift / the night before. 'Again today' one-tap
+  shortcut after a same-person day (build). Each day individually consumes the 7-day pool. ·
+  💍 Marriage → My marriage /
   My child's marriage (**BOTH: dates hidden for first 30 days** — owner rule, weddings are planned) ·
   🕊 Family death → Child / Parent / Spouse → start date → **duration buttons 3–7 days, chosen ONCE at
   booking** (owner+session 28: no re-applying mid-funeral; need more later → just re-enter Special Leave) ·
