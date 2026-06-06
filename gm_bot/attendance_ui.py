@@ -96,48 +96,57 @@ def grid(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineK
 
 # ---------------------------------------------------------------- day dry-run (owner, session 28)
 
-def staff_day_events(p: dict) -> list[tuple[int, str]]:
-    """The check-in message schedule for ONE staff member's shift (minutes-of-day, label).
-    Pure — the same brain the real scheduler will use at launch."""
+def staff_day_events(p: dict) -> list[tuple[int, int, str]]:
+    """The check-in message schedule for ONE shift: (day_offset_from_shift_START, minute, label).
+    End-of-shift events on an overnight shift carry offset +1 (they land the NEXT calendar day);
+    a pre-reminder for a just-after-midnight start carries −1. Pure — the launch scheduler's brain."""
     ws = to_min(p.get("work_start"))
     ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
     if ws is None or ln is None:
         return []
-    end = (ws + ln) % 1440
-    return [
-        ((ws - 10) % 1440, "T−10 pre-reminder"),
+    raw = [
+        (ws - 10, "T−10 pre-reminder"),
         (ws, "T0 start prompt (only if not checked in)"),
-        ((ws + 5) % 1440, "T+5 free-minutes message (only if still not checked in)"),
-        (end, "check-out request"),
-        ((end + 10) % 1440, "leave-early ask (only if no check-out)"),
+        (ws + 5, "T+5 free-minutes message (only if still not checked in)"),
+        (ws + ln, "check-out request"),
+        (ws + ln + 10, "leave-early ask (only if no check-out)"),
     ]
+    return [(m // 1440, m % 1440, label) for m, label in raw]
 
 
 def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
     """All would-be check-in messages for one date, whole active TWB roster, chronological.
-    Skips: Tyty, Delis, day-off staff, staff on approved AL that date.
+    Each event is anchored to its SHIFT-START date: it appears on `target` only if the person
+    actually worked that shift (start date not their day-off, not on approved AL) — so an
+    overnight 6am check-out exists only when YESTERDAY was a working day.
     Returns (minute_of_day, staff_name, label, message_text)."""
     import json as _json
 
     from shared.database import _db
-    on_al: set[int] = set()
+    al_days: dict[int, set[str]] = {}
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT staff_id, days FROM al_requests WHERE status='approved'")
             for r in cur.fetchall():
                 try:
-                    if target.isoformat() in _json.loads(r["days"] or "[]"):
-                        on_al.add(r["staff_id"])
+                    al_days.setdefault(r["staff_id"], set()).update(_json.loads(r["days"] or "[]"))
                 except Exception:
                     pass
+
+    def works_on(p: dict, day: date) -> bool:
+        if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == day.weekday():
+            return False
+        return day.isoformat() not in al_days.get(p["id"], set())
+
     events = []
     for p in staff_all("active"):
-        if p.get("org") != "TWB" or p.get("canonical_name") == "Tyty" or p["id"] in on_al:
-            continue
-        if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == target.weekday():
+        if p.get("org") != "TWB" or p.get("canonical_name") == "Tyty":
             continue
         name = p.get("call_name") or p["canonical_name"]
-        for minute, label in staff_day_events(p):
+        for day_offset, minute, label in staff_day_events(p):
+            shift_start_day = target - timedelta(days=day_offset)
+            if not works_on(p, shift_start_day):
+                continue
             if label.startswith("T−10"):
                 text = _ci_msg_pre(p)
             elif label.startswith("T0"):
