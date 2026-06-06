@@ -328,14 +328,26 @@
   (instant acknowledgment + condolence + Supervisors notice) · sick = notify, no gate · marriage =
   normal AL approval (30+ days out by design). Evidence: death never asked · marriage = the 30-day rule ·
   sick = see below.
+- **DEATH PHOTOS (owner question, session 28 — Khmer staff sometimes send photos of the deceased):**
+  the death flow NEVER asks for any document or photo. If one arrives anyway in a death context:
+  **NO AI ever touches it** (running vision on someone's dead parent is unconscionable), it is never
+  forwarded anywhere, and the GM replies only with condolence: *"You don't need to send anything —
+  we're so sorry for your loss 🤍"*. Fraud risk is naturally low (funerals are community events; seniors
+  know) — if abuse is ever suspected, it's a human conversation for the owner, not a verification flow.
 - **🤒 SICK→ME — THE ANTI-FAKE LADDER (owner practice, session 28):**
   - GM: *"Sorry to hear 😟 Take some medicine and come try — see how you feel at work. What time can you
     come?"* → Late-style time buttons + `[🛌 I really can't come today]`.
   - **PAPERLESS SICK = INFORMED LATENESS, identical price** (payback debt at need-slots for ALL missed
     minutes incl. full day + −1/min when points activate) — "sick" carries ZERO discount, so only truth
     says it. Full-day claim → *"If you see a doctor, send me a photo of the papers."*
-  - **Papers photo** (within ~3 days) → forwarded to OWNER for one tap → debt+points wiped, real sick day,
-    **AL UNTOUCHED (owner + law: own certified sickness is sick leave, separate from AL — never deduct)**.
+  - **Papers photo** (within ~3 days) → **AI VISION READ (owner, session 28 — one Sonnet/Haiku call per
+    photo, rare event = pennies):** extract {is_medical_document, hospital/clinic name, address, phone,
+    doctor name, patient name, document date, confidence, red_flags} → stored on the sick case AND into a
+    growing `medical_providers` knowledge table (hospitals/doctors seen) → owner approval card shows the
+    extraction + cross-checks (patient name ≈ staff name? date ≈ sick day? same doctor/clinic recurring
+    across many staff? date looks edited?) → OWNER still taps the final ✅ (AI reads, never decides).
+    On ✅: debt+points wiped, real sick day, **AL UNTOUCHED (owner + law: own certified sickness is sick
+    leave, separate from AL — never deduct)**.
     Job legally protected up to ~6 months certified. 🔒 minor: papers-day paid or unpaid = owner policy
     (recommend paid — rare once paperless costs payback). OLD "suggest 0.5 AL" practice = DEAD.
   - **FREQUENCY DOSSIER (paperless only — nice until bam, owner):** flags → owner card with full history

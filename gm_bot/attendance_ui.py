@@ -226,10 +226,12 @@ def sick_family_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMa
 def marriage_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
-        [InlineKeyboardButton("💍 My marriage (3 days)", callback_data="att:sp:marmy")],
+        [InlineKeyboardButton("💍 My marriage — 30+ days · ស្នើមុន 30 ថ្ងៃ", callback_data="att:sp:marmy")],
         [InlineKeyboardButton("👰 My child's marriage (1 day)", callback_data="att:sp:marchild")],
     ]
-    return _hdr(p, "💍 Whose marriage?"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "💍 Whose marriage?\n"
+                   "(Your own marriage: ask at least 30 days before. / "
+                   "រៀបការខ្លួនឯង៖ ស្នើសុំមុនយ៉ាងតិច 30 ថ្ងៃ។)"), InlineKeyboardMarkup(rows)
 
 
 def marriage_dates(p: dict, child: bool) -> tuple[str, InlineKeyboardMarkup]:
