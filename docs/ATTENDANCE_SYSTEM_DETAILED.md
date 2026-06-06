@@ -538,6 +538,11 @@
   full-day(s) AL placed on the FATTEST-coverage days for their expertise, **deliberately ADJACENT to their
   existing day off** (owner approved) so 2 AL days become a real 3-day break. Test ONE STAFF AT A TIME;
   owner reviews every pick before anything is sent. (NO auto OT offering — owner rejected.)
+- **ABSOLUTE GATE (owner, session 28): until the explicit go-ahead, staff input is IGNORED entirely
+  (no replies, no recording, not even silent location collection) and NOTHING is pushed to staff.**
+  Only the roll-call greeting exists for staff. Testing = owner-only: /test shell + simulators +
+  the whole-roster DAY DRY-RUN (compute_day_events walks every would-be message one tap at a time —
+  same scheduling brain the launch jobs will use).
 - **LAUNCH PROCEDURE (owner FINAL v2, session 28) — two phases:**
   1. **STEP-BY-STEP ROLE-PLAY (owner + me, no staff bugged):** GM pushes every flow to the OWNER ONLY,
      and he walks each LADDER step by step, response by response — first pretending to be the senior doing
