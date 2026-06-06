@@ -177,9 +177,11 @@
    overlaps()); skip if day-off / approved AL / Tyty / Delis / already checked in.
 7. **CHECK-OUT (owner, session 28):** at work_end → DM *"Shift over — share your live location to check
    out."* If their live location has been ON since check-in (forgot it on / left it on) → auto-checked-out,
-   no message needed (we know they were there to the last minute). No response → ONE gentle ask
-   (*"Did you leave early? If not, share your location to check out."*), then flag *early-leave?* for the
-   digest. Skipped if rest-of-day leave was approved.
+   no message needed (we know they were there to the last minute). **TIMING (session 28):** request at
+   work_end → no response by **+10 min** → ONE gentle ask (*"Did you leave early? If not, share your
+   location to check out."*) → still nothing by **+30 min** → case closes silently as no-check-out →
+   digest flag with evidence (last ping / stop-edit time). Never more than 2 messages — check-out is
+   evidence collection, not a chase. Skipped if rest-of-day leave was approved.
    **"DID YOU LEAVE EARLY" TIMING (clarified session 28):** the question fires ONLY at check-out time,
    NEVER mid-shift — stopping a voluntary live share mid-shift gets silence (their right; no continuous
    tracking). The stop-edit signal is silently RECORDED and upgrades the digest flag's evidence quality:
