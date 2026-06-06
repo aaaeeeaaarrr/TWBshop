@@ -163,7 +163,7 @@ def special_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "🕊 Special Leave · ច្បាប់ពិសេស"), InlineKeyboardMarkup(rows)
 
 
-_WHO_KH = {"child": "កូនអ្នក", "spouse": "ប្តី/ប្រពន្ធអ្នក", "parent": "ឪពុក/ម្តាយអ្នក"}
+_WHO_KH = {"child": "កូនរបស់អ្នក", "spouse": "ប្តី/ប្រពន្ធរបស់អ្នក", "parent": "ឪពុក/ម្តាយរបស់អ្នក"}
 
 
 def sick_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -269,9 +269,12 @@ def sick_family_time_grid(p: dict, who: str, iso: str, stage: str,
 
 def sick_family_stub(p: dict, who: str, iso: str, window: str = "full day") -> tuple[str, InlineKeyboardMarkup]:
     d = day_label(date.fromisoformat(iso))
-    return _hdr(p, "Sick leave for your %s — %s, %s ✓\nTake care 🤍\n\n"
+    return _hdr(p, "Sick leave for your %s — %s, %s ✓\n"
+                   "ច្បាប់ឈឺសម្រាប់%s — %s, %s ✓\n"
+                   "Take care 🤍\nថែទាំឱ្យបានល្អ 🤍\n\n"
                    "🚧 Next build: senior notify + Supervisors notice + the night-before "
-                   "one-tap re-book nudge (12h before next shift)." % (who, d, window)), \
+                   "one-tap re-book nudge (12h before next shift)."
+                % (who, d, window, _WHO_KH.get(who, who), d, window)), \
         InlineKeyboardMarkup([_back_row("att:sp:sick"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -333,7 +336,7 @@ def death_days(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
     btns = [InlineKeyboardButton("%d ថ្ងៃ / days" % n, callback_data="att:sp:deathn:%s:%s:%d" % (who, iso, n))
             for n in range(3, 8)]
     rows = [_back_row("att:sp:death")] + grid(btns, 3)
-    return _hdr(p, "🕊 How many days do you need?\n🕊 ត្រូវការប៉ុន្មានថ្ងៃ?"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🕊 How many days do you need?\n🕊 ត្រូវការសម្រាកប៉ុន្មានថ្ងៃ?"), InlineKeyboardMarkup(rows)
 
 
 def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -418,7 +421,7 @@ def late_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     btns = [InlineKeyboardButton(fmt12(ws + o), callback_data="att:late:o:%d" % o) for o in offs]
     rows = [_back_row()] + grid(btns, 3)
     return _hdr(p, "How late will you be? Pick the time you'll arrive:\n"
-                   "តើអ្នកនឹងមកដល់ម៉ោងប៉ុន្មាន?"), InlineKeyboardMarkup(rows)
+                   "អ្នកនឹងមកដល់ម៉ោងប៉ុន្មាន? សូមជ្រើសម៉ោងដែលអ្នកនឹងមកដល់៖"), InlineKeyboardMarkup(rows)
 
 
 def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -449,16 +452,16 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
     rows = [_back_row("att:am")] + grid(btns, 4)
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀ Earlier", callback_data="att:al:p:%d" % (page - 1)))
+        nav.append(InlineKeyboardButton("◀ Earlier · មុន", callback_data="att:al:p:%d" % (page - 1)))
     if (page + 1) * 28 < 90:
-        nav.append(InlineKeyboardButton("Later ▶", callback_data="att:al:p:%d" % (page + 1)))
+        nav.append(InlineKeyboardButton("Later · បន្ទាប់ ▶", callback_data="att:al:p:%d" % (page + 1)))
     if nav:
         rows.append(nav)
     if picked:
-        rows.append([InlineKeyboardButton("✅ Done (%d day%s)" % (len(picked), "s" if len(picked) > 1 else ""),
+        rows.append([InlineKeyboardButton("✅ Done · រួចរាល់ (%d)" % len(picked),
                                           callback_data="att:al:done")])
     return _hdr(p, "You have %s AL days left. Choose dates (tap to ✓, then Done).\n"
-                   "អ្នកនៅសល់ច្បាប់ %s ថ្ងៃ។ ជ្រើសរើសថ្ងៃ៖\n"
+                   "អ្នកនៅសល់ AL %s ថ្ងៃ។ ជ្រើសថ្ងៃ (ចុចដើម្បី ✓ បន្ទាប់មកចុច Done)។\n"
                    "⚠ days are short notice (within 7 days) — they cost points; "
                    "I'll show the exact cost before you confirm.\n"
                    "⚠ ថ្ងៃដែលមានសញ្ញា ⚠ គឺស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ត្រូវដក Points; "
@@ -478,10 +481,13 @@ def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMa
     near = _near_days(picked)
     if near:
         sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
-        pts = SHORT_NOTICE_PT_PER_MIN * sl * len(near)
-        txt += ("\n\n⚠ Short notice: %s\nFull-day cost: about −%d points (−0.1/min). "
-                "Hours-AL costs less — I'll show the exact number."
-                % (", ".join(day_label(date.fromisoformat(d)) for d in near), round(pts)))
+        pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
+        nd = ", ".join(day_label(date.fromisoformat(d)) for d in near)
+        txt += ("\n\n⚠ Short notice: %s\n⚠ ស្នើជិតពេល៖ %s\n"
+                "Full-day cost: about −%d points (−0.1/min). Hours-AL costs less — I'll show the "
+                "exact number.\n"
+                "ពេញមួយថ្ងៃ៖ ប្រហែល −%d points (−0.1/min)។ AL តាមម៉ោងដក points តិចជាង — "
+                "ខ្ញុំនឹងបង្ហាញចំនួនពិត។" % (nd, nd, pts, pts))
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 
@@ -548,7 +554,9 @@ def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         btns.append(InlineKeyboardButton(day_label(d), callback_data="att:do:d:%s" % d.isoformat()))
     rows = [_back_row("att:am")] + grid(btns, 4)
     return _hdr(p, "Change day off — pick the NEW day you want off (next 30 days, not today).\n"
-                   "Current day off: %s" % (p.get("day_off") or "?")), InlineKeyboardMarkup(rows)
+                   "ប្តូរថ្ងៃឈប់ — ជ្រើសថ្ងៃឈប់ថ្មីដែលអ្នកចង់បាន (30 ថ្ងៃខាងមុខ មិនមែនថ្ងៃនេះ)។\n"
+                   "Current day off · ថ្ងៃឈប់បច្ចុប្បន្ន៖ %s" % (p.get("day_off") or "?")), \
+        InlineKeyboardMarkup(rows)
 
 
 def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
@@ -570,8 +578,9 @@ def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
     rows += [[InlineKeyboardButton(c["canonical_name"], callback_data="att:do:p:%d" % c["id"])]
              for c in cands[:8]]
     d = date.fromisoformat(iso)
-    return _hdr(p, "Swap day-off for %s — with whom? (similar shift times; "
-                   "must be the same week)" % day_label(d)), InlineKeyboardMarkup(rows)
+    return _hdr(p, "Swap day-off for %s — with whom? (similar shift times; within 7 days)\n"
+                   "ប្តូរថ្ងៃឈប់ទៅ %s — ជាមួយអ្នកណា? (ម៉ោងវេនប្រហាក់ប្រហែល; ក្នុង 7 ថ្ងៃ)"
+                % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
 
 
 def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -591,7 +600,7 @@ def ot_durations(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         btns.append(InlineKeyboardButton(label, callback_data="att:ot:d:%d" % m))
         m += 30
     rows = [_back_row("att:aw")] + grid(btns, 4)
-    return _hdr(p, "Give OT — how much?"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "Give OT — how much?\nអនុញ្ញាត OT — ប៉ុន្មានម៉ោង?"), InlineKeyboardMarkup(rows)
 
 
 def ot_staff_pick(p: dict, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -599,7 +608,8 @@ def ot_staff_pick(p: dict, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
     rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:ot:s:%d:%d" % (minutes, r["id"]))]
              for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"][:35]
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    return _hdr(p, "Give %s OT — to whom?" % label), InlineKeyboardMarkup(rows)
+    return _hdr(p, "Give %s OT — to whom?\nអនុញ្ញាត OT %s — ឱ្យអ្នកណា?" % (label, label)), \
+        InlineKeyboardMarkup(rows)
 
 
 def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -648,7 +658,7 @@ def _ci_msg_pre(p: dict) -> str:
             "វេនការងាររបស់អ្នកនឹងចាប់ផ្តើមក្នុង 10 នាទីទៀត (%s)។ សូមចុះវត្តមានដោយចែករំលែក"
             "ទីតាំងបន្តផ្ទាល់។\n\n"
             "Arrive 5 minutes early and you earn +10 points ⭐\n"
-            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 ពិន្ទុ ⭐" % (t, t))
+            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐" % (t, t))
 
 
 def _ci_msg_start() -> tuple[str, InlineKeyboardMarkup]:
@@ -669,18 +679,20 @@ _CI_MSG_PLUS5 = ("We give everyone 5 free late minutes 😊 More than 5 — ever
                  "កាន់តែតិច។ ជួបគ្នាឆាប់ៗ!")
 
 _CI_MSG_OUT = ("Shift over — share your live location to check out.\n"
-               "(KH 🚧 next ChatGPT batch)")
+               "វេនចប់ហើយ — សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។")
 
 _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\n"
-                "(KH 🚧 next ChatGPT batch)")
+                "អ្នកចេញមុនម៉ោងមែនទេ? បើមិនមែន សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។")
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     exp = ", ".join(p.get("expertise") or []) or "-"
-    return _hdr(p, "📋 My schedule\n"
-                   "Shift: %s–%s\nDay off: %s\nExpertise: %s\n\n"
-                   "AL left: %s days\nPayback debt: 0 min 🚧\nOT bank: 0h 🚧\n"
-                   "Upcoming AL: 🚧 (reads al_requests next build)"
+    return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
+                   "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
+                   "AL left · AL នៅសល់: %s days\n"
+                   "Payback debt · ជំពាក់ម៉ោងសងវិញ: 0 min 🚧\n"
+                   "OT bank · OT សន្សំ: 0h 🚧\n"
+                   "Upcoming AL · AL ខាងមុខ: 🚧 (reads al_requests next build)"
                 % (p.get("work_start") or "?", p.get("work_end") or "?",
                    p.get("day_off") or "?", exp, p.get("al_left", "?"))), \
         InlineKeyboardMarkup([_back_row("att:am")])
@@ -728,22 +740,23 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
                 if dist > 200:
                     await msg.reply_text(
                         "You're not at the shop yet — it will count when you arrive.\n"
-                        "(KH 🚧)  [test: %dm from TWB]" % round(dist))
+                        "អ្នកមិនទាន់នៅហាងទេ — ចុះវត្តមាននឹងរាប់ពេលអ្នកមកដល់។\n"
+                        "[test: %dm from TWB]" % round(dist))
                     return
                 rel = (_now_min() - ws) % 1440
                 early = 1440 - rel if rel > 720 else 0
                 late = rel if rel <= 720 else 0
                 if early >= 5:
                     await msg.reply_text(
-                        "Checked in ✓ — %d min early. +10 points ⭐ (points pending)\n"
-                        "(KH 🚧)" % early)
+                        "Checked in ✓ — %d min early. +10 points ⭐\n"
+                        "ចុះវត្តមានរួច ✓ — មុន %d នាទី។ +10 points ⭐" % (early, early))
                 elif late <= 5:
-                    await msg.reply_text("Checked in ✓\n(KH 🚧)")
+                    await msg.reply_text("Checked in ✓\nចុះវត្តមានរួច ✓")
                 else:
                     await msg.reply_text(
-                        "Checked in ✓ — %d min late (counts as pay-back).\n\n"
-                        "Why were you late?\nហេតុអ្វីបានជាមកយឺត? (draft KH — typed answer, "
-                        "stored verbatim)" % late)
+                        "Checked in ✓ — %d min late (counts as pay-back).\n"
+                        "ចុះវត្តមានរួច ✓ — យឺត %d នាទី (រាប់ជាម៉ោងសងវិញ)។\n\n"
+                        "Why were you late?\nហេតុអ្វីបានជាអ្នកមកយឺត?" % (late, late))
                 return
         await msg.reply_text(
             "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"

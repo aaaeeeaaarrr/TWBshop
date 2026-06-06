@@ -328,10 +328,12 @@
   TIME (owner, session 28):** date → Full day OR hours (15-min from→to; mid-shift → starts at Now, like
   AL); **NIGHT-BEFORE NUDGE replaces re-asking (owner, session 28):** after a family-sick day, GM nudges
   **12h before their next shift** (slid back to 20:00 the prior evening if it lands in the 21:30–08:00
-  quiet window): *"Is your {child} better? If you need tomorrow off too, tell me now."* → TWO short
-  buttons (owner: long labels truncate): `[Again tomorrow · ស្អែកទៀត]` (→ the standard Full-day/Choose-time
-  screen) · `[👍 Better · ធូរស្បើយហើយ]` (→ GM replies *"Great news — see you at {shift} 🤍"*). Day-by-day
-  control kept. Each day individually consumes the 7-day pool (internal counter — NEVER mention the
+  quiet window): FINAL bilingual: *"Is your {child} better? If you need tomorrow off too, tell me now. /
+  តើ{child_kh}ធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។"* → TWO short
+  buttons: `[Again tomorrow · ស្អែកទៀត]` (→ the standard Full-day/Choose-time screen) ·
+  `[👍 Better · ធូរស្បើយហើយ]` (→ GM replies *"Great news — see you at {time} 🤍 /
+  ដំណឹងល្អណាស់ — ជួបគ្នា {time} 🤍"*). Day-by-day control kept. (Batch-30 finals wired session 28:
+  every staff-facing string in the shell is now FINAL bilingual.) Each day individually consumes the 7-day pool (internal counter — NEVER mention the
   pool/jargon to staff; confirmations stay minimal: "Sick leave for your child — Sa 07/06, full day ✓
   Take care 🤍"). ·
   💍 Marriage → My marriage /
