@@ -92,13 +92,11 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     # Khmer labels reviewed via ChatGPT, owner-approved session 28.
     # Order + grouping per owner (session 28): Check-in, Late, About Work (seniors), About Me.
     # Emergency AL REMOVED by owner — weird emergencies will be handled via the points system (TBD).
+    # About Work is open to EVERYONE now (owner session 28): Rules for all, Give OT inside for seniors
     rows = [
         [InlineKeyboardButton("📍 Check in · ចូលវត្តមាន", callback_data="att:ci")],
         [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
-    ]
-    if p.get("is_senior"):
-        rows.append([InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")])
-    rows += [
+        [InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")],
         [InlineKeyboardButton("👤 About Me · របស់ខ្ញុំ", callback_data="att:am")],
         [InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")],
     ]
@@ -117,12 +115,30 @@ def about_me_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    # seniors only for now — later: Stocks + other checks most staff can access (owner)
+    # Rules for everyone; Give OT seniors only; later: Stocks + other checks (owner)
     rows = [
         _back_row(),
-        [InlineKeyboardButton("➕ Give OT", callback_data="att:ot:give")],
+        [InlineKeyboardButton("📜 Rules · ច្បាប់ហាង", callback_data="att:rules")],
     ]
+    if p.get("is_senior"):
+        rows.append([InlineKeyboardButton("➕ Give OT", callback_data="att:ot:give")])
     return _hdr(p, "🧰 About Work"), InlineKeyboardMarkup(rows)
+
+
+def rules_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    # DRAFT wording — final EN+KH comes from the owner's ChatGPT pass
+    return _hdr(p,
+                "📜 Shop rules — the short version\n"
+                "• Check in by sharing live location. Arrive 5+ min early = +10 points ⭐\n"
+                "• Late? Tell us as early as you can — the sooner you tell, the less it costs.\n"
+                "• The first 5 late minutes are free 😊\n"
+                "• Late minutes become pay-back time — you work them back when the shop needs you.\n"
+                "• No-show = 1 day's pay and no bonus this time.\n"
+                "• AL: ask 7+ days ahead. Day-off swap: same week, your partner agrees first.\n"
+                "• OT: given by seniors, saved as hours — take them back when it's calm.\n"
+                "• Points restart after every 2nd pay — every month is a fresh start 🌱\n"
+                "\n(🚧 wording draft — Khmer version after ChatGPT pass)"), \
+        InlineKeyboardMarkup([_back_row("att:aw")])
 
 
 def late_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -383,9 +399,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "am":
         return await show(about_me_menu(p))
     if action == "aw":
-        if not p.get("is_senior"):
-            return await show(main_menu(p))
         return await show(about_work_menu(p))
+    if action == "rules":
+        return await show(rules_screen(p))
     if action == "late":
         if len(data) > 2 and data[2] == "o":
             return await show(late_picked(p, int(data[3])))

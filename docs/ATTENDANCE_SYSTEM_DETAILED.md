@@ -401,8 +401,7 @@
 | # | Cause | Points (owner-adjustable) |
 |---|-------|--------------------------|
 | P1 | Arrived >5 min early (live location in zone) | **+10** (not while a payback debt is open 🔒) |
-| P2 | Late, informed BEFORE shift start | **−1 / min late** (location-measured; ≤5 min late = FREE, >5 = all minutes count from minute 1) |
-| P3 | Late, informed AFTER shift started — incl. silent arrivers who never tapped anything (the check-in prompt at start is their escalation; informing BEFORE start is what earns the cheaper P2 rate) | **−2 / min late** (same 5-min free rule) |
+| P2/P3 | LATE — **INFORM-TIME SPLIT (owner FINAL, session 28):** minutes BEFORE they told us = **−2 each**; minutes AFTER they told us = **−1 each** (informed before shift start ⇒ all −1). **TIGHTER variant chosen:** the −1 rate holds only until their DECLARED arrival time — past it, −2 resumes (the team is guessing again). **Arriving EARLIER than declared = always fine** — actual location-measured minutes are charged, never the declared ones; over-padding ("2 hours" then 30 min) costs nothing in points but declared-vs-actual gaps are TRACKED and chronic padders surface in the digest (human conversation, not math). ≤5 min late = FREE; >5 = all minutes count from minute 1. | −2 silent / −1 informed |
 | P4 | (existing) recognition/leaderboard points | unchanged |
 | P5 | (future, owner) stock checks done, other duties | TBD |
 
@@ -410,7 +409,15 @@
   ALL minutes count from minute one (debt + points), measured by location.
 
 - config table `points_rules` (cause, value, active=false) — single place for the owner to adjust.
-- AL deduction for no-show is an AL/salary action, NOT points (separate ledgers).
+- **LEADERBOARD RESETS after every 2nd pay (owner, session 28):** when the owner confirms the 2nd pay
+  went out, the points board restarts — every cycle is a fresh start ("courage for the next one").
+  Repeat no-showers are an employment question, not a points question.
+- **Informed-then-never-showed:** the informing earns NOTHING — no-show penalties apply in full.
+- 🔒 STILL OPEN: no-show POINTS — money-only (1 day's pay + bonus), or also a FLAT points hit (e.g. −50)?
+  (Owner's monthly reset weakens the "unrecoverable score" objection, but per-minute (−2 × whole shift
+  ≈ −1000) would still nuke the board — recommend money-only or flat.)
+- **RULES LIVE IN: About Work → 📜 Rules** (open to ALL staff now) — short, friendly, almost no math;
+  the nudge messages stay one-liners and the precise rates live in the Rules screen + launch announcement.
 
 ## 10. RECORDS, DIGEST
 - Tables ✅: al_requests, al_approvals, lateness_records, attendance_sessions; salary_usd/bonus_usd/phone
