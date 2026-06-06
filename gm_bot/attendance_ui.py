@@ -14,7 +14,8 @@ Pure helpers live at the top — unit-tested in tests/test_attendance_ui.py.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -25,6 +26,31 @@ from shared.database import staff_all
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
+_PP = ZoneInfo("Asia/Phnom_Penh")
+SHORT_NOTICE_PT_PER_MIN = 0.1   # owner, session 28: AL days within 7 days cost −0.1 pt/min (pending)
+
+
+def _today() -> date:
+    return datetime.now(_PP).date()
+
+
+def _now_min() -> int:
+    n = datetime.now(_PP)
+    return n.hour * 60 + n.minute
+
+
+def _shift_running(p: dict) -> bool:
+    ws = to_min(p.get("work_start"))
+    ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
+    if ws is None or ln is None:
+        return False
+    return (_now_min() - ws) % 1440 < ln
+
+
+def _near_days(picked: set[str]) -> list[str]:
+    """Selected dates that are short notice (today..today+6)."""
+    cut = _today() + timedelta(days=6)
+    return sorted(d for d in picked if date.fromisoformat(d) <= cut)
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -176,18 +202,20 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
 
 def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     al_left = p.get("al_left")
-    start = date.today() + timedelta(days=7 + page * 28)
+    start = _today() + timedelta(days=page * 28)
     days = [start + timedelta(days=i) for i in range(28)]
+    near_cut = _today() + timedelta(days=6)
     btns = []
     for d in days:
         iso = d.isoformat()
         mark = "✓ " if iso in picked else ""
-        btns.append(InlineKeyboardButton(mark + day_label(d), callback_data="att:al:d:%s" % iso))
+        warn = "⚠ " if d <= near_cut else ""
+        btns.append(InlineKeyboardButton(warn + mark + day_label(d), callback_data="att:al:d:%s" % iso))
     rows = [_back_row("att:am")] + grid(btns, 4)
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("◀ Earlier", callback_data="att:al:p:%d" % (page - 1)))
-    if 7 + (page + 1) * 28 <= 90:
+    if (page + 1) * 28 < 90:
         nav.append(InlineKeyboardButton("Later ▶", callback_data="att:al:p:%d" % (page + 1)))
     if nav:
         rows.append(nav)
@@ -196,28 +224,50 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
                                           callback_data="att:al:done")])
     return _hdr(p, "You have %s AL days left. Choose dates (tap to ✓, then Done).\n"
                    "អ្នកនៅសល់ច្បាប់ %s ថ្ងៃ។ ជ្រើសរើសថ្ងៃ៖\n"
-                   "(Today + next 6 days are Emergency AL only.)"
+                   "⚠ days are short notice (within 7 days) — they cost points; "
+                   "I'll show the exact cost before you confirm."
                 % (al_left if al_left is not None else "?", al_left if al_left is not None else "?")), \
         InlineKeyboardMarkup(rows)
 
 
 def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMarkup]:
     days = ", ".join(day_label(date.fromisoformat(d)) for d in sorted(picked))
-    rows = [_back_row("att:al"),
-            [InlineKeyboardButton("Full day · ពេញមួយថ្ងៃ", callback_data="att:al:full")],
-            [InlineKeyboardButton("Choose time · ជ្រើសម៉ោង", callback_data="att:al:time")]]
-    return _hdr(p, "AL for: %s\nFull day or part of the day?\n"
-                   "សុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" % days), InlineKeyboardMarkup(rows)
+    today_running = _today().isoformat() in picked and _shift_running(p)
+    rows = [_back_row("att:al")]
+    if not today_running:  # a half-worked day can only be "from now" — Full day hidden
+        rows.append([InlineKeyboardButton("Full day · ពេញមួយថ្ងៃ", callback_data="att:al:full")])
+    rows.append([InlineKeyboardButton("Choose time · ជ្រើសម៉ោង", callback_data="att:al:time")])
+    txt = "AL for: %s\nFull day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" % days
+    near = _near_days(picked)
+    if near:
+        sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
+        pts = SHORT_NOTICE_PT_PER_MIN * sl * len(near)
+        txt += ("\n\n⚠ Short notice: %s\nFull-day cost: about −%d points (−0.1/min). "
+                "Hours-AL costs less — I'll show the exact number."
+                % (", ".join(day_label(date.fromisoformat(d)) for d in near), round(pts)))
+    if today_running:
+        txt += "\n\n(Your shift already started — time starts from NOW.)"
+    return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 
-def al_time_grid(p: dict, stage: str, from_min: int | None = None) -> tuple[str, InlineKeyboardMarkup]:
+def al_time_grid(p: dict, stage: str, from_min: int | None = None,
+                 picked: set[str] | None = None) -> tuple[str, InlineKeyboardMarkup]:
     ws, length = to_min(p.get("work_start")), shift_len_min(p.get("work_start"), p.get("work_end"))
+    # today selected + shift running -> first option is NOW, nothing in the past (owner, session 28)
+    now_floor = None
+    if stage == "from" and picked and _today().isoformat() in picked and _shift_running(p):
+        now_floor = ws + ((_now_min() - ws) % 1440)
     btns = []
+    if now_floor is not None:
+        btns.append(InlineKeyboardButton("Now (%s)" % fmt12(now_floor),
+                                         callback_data="att:al:f:%d" % now_floor))
     for o in range(0, length + 1, 15):
         m = ws + o
         if stage == "from" and o == length:
             continue
         if stage == "to" and from_min is not None and m <= from_min:
+            continue
+        if now_floor is not None and m <= now_floor:
             continue
         btns.append(InlineKeyboardButton(
             fmt12(m), callback_data="att:al:%s:%d" % ("f" if stage == "from" else "t", m)))
@@ -252,7 +302,7 @@ def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    start = date.today() + timedelta(days=1)
+    start = _today() + timedelta(days=1)
     own_off = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
     btns = []
     for i in range(30):
@@ -428,16 +478,28 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if sub == "done":
                 return await show(al_fullday_or_time(p, picked))
             if sub == "full":
-                return await show(al_stub(p, "Full-day AL for %d day(s) selected." % len(picked)))
+                near = _near_days(picked)
+                detail = "Full-day AL for %d day(s) selected." % len(picked)
+                if near:
+                    sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
+                               % (len(near), round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))))
+                return await show(al_stub(p, detail))
             if sub == "time":
-                return await show(al_time_grid(p, "from"))
+                return await show(al_time_grid(p, "from", picked=picked))
             if sub == "f":
                 context.user_data["att_al_from"] = int(data[3])
                 return await show(al_time_grid(p, "to", int(data[3])))
             if sub == "t":
                 f = context.user_data.get("att_al_from")
-                return await show(al_stub(p, "Hours AL: %s → %s (fractional deduction)."
-                                          % (fmt12(f), fmt12(int(data[3])))))
+                t = int(data[3])
+                detail = "Hours AL: %s → %s (fractional deduction)." % (fmt12(f), fmt12(t))
+                near = _near_days(picked)
+                if near:
+                    window = t - f
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
+                               % (len(near), round(SHORT_NOTICE_PT_PER_MIN * window * len(near))))
+                return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
     if action == "em":

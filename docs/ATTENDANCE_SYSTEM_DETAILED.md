@@ -263,8 +263,23 @@
    - **Cancel AL {date}** → confirm → release the booking, refund any deducted AL, collapse/refresh senior
      messages, notify Supervisors group if it had been announced. **Cutoff (owner): cannot cancel once the
      AL TIME has started** (the window, not the whole day).
-3. **Date selection** — multiple choice, **days 7→90** (`29/06` format; grid+pager per §2).
-   **Today + next 6 days are NOT shown** (owner, session 28) — that range belongs to Emergency AL.
+3. **Date selection — UPDATED (owner, session 28 v2): days 0→90 INCLUDING TODAY.** Days 0–6 show a ⚠
+   marker — selectable, allowed, but **SHORT-NOTICE PRICED: −0.1 points per AL minute on those days**
+   (full 9h day ≈ −54 pts; pending points activation). The warning shows the COMPUTED TOTAL before
+   confirming, never just the rate. Per-day evaluation: 8 days picked, 3 within the window → only those
+   3 cost points. **This fully replaces Emergency AL** (no limiter, no bonus-warning ladder — the price +
+   2-senior approval + digest visibility do the governing).
+   - **TODAY while shift already running:** Full-day option HIDDEN (half-worked day); time picker's first
+     button = **Now (exact current time)** and past times never shown — the gap before the request stays
+     in the lateness machinery (no retro-excuses possible by construction).
+   - **From-now requests inherit 1-SENIOR-TO-LEAVE** (from the old mid-shift emergency): seniors pinged
+     instantly, one ✅ lets them go, second ratifies after.
+   - **Compassion override:** on approval, owner/seniors can waive the short-notice points for genuine
+     crises (points pending owner tuning anyway).
+   - Lateness-vs-AL arbitrage is INTENTIONAL: asking properly (−0.1/min + AL + approval) is ~10× cheaper
+     than being late (−1/−2/min + payback) — pushes people from surprising the team into proper requests.
+   - ⚠ Rules-screen bullet "AL: ask 7+ days ahead" needs updating + retranslation (batch with next
+     ChatGPT pass).
 4. **Full day or Choose Time** → buttons. Choose Time → their work hours in **15-min buttons**
    (9:00am, 9:15am …), pick **from** then **to**.
 5. **Reason** — bilingual ask (Khmer under).
