@@ -317,9 +317,9 @@
 ## 6b. SPECIAL LEAVE (About Me → 🕊 Special Leave) — owner spec + Cambodian law, session 28 ⏳
 > Legal basis: Labor Law Art. 169–171 + Prakas 267/2001 — special leave = up to 7 PAID days/yr for
 > immediate-family events; deduct from AL if available, else make-up hours; NEVER salary.
-- **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent · 💍 Marriage → My marriage
-  (dates hidden for first 30 days — owner rule) / My child's marriage · 🕊 Family death → Child / Parent /
-  Spouse → dates · 👶 Wife giving birth.
+- **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent · 💍 Marriage → My marriage /
+  My child's marriage (**BOTH: dates hidden for first 30 days** — owner rule, weddings are planned) ·
+  🕊 Family death → Child / Parent / Spouse → dates · 👶 Wife giving birth.
 - **Funding:** taken from AL; for own marriage + death of child/parent/spouse (+ wife birth): if AL = 0 →
   **AL GOES NEGATIVE (only here), floor −7/yr, NEVER money**. Negative repaid by future +1.5/mo accrual;
   resignation with negative AL → shop absorbs (owner). 7-day/yr special-leave counter; beyond 7 → normal

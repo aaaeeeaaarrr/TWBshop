@@ -227,17 +227,18 @@ def marriage_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
         [InlineKeyboardButton("💍 My marriage — 30+ days · ស្នើមុន 30 ថ្ងៃ", callback_data="att:sp:marmy")],
-        [InlineKeyboardButton("👰 My child's marriage (1 day)", callback_data="att:sp:marchild")],
+        [InlineKeyboardButton("👰 My child's marriage — 30+ days · ស្នើមុន 30 ថ្ងៃ", callback_data="att:sp:marchild")],
     ]
     return _hdr(p, "💍 Whose marriage?\n"
-                   "(Your own marriage: ask at least 30 days before. / "
-                   "រៀបការខ្លួនឯង៖ ស្នើសុំមុនយ៉ាងតិច 30 ថ្ងៃ។)"), InlineKeyboardMarkup(rows)
+                   "(Marriages: ask at least 30 days before. / "
+                   "រៀបការ៖ ស្នើសុំមុនយ៉ាងតិច 30 ថ្ងៃ។)"), InlineKeyboardMarkup(rows)
 
 
 def marriage_dates(p: dict, child: bool) -> tuple[str, InlineKeyboardMarkup]:
     if child:
-        rows = _date_grid_rows("att:sp:marcd", _today() + timedelta(days=1), 28, "att:sp:mar")
-        return _hdr(p, "👰 Your child's marriage — which day? (1 day)"), InlineKeyboardMarkup(rows)
+        rows = _date_grid_rows("att:sp:marcd", _today() + timedelta(days=31), 28, "att:sp:mar")
+        return _hdr(p, "👰 Your child's marriage — which day? (1 day; "
+                       "must be planned 30+ days ahead)"), InlineKeyboardMarkup(rows)
     # own marriage: dates start at day 31 (owner rule — plan 30+ days ahead)
     rows = _date_grid_rows("att:sp:mard", _today() + timedelta(days=31), 28, "att:sp:mar")
     return _hdr(p, "💍 Your marriage — first day of leave? (3 days; "
