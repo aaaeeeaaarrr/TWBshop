@@ -89,18 +89,40 @@ def _back_row(target: str = "att:menu") -> list[InlineKeyboardButton]:
 # ---------------------------------------------------------------- screens
 
 def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    # Khmer labels reviewed via ChatGPT, owner-approved session 28
+    # Khmer labels reviewed via ChatGPT, owner-approved session 28.
+    # Order + grouping per owner (session 28): Check-in, Late, About Work (seniors), About Me.
+    # Emergency AL REMOVED by owner — weird emergencies will be handled via the points system (TBD).
     rows = [
-        [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
-        [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
-        [InlineKeyboardButton("🚨 Emergency AL · ឈប់សម្រាកបន្ទាន់", callback_data="att:em")],
-        [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
-        [InlineKeyboardButton("⏱ OT · ថែមម៉ោង", callback_data="att:ot")],
         [InlineKeyboardButton("📍 Check in · ចូលវត្តមាន", callback_data="att:ci")],
-        [InlineKeyboardButton("📋 My schedule · កាលវិភាគការងាររបស់ខ្ញុំ", callback_data="att:my")],
+        [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
+    ]
+    if p.get("is_senior"):
+        rows.append([InlineKeyboardButton("🧰 About Work · អំពីការងារ", callback_data="att:aw")])
+    rows += [
+        [InlineKeyboardButton("👤 About Me · អំពីខ្ញុំ", callback_data="att:am")],
         [InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")],
     ]
     return _hdr(p, "Main menu — what they see when they type anything:"), InlineKeyboardMarkup(rows)
+
+
+def about_me_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        _back_row(),
+        [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
+        [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
+        [InlineKeyboardButton("⏱ OT · ថែមម៉ោង", callback_data="att:ot")],
+        [InlineKeyboardButton("📋 My schedule · កាលវិភាគការងាររបស់ខ្ញុំ", callback_data="att:my")],
+    ]
+    return _hdr(p, "👤 About Me"), InlineKeyboardMarkup(rows)
+
+
+def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    # seniors only for now — later: Stocks + other checks most staff can access (owner)
+    rows = [
+        _back_row(),
+        [InlineKeyboardButton("➕ Give OT", callback_data="att:ot:give")],
+    ]
+    return _hdr(p, "🧰 About Work"), InlineKeyboardMarkup(rows)
 
 
 def late_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -137,7 +159,7 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
         iso = d.isoformat()
         mark = "✓ " if iso in picked else ""
         btns.append(InlineKeyboardButton(mark + day_label(d), callback_data="att:al:d:%s" % iso))
-    rows = [_back_row()] + grid(btns, 4)
+    rows = [_back_row("att:am")] + grid(btns, 4)
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("◀ Earlier", callback_data="att:al:p:%d" % (page - 1)))
@@ -214,7 +236,7 @@ def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         if d.weekday() == own_off:
             continue  # their current day off — nothing to swap there (owner, session 28)
         btns.append(InlineKeyboardButton(day_label(d), callback_data="att:do:d:%s" % d.isoformat()))
-    rows = [_back_row()] + grid(btns, 4)
+    rows = [_back_row("att:am")] + grid(btns, 4)
     return _hdr(p, "Change day off — pick the NEW day you want off (next 30 days, not today).\n"
                    "Current day off: %s" % (p.get("day_off") or "?")), InlineKeyboardMarkup(rows)
 
@@ -243,15 +265,12 @@ def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    if p.get("is_senior"):
-        rows = [_back_row(), [InlineKeyboardButton("➕ Give OT", callback_data="att:ot:give")]]
-        return _hdr(p, "Your OT bank: 0h 🚧\n\nAs a SENIOR you can grant OT (owner approves)."), \
-            InlineKeyboardMarkup(rows)
+    # everyone's personal OT view — Give OT lives under About Work (seniors)
     return _hdr(p, "Your OT bank: 0h 🚧\n\nOT is given by your seniors when the shop needs extra "
                    "hours — when you have hours banked, I'll show you the times to take them back.\n"
                    "OT ត្រូវបានអនុញ្ញាតដោយបងៗ/អ្នកគ្រប់គ្រង ពេលហាងត្រូវការម៉ោងបន្ថែម។ "
                    "ពេលអ្នកមានម៉ោង OT សន្សំទុក ខ្ញុំនឹងបង្ហាញពេលដែលអ្នកអាចសម្រាកសងម៉ោងវិញបាន។"), \
-        InlineKeyboardMarkup([_back_row()])
+        InlineKeyboardMarkup([_back_row("att:am")])
 
 
 def ot_durations(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -261,7 +280,7 @@ def ot_durations(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         label = ("%dmin" % m) if m < 60 else ("%gh" % (m / 60))
         btns.append(InlineKeyboardButton(label, callback_data="att:ot:d:%d" % m))
         m += 30
-    rows = [_back_row("att:ot")] + grid(btns, 4)
+    rows = [_back_row("att:aw")] + grid(btns, 4)
     return _hdr(p, "Give OT — how much?"), InlineKeyboardMarkup(rows)
 
 
@@ -281,7 +300,7 @@ def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]
                   "🚧 Next build: when+why steps, owner card, banking, buyback slots, daily reminder."
                % (label, rec["canonical_name"] if rec else "?", p["canonical_name"], label,
                   rec["canonical_name"] if rec else "?"))
-    return txt, InlineKeyboardMarkup([_back_row("att:ot"),
+    return txt, InlineKeyboardMarkup([_back_row("att:aw"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -301,7 +320,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "Upcoming AL: 🚧 (reads al_requests next build)"
                 % (p.get("work_start") or "?", p.get("work_end") or "?",
                    p.get("day_off") or "?", exp, p.get("al_left", "?"))), \
-        InlineKeyboardMarkup([_back_row()])
+        InlineKeyboardMarkup([_back_row("att:am")])
 
 
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
@@ -361,6 +380,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "menu":
         context.user_data["att_al_picked"] = set()
         return await show(main_menu(p))
+    if action == "am":
+        return await show(about_me_menu(p))
+    if action == "aw":
+        if not p.get("is_senior"):
+            return await show(main_menu(p))
+        return await show(about_work_menu(p))
     if action == "late":
         if len(data) > 2 and data[2] == "o":
             return await show(late_picked(p, int(data[3])))

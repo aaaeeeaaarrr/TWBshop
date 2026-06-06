@@ -274,7 +274,13 @@
    supersede pattern (Backlog B).
 10. ~~Advance-notice question~~ RESOLVED by §5.3: normal AL starts at day 7; anything sooner = Emergency AL.
 
-## 6. EMERGENCY AL (private, button flow) ⏳ — owner spec session 28
+## 6. EMERGENCY AL — ❌ REMOVED FROM MENU (owner, session 28 late): "sometimes some people have weird
+## emergencies popping up" — a rigid 1×/30-days flow doesn't fit real life. Owner is bringing the POINTS
+## system into this instead (discussion open — see §9). Design below KEPT for reference only; the
+## main menu is now: Check in · Late · About Work (seniors: Give OT, later stocks/checks) · About Me
+## (AL, Change day off, OT, My schedule). ⚠️ OPEN: with Emergency gone, days 0–6 have NO request path
+## (normal AL starts at day 7) — resolve when the points discussion lands.
+### (shelved design follows)
 1. Staff taps **Emergency AL** → warning, bilingual:
    *"You can only do this once every 30 days. Do you understand?"*
    `[I fully understand]` `[No Emergency AL]` (second = back to main menu).
