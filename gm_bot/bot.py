@@ -1070,20 +1070,31 @@ async def _resolve_report_math_if_fixed(context, chat_id: int, full: dict, fixed
 
 
 async def _edited_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Staff fix reports by EDITING them (session 28 — edits used to be invisible).
-    Re-parse REPORT edits; a now-correct report closes its clarification + gets thanked."""
+    """Edits used to be invisible (session 28). Two real cases:
+    1. staff fix a REPORT by editing it -> re-parse; correct math closes the case + thanks them;
+    2. staff complete an ANSWER by editing it ("...but we can not find it") -> the edited text
+       runs through clarification resolution + the judge, any group."""
     msg = update.edited_message
-    if not msg or msg.chat_id != config.DAILY_REPORT_CHAT_ID:
+    if not msg:
         return
     text = msg.text or msg.caption or ""
     if not text.strip():
         return
+    if msg.chat_id == config.DAILY_REPORT_CHAT_ID:
+        try:
+            full = await _store_daily_report_if_any(msg, text)  # idempotent update, same message_id
+            if full is not None:
+                await _resolve_report_math_if_fixed(context, msg.chat_id, full, msg, "edit")
+                return  # it was a report — done
+        except Exception as e:
+            logger.error("edited report handling failed: %s", e)
+    # edited answer to an open clarification (any group)
     try:
-        full = await _store_daily_report_if_any(msg, text)  # idempotent update, same message_id
-        if full is not None:
-            await _resolve_report_math_if_fixed(context, msg.chat_id, full, msg, "edit")
+        resolved = _resolve_clarification_response(msg.chat_id, msg, text)
+        if resolved:
+            await _judge_clarification(context, resolved["clar"], resolved["answer"], answer_msg=msg)
     except Exception as e:
-        logger.error("edited report handling failed: %s", e)
+        logger.error("edited answer handling failed: %s", e)
 
 
 async def _maybe_correct_report(context, msg, full: dict) -> None:
