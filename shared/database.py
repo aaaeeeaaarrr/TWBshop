@@ -2470,7 +2470,7 @@ def seed_staff_registry() -> int:
 def _staff_row(r: dict) -> dict:
     import json as _json
     d = dict(r)
-    for k in ("aliases", "telegram_ids"):
+    for k in ("aliases", "telegram_ids", "expertise"):
         try:
             d[k] = _json.loads(d.get(k) or "[]")
         except Exception:
