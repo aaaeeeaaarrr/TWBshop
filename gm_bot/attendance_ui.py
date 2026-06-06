@@ -97,9 +97,9 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
     ]
     if p.get("is_senior"):
-        rows.append([InlineKeyboardButton("🧰 About Work · អំពីការងារ", callback_data="att:aw")])
+        rows.append([InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")])
     rows += [
-        [InlineKeyboardButton("👤 About Me · អំពីខ្ញុំ", callback_data="att:am")],
+        [InlineKeyboardButton("👤 About Me · របស់ខ្ញុំ", callback_data="att:am")],
         [InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")],
     ]
     return _hdr(p, "Main menu — what they see when they type anything:"), InlineKeyboardMarkup(rows)
