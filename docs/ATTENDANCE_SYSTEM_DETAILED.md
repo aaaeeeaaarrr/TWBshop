@@ -179,7 +179,18 @@
    out."* If their live location has been ON since check-in (forgot it on / left it on) → auto-checked-out,
    no message needed (we know they were there to the last minute). No response + not in zone → flag
    *early-leave?* for the digest. Skipped if rest-of-day emergency AL was approved.
-8. ~~Pre-shift reminder~~ REJECTED (owner session 28: no need — check-in prompt at start is enough).
+8. **CHECK-IN MESSAGE SEQUENCE (owner FINAL, session 28 — pre-reminder REVIVED with a job):**
+   skipped entirely on day-off / AL / already-checked-in / Tyty / Delis.
+   - **T−10 min:** pre-reminder — shift starts in 10 min, check in via live location, AND advertise the
+     early-bird reward: arrive 5 min before start = **+10 points**.
+   - **T0 (start):** still no in-zone location → the normal check-in prompt (+ I'm-late button).
+   - **T+5 min:** still nothing → the NICE message (short, encouraging, never scolding — owner: "I want
+     them to feel good and encouraged"): we give **5 FREE late minutes**; beyond that ALL late minutes
+     count — they become **payback (buyback) time** AND **points**: −1/min if they informed BEFORE shift
+     start, −2/min if they didn't.
+   - **GRACE RULE (updates the old "strict from minute 1"):** late ≤5 min → totally free (no debt, no
+     points). Late >5 min → **ALL minutes count from minute 1** (not minus 5) — debt = actual minutes;
+     points rate by informed-before (−1) vs not (−2).
 
 ## 4. LATE (private, button flow) ⏳ — owner spec session 28
 1. Staff taps **Late** (or gets the check-in prompt and taps `I'm late`).
@@ -390,12 +401,13 @@
 | # | Cause | Points (owner-adjustable) |
 |---|-------|--------------------------|
 | P1 | Arrived >5 min early (live location in zone) | **+10** (not while a payback debt is open 🔒) |
-| P2 | Late, informed BEFORE shift start | **−1 / min late** (location-measured, STRICT from minute 1) |
-| P3 | Late, informed AFTER shift started — incl. silent arrivers who never tapped anything (the check-in prompt at start is their escalation; informing BEFORE start is what earns the cheaper P2 rate) | **−2 / min late** (location-measured, STRICT) |
+| P2 | Late, informed BEFORE shift start | **−1 / min late** (location-measured; ≤5 min late = FREE, >5 = all minutes count from minute 1) |
+| P3 | Late, informed AFTER shift started — incl. silent arrivers who never tapped anything (the check-in prompt at start is their escalation; informing BEFORE start is what earns the cheaper P2 rate) | **−2 / min late** (same 5-min free rule) |
 | P4 | (existing) recognition/leaderboard points | unchanged |
 | P5 | (future, owner) stock checks done, other duties | TBD |
 
-- **NO grace window (owner: strict)** — lateness counts from minute one, measured by location.
+- **5-MINUTE FREE WINDOW (owner updated session 28, replaces "no grace"):** late ≤5 min = free; >5 min →
+  ALL minutes count from minute one (debt + points), measured by location.
 
 - config table `points_rules` (cause, value, active=false) — single place for the owner to adjust.
 - AL deduction for no-show is an AL/salary action, NOT points (separate ledgers).
