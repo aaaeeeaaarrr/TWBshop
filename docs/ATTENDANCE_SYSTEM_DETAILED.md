@@ -319,7 +319,11 @@
 > immediate-family events; deduct from AL if available, else make-up hours; NEVER salary.
 - **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent · 💍 Marriage → My marriage /
   My child's marriage (**BOTH: dates hidden for first 30 days** — owner rule, weddings are planned) ·
-  🕊 Family death → Child / Parent / Spouse → dates · 👶 Wife giving birth.
+  🕊 Family death → Child / Parent / Spouse → start date → **duration buttons 3–7 days, chosen ONCE at
+  booking** (owner+session 28: no re-applying mid-funeral; need more later → just re-enter Special Leave) ·
+  👶 Wife giving birth. **Death-photo reply FINAL bilingual:** *"You don't need to send anything — we're
+  so sorry for your loss 🤍 / អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍"*.
+  ALL Special Leave strings now FINAL bilingual in the shell (ChatGPT batch session 28, via khmer_inbox).
 - **Funding:** taken from AL; for own marriage + death of child/parent/spouse (+ wife birth): if AL = 0 →
   **AL GOES NEGATIVE (only here), floor −7/yr, NEVER money**. Negative repaid by future +1.5/mo accrual;
   resignation with negative AL → shop absorbs (owner). 7-day/yr special-leave counter; beyond 7 → normal

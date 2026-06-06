@@ -153,25 +153,31 @@ def _date_grid_rows(prefix: str, start: date, count: int, back: str) -> list[lis
 def special_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:am"),
-        [InlineKeyboardButton("🤒 Sick", callback_data="att:sp:sick")],
-        [InlineKeyboardButton("💍 Marriage", callback_data="att:sp:mar")],
-        [InlineKeyboardButton("🕊 Family death", callback_data="att:sp:death")],
-        [InlineKeyboardButton("👶 Wife giving birth", callback_data="att:sp:birth")],
+        [InlineKeyboardButton("🤒 Sick · ឈឺ", callback_data="att:sp:sick")],
+        [InlineKeyboardButton("💍 Marriage · រៀបការ", callback_data="att:sp:mar")],
+        [InlineKeyboardButton("🕊 Family death · មរណភាពគ្រួសារ", callback_data="att:sp:death")],
+        [InlineKeyboardButton("👶 Wife giving birth · ប្រពន្ធសម្រាលកូន", callback_data="att:sp:birth")],
     ]
     return _hdr(p, "🕊 Special Leave — choose the reason:\n"
+                   "🕊 ច្បាប់ពិសេស — ជ្រើសរើសមូលហេតុ៖\n"
                    "(taken from AL; for marriage / family death / birth the balance can go below zero — "
-                   "never from salary)"), InlineKeyboardMarkup(rows)
+                   "never from salary)\n"
+                   "(ដកពី AL; សម្រាប់រៀបការ / មរណភាពគ្រួសារ / ប្រពន្ធសម្រាលកូន AL អាចធ្លាក់ក្រោម 0 — "
+                   "មិនដកពីប្រាក់ខែទេ)"), InlineKeyboardMarkup(rows)
+
+
+_WHO_KH = {"child": "កូនអ្នក", "spouse": "ប្តី/ប្រពន្ធអ្នក", "parent": "ឪពុក/ម្តាយអ្នក"}
 
 
 def sick_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
-        [InlineKeyboardButton("Me", callback_data="att:sp:me")],
-        [InlineKeyboardButton("My child", callback_data="att:sp:sickf:child")],
-        [InlineKeyboardButton("My spouse", callback_data="att:sp:sickf:spouse")],
-        [InlineKeyboardButton("My parent", callback_data="att:sp:sickf:parent")],
+        [InlineKeyboardButton("Me · ខ្ញុំ", callback_data="att:sp:me")],
+        [InlineKeyboardButton("My child · កូនខ្ញុំ", callback_data="att:sp:sickf:child")],
+        [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ", callback_data="att:sp:sickf:spouse")],
+        [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ", callback_data="att:sp:sickf:parent")],
     ]
-    return _hdr(p, "🤒 Who is sick?"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🤒 Who is sick?\n🤒 អ្នកណាឈឺ?"), InlineKeyboardMarkup(rows)
 
 
 def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -181,27 +187,33 @@ def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     offs = late_offsets(shift_len_min(p["work_start"], p["work_end"]))
     btns = [InlineKeyboardButton(fmt12(ws + o), callback_data="att:sp:meo:%d" % o) for o in offs]
     rows = [_back_row("att:sp:sick")] + grid(btns, 3)
-    rows.append([InlineKeyboardButton("🛌 I really can't come today", callback_data="att:sp:mecant")])
+    rows.append([InlineKeyboardButton("🛌 I really can't come today · ថ្ងៃនេះមកមិនបានមែនទែន",
+                                      callback_data="att:sp:mecant")])
     return _hdr(p, "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
-                   "What time can you come?"), InlineKeyboardMarkup(rows)
+                   "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល — មើលថាអ្នកមានអារម្មណ៍យ៉ាងម៉េច"
+                   "នៅកន្លែងធ្វើការ។\n\n"
+                   "What time can you come?\nអ្នកអាចមកម៉ោងប៉ុន្មាន?"), InlineKeyboardMarkup(rows)
 
 
 def sick_me_time(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
     ws = to_min(p.get("work_start"))
+    t = fmt12(ws + offset)
     txt = _hdr(p,
-               "Get well — see you ~%s 🤍\n\n"
+               "Get well — see you ~%s 🤍\n"
+               "សូមឱ្យឆាប់ធូរស្បើយ — ជួបគ្នាប្រហែល %s 🤍\n\n"
                "[TEST PREVIEW → SUPERVISORS group]\n"
                "“%s is sick, coming ~%s today.”\n\n"
                "(Missed time becomes pay-back, same as informed late. Doctor papers later wipe it.)\n"
                "🚧 Next build: arrival watch, papers photo intake → owner tap, frequency dossier."
-               % (fmt12(ws + offset), p.get("call_name") or p["canonical_name"], fmt12(ws + offset)))
+               % (t, t, p.get("call_name") or p["canonical_name"], t))
     return txt, InlineKeyboardMarkup([_back_row("att:sp:me"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
 def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     txt = _hdr(p,
-               "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n\n"
+               "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
+               "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n\n"
                "(Provisional: the missed shift becomes pay-back time unless papers arrive within 3 days.\n"
                "Papers → real sick day: no pay-back, no points, AL untouched.)\n"
                "🚧 Next build: papers intake → owner tap, provisional debt, frequency dossier.")
@@ -211,7 +223,8 @@ def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 def sick_family_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
     rows = _date_grid_rows("att:sp:famd:%s" % who, _today(), 14, "att:sp:sick")
-    return _hdr(p, "🤒 Sick leave for your %s — which day?" % who), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🤒 Sick leave for your %s — which day?\n🤒 %sឈឺ — សុំច្បាប់ថ្ងៃណា?"
+                % (who, _WHO_KH.get(who, who))), InlineKeyboardMarkup(rows)
 
 
 def sick_family_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
@@ -226,12 +239,13 @@ def sick_family_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMa
 def marriage_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
-        [InlineKeyboardButton("💍 My marriage — 30+ days · ស្នើមុន 30 ថ្ងៃ", callback_data="att:sp:marmy")],
-        [InlineKeyboardButton("👰 My child's marriage — 30+ days · ស្នើមុន 30 ថ្ងៃ", callback_data="att:sp:marchild")],
+        [InlineKeyboardButton("💍 My marriage · រៀបការខ្ញុំ — ស្នើមុន 30+ ថ្ងៃ", callback_data="att:sp:marmy")],
+        [InlineKeyboardButton("👰 My child's marriage · រៀបការកូនខ្ញុំ — ស្នើមុន 30+ ថ្ងៃ",
+                              callback_data="att:sp:marchild")],
     ]
-    return _hdr(p, "💍 Whose marriage?\n"
-                   "(Marriages: ask at least 30 days before. / "
-                   "រៀបការ៖ ស្នើសុំមុនយ៉ាងតិច 30 ថ្ងៃ។)"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "💍 Whose marriage?\n💍 អ្នកណារៀបការ?\n"
+                   "(Marriages: ask at least 30 days before.)\n"
+                   "(រៀបការ៖ សូមស្នើសុំជាមុនយ៉ាងតិច 30 ថ្ងៃ។)"), InlineKeyboardMarkup(rows)
 
 
 def marriage_dates(p: dict, child: bool) -> tuple[str, InlineKeyboardMarkup]:
@@ -261,35 +275,48 @@ def marriage_stub(p: dict, iso: str, child: bool) -> tuple[str, InlineKeyboardMa
 def death_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         _back_row("att:sp"),
-        [InlineKeyboardButton("My child", callback_data="att:sp:deathw:child")],
-        [InlineKeyboardButton("My parent", callback_data="att:sp:deathw:parent")],
-        [InlineKeyboardButton("My spouse", callback_data="att:sp:deathw:spouse")],
+        [InlineKeyboardButton("My child · កូនខ្ញុំ", callback_data="att:sp:deathw:child")],
+        [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ", callback_data="att:sp:deathw:parent")],
+        [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ", callback_data="att:sp:deathw:spouse")],
     ]
-    return _hdr(p, "🕊 We're very sorry. Who passed away?"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🕊 We're very sorry. Who passed away?\n"
+                   "🕊 យើងសូមចូលរួមរំលែកទុក្ខ។ តើអ្នកណាទទួលមរណភាព?"), InlineKeyboardMarkup(rows)
 
 
 def death_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
     rows = _date_grid_rows("att:sp:deathd:%s" % who, _today(), 8, "att:sp:death")
-    return _hdr(p, "🕊 First day of leave? (3 days)"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "🕊 First day of leave?\n🕊 ថ្ងៃចាប់ផ្តើមសម្រាក?"), InlineKeyboardMarkup(rows)
 
 
-def death_stub(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+def death_days(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
+    # owner, session 28: choose 3–7 once at booking (no re-applying mid-funeral); more later = re-enter
+    btns = [InlineKeyboardButton("%d ថ្ងៃ / days" % n, callback_data="att:sp:deathn:%s:%s:%d" % (who, iso, n))
+            for n in range(3, 8)]
+    rows = [_back_row("att:sp:death")] + grid(btns, 3)
+    return _hdr(p, "🕊 How many days do you need?\n🕊 ត្រូវការប៉ុន្មានថ្ងៃ?"), InlineKeyboardMarkup(rows)
+
+
+def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeyboardMarkup]:
     d = date.fromisoformat(iso)
-    d3 = day_label(d + timedelta(days=2))
+    dn = day_label(d + timedelta(days=days - 1))
     return _hdr(p, "We're very sorry for your loss 🤍\n"
-                   "3 days of leave, %s → %s. No approval needed.\n\n"
+                   "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍\n\n"
+                   "%d days of leave, %s → %s. No approval needed.\n"
+                   "សម្រាក %d ថ្ងៃ, %s → %s។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។\n\n"
                    "[TEST PREVIEW → SUPERVISORS group]\n"
                    "“%s on leave %s → %s (family).”  ← reason NEVER in groups\n\n"
-                   "(From AL — balance can go below zero, never from salary. Extra days possible as "
-                   "normal AL.)\n🚧 Next build: instant booking + notices + negative-AL ledger."
-                % (day_label(d), d3, p.get("call_name") or p["canonical_name"], day_label(d), d3)), \
+                   "(From AL — balance can go below zero, never from salary. Need more later? Just open "
+                   "Special Leave again.)\n🚧 Next build: instant booking + notices + negative-AL ledger."
+                % (days, day_label(d), dn, days, day_label(d), dn,
+                   p.get("call_name") or p["canonical_name"], day_label(d), dn)), \
         InlineKeyboardMarkup([_back_row("att:sp:death"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
 def birth_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = _date_grid_rows("att:sp:birthd", _today(), 8, "att:sp")
-    return _hdr(p, "👶 Congratulations! First day of leave? (2 days)"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "👶 Congratulations! First day of leave? (2 days)\n"
+                   "👶 អបអរសាទរ! ថ្ងៃចាប់ផ្តើមសម្រាក? (2 ថ្ងៃ)"), InlineKeyboardMarkup(rows)
 
 
 def birth_stub(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
@@ -328,8 +355,14 @@ def rules_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                 "• នាទីយឺតនឹងក្លាយជាម៉ោងសងវិញ — អ្នកធ្វើសងពេលហាងត្រូវការអ្នក។\n\n"
                 "• No-show = 1 day's pay and no bonus this time.\n"
                 "• No-show = ប្រាក់ឈ្នួល 1 ថ្ងៃ និងមិនមាន Bonus លើកនេះ។\n\n"
-                "• AL: ask 7+ days ahead. Day-off swap: within 7 days, your partner agrees first.\n"
-                "• AL៖ សូមស្នើសុំជាមុន 7+ ថ្ងៃ។ ប្តូរថ្ងៃឈប់៖ ក្នុងរយៈពេល 7 ថ្ងៃ ហើយអ្នកប្តូរជាមួយត្រូវយល់ព្រមមុន។\n\n"
+                "• AL: free when asked 7+ days ahead. Within 7 days is possible — it costs points.\n"
+                "• AL៖ ស្នើមុន 7+ ថ្ងៃ = មិនដក Points។ ក្នុង 7 ថ្ងៃ អាចស្នើបាន — តែដក Points។\n\n"
+                "• Special Leave (sick, marriage, family death, birth): see the menu — money is never "
+                "taken for these.\n"
+                "• ច្បាប់ពិសេស (ឈឺ, រៀបការ, មរណភាពគ្រួសារ, ប្រពន្ធសម្រាលកូន)៖ សូមមើលក្នុង menu — "
+                "មិនដកលុយសម្រាប់រឿងទាំងនេះទេ។\n\n"
+                "• Day-off swap: within 7 days, your partner agrees first.\n"
+                "• ប្តូរថ្ងៃឈប់៖ ក្នុងរយៈពេល 7 ថ្ងៃ ហើយអ្នកប្តូរជាមួយត្រូវយល់ព្រមមុន។\n\n"
                 "• OT: given by seniors, saved as hours — take them back when it's calm.\n"
                 "• OT៖ បងៗ/អ្នកគ្រប់គ្រងជាអ្នកអនុញ្ញាត ហើយសន្សំជាម៉ោង — អាចសម្រាកសងម៉ោងវិញ ពេលហាងស្ងប់។\n\n"
                 "• Points restart after every 2nd pay — every month is a fresh start 🌱\n"
@@ -387,7 +420,9 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
     return _hdr(p, "You have %s AL days left. Choose dates (tap to ✓, then Done).\n"
                    "អ្នកនៅសល់ច្បាប់ %s ថ្ងៃ។ ជ្រើសរើសថ្ងៃ៖\n"
                    "⚠ days are short notice (within 7 days) — they cost points; "
-                   "I'll show the exact cost before you confirm."
+                   "I'll show the exact cost before you confirm.\n"
+                   "⚠ ថ្ងៃដែលមានសញ្ញា ⚠ គឺស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ត្រូវដក Points; "
+                   "ខ្ញុំនឹងបង្ហាញចំនួនដកពិតប្រាកដ មុនពេលអ្នកបញ្ជាក់។"
                 % (al_left if al_left is not None else "?", al_left if al_left is not None else "?")), \
         InlineKeyboardMarkup(rows)
 
@@ -649,7 +684,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "deathw":
             return await show(death_dates(p, data[3]))
         if sub == "deathd":
-            return await show(death_stub(p, data[3], data[4]))
+            return await show(death_days(p, data[3], data[4]))
+        if sub == "deathn":
+            return await show(death_stub(p, data[3], data[4], int(data[5])))
         if sub == "birth":
             return await show(birth_dates(p))
         if sub == "birthd":
