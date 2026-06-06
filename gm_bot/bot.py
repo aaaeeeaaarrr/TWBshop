@@ -26,7 +26,7 @@ from shared.database import (
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
     gm_get_approved_policy_for_type,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
-    gm_append_refinement_note, save_ops_message,
+    gm_append_refinement_note,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, gm_get_state, gm_set_state,
@@ -2064,18 +2064,9 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Always buffer this message for later correlation
     _msg_buffer[key].append((now, msg))
 
-    # Persist to ops_messages so all groups accumulate history automatically
-    try:
-        media_type = ("photo" if msg.photo else
-                      "video" if msg.video else
-                      "document" if msg.document else None)
-        sent_at = msg.date.isoformat() if msg.date else None
-        sender_id = msg.from_user.id if msg.from_user else None
-        chat_title = msg.chat.title or None
-        save_ops_message(chat_id, msg_id, chat_title, sender_id, sender,
-                         text or None, media_type, sent_at)
-    except Exception as _e:
-        logger.debug("ops_messages log failed: %s", _e)
+    # ops_messages persistence REMOVED (session 28): the Telethon listener is the single
+    # canonical recorder (now self-healing on startup). Two writers caused duplicate rows
+    # (bot-api ids + telethon ids for the same message).
 
     logger.debug("Group msg: chat_id=%s title=%r sender=%s", chat_id, msg.chat.title, sender)
 
