@@ -237,8 +237,6 @@ def sick_family_fulltime(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboa
                                       callback_data="att:sp:famt:%s:%s" % (who, iso))])
     txt = "Sick leave for your %s — %s\nFull day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" \
           % (who, d)
-    if today_running:
-        txt += "\n\n(Your shift already started — time starts from NOW.)"
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 
@@ -264,18 +262,16 @@ def sick_family_time_grid(p: dict, who: str, iso: str, stage: str,
              ("att:sp:famtt:%s:%s:%d:%d" % (who, iso, from_min, m))
         btns.append(InlineKeyboardButton(fmt12(m), callback_data=cb))
     rows = [_back_row("att:sp:famd:%s:%s" % (who, iso))] + grid(btns, 4)
-    q = "From what time?" if stage == "from" else "Until what time?"
+    q = ("From what time?\nចាប់ពីម៉ោងប៉ុន្មាន?" if stage == "from"
+         else "Until what time?\nដល់ម៉ោងប៉ុន្មាន?")
     return _hdr(p, q), InlineKeyboardMarkup(rows)
 
 
 def sick_family_stub(p: dict, who: str, iso: str, window: str = "full day") -> tuple[str, InlineKeyboardMarkup]:
     d = day_label(date.fromisoformat(iso))
-    return _hdr(p, "Sick leave for your %s on %s (%s) — from the 7-day special-leave pool (AL), "
-                   "no points, no papers needed.\n\n"
-                   "One day at a time: still sick tomorrow? Ask again before your shift — or the night "
-                   "before. (Build: an 'Again today' one-tap shortcut appears after a same-person day.)\n"
-                   "🚧 Next build: notify seniors (no approval gate) + Supervisors plain notice + "
-                   "pool counter." % (who, d, window)), \
+    return _hdr(p, "Sick leave for your %s — %s, %s ✓\nTake care 🤍\n\n"
+                   "🚧 Next build: senior notify + Supervisors notice + the night-before "
+                   "one-tap re-book nudge (12h before next shift)." % (who, d, window)), \
         InlineKeyboardMarkup([_back_row("att:sp:sick"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -486,8 +482,6 @@ def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMa
         txt += ("\n\n⚠ Short notice: %s\nFull-day cost: about −%d points (−0.1/min). "
                 "Hours-AL costs less — I'll show the exact number."
                 % (", ".join(day_label(date.fromisoformat(d)) for d in near), round(pts)))
-    if today_running:
-        txt += "\n\n(Your shift already started — time starts from NOW.)"
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 
@@ -513,7 +507,8 @@ def al_time_grid(p: dict, stage: str, from_min: int | None = None,
         btns.append(InlineKeyboardButton(
             fmt12(m), callback_data="att:al:%s:%d" % ("f" if stage == "from" else "t", m)))
     rows = [_back_row("att:al")] + grid(btns, 4)
-    q = "From what time?" if stage == "from" else "Until what time?"
+    q = ("From what time?\nចាប់ពីម៉ោងប៉ុន្មាន?" if stage == "from"
+         else "Until what time?\nដល់ម៉ោងប៉ុន្មាន?")
     return _hdr(p, q), InlineKeyboardMarkup(rows)
 
 

@@ -326,8 +326,13 @@
 > immediate-family events; deduct from AL if available, else make-up hours; NEVER salary.
 - **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent — **FAMILY-SICK = ONE DAY AT A
   TIME (owner, session 28):** date → Full day OR hours (15-min from→to; mid-shift → starts at Now, like
-  AL); still sick tomorrow → ask again before the shift / the night before. 'Again today' one-tap
-  shortcut after a same-person day (build). Each day individually consumes the 7-day pool. ·
+  AL); **NIGHT-BEFORE NUDGE replaces re-asking (owner, session 28):** after a family-sick day, GM nudges
+  **12h before their next shift** (slid back to 20:00 the prior evening if it lands in the 21:30–08:00
+  quiet window): *"Is your {child} better? If you need tomorrow off too, tell me now."* →
+  `[Again tomorrow — full day]` `[Choose time]` `[👍 better, I'm coming]` — one-tap re-book, day-by-day
+  control kept. Each day individually consumes the 7-day pool (internal counter — NEVER mention the
+  pool/jargon to staff; confirmations stay minimal: "Sick leave for your child — Sa 07/06, full day ✓
+  Take care 🤍"). ·
   💍 Marriage → My marriage /
   My child's marriage (**BOTH: dates hidden for first 30 days** — owner rule, weddings are planned) ·
   🕊 Family death → Child / Parent / Spouse → start date → **duration buttons 3–7 days, chosen ONCE at
