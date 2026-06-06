@@ -314,6 +314,40 @@
    supersede pattern (Backlog B).
 10. ~~Advance-notice question~~ RESOLVED by §5.3: normal AL starts at day 7; anything sooner = Emergency AL.
 
+## 6b. SPECIAL LEAVE (About Me → 🕊 Special Leave) — owner spec + Cambodian law, session 28 ⏳
+> Legal basis: Labor Law Art. 169–171 + Prakas 267/2001 — special leave = up to 7 PAID days/yr for
+> immediate-family events; deduct from AL if available, else make-up hours; NEVER salary.
+- **Menu (reason FIRST):** 🤒 Sick → Me / My child / My spouse / My parent · 💍 Marriage → My marriage
+  (dates hidden for first 30 days — owner rule) / My child's marriage · 🕊 Family death → Child / Parent /
+  Spouse → dates · 👶 Wife giving birth.
+- **Funding:** taken from AL; for own marriage + death of child/parent/spouse (+ wife birth): if AL = 0 →
+  **AL GOES NEGATIVE (only here), floor −7/yr, NEVER money**. Negative repaid by future +1.5/mo accrual;
+  resignation with negative AL → shop absorbs (owner). 7-day/yr special-leave counter; beyond 7 → normal
+  AL request. Defaults: marriage 3d · child's marriage 1d · wife birth 2d · death 3d (+extra via normal AL).
+- **NO short-notice points EVER on special leave** (never charge grief). Approval: death = NO approval
+  (instant acknowledgment + condolence + Supervisors notice) · sick = notify, no gate · marriage =
+  normal AL approval (30+ days out by design). Evidence: death never asked · marriage = the 30-day rule ·
+  sick = see below.
+- **🤒 SICK→ME — THE ANTI-FAKE LADDER (owner practice, session 28):**
+  - GM: *"Sorry to hear 😟 Take some medicine and come try — see how you feel at work. What time can you
+    come?"* → Late-style time buttons + `[🛌 I really can't come today]`.
+  - **PAPERLESS SICK = INFORMED LATENESS, identical price** (payback debt at need-slots for ALL missed
+    minutes incl. full day + −1/min when points activate) — "sick" carries ZERO discount, so only truth
+    says it. Full-day claim → *"If you see a doctor, send me a photo of the papers."*
+  - **Papers photo** (within ~3 days) → forwarded to OWNER for one tap → debt+points wiped, real sick day,
+    **AL UNTOUCHED (owner + law: own certified sickness is sick leave, separate from AL — never deduct)**.
+    Job legally protected up to ~6 months certified. 🔒 minor: papers-day paid or unpaid = owner policy
+    (recommend paid — rare once paperless costs payback). OLD "suggest 0.5 AL" practice = DEAD.
+  - **FREQUENCY DOSSIER (paperless only — nice until bam, owner):** flags → owner card with full history
+    (dates, weekday, papers ratio, came-vs-full-day, debt status): 2-in-7d (burst) · 3-in-30d (drip,
+    even spread) · 5-in-90d (chronic) · 3-of-last-4 same weekday ("every Monday") · 2-in-60d adjacent to
+    day-off (bridge) · 2 within 2 days after payday (payday echo).
+  - Family-sick (child/spouse/parent) untouched by the ladder — legal special-leave lane.
+- **HIRE BOT (owner, session 28):** add intake health question — *"Is your health 100% for this job?"*
+  `[Yes 100%]` / `[I want to explain]` + free text; stored on the candidate file (cross-checked later
+  against sick dossiers).
+- **Maternity NOT here** — 90d at half pay after 1yr service, own legal regime, case-by-case later.
+
 ## 6. EMERGENCY AL — ❌ REMOVED FROM MENU (owner, session 28 late): "sometimes some people have weird
 ## emergencies popping up" — a rigid 1×/30-days flow doesn't fit real life. Owner is bringing the POINTS
 ## system into this instead (discussion open — see §9). Design below KEPT for reference only; the
