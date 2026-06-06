@@ -325,9 +325,9 @@
    **PARTNER-DM TEMPLATE (owner-approved Khmer, session 28):**
    EN: *"{requester} wants to swap their day off with you: {requester} takes {weekday1} {dd/mm} off, you
    take {weekday2} {dd/mm} — same week. Reason: {reason}"*
-   KH: *"{requester} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ {requester} ឈប់{kh_weekday1} ទី{dd/mm}
-   ហើយអ្នកឈប់{kh_weekday2} ទី{dd/mm} — ក្នុងសប្តាហ៍ដដែល។"*
-   (Khmer weekday helper needed: ច័ន្ទ/អង្គារ/ពុធ/ព្រហស្បតិ៍/សុក្រ/សៅរ៍/អាទិត្យ.)
+   KH: *"{requester} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ {requester} ឈប់ {Wed 10/06}
+   ហើយអ្នកឈប់ {Thu 11/06} — ក្នុងសប្តាហ៍ដដែល។"*
+   (Dates stay ENGLISH inside Khmer text — owner rule, no Khmer weekdays/numerals.)
    **REASON IS NEVER TRANSLATED (owner, session 28 — GLOBAL rule for ALL flows):** the staff's typed
    reason is passed VERBATIM in whatever language they wrote it (English or Khmer) — to partners,
    seniors, owner, records. The bot's framing is bilingual; the quoted reason is raw.
@@ -341,8 +341,10 @@
    - **AL on a swap-affected day:** allowed (deducts normally), but the senior card adds:
      *"Note: this day is affected by her day-off swap approved on {date}."* No blind approvals.
    - Approved-change ripple (§8) re-validates everything else as usual.
-8. **GLOBAL DATE FORMAT (all ladders):** buttons `Tu 23/06` (shared day_label helper) · message text
-   `Tue 23/06` · Khmer `ថ្ងៃពុធ ទី23/06` (Khmer-weekday helper). Identical in every flow.
+8. **GLOBAL DATE FORMAT (all ladders — owner FINAL session 28): ENGLISH DATES EVERYWHERE, even inside
+   Khmer sentences.** Buttons `Tu 23/06` (shared day_label helper) · message text `Tue 23/06` · Khmer
+   lines embed the same English form (no Khmer weekday names, no Khmer numerals, NO Khmer-weekday
+   helper). Identical in every flow.
 
 ## 8. COVERAGE GUARDRAIL + RIPPLE CHECK (standing) ⏳ — LOCKED IN (owner session 28)
 - Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off/swap opens an expertise hole.
