@@ -93,7 +93,7 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [
         [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
         [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
-        [InlineKeyboardButton("🚨 Emergency Leave · ឈប់សម្រាកបន្ទាន់", callback_data="att:em")],
+        [InlineKeyboardButton("🚨 Emergency AL · ឈប់សម្រាកបន្ទាន់", callback_data="att:em")],
         [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
         [InlineKeyboardButton("⏱ OT · ថែមម៉ោង", callback_data="att:ot")],
         [InlineKeyboardButton("📍 Check in · ចូលវត្តមាន", callback_data="att:ci")],
@@ -188,10 +188,10 @@ def al_stub(p: dict, detail: str) -> tuple[str, InlineKeyboardMarkup]:
 
 def emergency_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [_back_row(),
-            [InlineKeyboardButton("I fully understand", callback_data="att:em:ok")],
-            [InlineKeyboardButton("No Emergency AL", callback_data="att:menu")]]
-    return _hdr(p, "⚠️ You can only do this once every 30 days. Do you understand?\n"
-                   "អ្នកអាចសុំឈប់សម្រាកបន្ទាន់បានតែ ១ដងក្នុង ៣០ថ្ងៃ។ យល់ព្រមទេ?"), InlineKeyboardMarkup(rows)
+            [InlineKeyboardButton("I fully understand · យល់ច្បាស់ហើយ", callback_data="att:em:ok")],
+            [InlineKeyboardButton("❌ No Emergency AL · មិនប្រើ", callback_data="att:menu")]]
+    return _hdr(p, "⚠️ You can only use Emergency AL once every 30 days. Do you understand?\n"
+                   "អ្នកអាចប្រើឈប់សម្រាកបន្ទាន់បានតែ ១ដងក្នុង ៣០ថ្ងៃ។ តើអ្នកយល់ច្បាស់ទេ?"), InlineKeyboardMarkup(rows)
 
 
 def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
