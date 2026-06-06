@@ -94,6 +94,13 @@
        the receiver's scheduled shift; only starts where start+duration ends BEFORE their next shift
        begins (gap between shifts; whole day if day-off) → **why: typed** (verbatim rule) → goes to the
        OWNER. *"Why is this OT needed? / តើ OT នេះត្រូវការសម្រាប់អ្វី?"*
+       **OT ON AN AL DAY (owner decision, session 28):** ALLOWED outside the leave window (AL already
+       deducted, no refund — their choice), with a FLAG LINE on the owner card: *"Note: receiver is on AL
+       this day ({window})."* **BLOCKED when overlapping the leave hours themselves** — one person can't
+       be officially absent and working the same minutes (availability pictures lie to seniors, the
+       Supervisors notice loses trust, check-in/left-early guards contradict, and hours-AL→OT overlap
+       would launder the controlled AL ledger into the self-serve OT bank). AL cancelled after an OT
+       grant that day → ripple check re-validates the OT booking (gap may have vanished).
      - **OWNER APPROVAL (always):** GM DMs owner the card — who gives, who gets, duration, when, why,
        receiver's current bank → [✅ Approve] / [❌ No]. Only on ✅ do the hours bank. **NO "stay-now" /
        pending state (owner final):** the grant→approve→bank chain is the whole system; the OT work itself
