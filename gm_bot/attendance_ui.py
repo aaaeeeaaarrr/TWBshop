@@ -160,7 +160,7 @@ def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMa
             [InlineKeyboardButton("Full day · ពេញមួយថ្ងៃ", callback_data="att:al:full")],
             [InlineKeyboardButton("Choose time · ជ្រើសម៉ោង", callback_data="att:al:time")]]
     return _hdr(p, "AL for: %s\nFull day or part of the day?\n"
-                   "ឈប់ពេញមួយថ្ងៃ ឬឈប់ត្រឹមតែខ្លះនៃថ្ងៃ?" % days), InlineKeyboardMarkup(rows)
+                   "សុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" % days), InlineKeyboardMarkup(rows)
 
 
 def al_time_grid(p: dict, stage: str, from_min: int | None = None) -> tuple[str, InlineKeyboardMarkup]:
