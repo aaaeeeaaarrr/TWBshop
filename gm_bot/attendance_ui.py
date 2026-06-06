@@ -281,12 +281,9 @@ def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]
 
 
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    return _hdr(p, "How to check in:\n"
-                   "1. Tap 📎 (attach) → Location → **Share Live Location**.\n"
-                   "2. Choose any duration — I only need to see you arrive.\n"
-                   "3. A single location pin does NOT count (it can be set anywhere).\n\n"
-                   "Your shift: %s–%s · zone: 200m around TWB.\n\n"
-                   "🚧 Next build: live geofence check, ‘Checked in ✓’, early +points event, check-out."
+    return _hdr(p, "Tap 📎 (attach) → Location → Share Live Location\n"
+                   "ចុច 📎 (ភ្ជាប់) → ទីតាំង (Location) → ចែករំលែកទីតាំងបន្តផ្ទាល់ (Share Live Location)\n\n"
+                   "Shift: %s–%s"
                 % (p.get("work_start") or "?", p.get("work_end") or "?")), \
         InlineKeyboardMarkup([_back_row()])
 

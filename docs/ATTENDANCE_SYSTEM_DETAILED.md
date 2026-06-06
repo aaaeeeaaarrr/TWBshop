@@ -146,7 +146,10 @@
    `[🕐 I'm late]` `[📍 How to check in]`  (owner's wording: "Are you late? If not, share live location
    to check in attendance" — refined above).
 2. **Live location received & in zone** → *"Checked in ✓"* + 👍; record checked_in_at. [Logic geofence]
-   - **static location pin** (one-shot, easily faked) → *"Please use Share → Live Location, not a single pin."*
+   - **static location pin** (one-shot, easily faked) — fires ANY time someone drops a pin (owner,
+     session 28): *"This does not count as check-in to work, do this instead:"* (+KH) followed by the
+     standard instruction block *"Tap 📎 (attach) → Location → Share Live Location"* (+KH). Check-in
+     screen itself is SHORT: instruction line (EN+KH) + "Shift: HH:MM–HH:MM", no zone talk.
    - shared but outside zone → *"You're not at the shop yet — it will count when you arrive."* (keep watching)
 3. **EARLY BIRD:** in zone >5 min before start → **+10 points** (points PENDING — record raw arrival time
    now, points computed later; see §9).
