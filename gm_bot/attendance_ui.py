@@ -611,6 +611,31 @@ def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
 
 # ---------------------------------------------------------------- handlers (OWNER ONLY)
 
+async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """TEST-ONLY location handler — OWNER ONLY (staff pins/locations stay unanswered until the
+    real check-in build). Static pin -> the final bilingual template; live location -> geofence
+    readout so the owner can test the 200m zone from anywhere."""
+    msg = update.message or update.edited_message
+    if not msg or not msg.location or update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    loc = msg.location
+    if getattr(loc, "live_period", None):
+        if update.edited_message:
+            return  # movement updates — stay quiet in test mode
+        from gm_bot.attendance import TWB_LAT, TWB_LNG, haversine_m
+        dist = haversine_m(loc.latitude, loc.longitude, TWB_LAT, TWB_LNG)
+        await msg.reply_text(
+            "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"
+            % (round(dist), "INSIDE the 200m zone ✅" if dist <= 200 else "outside the zone ❌"))
+        return
+    # static pin — the locked bilingual response
+    await msg.reply_text(
+        "Sending a pin does not count as check-in to work.\n"
+        "ការផ្ញើទីតាំងជា Pin មិនរាប់ជាការចុះវត្តមានចូលធ្វើការទេ។\n\n"
+        "Do this instead:\nសូមធ្វើតាមនេះវិញ៖\n\n"
+        "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់")
+
+
 async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Owner-only: open the role-play shell."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:

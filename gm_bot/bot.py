@@ -2138,6 +2138,9 @@ def build_app() -> Application:
     from gm_bot import attendance_ui
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
+    # test-only location handler (owner only): pin template + live-location geofence readout
+    app.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.LOCATION, attendance_ui.handle_location_test))
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.
