@@ -2134,6 +2134,10 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall
     app.add_handler(CallbackQueryHandler(rollcall.bind_callback, pattern=r"^bind:"))
+    # attendance role-play shell — OWNER ONLY, test mode (no staff interaction at all)
+    from gm_bot import attendance_ui
+    app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
+    app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

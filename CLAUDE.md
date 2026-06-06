@@ -574,8 +574,16 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
   staff_bind_uid() in database.py. _private_text_router replaces _owner_private_departure registration
   (owner → departure detect, others → roll-call). 12 tests test_rollcall.py. OWNER IS TELLING ALL STAFF
   TO MESSAGE THE GM NOW (roll-call = binding + Start-press collection).
-- **NEXT BUILD (in order):** main-menu button shell → check-in job (+check-out, shift-continuity) → Late
-  ladder + payback slots → AL/Emergency flows → day-off swap → Give OT/time bank → slips/payroll →
+- **MENU SHELL BUILT & DEPLOYED (gm_bot/attendance_ui.py):** owner-only /test → persona picker (any active
+  staff) → full main menu + first screens of every flow (Late ladder times, AL date-grid multi-select +
+  full-day/15-min from→to, Emergency warning+dates, Day-off dates+partner candidates, OT staff/senior views
+  + Give-OT durations+staff pick, Check-in instructions, My schedule card). Cross-audience messages appear
+  as [TEST PREVIEW] text; DB-writing endpoints are 🚧 stubs. SAFETY CONTRACT: module has NO send to any
+  chat but the owner's own /test message — staff still only get the roll-call greeting. 6 tests
+  test_attendance_ui.py (fmt12/day_label/shift_len/late_offsets/grid).
+- **NEXT BUILD (in order):** wire real ladders behind the shell — check-in job (+check-out,
+  shift-continuity) → Late ladder + payback slots → AL/Emergency flows → day-off swap → Give OT/time bank
+  → slips/payroll →
   role-play test with owner (attendance_test_mode: everything to owner only, he plays every role, tweaks
   wording+Khmer) → go-live WITHOUT live-location until owner explains + ALL staff pressed Start.
 - **Button stacking fixes shipped:** gm _exstaff_kb + b2b Confirm-Recurring ×2 + Bank-account-number.
