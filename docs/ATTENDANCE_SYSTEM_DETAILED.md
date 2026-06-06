@@ -93,7 +93,8 @@
        insight as payback placement). START-TIME CONSTRAINTS (owner, session 28): never show times inside
        the receiver's scheduled shift; only starts where start+duration ends BEFORE their next shift
        begins (gap between shifts; whole day if day-off) → **why: typed** (verbatim rule) → goes to the
-       OWNER. *"Why is this OT needed? / តើ OT នេះត្រូវការសម្រាប់អ្វី?"*
+       OWNER. FINAL why-prompt (owner+ChatGPT): *"Please type the reason why this OT is needed."* /
+       *"សូមវាយបញ្ចូលហេតុផលថា ហេតុអ្វីបានជាត្រូវការ OT នេះ។"*
        **OT ON AN AL DAY (owner decision, session 28):** ALLOWED outside the leave window (AL already
        deducted, no refund — their choice), with a FLAG LINE on the owner card: *"Note: receiver is on AL
        this day ({window})."* **BLOCKED when overlapping the leave hours themselves** — one person can't
