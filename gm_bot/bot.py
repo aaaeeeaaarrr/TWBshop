@@ -1889,6 +1889,42 @@ async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT
         await update.message.reply_text("Which one left?", reply_markup=kb)
 
 
+async def _new_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """A member JOINED an internal group -> if they're registered active staff who haven't
+    pressed Start with the GM yet, post a friendly in-group nudge tagging them to do so
+    (session 28). Safe by design: fires ONLY for registered active staff, only if not yet
+    greeted, once per uid (throttled in gm_state), never for customers/bots/unknowns."""
+    msg = update.message
+    if not msg or not msg.new_chat_members:
+        return
+    if msg.chat_id not in [cid for _, cid in _internal_groups()]:
+        return
+    for member in msg.new_chat_members:
+        if member.is_bot:
+            continue
+        uid = member.id
+        staff = staff_get_by_uid(uid)
+        if not staff or staff.get("status") != "active":
+            continue  # unknown / ex-staff -> say nothing in-group (offboarding handles leavers)
+        if gm_get_state("rollcall_greeted:%d" % uid) == "true":
+            continue  # already started with the GM
+        if gm_get_state("welcome_nudged:%d" % uid) == "true":
+            continue  # throttle: re-adds don't re-spam
+        gm_set_state("welcome_nudged:%d" % uid, "true")
+        call = staff.get("call_name") or staff["canonical_name"]
+        try:
+            await context.bot.send_message(
+                chat_id=msg.chat_id,
+                text=("👋 Welcome %s! Please open @twb_gm_bot and press START so I can help "
+                      "you with attendance.\n"
+                      "សូមស្វាគមន៍ %s! សូមបើក @twb_gm_bot ហើយចុច START ដើម្បីឱ្យខ្ញុំអាចជួយ"
+                      "អ្នកអំពីវត្តមាន។" % (_staff_mention(call, uid), call)),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error("welcome nudge failed: %s", e)
+
+
 async def _left_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """A member left an internal group -> if they're known active staff, ask the owner
     whether they left the company."""
@@ -2386,6 +2422,7 @@ def build_app() -> Application:
     app.add_handler(build_stock_conversation())
     # A known staff member leaving an internal group -> ask the owner if they left.
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, _left_member_handler))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, _new_member_handler))
     # Owner DMs GM in plain language that someone left (silent unless it's a departure).
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, _private_text_router))
