@@ -31,6 +31,7 @@ from shared.database import (
     late_declare, payback_open_debt, payback_add_debt, payback_credit, payback_book, payback_all_open,
     al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
     al_pending_requests, al_deduct, points_record, points_seed_catalogue,
+    al_leave_days_set, payback_bookings_due_reminder, payback_mark_reminded,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1118,6 +1119,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         try:
             await context.bot.send_message(uid, text)
+            # arm check-out capture: next in-zone share while this is set = checked out
+            if label.startswith("check-out"):
+                from shared.database import flow_save
+                flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=90)
         except Exception as e:
             logger.error("checkin send to %s failed: %s", name, e)
 
@@ -1197,6 +1202,15 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone, now_pp.isoformat())
     except Exception:
         pass
+    # check-OUT capture: if a check-out request armed this, an in-zone share closes the shift
+    from shared.database import flow_load, flow_clear, att_check_out
+    fs = flow_load(user.id)
+    if fs and fs.get("flow") == "checkout" and in_zone and not update.edited_message:
+        att_check_out(staff["id"], fs["data"].get("shift_date", shift_date), now_pp.isoformat())
+        flow_clear(user.id)
+        await msg.reply_text("Checked out ✓ — thank you, rest well 🤍\n"
+                             "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍")
+        return True
     if not in_zone:
         if not update.edited_message:
             await msg.reply_text(ui._V_FAR)
@@ -1414,8 +1428,19 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if not staff or not (staff.get("telegram_ids") or []):
             continue
         uid = staff["telegram_ids"][0]
-        # ladder_days counts legitimate working days elapsed (simplified: calendar days here)
-        days = (today - debt["created_date"]).days if debt.get("created_date") else 0
+        # ladder days = calendar days since created MINUS legitimate-leave days (freeze rule) and the
+        # staff's day-off weekday (they can still tap, but we don't count it as a chance missed)
+        from datetime import timedelta as _td
+        leave = al_leave_days_set(debt["staff_id"])
+        off = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5,
+               "sun": 6}.get((staff.get("day_off") or "")[:3].lower())
+        days = 0
+        if debt.get("created_date"):
+            d = debt["created_date"]
+            while d < today:
+                d += _td(days=1)
+                if d.isoformat() not in leave and d.weekday() != off:
+                    days += 1
         stage = pb.ignore_stage(days)
         try:
             if stage == "warn":
@@ -1440,6 +1465,40 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                            d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         except Exception as e:
             logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
+
+
+async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Gated, hourly: 12h-before reminder for booked payback slots (reward-neutral, encouraging)."""
+    if not _attendance_live():
+        return
+    from datetime import datetime as _dt
+    now = datetime.now(finance.PP_TZ)
+    for b in payback_bookings_due_reminder():
+        ids = b.get("telegram_ids")
+        try:
+            import json as _json
+            ids = _json.loads(ids) if isinstance(ids, str) else (ids or [])
+        except Exception:
+            ids = []
+        if not ids:
+            continue
+        slot_dt = _dt.combine(b["slot_date"], _dt.min.time()).replace(tzinfo=finance.PP_TZ) \
+            + __import__("datetime").timedelta(minutes=b["start_min"])
+        hrs = (slot_dt - now).total_seconds() / 3600
+        if not (0 < hrs <= 12):
+            continue
+        try:
+            await context.bot.send_message(
+                ids[0],
+                "Reminder — your payback time is %s %s.\n"
+                "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺ %s %s។\n"
+                "Come 5 minutes early and you earn +10 points ⭐\n"
+                "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
+                % (b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"]),
+                   b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"])))
+            payback_mark_reminded(b["id"])
+        except Exception as e:
+            logger.error("12h reminder failed: %s", e)
 
 
 async def _al_accrual_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2847,6 +2906,9 @@ def build_app() -> Application:
     app.job_queue.run_daily(_payback_ladder_job,
                             time=__import__("datetime").time(hour=0, minute=10),
                             name="gm_payback_ladder")
+    # 12h-before booking reminders: hourly, gated
+    app.job_queue.run_repeating(_booking_reminder_job, interval=3600, first=120,
+                                name="gm_booking_reminder")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

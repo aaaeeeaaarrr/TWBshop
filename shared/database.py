@@ -2337,8 +2337,10 @@ def init_attendance_db() -> None:
                     minutes     INTEGER,
                     auto_booked BOOLEAN DEFAULT FALSE,
                     status      TEXT DEFAULT 'booked',  -- booked | done | missed
+                    reminded_12h BOOLEAN DEFAULT FALSE,
                     created_at  TIMESTAMPTZ DEFAULT NOW()
                 );
+                ALTER TABLE payback_bookings ADD COLUMN IF NOT EXISTS reminded_12h BOOLEAN DEFAULT FALSE;
                 CREATE TABLE IF NOT EXISTS attendance_sessions (
                     id            SERIAL PRIMARY KEY,
                     staff_id      INTEGER REFERENCES staff_registry(id),
@@ -2780,6 +2782,38 @@ def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, en
                 VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                 (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked))
             return cur.fetchone()["id"]
+
+
+def al_leave_days_set(staff_id: int) -> set:
+    """All approved AL/leave day ISO strings for a staff (to FREEZE the payback ladder on them)."""
+    import json as _json
+    out = set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved'",
+                        (staff_id,))
+            for r in cur.fetchall():
+                try:
+                    out.update(_json.loads(r["days"] or "[]"))
+                except Exception:
+                    pass
+    return out
+
+
+def payback_bookings_due_reminder(within_hours: int = 12) -> list[dict]:
+    """Booked payback slots starting within `within_hours` not yet 12h-reminded."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT b.*, s.telegram_ids, s.call_name, s.canonical_name
+                           FROM payback_bookings b JOIN staff_registry s ON s.id=b.staff_id
+                           WHERE b.status='booked' AND b.reminded_12h=FALSE""")
+            return [dict(r) for r in cur.fetchall()]
+
+
+def payback_mark_reminded(booking_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE payback_bookings SET reminded_12h=TRUE WHERE id=%s", (booking_id,))
 
 
 def payback_all_open() -> list[dict]:

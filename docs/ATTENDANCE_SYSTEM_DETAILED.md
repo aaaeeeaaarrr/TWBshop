@@ -60,6 +60,12 @@ watchdogs · data backfill.
   recorded (their flows pending); values all PENDING/inactive by design.
 - **AL ACCRUAL:** arrears for NEW HIRES not implemented (no join_date column) — currently credits all
   active TWB equally; add start_date + arrears logic before relying on balances for new staff.
+- **WAVE 2:** ✅ check-out (flow_state armed by the request, in-zone share closes it); ✅ leave-freeze
+  (ladder day-count skips approved-AL days + day-off weekday); ✅ 12h booking reminder (hourly, gated).
+  STILL PENDING: (a) ARRIVAL-WATCH ("are you there yet?" 4×15min) deferred to bundle with the real
+  Late-DECLARE staff entry (no declarations exist until that's wired); (b) auto-checkout if location
+  stayed on all shift not yet done (only the request→share path); (c) check-out silent-close +30min
+  digest flag not yet wired; (d) slot NEED-RANKING still pending (coverage engine = Wave 2b).
 
 ## SYSTEM AUDIT RESOLUTIONS (session 28 — hole-hunt)
 - **H1 STATE PERSISTENCE (build #1):** every real ladder persists step+partial-data to a `gm_flow_state`
