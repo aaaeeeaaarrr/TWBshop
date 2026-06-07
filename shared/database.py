@@ -2312,6 +2312,18 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: sick cases (own + family)
+                CREATE TABLE IF NOT EXISTS sick_cases (
+                    id          SERIAL PRIMARY KEY,
+                    staff_id    INTEGER REFERENCES staff_registry(id),
+                    who         TEXT,    -- 'me' | 'child' | 'spouse' | 'parent'
+                    the_date    DATE,
+                    status      TEXT DEFAULT 'open',  -- open|provisional|papered|cleared|no_papers
+                    papers_seen BOOLEAN DEFAULT FALSE,
+                    covered_days INTEGER,
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_sick_open ON sick_cases (status);
                 -- session 28: Give-OT time bank
                 CREATE TABLE IF NOT EXISTS ot_bank (
                     staff_id    INTEGER PRIMARY KEY REFERENCES staff_registry(id),
@@ -2652,6 +2664,52 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def sick_create(staff_id: int, who: str, the_date: str, status: str = "open") -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO sick_cases (staff_id, who, the_date, status)
+                           VALUES (%s,%s,%s,%s) RETURNING id""", (staff_id, who, the_date, status))
+            return cur.fetchone()["id"]
+
+
+def sick_get(case_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sick_cases WHERE id=%s", (case_id,))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def sick_set(case_id: int, status: str | None = None, papers_seen: bool | None = None,
+             covered_days: int | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if status is not None:
+                cur.execute("UPDATE sick_cases SET status=%s WHERE id=%s", (status, case_id))
+            if papers_seen is not None:
+                cur.execute("UPDATE sick_cases SET papers_seen=%s WHERE id=%s", (papers_seen, case_id))
+            if covered_days is not None:
+                cur.execute("UPDATE sick_cases SET covered_days=%s WHERE id=%s", (covered_days, case_id))
+
+
+def sick_provisional_open() -> list[dict]:
+    """Provisional own-sick cases (no papers yet) — the daily job checks the grace deadline."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sick_cases WHERE status='provisional' AND who='me'")
+            return [dict(r) for r in cur.fetchall()]
+
+
+def sick_family_days_used(staff_id: int, year: int) -> float:
+    """Family-sick days used this year (toward the 7-day pool)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT COUNT(*) AS n FROM sick_cases
+                           WHERE staff_id=%s AND who<>'me'
+                           AND EXTRACT(YEAR FROM the_date)=%s""", (staff_id, year))
+            return float((cur.fetchone() or {}).get("n", 0))
 
 
 def ot_bank_balance(staff_id: int) -> int:

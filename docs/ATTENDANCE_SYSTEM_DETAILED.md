@@ -66,6 +66,11 @@ watchdogs · data backfill.
   Late-DECLARE staff entry (no declarations exist until that's wired); (b) auto-checkout if location
   stayed on all shift not yet done (only the request→share path); (c) check-out silent-close +30min
   digest flag not yet wired; (d) slot NEED-RANKING ✅ DONE Wave 2b.
+- **WAVE 5a (Special Leave — sick core):** ✅ sick.py pure (papers grace, family pool, who-KH) +3 tests;
+  sick_cases table + helpers; paperless-deadline daily job (provisional→payback after 3 days, gated).
+  PENDING 5b: papers AI reader (read_medical_paper) + owner card + undated playbook + recovery ask +
+  retroactive reversal + part-duty + family-sick declare flow. PENDING 5c: marriage / family-death
+  two-tier / wife-birth. The sick-declare staff UI (take-a-pill ladder) wires in Wave 7.
 - **WAVE 4 (Give OT):** ✅ ot.py pure (cap 14h, duration options) + coverage.surplus/slot_surplus (+5
   tests); ot_bank/ot_grants/ot_buyback tables + helpers. Orchestration: submit_ot_grant → OWNER card
   (approve/reject+memo both) → NOW banks immediately + buyback offer (safest/most-surplus slots first);

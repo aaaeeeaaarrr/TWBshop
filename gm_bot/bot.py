@@ -35,6 +35,7 @@ from shared.database import (
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
     swap_add_senior_vote, swap_set_status,
     ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
+    sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1724,6 +1725,36 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
 
 
+async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily (gated): provisional own-sick cases past the 3-day papers grace with no papers →
+    the missed shift becomes payback debt (the paperless rule)."""
+    if not _attendance_live():
+        return
+    from gm_bot import sick as sk
+    from gm_bot.attendance import to_min
+    today = datetime.now(finance.PP_TZ).date()
+    for c in sick_provisional_open():
+        if c.get("papers_seen"):
+            continue
+        if not sk.papers_deadline_passed(c["the_date"], today):
+            continue
+        staff = next((s for s in staff_all("active") if s["id"] == c["staff_id"]), None)
+        if not staff:
+            continue
+        ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+        shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
+        payback_add_debt(staff["id"], shift_min, "paperless sick (no papers in 3 days)",
+                         c["the_date"].isoformat())
+        sick_set(c["id"], status="no_papers")
+        if staff.get("telegram_ids"):
+            try:
+                await context.bot.send_message(staff["telegram_ids"][0],
+                    "No papers came — the missed time goes to your pay-back balance.\n"
+                    "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
+            except Exception:
+                pass
+
+
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Gated, hourly: 12h-before reminder for booked payback slots (reward-neutral, encouraging)."""
     if not _attendance_live():
@@ -3171,6 +3202,10 @@ def build_app() -> Application:
     # 12h-before booking reminders: hourly, gated
     app.job_queue.run_repeating(_booking_reminder_job, interval=3600, first=120,
                                 name="gm_booking_reminder")
+    # paperless-sick papers deadline: daily 07:20 PP (00:20 UTC), gated
+    app.job_queue.run_daily(_sick_papers_deadline_job,
+                            time=__import__("datetime").time(hour=0, minute=20),
+                            name="gm_sick_papers_deadline")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.
