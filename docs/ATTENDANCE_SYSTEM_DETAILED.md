@@ -322,6 +322,13 @@
        warning arrives as a plain DM even with no check-in; day-4 auto-books regardless. NO-SHOW +
        DEBT never mix: the missed shift is penalized in money/bonus (1 day's pay, bonus not earned,
        −2/min points), NEVER added to the payback balance — the debt simply survives unchanged.
+       **SICK vs PAYBACK SLOT (owner Q, session 28):** informed sick before a slot = slot cancelled,
+       NO skip penalty, debt unchanged, freeze applies; sick mid-slot = partial credit + remainder
+       stays. Slot-into-shift: slot gets partial credit, the shift becomes a normal own-sick day.
+       **ANTI-DODGE:** the FIRST paperless sick on an assigned slot is a free pass (rebooked); the
+       SECOND paperless slot-sick on the SAME debt counts as a skip step + dossier flag — papers
+       always reset the benefit of the doubt. (A slot-only sick day costs nothing by itself, so
+       serial slot-sickness would otherwise dodge forever for free.)
        **LEGITIMATE-LEAVE FREEZE (owner Q, session 28): "earned absence pauses the clock; stolen
        absence doesn't."** Approved AL / special leave (death, marriage, birth, family-sick) / PH /
        claimed sick days (papers OR paperless — the paper only prices the sick day itself) do NOT
