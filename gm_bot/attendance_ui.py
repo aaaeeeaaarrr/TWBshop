@@ -234,12 +234,15 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Noted — see you ~9:30pm 🤍\nកត់ចំណាំហើយ — ជួបគ្នា ~9:30pm 🤍\n\n"
          "[TEST PREVIEW → SUPERVISORS group]\n"
          "“Davy will be ~30 min late for the 9pm shift today.\n"
-         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។”  ← name+time only, never the reason",
+         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។”\n"
+         "← the reason follows as a REPLY to this once given on arrival (see step ③)",
          None),
         ("② arrival watch — declared time passed, no location yet (repeats 4× every 15 min)",
          "Are you there yet?\nមកដល់ហើយឬនៅ?\n" + _CI_HOWTO, None),
-        ("③ they arrive — verdict + reason ask",
-         "(same messages as Dry-run 1 steps ④–⑥ — already approved)", None),
+        ("③ they arrive — verdict + reason ask, then the reason goes to Supervisors",
+         "(verdict + 'Why were you late?' = Dry-run 1 steps ④–⑥, already approved)\n\n"
+         "[TEST PREVIEW → SUPERVISORS group, as a REPLY to the heads-up]\n"
+         "“Davy arrived 9:32pm — reason: moto broke” (KH — next batch)", None),
         ("④ payback slot picker (right after the reason; no AL option — late = time)",
          "You owe 90 min. Pick when to work it off — these are the times we need you most:\n"
          "អ្នកនៅត្រូវសង 90 min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖",
@@ -302,9 +305,10 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "AL របស់អ្នកសម្រាប់ Tue 23/06 → Thu 25/06 ត្រូវបានអនុម័តហើយ ✓", None),
         ("④ to the requester — not approved (seniors-only recap, nothing to the group)",
          "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
-        ("⑤ the SUPERVISORS group notice (the locked format — range, normal day off, back-at-work)",
+        ("⑤ the SUPERVISORS group notice (locked format + the reason — owner remodel)",
          "Meng on leave Tue 23/06 → Thu 25/06 (3 days).\n"
          "Meng ឈប់សម្រាក Tue 23/06 → Thu 25/06 (3 ថ្ងៃ)។\n"
+         "Reason: family trip\nមូលហេតុ៖ family trip\n"
          "Normal day off: Friday 26/06.\nថ្ងៃឈប់ធម្មតា៖ Friday 26/06។\n"
          "Back at work: Saturday 27/06, 9pm.\nត្រឡប់មកធ្វើការ៖ Saturday 27/06, 9pm។", None),
         ("⑥ cancelling an AL — refund confirmation",

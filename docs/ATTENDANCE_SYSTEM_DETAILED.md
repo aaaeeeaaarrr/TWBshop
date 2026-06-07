@@ -136,6 +136,20 @@
   The ONLY typed text is the reason fields (passed verbatim to seniors, not AI-read). Haiku is needed only
   for the group-redirect detection and understand-without-reply edges. (Telegram Bot API itself — messages,
   buttons, edits, reacts — is FREE; "API $" only ever means AI calls.)
+- **ALWAYS-SHOW-REASON + OWNER-GATED CALL-OUTS (owner remodel, session 28):**
+  1. Every recorded event (late, sick, AL, swap, OT, no-show) keeps its VERBATIM reason attached and
+     VISIBLE on every owner/senior surface — approval cards, dossiers, digests, /whois, payroll notes —
+     **AND in the SUPERVISORS GROUP notices (owner clarified session 28):** the approved-AL notice
+     includes the reason; the lateness heads-up still goes out at declare-time (no reason exists yet)
+     and **the reason is posted as a reply to it once given on arrival** ("Davy arrived 9:32pm —
+     reason: moto broke"). EXCEPTION kept for dignity: family-death notices stay "(family)" — veto if
+     you want the cause shown.
+  2. FREQUENCIES learned over time at analysis-time ("traffic ×14 this month", "sick: 3rd Monday"),
+     surfacing in the owner digest/dossiers.
+  3. **CALL-OUT GATE: the GM NEVER confronts a staff member about a reason pattern on its own.**
+     It messages the OWNER first with the dossier; only on the owner's explicit go (and his wording
+     preference) does anything reach the person. Nice to their face, evidence to the owner, the bam
+     is always a human decision.
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
@@ -242,8 +256,9 @@
    would teach staff which excuses are acceptable; the reason never changes the penalty, so its only
    value is honest signal). Categorization happens at ANALYSIS time (digest/Opus-on-subscription), never
    at confession time. Why on arrival: they're rushing/driving at the Late tap.
-4. **Posted to SUPERVISORS group instantly** — name + expected time only. **NO reason in-group**
-   (owner confirmed session 28; reasons stay private).
+4. **Posted to SUPERVISORS group instantly** — name + expected time (no reason exists yet at
+   declare-time). **REMODEL (owner, session 28 late): once the reason is given on arrival, it is
+   POSTED AS A REPLY to that heads-up** — Supervisors always end up seeing the why.
 5. **Arrival watch:** at the selected time, if live location still doesn't show them at the premise →
    *"Are you there yet? Open Live Location."* — repeat **4× every 15 min** until location confirms.
 6. **TRUTH = LOCATION:** late minutes are computed from when their live location enters the zone,
@@ -652,5 +667,6 @@
 - **SUPERVISORS group (clean outcomes only):** instant lateness heads-up; approved AL/swap plain notices.
 - **Private to owner:** quorum stand-offs, balance shortfalls, coverage warnings, salary-touching approvals,
   no-show/2-day-pay confirmations, uid-bind confirmations, anything unusual.
-- **Never in any group:** REASONS (owner confirmed session 28), availability details, who-approved,
-  the questioning back-and-forth.
+- **Never in any group:** availability details, who-approved, the questioning back-and-forth,
+  family-death causes ("(family)" only). REASONS now DO reach the SUPERVISORS group (owner remodel,
+  session 28): AL notices carry them; lateness reasons follow as a reply on arrival.
