@@ -314,6 +314,10 @@
        · Skipped the assigned slot → re-book ONCE → skipped again → **next bonus not earned** +
          the case lands in the owner digest as a person-problem.
        Ignoring stops being a strategy: the only way out of the debt is through it.
+       **REMAINDER CLOCK (owner Q, session 28): a partial booking RESETS the ladder for the leftover**
+       — they engaged in good faith, so the remaining minutes get a fresh day-0 (counted from when the
+       partial slot was worked). The daily check-in line + day-3 warn + day-4 auto-book then apply to
+       the smaller number. Self-booking stays available anytime via the menu.
      - **PAYBACK SLOT = MINI-SHIFT (owner REVERSED the no-reward rule, session 28 — "encourage them,
        not just break them"):** a booked slot (self-picked OR auto-assigned) gets the FULL check-in
        treatment — T−10 pre-reminder (with the how-to + the +10 line), T0 prompt, location check-in —
