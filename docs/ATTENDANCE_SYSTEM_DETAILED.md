@@ -73,8 +73,11 @@ watchdogs · data backfill.
 - **WAVE 6a (cross-cutting):** ✅ no_show_records table + daily no-show sweep (yesterday's scheduled
   staff with no check-in & no leave → record + no_show points event + owner note 1-day-pay) — also
   UNBLOCKS retroactive reversal (no_show_reverse helper ready) + slips. ✅ group-redirect (gated,
-  keyword, bilingual) in Supervisors/Management. PENDING 6b: call-outs (frequency dossier → Sonnet
-  private/Opus group), slips/payroll table+review, voice/photo reason capture, broad 👍 ack.
+  keyword, bilingual) in Supervisors/Management.
+- **WAVE 6b:** ✅ call-outs (frequency.py +5 tests; ai_client.generate_callout Sonnet-private/Opus-group;
+  weekly _callout_job Mondays, throttled per ISO-week, CC owner+Tyty) + voice/photo/sticker reason
+  capture (on a reason-wait → store + Supervisors). PENDING 6c: slips/payroll table + pay-day review;
+  broad 👍 ack beyond clarifications.
 - **WAVE 5c (marriage/death/birth):** ✅ special.py pure (+5 tests) + special_leaves table; book_family_death
   (instant, condolence, Supervisors notice w/ relation, AL deduct negative-ok, compassion-tier 1d→owner
   upgrade card+callback), book_wife_birth (2d notify), marriage routes through the AL approval engine

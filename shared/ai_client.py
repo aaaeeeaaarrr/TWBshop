@@ -1056,6 +1056,35 @@ async def assess_receipt_photo(image_bytes: bytes,
 
 
 # Bounded short-context judgment (one question + one reply) — Sonnet is the right tier.
+CALLOUT_PRIVATE_MODEL = "claude-sonnet-4-6"   # warm private nudge
+CALLOUT_GROUP_MODEL = "claude-opus-4-8"       # the unnamed group wink (highest-stakes 100 words)
+
+
+async def generate_callout(dossier: str, call_name: str, channel: str) -> str:
+    """Craft a bilingual (EN + KH) attendance call-out. channel='private' (Sonnet, warm, names them
+    once) or 'group' (Opus, NEVER names, unmistakable to the person, light to everyone else)."""
+    model = CALLOUT_PRIVATE_MODEL if channel == "private" else CALLOUT_GROUP_MODEL
+    if channel == "private":
+        sys = ("You are the GM of a Phnom Penh bakery. Write a SHORT, warm private message to a staff "
+               "member about a lateness pattern. Address them by call-name ONCE at the start, not again. "
+               "Kind, not scolding — 'we noticed, let's fix it together'. Mention the pattern lightly. "
+               "Output English then Khmer underneath. No threats.")
+    else:
+        sys = ("You are the GM of a Phnom Penh bakery. Write a SHORT group message that NEVER names "
+               "anyone, is light/friendly to everyone, but unmistakable to the one person it's about — "
+               "a wink that says 'we track patterns and we're watching, kindly'. Output English then "
+               "Khmer underneath. No names, no shame.")
+    try:
+        resp = await _get_client().messages.create(
+            model=model, max_tokens=300, system=sys,
+            messages=[{"role": "user", "content":
+                       "Pattern: %s\nCall name (private only): %s" % (dossier, call_name)}])
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("generate_callout failed: %s", exc)
+        return ""
+
+
 MEDICAL_PAPER_MODEL = "claude-opus-4-8"   # rare, high-judgment (undated papers, part-duty advice)
 
 

@@ -2686,6 +2686,16 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
     return out
 
 
+def lateness_dates(staff_id: int, days: int = 90) -> list[str]:
+    """Recent lateness event dates (for the frequency engine)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT for_shift FROM lateness_records
+                           WHERE staff_id=%s AND for_shift >= (CURRENT_DATE - %s)
+                           AND for_shift IS NOT NULL""", (staff_id, days))
+            return [str(r["for_shift"]) for r in cur.fetchall()]
+
+
 def no_show_record(staff_id: int, shift_date: str) -> bool:
     """Record a no-show (idempotent). Returns True if newly recorded."""
     with _db() as conn:

@@ -37,7 +37,7 @@ from shared.database import (
     ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
-    no_show_record, no_show_reverse,
+    no_show_record, no_show_reverse, lateness_dates,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -62,7 +62,7 @@ from shared.ai_client import (
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
     extract_daily_report_ai, generate_attendance_digest, detect_leave_request,
-    classify_stock_photo, read_stock_sheet, read_medical_paper,
+    classify_stock_photo, read_stock_sheet, read_medical_paper, generate_callout,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 from gm_bot import finance, clarify, lateness, mentions, reconcile, sales, stock
@@ -1074,12 +1074,48 @@ async def _send_reconciliation(context, business_day: str) -> None:
         logger.error("reconciliation failed for %s: %s", business_day, e)
 
 
-async def _private_photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Private photo: staff sick papers (gated). Harmless no-op otherwise."""
+async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """If a staff is on a reason-wait (flow_state step ends with 'reason') and sends voice/photo/
+    sticker instead of typing → store it verbatim + post to Supervisors (lateness reasons). Gated."""
+    if not _attendance_live():
+        return False
+    msg = update.message
+    user = update.effective_user
+    if not msg or not user:
+        return False
+    from shared.database import flow_load, flow_clear
+    fs = flow_load(user.id)
+    if not fs or not str(fs.get("step", "")).endswith("reason"):
+        return False
+    staff = staff_get_by_uid(user.id)
+    kind = ("voice" if msg.voice else "photo" if msg.photo else "sticker" if msg.sticker else "media")
+    flow_clear(user.id)
+    await msg.reply_text("Got it 👍 thank you.\nទទួលបានហើយ 👍 អរគុណ។")
     try:
+        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
+            "%s sent a %s reason:" % ((staff.get("call_name") if staff else "Staff"), kind))
+        await context.bot.forward_message(config.SUPERVISORS_CHAT_ID, msg.chat_id, msg.message_id)
+    except Exception:
+        pass
+    return True
+
+
+async def _private_photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Private photo: voice/photo reason capture first, then staff sick papers (gated)."""
+    try:
+        if await _capture_voice_reason(update, context):
+            return
         await _handle_sick_paper(update, context)
     except Exception as e:
-        logger.error("sick paper handling failed: %s", e)
+        logger.error("private photo handling failed: %s", e)
+
+
+async def _private_voice_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Private voice/sticker: reason capture (gated)."""
+    try:
+        await _capture_voice_reason(update, context)
+    except Exception as e:
+        logger.error("voice reason handling failed: %s", e)
 
 
 async def _private_location_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1936,6 +1972,47 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 pass
     elif sub == "rest":
         await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជា 🤍 សម្រាកថ្ងៃនេះ។")
+
+
+async def _callout_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Weekly (gated): detect lateness patterns → autonomous call-out (Sonnet private + Opus group),
+    CC owner + Tyty. Throttled once per staff per ISO-week so it never nags."""
+    if not _attendance_live():
+        return
+    from gm_bot import frequency as fq
+    now = datetime.now(finance.PP_TZ)
+    if now.weekday() != 0:   # Mondays only
+        return
+    today = now.date()
+    wkstamp = today.strftime("%G-W%V")
+    for s in staff_all("active"):
+        if s.get("org") != "TWB" or s["canonical_name"] == "Tyty":
+            continue
+        pat = fq.detect(lateness_dates(s["id"]), today)
+        if not pat:
+            continue
+        stamp = "callout_done:%d:%s" % (s["id"], wkstamp)
+        if gm_get_state(stamp) == "true":
+            continue
+        gm_set_state(stamp, "true")
+        call = s.get("call_name") or s["canonical_name"]
+        dossier = "%s (%s)" % (pat["flag"], pat["detail"])
+        uids = s.get("telegram_ids") or []
+        try:
+            priv = await generate_callout(dossier, call, "private")
+            if priv and uids:
+                await context.bot.send_message(uids[0], priv)
+            grp = await generate_callout(dossier, call, "group")
+            if grp:
+                await context.bot.send_message(config.SUPERVISORS_CHAT_ID, grp)
+            # CC both owners
+            for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+                if oid:
+                    await context.bot.send_message(oid,
+                        "📣 Call-out sent — %s (%s).\nPrivate: %s\nGroup: %s"
+                        % (call, pat["detail"], priv[:120], grp[:120]))
+        except Exception as e:
+            logger.error("callout for %s failed: %s", call, e)
 
 
 async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3457,9 +3534,12 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
-    # private photo from staff → sick papers (gated); falls through harmlessly otherwise
+    # private photo from staff → reason capture / sick papers (gated); harmless otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))
+    app.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & (filters.VOICE | filters.Sticker.ALL | filters.VIDEO_NOTE),
+        _private_voice_router))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)
@@ -3483,6 +3563,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_no_show_sweep_job,
                             time=__import__("datetime").time(hour=1, minute=0),
                             name="gm_no_show_sweep")
+    # weekly call-outs: daily 08:30 PP (01:30 UTC), job fires Mondays only, gated
+    app.job_queue.run_daily(_callout_job,
+                            time=__import__("datetime").time(hour=1, minute=30),
+                            name="gm_callout")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.
