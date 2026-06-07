@@ -66,6 +66,14 @@ watchdogs · data backfill.
   Late-DECLARE staff entry (no declarations exist until that's wired); (b) auto-checkout if location
   stayed on all shift not yet done (only the request→share path); (c) check-out silent-close +30min
   digest flag not yet wired; (d) slot NEED-RANKING ✅ DONE Wave 2b.
+- **WAVE 4 (Give OT):** ✅ ot.py pure (cap 14h, duration options) + coverage.surplus/slot_surplus (+5
+  tests); ot_bank/ot_grants/ot_buyback tables + helpers. Orchestration: submit_ot_grant → OWNER card
+  (approve/reject+memo both) → NOW banks immediately + buyback offer (safest/most-surplus slots first);
+  FUTURE → staff accept→commitment. buyback booking callback. PENDING: (a) senior-facing Give-OT entry
+  (Now=present-by-schedule list, duration, why) wires in Wave 7; (b) NOW location/senior-confirm PROOF
+  (first version banks on owner-approve, not on verified completion); (c) FUTURE accepted→work-slot
+  completion→bank + accepted-no-show penalty not yet wired; (d) buyback 12h reminder reuses payback
+  reminder pattern (not yet for ot_buyback table).
 - **WAVE 3 (day-off swap):** ✅ dayoff_overrides (dated, schedule-resolvers consult them — works_on now
   honors swaps) + dayoff_swaps + swap.py pure (within-7-days, partner-eligible) +4 tests. Orchestration:
   submit_swap → PARTNER card first (agree/no) → on agree, senior cards → 2 votes → apply overrides +

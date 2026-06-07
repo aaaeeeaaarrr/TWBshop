@@ -2312,6 +2312,34 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: Give-OT time bank
+                CREATE TABLE IF NOT EXISTS ot_bank (
+                    staff_id    INTEGER PRIMARY KEY REFERENCES staff_registry(id),
+                    balance_min INTEGER DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS ot_grants (
+                    id          SERIAL PRIMARY KEY,
+                    senior_id   INTEGER REFERENCES staff_registry(id),
+                    staff_id    INTEGER REFERENCES staff_registry(id),
+                    kind        TEXT,   -- 'now' | 'future'
+                    minutes     INTEGER,
+                    when_date   DATE,
+                    start_min   INTEGER,
+                    reason      TEXT,
+                    status      TEXT DEFAULT 'pending_owner',  -- pending_owner|approved|rejected|done
+                    staff_ok    BOOLEAN,
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS ot_buyback (
+                    id         SERIAL PRIMARY KEY,
+                    staff_id   INTEGER REFERENCES staff_registry(id),
+                    slot_date  DATE,
+                    start_min  INTEGER,
+                    end_min    INTEGER,
+                    minutes    INTEGER,
+                    status     TEXT DEFAULT 'booked',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
                 -- session 28: dated day-off overrides (swaps) — schedule resolvers consult these
                 CREATE TABLE IF NOT EXISTS dayoff_overrides (
                     id        SERIAL PRIMARY KEY,
@@ -2624,6 +2652,59 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def ot_bank_balance(staff_id: int) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT balance_min FROM ot_bank WHERE staff_id=%s", (staff_id,))
+            r = cur.fetchone()
+            return int(r["balance_min"]) if r else 0
+
+
+def ot_bank_add(staff_id: int, minutes: int) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO ot_bank (staff_id, balance_min) VALUES (%s,%s)
+                ON CONFLICT (staff_id) DO UPDATE SET balance_min=ot_bank.balance_min+%s
+                RETURNING balance_min""", (staff_id, minutes, minutes))
+            return int(cur.fetchone()["balance_min"])
+
+
+def ot_grant_create(senior_id, staff_id, kind, minutes, when_date, start_min, reason) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO ot_grants
+                (senior_id, staff_id, kind, minutes, when_date, start_min, reason)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (senior_id, staff_id, kind, minutes, when_date, start_min, reason))
+            return cur.fetchone()["id"]
+
+
+def ot_grant_get(grant_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ot_grants WHERE id=%s", (grant_id,))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def ot_grant_set(grant_id: int, status: str | None = None, staff_ok: bool | None = None) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if status is not None:
+                cur.execute("UPDATE ot_grants SET status=%s WHERE id=%s", (status, grant_id))
+            if staff_ok is not None:
+                cur.execute("UPDATE ot_grants SET staff_ok=%s WHERE id=%s", (staff_ok, grant_id))
+
+
+def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO ot_buyback (staff_id, slot_date, start_min, end_min, minutes)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (staff_id, slot_date, start_min, end_min, minutes))
+            return cur.fetchone()["id"]
 
 
 def dayoff_set_override(staff_id: int, the_date: str, kind: str, reason: str = "") -> None:

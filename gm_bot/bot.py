@@ -34,6 +34,7 @@ from shared.database import (
     al_leave_days_set, payback_bookings_due_reminder, payback_mark_reminded,
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
     swap_add_senior_vote, swap_set_status,
+    ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1258,6 +1259,131 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
+
+
+async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes: int,
+                          when_date: str | None, start_min: int | None, reason: str) -> int:
+    """Senior grants OT → owner approval card (both owners CC'd is implicit: owner is the approver)."""
+    gid = ot_grant_create(senior["id"], staff["id"], kind, minutes, when_date, start_min, reason)
+    sn = staff.get("call_name") or staff["canonical_name"]
+    snr = senior.get("call_name") or senior["canonical_name"]
+    bank = ot_bank_balance(staff["id"])
+    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    whentxt = ("now" if kind == "now" else (when_date or "?"))
+    body = ("OT grant: %s → %s, %s, when: %s. Why: %s\nReceiver's bank: %gh / 14h"
+            % (snr, sn, label, whentxt, reason, bank / 60))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve", callback_data="att:ot:ok:%d" % gid)],
+        [InlineKeyboardButton("❌ No", callback_data="att:ot:no:%d" % gid)],
+    ])
+    await context.bot.send_message(config.OWNER_TELEGRAM_ID, body, reply_markup=kb)
+    return gid
+
+
+async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:ot:ok|no:{id} — owner approves/rejects an OT grant."""
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    _, _, decision, gid_s = query.data.split(":")
+    g = ot_grant_get(int(gid_s))
+    if not g or g["status"] != "pending_owner":
+        await query.edit_message_text(query.message.text + "\n\n(already decided)")
+        return
+    staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+    senior = next((s for s in staff_all("active") if s["id"] == g["senior_id"]), None)
+    if decision == "no":
+        ot_grant_set(int(gid_s), status="rejected")
+        await query.edit_message_text(query.message.text + "\n\n❌ Rejected.")
+        # memo both senior + staff (reject-before-start path)
+        for s in (staff, senior):
+            if s and (s.get("telegram_ids") or []):
+                await context.bot.send_message(s["telegram_ids"][0],
+                    "The OT was not approved this time.\nOT មិនត្រូវបានអនុម័តលើកនេះទេ។")
+        return
+    ot_grant_set(int(gid_s), status="approved")
+    await query.edit_message_text(query.message.text + "\n\n✅ Approved.")
+    # NOW = bank immediately (first version; location/senior-confirm proof = wave note);
+    # FUTURE = ask staff to accept (becomes a work slot)
+    if not staff or not (staff.get("telegram_ids") or []):
+        return
+    if g["kind"] == "now":
+        new_bal = ot_bank_add(staff["id"], g["minutes"])
+        ot_grant_set(int(gid_s), status="done")
+        await _offer_buyback(context, staff, new_bal, staff["telegram_ids"][0], g["minutes"])
+    else:
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % int(gid_s))],
+            [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % int(gid_s))],
+        ])
+        await context.bot.send_message(staff["telegram_ids"][0],
+            "You're asked for OT on %s — can you?\nអ្នកត្រូវបានស្នើឱ្យធ្វើ OT នៅ %s — អ្នកអាចទេ?"
+            % (g.get("when_date") or "?", g.get("when_date") or "?"), reply_markup=kb)
+
+
+async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:otf:yes|no:{id} — staff accepts/declines a FUTURE OT (accept = commitment)."""
+    query = update.callback_query
+    await query.answer()
+    g = ot_grant_get(int(query.data.split(":")[3]))
+    staff = staff_get_by_uid(update.effective_user.id)
+    if not g or not staff or staff["id"] != g["staff_id"] or g["status"] != "approved":
+        return
+    if query.data.split(":")[2] == "no":
+        ot_grant_set(g["id"], status="rejected", staff_ok=False)
+        await query.edit_message_text(query.message.text + "\n\n❌ Declined (no problem).")
+        return
+    ot_grant_set(g["id"], staff_ok=True)
+    await query.edit_message_text(query.message.text +
+        "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)")
+    # the worked-then-banked happens at completion (check-in handler / senior confirm — wave note)
+
+
+async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_added: int) -> None:
+    """Offer buyback rest at the SAFEST (most-surplus) times — reward tone."""
+    from gm_bot import coverage as cov, payback as pb
+    from gm_bot.attendance import to_min
+    ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+    label = ("%dmin" % just_added) if just_added < 60 else ("%gh" % (just_added / 60))
+    rows = []
+    if ws is not None and we is not None:
+        days = pb.working_days_ahead(staff.get("day_off"), set(),
+                                     datetime.now(finance.PP_TZ).date(), 7, 3)
+        roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
+        scored = []
+        for d in days:
+            wd = d.strftime("%a")
+            for _lbl, s_min, e_min in pb.slot_windows(ws, we, bank_min):
+                surp = cov.slot_surplus(staff.get("expertise") or [], s_min, e_min, wd,
+                                        roster, set(), to_min)
+                txt = "%s %s-%s" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
+                scored.append((surp, [InlineKeyboardButton(
+                    txt, callback_data="att:otb:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, bank_min))]))
+        scored.sort(key=lambda t: -t[0])   # safest (most surplus) first
+        rows = [b for _s, b in scored]
+    await context.bot.send_message(uid,
+        "+%s OT approved — your bank: %gh. Choose when to take it back:\n"
+        "+%s OT ត្រូវបានអនុម័ត — OT bank៖ %gh។ សូមជ្រើសម៉ោងសម្រាកសងវិញ៖"
+        % (label, bank_min / 60, label, bank_min / 60),
+        reply_markup=InlineKeyboardMarkup(rows) if rows else None)
+
+
+async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:otb:{date}:{start}:{end}:{bankmin} — staff books buyback rest."""
+    query = update.callback_query
+    await query.answer()
+    staff = staff_get_by_uid(update.effective_user.id)
+    if not staff:
+        return
+    _, _, slot_date, s_min, e_min, _bank = query.data.split(":")
+    ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), int(e_min) - int(s_min))
+    from datetime import date as _date
+    d = _date.fromisoformat(slot_date)
+    await query.edit_message_text(
+        "Booked your rest ✓ — %s %s-%s 🌴\nបានកក់ការសម្រាករបស់អ្នក ✓ — %s %s-%s 🌴"
+        % (d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min)),
+           d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min))))
 
 
 async def submit_swap(context, requester: dict, partner: dict, req_off_date: str,
@@ -3027,6 +3153,9 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_al_approval_callback, pattern=r"^att:alapp:"))
     app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))
     app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
+    app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
+    app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
+    app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)

@@ -81,6 +81,31 @@ def shortfall(station: str, window: str, w_start: int, w_end: int, day_abbr: str
                - on_duty(station, w_start, w_end, day_abbr, staff_list, leave_names, to_min))
 
 
+def surplus(station: str, window: str, w_start: int, w_end: int, day_abbr: str,
+            staff_list: list[dict], leave_names: set, to_min) -> int:
+    """How OVER-staffed a station is (on-duty − target). Used to find SAFE times to give rest
+    back (OT buyback) — higher surplus = safest to remove a person."""
+    return (on_duty(station, w_start, w_end, day_abbr, staff_list, leave_names, to_min)
+            - window_target(window, day_abbr, station))
+
+
+def slot_surplus(expertise: set | list, slot_start: int, slot_end: int, day_abbr: str,
+                 staff_list: list[dict], leave_names: set, to_min) -> int:
+    """Safest-to-rest score for a buyback slot = MIN surplus across overlapped windows for the
+    stations this person fills (taking them out must not breach any window). Higher = safer."""
+    stations = stations_for(expertise)
+    if not stations:
+        return 0
+    worst = None
+    for wname, ws, we in WINDOWS:
+        if not overlaps(slot_start, slot_end % 1440, ws, we % 1440):
+            continue
+        for st in stations:
+            sp = surplus(st, wname, ws, we, day_abbr, staff_list, leave_names, to_min)
+            worst = sp if worst is None else min(worst, sp)
+    return worst if worst is not None else 0
+
+
 def slot_score(expertise: set | list, slot_start: int, slot_end: int, day_abbr: str,
                staff_list: list[dict], leave_names: set, to_min) -> int:
     """Neediness of a payback/OT slot for THIS person = the biggest shortfall, across the
