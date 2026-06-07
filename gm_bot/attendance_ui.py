@@ -1029,7 +1029,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     upcoming.sort()
     up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
     for d, rid in upcoming[:6]:
-        rows.append([InlineKeyboardButton("✕ Cancel AL %s" % day_label(date.fromisoformat(d)),
+        rows.append([InlineKeyboardButton("✕ Cancel AL · បោះបង់ AL %s" % day_label(date.fromisoformat(d)),
                                           callback_data="att:my:cancel:%s:%d" % (d, rid))])
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"

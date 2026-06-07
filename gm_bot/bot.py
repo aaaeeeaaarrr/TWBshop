@@ -1090,7 +1090,7 @@ async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TY
     staff = staff_get_by_uid(user.id)
     kind = ("voice" if msg.voice else "photo" if msg.photo else "sticker" if msg.sticker else "media")
     flow_clear(user.id)
-    await msg.reply_text("Got it 👍 thank you.\nទទួលបានហើយ 👍 អរគុណ។")
+    await msg.reply_text("Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។")
     try:
         await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
             "%s sent a %s reason:" % ((staff.get("call_name") if staff else "Staff"), kind))
@@ -1322,11 +1322,13 @@ async def book_family_death(context, staff: dict, who: str, start_date: str) -> 
     if staff.get("telegram_ids"):
         await context.bot.send_message(staff["telegram_ids"][0],
             "We're very sorry for your loss 🤍\n%d days of leave, %s → %s. No approval needed.\n"
-            "យើងសូមចូលរួមរំលែកទុក្ខ 🤍 សម្រាក %d ថ្ងៃ, %s → %s។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។"
+            "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍 សម្រាក %d ថ្ងៃ, %s → %s។ "
+            "មិនចាំបាច់រង់ចាំការអនុម័តទេ។"
             % (days, d0.strftime("%a %d/%m"), dn, days, d0.strftime("%a %d/%m"), dn))
     try:
         await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-            "%s on leave %s → %s (death of %s)." % (name, d0.strftime("%a %d/%m"), dn, who))
+            "%s on leave %s → %s (death of %s).\n%s ឈប់សម្រាក %s → %s (មរណភាព %s)។"
+            % (name, d0.strftime("%a %d/%m"), dn, who, name, d0.strftime("%a %d/%m"), dn, who))
     except Exception:
         pass
     # compassion tier → let the owner upgrade to the full law-tier with one tap
@@ -1363,7 +1365,7 @@ async def _death_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_
         staff = next((s for s in staff_all("active") if s["id"] == leave["staff_id"]), None)
         if staff and staff.get("telegram_ids"):
             await context.bot.send_message(staff["telegram_ids"][0],
-                "Your leave is extended to %d days 🤍\nច្បាប់របស់អ្នកត្រូវបានបន្ថែមដល់ %d ថ្ងៃ 🤍"
+                "Your leave is extended to %d days 🤍\nច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ %d ថ្ងៃហើយ 🤍"
                 % (new_days, new_days))
     await query.edit_message_text(query.message.text + "\n\n✓ %d day(s)." % new_days)
 
@@ -1383,7 +1385,8 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
             % (d0.strftime("%a %d/%m"), dn, d0.strftime("%a %d/%m"), dn))
     try:
         await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-            "%s on leave %s → %s (wife giving birth)." % (name, d0.strftime("%a %d/%m"), dn))
+            "%s on leave %s → %s (wife giving birth).\n%s ឈប់សម្រាក %s → %s (ប្រពន្ធសម្រាលកូន)។"
+            % (name, d0.strftime("%a %d/%m"), dn, name, d0.strftime("%a %d/%m"), dn))
     except Exception:
         pass
     return leave_id
@@ -1446,7 +1449,7 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % int(gid_s))],
         ])
         await context.bot.send_message(staff["telegram_ids"][0],
-            "You're asked for OT on %s — can you?\nអ្នកត្រូវបានស្នើឱ្យធ្វើ OT នៅ %s — អ្នកអាចទេ?"
+            "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
             % (g.get("when_date") or "?", g.get("when_date") or "?"), reply_markup=kb)
 
 
@@ -1509,7 +1512,7 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     from datetime import date as _date
     d = _date.fromisoformat(slot_date)
     await query.edit_message_text(
-        "Booked your rest ✓ — %s %s-%s 🌴\nបានកក់ការសម្រាករបស់អ្នក ✓ — %s %s-%s 🌴"
+        "Booked your rest ✓ — %s %s-%s 🌴\nបានកក់ម៉ោងសម្រាករបស់អ្នករួច ✓ — %s %s-%s 🌴"
         % (d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min)),
            d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min))))
 
@@ -1523,11 +1526,11 @@ async def submit_swap(context, requester: dict, partner: dict, req_off_date: str
     d1 = _date.fromisoformat(req_off_date).strftime("%a %d/%m")
     d2 = _date.fromisoformat(partner_off_date).strftime("%a %d/%m")
     body = ("%s wants to swap day off: %s takes %s off, you take %s — same week. Reason: %s\n"
-            "%s ស្នើសុំប្តូរថ្ងៃឈប់៖ %s ឈប់ %s ហើយអ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។ មូលហេតុ៖ %s"
+            "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ %s ឈប់ %s, អ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។ មូលហេតុ៖ %s"
             % (rn, rn, d1, d2, reason, rn, rn, d1, d2, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:swp:%d:agree" % swap_id)],
-        [InlineKeyboardButton("✋ No · មិនព្រម", callback_data="att:swp:%d:no" % swap_id)],
+        [InlineKeyboardButton("✋ No · ទេ", callback_data="att:swp:%d:no" % swap_id)],
     ])
     pids = partner.get("telegram_ids") or []
     if pids:
@@ -1555,7 +1558,7 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
         if req and (req.get("telegram_ids") or []):
             await context.bot.send_message(req["telegram_ids"][0],
                 "Your day-off swap wasn't accepted by your partner.\n"
-                "ការប្តូរថ្ងៃឈប់របស់អ្នកមិនត្រូវបានទទួលយកដោយដៃគូទេ។")
+                "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។")
         return
     swap_set_partner(int(sw["id"]), True)
     await query.edit_message_text(query.message.text + "\n\n✅ You agreed — sending to seniors.")
@@ -1615,22 +1618,23 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
         for s in (req, partner):
             if s.get("telegram_ids"):
                 await context.bot.send_message(s["telegram_ids"][0],
-                    "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកត្រូវបានអនុម័ត ✓")
+                    "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓")
         try:
             from datetime import date as _date
+            rn2 = req.get("call_name") or req["canonical_name"]
+            pn2 = partner.get("call_name") or partner["canonical_name"]
+            rd2 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+            pd2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
             await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-                "Day-off swap: %s off %s, %s off %s."
-                % (req.get("call_name") or req["canonical_name"],
-                   _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m"),
-                   partner.get("call_name") or partner["canonical_name"],
-                   _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")))
+                "Day-off swap: %s off %s, %s off %s.\nប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
+                % (rn2, rd2, pn2, pd2, rn2, rd2, pn2, pd2))
         except Exception:
             pass
     else:
         for s in (req, partner):
             if s.get("telegram_ids"):
                 await context.bot.send_message(s["telegram_ids"][0],
-                    "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនត្រូវបានអនុម័តទេ។")
+                    "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។")
 
 
 def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
@@ -1875,7 +1879,8 @@ async def _handle_sick_paper(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not case:
         return False
     sick_set(case["id"], papers_seen=True)
-    await msg.reply_text("Got your papers ✓ sending to the owner.\nទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។")
+    await msg.reply_text("Got your papers ✓ sending to the owner.\n"
+                         "បានទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។")
     try:
         photo = await msg.photo[-1].get_file()
         data = bytes(await photo.download_as_bytearray())
@@ -1949,10 +1954,11 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await context.bot.send_message(uid,
                 "Feeling a little better? If you're up to it, there's light work today (+15 points ⭐) — "
                 "only if you truly feel able 🤍\n"
-                "បើធូរស្បើយបន្តិច ហើយអ្នកអាចបាន មានការងារស្រាលៗថ្ងៃនេះ (+15 ពិន្ទុ ⭐) — តែបើអ្នកពិតជាអាច 🤍",
+                "ធូរស្បើយបន្តិចហើយឬនៅ? បើអ្នកមានកម្លាំង អាចមកធ្វើការងារស្រាលៗថ្ងៃនេះបាន (+15 points ⭐) — "
+                "តែបើអ្នកពិតជាអាចធ្វើបានប៉ុណ្ណោះ 🤍",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💪 I can come", callback_data="att:sp:come:%d" % case_id)],
-                    [InlineKeyboardButton("🛌 Rest today", callback_data="att:sp:rest:%d" % case_id)]]))
+                    [InlineKeyboardButton("💪 I can come · ខ្ញុំអាចមក", callback_data="att:sp:come:%d" % case_id)],
+                    [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:sp:rest:%d" % case_id)]]))
     elif sub == "come":
         # staff opted into part-duty (whole day stays papered; +15 gift; relaxed check-out)
         try:
@@ -1961,7 +1967,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
         await query.edit_message_text(
             "Thank you for coming in 🤍 light duty only — a senior will point you to seated/easy work.\n"
-            "អរគុណដែលបានមក 🤍 ការងារស្រាលៗ — បងៗនឹងណែនាំការងារ។")
+            "អរគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារអង្គុយ ឬការងារងាយៗឱ្យអ្នក។")
         # tell on-shift seniors
         for sen in _seniors(exclude_staff_id=case["staff_id"]):
             try:
@@ -1971,7 +1977,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             except Exception:
                 pass
     elif sub == "rest":
-        await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជា 🤍 សម្រាកថ្ងៃនេះ។")
+        await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។")
 
 
 async def _callout_job(context: ContextTypes.DEFAULT_TYPE) -> None:
