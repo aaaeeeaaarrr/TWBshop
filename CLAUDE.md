@@ -566,6 +566,15 @@ fixes live, data-reliability package live, Level-1 reconciliation live, lateness
   RIGHT=given (call names from right name).
 - **Pending ChatGPT batch (build-time strings):** day-3 warning, booked-confirm frame, 12h reminder,
   check-in debt line, auto-book notice, arrival watch — drafts in docs/ATTENDANCE_SYSTEM_DETAILED.md.
+- **Stocks/COMMS outage healed + senior-room recording armed (Jun 7 late):** May 28-29 backfilled for
+  Stock Checks (105 msgs/90 photos) + COMMS (26). DISCOVERY: listener account is NOT in Supervisors/
+  Management (owner: must NEVER join — junior staff use the shop account) → GM bot = permanent sole
+  writer there (exception re-added in _live_group_handler); Supervisors/Management May 28-29 =
+  unrecoverable (low cadence, accepted). Watchdog now also monitors twbshop-gm + twbshop-hire services
+  + per-chat cadence (REPORT/Stock 26h, COMMS 48h, Supervisors 96h). HIRE BOT = backup recorder for the
+  2 senior groups (_backup_recorder, group=-2; same message_id space = dup-free dual writing) — OWNER
+  ACTION: BotFather /setjoingroups ON + Group Privacy OFF for hire bot (it was group-blocked by design),
+  THEN add it to Supervisors + Management (privacy must be off BEFORE adding).
 - Suite green: 297.
 
 **▶ RESUME HERE (session 28 end): ATTENDANCE BUILD IN PROGRESS.**
