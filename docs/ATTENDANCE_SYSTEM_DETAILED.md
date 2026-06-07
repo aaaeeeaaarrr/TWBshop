@@ -255,7 +255,7 @@
   (Telegram caps ~100 buttons/keyboard; 90 stacked single-row date buttons would be an endless scroll.)
 
 ## 3. CHECK-IN (replaces whole-shift tracking) ⏳ — owner spec session 28
-1. **At shift start:** if no live location shows them inside the 200m zone → DM:
+1. **At shift start:** if no live location shows them inside the 100m zone → DM:
    *"Your shift just started. Please share your **live location** to check in. Running late? Tap below."*
    `[🕐 I'm late]` `[📍 How to check in]`  (owner's wording: "Are you late? If not, share live location
    to check in attendance" — refined above).

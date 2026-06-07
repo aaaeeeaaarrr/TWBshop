@@ -19,7 +19,10 @@ TWB_LAT = 11.5387774
 TWB_LNG = 104.9147998
 WORK_ZONE_RADIUS_M = 100      # owner session 28: tightened 200->100 for TWB (Delis TBD — staff live
                              # in the building there; revisit when Delis is integrated)
-OUTSIDE_BUDGET_MIN = 30       # total minutes a staff may be outside the zone per shift
+OUTSIDE_BUDGET_MIN = 30       # ⚠️ DEAD/vestigial (session 28): the 30-min outside-zone allowance
+                             # belonged to the WHOLE-SHIFT tracking model that was DROPPED for
+                             # check-in-only. outside_exceeded() is unused by the live design — kept
+                             # only so the existing test passes. Do NOT wire mid-shift outside-tracking.
 
 
 def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
