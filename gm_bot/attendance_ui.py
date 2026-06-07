@@ -924,7 +924,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "dr":
         if len(data) > 2 and data[2] == "go":
-            events = build_catalogue(p) + [
+            sample = _persona(context) or next(
+                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None), None)
+            if sample is None:
+                await query.answer("No staff with shifts found")
+                return
+            events = build_catalogue(sample) + [
                 ("📅 schedule summary", schedule_summary(_today()), None)]
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
