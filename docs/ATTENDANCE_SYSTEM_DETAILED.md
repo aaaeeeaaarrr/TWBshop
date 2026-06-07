@@ -143,9 +143,8 @@
   machinery, never blocking. Abandoned button-flows just sit in scroll-back (tap-time validation).
   Reason-step abandoned mid-request = a DRAFT: never sent to seniors, quietly expires after 24h.
   One text-wait at a time — a new flow's reason step replaces the old wait (last intention wins).
-- **SETTLE MENU AL GUARD (owner, session 28):** `[🏖 Take from AL]` is HIDDEN when al_left < 7 —
-  scarce AL is for real leave; payback only. 🔒 owner: should the 14-day deadline auto-settle respect
-  the same floor (eat AL only down to 7, remainder from salary)? (recommended yes.)
+- ~~Settle-menu AL guard~~ SUPERSEDED same session: lateness has NO AL option at all (late = time,
+  leave = AL, never mixed) — see §4.7 ignore-the-planner ladder.
 - **👍 ACK RULES (updated session 28):**
   - **OWNER: ALWAYS 👍** any typed owner message the GM understood — no exceptions. (Born from the Lim
     Soleng case: owner typed "Yes she's finished", GM acted but never confirmed.) PLUS when an owner
@@ -236,10 +235,10 @@
    location confirms arrival, GM asks *"Why were you late?"* (bilingual) — they TYPE the answer, stored
    verbatim. **MECHANICS (owner Qs, session 28):** NO reply/tag needed — private 1-on-1, the ask opens an
    awaiting-reason state and the next text IS the reason (menu-on-any-text is suspended while awaiting —
-   no menu spam). First message → 👍 + the settle menu (`[💪 Pay back]` `[🏖 Take from AL (X left)]`);
-   **further texts until a settle button is tapped (or ~10 min) APPEND to the stored reason** — Khmer
+   no menu spam). First message → 👍 + the payback SLOT BUTTONS directly (no AL option — late = time);
+   **further texts until a slot button is tapped (or ~10 min) APPEND to the stored reason** — Khmer
    burst-texting ("moto broke" / "on bridge" / "sorry boss") lands as ONE reason, no re-asks, no second 👍.
-   Ignoring the settle menu → the 14-day deadline machinery. NO preset reason buttons anywhere ("a menu of excuses is a menu of permission" — presets
+   Ignoring the slots → the ignore-the-planner ladder (§4.7). NO preset reason buttons anywhere ("a menu of excuses is a menu of permission" — presets
    would teach staff which excuses are acceptable; the reason never changes the penalty, so its only
    value is honest signal). Categorization happens at ANALYSIS time (digest/Opus-on-subscription), never
    at confession time. Why on arrival: they're rushing/driving at the Late tap.
@@ -249,11 +248,9 @@
    *"Are you there yet? Open Live Location."* — repeat **4× every 15 min** until location confirms.
 6. **TRUTH = LOCATION:** late minutes are computed from when their live location enters the zone,
    NOT what they said.
-7. **On arrival → settle the debt.** GM: *"Pay back? Or take from AL (you have {X} left)? If not enough AL,
-   it comes from salary."* Buttons:
-   - **Take from AL** — fractional: owed_minutes / shift_hours (e.g. 30 min on 10h = 0.05 AL).
-     If AL hits 0 → remainder from **salary** 🔒 (needs salary columns; recommend owner-approval gate on any
-     salary deduction).
+7. **On arrival → straight to payback (owner FINAL, session 28): NO AL option for lateness — late costs
+   TIME, leave costs AL, the currencies never mix.** After the reason, the GM goes directly to the
+   payback slot buttons. AL/salary are NEVER touched automatically for lateness.
    - **Pay back → NEED-TARGETED SLOTS, SHIFT-ADJACENT ONLY (v4 FINAL, owner session 28):**
      NO auto-pay; NO slots far from their shift. Slots are **immediately BEFORE or AFTER their own shift**
      — except ONE day-off option (see below). [Logic, no AI — §8 engine scores expertise thinness.]
@@ -275,8 +272,17 @@
        (his own schedule changed), the tap is rejected gracefully and the SAME message's buttons are
        EDITED IN PLACE with fresh slots (Telegram edit_message_reply_markup — Bot API messaging/edits are
        FREE; only AI reads cost money).
-     - **Ignore the planner / never show:** **14-day deadline (owner CONFIRMED)** auto-settles the
-       remainder from AL → salary past 0 (AL can NEVER go negative — salary catches the overflow).
+     - **IGNORE-THE-PLANNER LADDER (owner FINAL, session 28 — replaces the 14-day auto-AL entirely;
+       the debt NEVER auto-converts, time stays time):**
+       · Day 0: debt born → slot buttons shown.
+       · Every CHECK-IN while unbooked: ONE calm line + the slot buttons (*"Checked in ✓ — you still owe
+         90 min, pick a time:"*) — daily cadence at a natural moment, never hourly hammering.
+       · Day 3: warning + slots again: *"Pick before tomorrow, or I'll pick for you."* /
+         *"សូមជ្រើសរើសមុនថ្ងៃស្អែក បើមិនទាន់ទេ ខ្ញុំនឹងជ្រើសរើសជូនអ្នក។"* (KH draft — next batch).
+       · Day 4: **GM auto-books the shop's #1 need-slot** + notifies them + plain Supervisors notice.
+       · Skipped the assigned slot → re-book ONCE → skipped again → **next bonus not earned** +
+         the case lands in the owner digest as a person-problem.
+       Ignoring stops being a strategy: the only way out of the debt is through it.
      - **+10 early points NEVER fire during a booked payback slot — CONFIRMED owner session 28** ("no
        reward for running away then paying back").
      - "My schedule" menu shows the live balance; weekly digest lists open debts.
