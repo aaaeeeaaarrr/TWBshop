@@ -531,9 +531,14 @@
       OPERATIONAL facts only ("Davy off ~2d, can do seated work, back ~Thu") — never a diagnosis,
       never the document. (This removes the "embarrassing disease" judgment entirely — no diagnosis
       ever reaches a group.)
-    - SENIOR HAND-OFF (owner picked #3): part-duty return → plain Supervisors line ("Davy on light duty
-      this afternoon, seated") + DM the on-shift senior ("point her to seated tasks" `[👍 Got it]`) +
-      arrival ping ("Davy, light duty, has arrived").
+    - SENIOR HAND-OFF (owner refined): plain Supervisors line + on ARRIVAL, DM EVERY senior whose shift
+      overlaps her presence (not just one — different shift times still meet her; more seniors care for
+      her) → each gets "Davy here on light duty, seated only" `[👍 Got it]`.
+    - FAMILY-SICK PAPERS (law dig: Art.171/Prakas 267 — family-member sickness = Special Leave, 7 paid
+      days/yr from AL; medical certificate NOT legally required, only the employer's optional right):
+      papers OPTIONAL, never demanded — sent = attached to dossier; not sent = day still counts + still
+      burns their AL (low abuse incentive since it costs their own AL). Owner may REQUEST a paper when a
+      pattern smells off.
     - OWNER CARD (goes to owner + Tyty; Opus advises, buttons are the veto): line of Opus read
       (likely days · semi-job? · contagious?) + `[📷 View paper]` · `[✓ Accept Opus]` (one-tap) ·
       `[1d][2d][3d][4+…]` (override duration) · `[💺 Semi-job ON/OFF]` (toggle) · `[🚫 No come-in /
@@ -543,6 +548,14 @@
       pings ≤30min) — not time-critical.
     - POINTS↔BONUS: keep DISCONNECTED for now (owner aim: eventually positive-points ⇒ earns bonus,
       after observing real behavior — Claude to flag thoughts meanwhile).
+    - RETROACTIVE PAPERS (owner approved session 28 — "time of paper ≠ truth of sickness, but OWNER
+      decides truth"): papers for a PAST day → same owner card → on ✓ REVERSE that day:
+      · no-show silent → later papers: refund the 1 day's pay, restore bonus eligibility, convert to
+        covered sick.
+      · paperless declared → never came → later papers: wipe the paperless-debt day, no penalty.
+      Owner ✗ leaves the penalty standing (a slip can't FORCE erasure). Anti-fraud: owner approves every
+      reversal + medical_providers table flags one clinic across many staff + WINDOW ~3 days (older needs
+      a stated reason). Never automatic.
     (New strings → pending KH batch.)
     **OWNER SKIPS THE DURATION QUESTION (owner, session 28):** no days set → the system simply runs
     the paperless-style nightly nudges day-by-day ("feeling better? / Again tomorrow / Better") with
