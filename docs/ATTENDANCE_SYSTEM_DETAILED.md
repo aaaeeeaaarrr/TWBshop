@@ -480,6 +480,13 @@
     the owner context, and the owner-override covers true emergencies like hospitalization).
     **Certified multi-day sickness:** if the papers state a rest period, those days book at once,
     freeze everything, and the nudge fires only before the stated return day.
+    **PAPERS WITHOUT A STATED PERIOD (owner Q, session 28):** the AI extraction adds a rest_period
+    field; when it's empty, the OWNER's approval card asks the duration — *"Cover how many days?"*
+    `[1] [2] [3] [More…]` — the owner reads the paper photo and sets it (he knows a dengue slip from
+    a headache slip). The night nudge then runs day-by-day as usual; an *Again tomorrow* BEYOND the
+    covered days gets the boundary message: *"Your paper covered {N} day(s). If you're still sick, a
+    new paper will cover the extra days — otherwise the time joins your pay-back balance. Get well 🤍"*
+    — so one vague clinic slip can never fund an open-ended week off.
   - **FREQUENCY DOSSIER (paperless only — nice until bam, owner):** flags → owner card with full history
     (dates, weekday, papers ratio, came-vs-full-day, debt status): 2-in-7d (burst) · 3-in-30d (drip,
     even spread) · 5-in-90d (chronic) · 3-of-last-4 same weekday ("every Monday") · 2-in-60d adjacent to
