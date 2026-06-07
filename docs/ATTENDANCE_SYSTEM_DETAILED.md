@@ -194,8 +194,9 @@
    "last seen in zone 2:30am, location stopped, no check-out" vs a bare "no check-out".
 8. **CHECK-IN MESSAGE SEQUENCE (owner FINAL, session 28 — pre-reminder REVIVED with a job):**
    skipped entirely on day-off / AL / already-checked-in / Tyty / Delis.
-   - **T−10 min:** pre-reminder — shift starts in 10 min, check in via live location, AND advertise the
-     early-bird reward: arrive 5 min before start = **+10 points**.
+   - **T−10 min:** pre-reminder — shift starts in 10 min, the 📍 how-to line, AND advertise the
+     early-bird reward: arrive 5 min before start = **+10 points**. Carries the `[🕘 I'm late ·
+     ខ្ញុំមកយឺត]` button (owner, session 28) — tapping it BEFORE start is exactly what earns the −1 rate.
    - **T0 (start):** still no in-zone location → the normal check-in prompt (+ I'm-late button).
    - **T+5 min:** still nothing → the NICE message — FINAL bilingual (owner+ChatGPT via khmer_inbox):
      *"We give everyone 5 free late minutes 😊 More than 5 — every late minute counts: as pay-back time,

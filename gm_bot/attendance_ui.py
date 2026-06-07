@@ -167,7 +167,7 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
     same template goes to every staff, so one of each possibility is the whole test)."""
     t0_text, t0_kb = _ci_msg_start()
     return [
-        ("① T−10 pre-reminder", _ci_msg_pre(p), None),
+        ("① T−10 pre-reminder", _ci_msg_pre(p), _kb_im_late()),
         ("② T0 shift-start prompt (only if not checked in)", t0_text, t0_kb),
         ("③ T+5 free-minutes (only if still not checked in)", _CI_MSG_PLUS5, None),
         ("④ check-in verdict — EARLY ⭐", _V_EARLY % (12, 12), None),
@@ -780,11 +780,15 @@ def _ci_msg_pre(p: dict) -> str:
             "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐") % (t, t)
 
 
-def _ci_msg_start() -> tuple[str, InlineKeyboardMarkup]:
-    # how-to is inline (the recognizable line) -> no separate How-to button needed
-    kb = InlineKeyboardMarkup([
+def _kb_im_late() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("🕘 I'm late · ខ្ញុំមកយឺត", callback_data="att:late")],
     ])
+
+
+def _ci_msg_start() -> tuple[str, InlineKeyboardMarkup]:
+    # how-to is inline (the recognizable line) -> no separate How-to button needed
+    kb = _kb_im_late()
     return ("Your shift just started — check in now.\n"
             "វេនការងាររបស់អ្នកទើបតែចាប់ផ្តើមហើយ — សូមចុះវត្តមាន។\n"
             + _CI_HOWTO + "\n\n"
