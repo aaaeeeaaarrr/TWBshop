@@ -1056,18 +1056,16 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
             p = _persona(context)
             ws = to_min(p.get("work_start")) if p else None
             if p and ws is not None:
-                if dist > WORK_ZONE_RADIUS_M:
+                from gm_bot.checkin import verdict
+                state, mins = verdict(_now_min(), ws, dist <= WORK_ZONE_RADIUS_M)
+                if state == "not_here":
                     await msg.reply_text(_V_FAR + "\n[test: %dm from TWB]" % round(dist))
-                    return
-                rel = (_now_min() - ws) % 1440
-                early = 1440 - rel if rel > 720 else 0
-                late = rel if rel <= 720 else 0
-                if early >= 5:
-                    await msg.reply_text(_V_EARLY % (early, early))
-                elif late <= 5:
+                elif state == "early":
+                    await msg.reply_text(_V_EARLY % (mins, mins))
+                elif state == "ontime":
                     await msg.reply_text(_V_ONTIME)
                 else:
-                    await msg.reply_text(_V_LATE % (late, late))
+                    await msg.reply_text(_V_LATE % (mins, mins))
                 return
         await msg.reply_text(
             "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"

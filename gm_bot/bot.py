@@ -27,6 +27,7 @@ from shared.database import (
     gm_get_approved_policy_for_type,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
     gm_append_refinement_note, save_ops_message, al_apply_due_deductions,
+    att_get_session, att_check_in, att_record_ping,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1061,6 +1062,108 @@ async def _send_reconciliation(context, business_day: str) -> None:
         )
     except Exception as e:
         logger.error("reconciliation failed for %s: %s", business_day, e)
+
+
+async def _private_location_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Staff check-in (gated/live) takes precedence; otherwise the owner-only test handler."""
+    try:
+        if await _handle_staff_location(update, context):
+            return
+    except Exception as e:
+        logger.error("staff location handling failed: %s", e)
+    from gm_bot import attendance_ui
+    await attendance_ui.handle_location_test(update, context)
+
+
+def _attendance_live() -> bool:
+    """MASTER SWITCH (owner gate): until set 'true', the check-in engine touches NO staff —
+    no scheduled prompts, no location processing. Flip via gm_set_state('attendance_live','true')
+    only after role-play sign-off + staff briefed. Default OFF."""
+    return gm_get_state("attendance_live") == "true"
+
+
+async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Per-minute: fire due check-in events (T−10/T0/T+5/check-out/leave-early) to staff.
+    GATED: returns immediately unless attendance_live. Suppresses prompts for staff already
+    checked in (T0/T+5) / checked out. State + sessions in DB so restarts are safe."""
+    if not _attendance_live():
+        return
+    from gm_bot import attendance_ui as ui, checkin as ci
+    now_pp = datetime.now(finance.PP_TZ)
+    today = now_pp.date().isoformat()
+    now_min = now_pp.hour * 60 + now_pp.minute
+    try:
+        events = ui.compute_day_events(now_pp.date())   # schedule-driven, skips day-off/AL/Tyty/Delis
+    except Exception as e:
+        logger.error("checkin scheduler compute failed: %s", e)
+        return
+    for minute, name, label, text in events:
+        if not ci.is_due(minute, now_min):
+            continue
+        staff = next((s for s in staff_all("active")
+                      if (s.get("call_name") or s["canonical_name"]) == name), None)
+        if not staff or not (staff.get("telegram_ids") or []):
+            continue
+        uid = staff["telegram_ids"][0]
+        sess = att_get_session(staff["id"], today)
+        checked_in = bool(sess and sess.get("checked_in_at"))
+        checked_out = bool(sess and sess.get("checked_out_at"))
+        # suppression: once checked in, drop T0/T+5 prompts; once checked out, drop the close prompts
+        if checked_in and (label.startswith("T0") or label.startswith("T+")):
+            continue
+        if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
+            continue
+        try:
+            await context.bot.send_message(uid, text)
+        except Exception as e:
+            logger.error("checkin send to %s failed: %s", name, e)
+
+
+async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Real staff check-in via live location. GATED. Returns True if handled (so the test
+    handler doesn't also fire). Records the ping (secret feed) always-on; on first in-zone
+    fix during a scheduled shift → check-in + verdict."""
+    if not _attendance_live():
+        return False
+    msg = update.message or update.edited_message
+    user = update.effective_user
+    if not msg or not msg.location or not user:
+        return False
+    staff = staff_get_by_uid(user.id)
+    if not staff or staff.get("status") != "active" or staff.get("org") != "TWB":
+        return False
+    if update.edited_message:   # live-share lifecycle update (movement/stop) — record silently
+        pass
+    loc = msg.location
+    from gm_bot import attendance as att, checkin as ci, attendance_ui as ui
+    in_zone = att.in_work_zone(loc.latitude, loc.longitude)
+    now_pp = datetime.now(finance.PP_TZ)
+    # find today's (or last night's overnight) shift this check-in belongs to
+    ws = att.to_min(staff.get("work_start"))
+    if ws is None:
+        return True
+    shift_date = now_pp.date().isoformat()
+    try:
+        att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone, now_pp.isoformat())
+    except Exception:
+        pass
+    if not in_zone:
+        if not update.edited_message:
+            await msg.reply_text(ui._V_FAR)
+        return True
+    now_min = now_pp.hour * 60 + now_pp.minute
+    state, mins = ci.verdict(now_min, ws, True)
+    late = mins if state == "late" else 0
+    early = mins if state == "early" else 0
+    first = att_check_in(staff["id"], shift_date, now_pp.isoformat(), True, late, early)
+    if first and not update.edited_message:
+        if state == "early":
+            await msg.reply_text(ui._V_EARLY % (early, early))
+        elif state == "late":
+            await msg.reply_text(ui._V_LATE % (late, late))
+        else:
+            await msg.reply_text(ui._V_ONTIME)
+    return True
 
 
 async def _al_deduction_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2425,9 +2528,13 @@ def build_app() -> Application:
     from gm_bot import attendance_ui
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
-    # test-only location handler (owner only): pin template + live-location geofence readout
+    # private location router: real staff check-in first (gated by attendance_live),
+    # else the owner-only test handler (pin template + geofence readout)
     app.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.LOCATION, attendance_ui.handle_location_test))
+        filters.ChatType.PRIVATE & filters.LOCATION, _private_location_router))
+    # per-minute check-in scheduler (gated; inert until attendance_live='true')
+    app.job_queue.run_repeating(_checkin_scheduler_job, interval=60, first=30,
+                                name="gm_checkin_scheduler")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

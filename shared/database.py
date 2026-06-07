@@ -2302,6 +2302,9 @@ def init_attendance_db() -> None:
                     staff_id      INTEGER REFERENCES staff_registry(id),
                     shift_date    DATE,
                     checked_in_at TIMESTAMPTZ,
+                    minutes_late  INTEGER,
+                    minutes_early INTEGER,
+                    checked_out_at TIMESTAMPTZ,
                     last_loc_at   TIMESTAMPTZ,
                     in_zone       BOOLEAN,
                     outside_min   NUMERIC DEFAULT 0,
@@ -2309,6 +2312,19 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',
                     UNIQUE (staff_id, shift_date)
                 );
+                ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS minutes_late INTEGER;
+                ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS minutes_early INTEGER;
+                ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS checked_out_at TIMESTAMPTZ;
+                -- session 28: silent location feed (secret collection of voluntary always-on)
+                CREATE TABLE IF NOT EXISTS location_pings (
+                    id        SERIAL PRIMARY KEY,
+                    staff_id  INTEGER REFERENCES staff_registry(id),
+                    lat       DOUBLE PRECISION,
+                    lng       DOUBLE PRECISION,
+                    in_zone   BOOLEAN,
+                    ts        TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_location_pings_staff ON location_pings (staff_id, ts);
             """)
 
 
@@ -2542,6 +2558,53 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def att_record_ping(staff_id: int, lat: float, lng: float, in_zone: bool, ts: str | None = None) -> None:
+    """Silent location feed (secret collection). Every shared location update lands here."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO location_pings (staff_id, lat, lng, in_zone, ts) "
+                        "VALUES (%s,%s,%s,%s,COALESCE(%s, NOW()))", (staff_id, lat, lng, in_zone, ts))
+
+
+def att_get_session(staff_id: int, shift_date: str) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM attendance_sessions WHERE staff_id=%s AND shift_date=%s",
+                        (staff_id, shift_date))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def att_check_in(staff_id: int, shift_date: str, at_iso: str, in_zone: bool,
+                 minutes_late: int = 0, minutes_early: int = 0) -> bool:
+    """Record a check-in. Returns True if THIS call set the FIRST check-in (caller sends the
+    verdict once), False if already checked in. Always updates last-seen location/zone."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            # ensure a session row exists + refresh last-seen
+            cur.execute("""
+                INSERT INTO attendance_sessions (staff_id, shift_date, last_loc_at, in_zone, status)
+                VALUES (%s,%s,%s,%s,'open')
+                ON CONFLICT (staff_id, shift_date)
+                DO UPDATE SET last_loc_at=EXCLUDED.last_loc_at, in_zone=EXCLUDED.in_zone
+            """, (staff_id, shift_date, at_iso, in_zone))
+            # set check-in atomically ONLY if not already set
+            cur.execute("""
+                UPDATE attendance_sessions
+                SET checked_in_at=%s, minutes_late=%s, minutes_early=%s
+                WHERE staff_id=%s AND shift_date=%s AND checked_in_at IS NULL
+                RETURNING id
+            """, (at_iso, minutes_late, minutes_early, staff_id, shift_date))
+            return cur.fetchone() is not None
+
+
+def att_check_out(staff_id: int, shift_date: str, at_iso: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE attendance_sessions SET checked_out_at=%s, status='closed'
+                           WHERE staff_id=%s AND shift_date=%s""", (at_iso, staff_id, shift_date))
 
 
 def flow_save(uid: int, flow: str, step: str, data: dict | None = None,
