@@ -535,8 +535,17 @@
 - **CAKE: Thyda + Tyty only.** They CAN prep but shouldn't (cake output drops). Thyda also real bakery,
   helps nights 9pm–12am. Tyty mass-produces before her holidays (manual arrangement, no rule).
 - **A PERSON FILLS ONE SLOT AT A TIME** — skills = where they CAN stand; minimums = bodies per station.
-- **KNOWN SOFT SPOT (accepted/pending):** Wed+Fri 17–19h prep = 1 (Seth/Failin alternate day-offs) —
-  owner to rule if the late prep tail matters.
+- **PREP TAIL ACCEPTED (owner):** Wed+Fri 17–19h showing 1 formal prepper is fine — the shop runs a
+  **half-prepper culture**: many staff learned preps because whenever one person preps alone, another
+  helps. Formal rule stays ≥2 in 10:00–19:00 for the engine; the tail dip is a non-flag.
+- **STANDING EXCEPTION (week of Jun 8):** Chuch Pisey WORKS his day-off Mon Jun 8, special hours
+  10:00–20:00 (covering Chomruen's AL), and takes **Thu Jun 11 off** instead (Vannary's swap, owner
+  approved; her "Thursday 9th" resolved = Thursday the 11th). Any launch before Jun 11 must honor this.
+- **HIRING-NEEDS ANALYZER (owner vision, session 28 — future organ of the brain):** the same coverage
+  table tells the HIRE flow WHAT to hire: compute the week's thinnest structural windows → produce the
+  hire profile ("we need MID-SHIFT now; experience optional — she can start FRONT"). New-hire skills
+  start minimal (front/prep) and grow in the registry as they learn. Connects coverage engine ↔ hire bot
+  when both are mature.
 
 ## 8. COVERAGE GUARDRAIL + RIPPLE CHECK (standing) ⏳ — LOCKED IN (owner session 28)
 - Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off/swap opens an expertise hole.
