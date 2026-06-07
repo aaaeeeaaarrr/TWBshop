@@ -4,6 +4,44 @@
 > Tags: [Haiku] [Sonnet] [Logic] [Telegram]. Status: ✅ built · ⏳ pending · 🔒 owner input.
 > Confirmed: 2 senior approvals · 100m geofence (TWB) · seniors set new-staff day-offs · Tyty exempt · Delis excluded.
 
+## ⛔ BEFORE GO-LIVE CHECKLIST (flip attendance_live='true' ONLY after ALL of these)
+> The whole system is built behind the `attendance_live` master switch (default OFF = zero staff
+> contact). This list is everything that must be wired/verified before the switch flips. Status:
+> ✅ done · �p partial(first-version) · ⏳ not built.
+
+**Built & gated (✅):** state persistence (gm_flow_state) · check-in core (scheduler + location +
+verdict + sessions + location_pings) · late→payback core (debt, slot picker, booking, ignore-ladder
+warn/autobook, Supervisors notice) · AL request+approval (this build) · auto-welcome · reconciliation ·
+watchdogs · data backfill.
+
+**MUST wire/finish before live (⏳/�p):**
+1. �p **Payback slot NEED-RANKING** — slots are correct but not yet sorted by neediest hour; needs the
+   coverage-table engine wired (front/kitchen/bar/prep minimums → score each candidate window).
+2. 🔡 **Legitimate-leave FREEZE in the payback ladder** — day-counting uses calendar days; must subtract
+   AL/sick/PH/special-leave days (the "earned absence pauses the clock" rule).
+3. ⏳ **Arrival watch** for late declarations — "Are you there yet?" 4× every 15 min until location.
+4. ⏳ **Check-out flow** — work_end request → +10min leave-early ask → +30min silent close + early-leave
+   digest flag; auto-checkout if location stayed on.
+5. ⏳ **12h-before reminders** — payback slots, OT buyback, own-sick & family-sick night nudges
+   (one shared scheduler, quiet-hours slide).
+6. ⏳ **Monthly AL accrual** (+1.5 on the 1st, arrears for new hires).
+7. ⏳ **Interactive My-schedule dashboard** — show upcoming AL/payback/OT-bank/special-leave; tap to cancel.
+8. ⏳ **Day-off swap ladder** (partner-first → seniors; within 7 days) + dry-run.
+9. ⏳ **Give OT real wiring** — Now/Later, senior grant card, owner approval card, banking, buyback,
+   location/senior-confirm proof, accepted=commitment penalty.
+10. ⏳ **Special Leave real wiring** — sick ladder + papers AI (owner card, undated playbook, retroactive
+    reversal, recovery ask, part-duty), marriage, family-death two-tier, wife-birth; family-sick day.
+11. ⏳ **Slips / payroll** — owner one-table review on pay days; bonus earned/not-earned; no-show 1-day cut.
+12. ⏳ **Points engine** — record raw events NOW (arrivals, lates, no-shows, OT, returns); values +
+    activation later (owner-tuned threshold). Catalogue lives in §9.
+13. ⏳ **Call-outs** — Sonnet private / Opus group, frequency dossiers, autonomous, CC owner+Tyty.
+14. ⏳ **Voice/photo/sticker reason capture** → store verbatim + Supervisors.
+15. ⏳ **Group-redirect** (AL/lateness posted in a group → "DM @twb_gm_bot") + understand-without-reply
+    + 👍 acks live for staff.
+16. ⏳ **Pending Khmer batch** — all (KH pending) strings through ChatGPT before they reach staff.
+17. ✅/🔒 **Launch gate:** role-play sign-off (owner walks every ladder) → brief staff → everyone pressed
+    Start (DONE 33/33) → flip `attendance_live`. Live-location REQUIREMENT waits until owner explains it.
+
 ## SYSTEM AUDIT RESOLUTIONS (session 28 — hole-hunt)
 - **H1 STATE PERSISTENCE (build #1):** every real ladder persists step+partial-data to a `gm_flow_state`
   table (uid → flow, step, data JSON, expires_at), written each step. Bot restart mid-flow → next tap
