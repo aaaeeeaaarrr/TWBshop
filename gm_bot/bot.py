@@ -1905,7 +1905,20 @@ async def _new_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         uid = member.id
         staff = staff_get_by_uid(uid)
         if not staff or staff.get("status") != "active":
-            continue  # unknown / ex-staff -> say nothing in-group (offboarding handles leavers)
+            # unknown / ex-staff: say nothing in-group, but tell the OWNER once (session 28) —
+            # could be a new hire, someone's new account, or a stranger to remove.
+            if not staff and gm_get_state("unknown_join_noted:%d" % uid) != "true":
+                gm_set_state("unknown_join_noted:%d" % uid, "true")
+                label = next((l for l, c in _internal_groups() if c == msg.chat_id), str(msg.chat_id))
+                who = member.full_name + (" @" + member.username if member.username else "")
+                try:
+                    await context.bot.send_message(
+                        config.OWNER_TELEGRAM_ID,
+                        "❓ Unknown account joined %s: %s (uid %d).\n"
+                        "New hire, someone's new account, or to remove?" % (label, who, uid))
+                except Exception:
+                    pass
+            continue  # offboarding handles leavers
         if gm_get_state("rollcall_greeted:%d" % uid) == "true":
             continue  # already started with the GM
         if gm_get_state("welcome_nudged:%d" % uid) == "true":
