@@ -61,13 +61,17 @@ def _alert(text: str) -> None:
 
 def main() -> None:
     problems = []
-    try:
-        active = subprocess.run(["systemctl", "is-active", "twbshop-listener"],
-                                capture_output=True, text=True).stdout.strip()
-        if active != "active":
-            problems.append("twbshop-listener service is %s." % (active or "unknown"))
-    except Exception as e:
-        print("service check failed:", e)
+    # twbshop-gm matters doubly: it is the ONLY recorder of Supervisors + Management
+    # (owner decision: the listener account stays out of senior rooms — junior staff use it).
+    # Bot API can't backfill history, so GM downtime there = permanent loss; detect fast.
+    for svc in ("twbshop-listener", "twbshop-gm"):
+        try:
+            active = subprocess.run(["systemctl", "is-active", svc],
+                                    capture_output=True, text=True).stdout.strip()
+            if active != "active":
+                problems.append("%s service is %s." % (svc, active or "unknown"))
+        except Exception as e:
+            print("service check failed:", e)
 
     def _age_hours(latest) -> float | None:
         if not latest:

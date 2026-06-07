@@ -2157,9 +2157,10 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     _msg_buffer[key].append((now, msg))
 
     # ops_messages persistence (session 28): the Telethon listener is the canonical recorder —
-    # EXCEPT for chats the listener account is NOT a member of (Supervisors, Management),
-    # where the GM bot remains the only possible writer. No dup risk while the listener is
-    # absent there; if the owner adds TheWineBakery24PP to those groups, remove this exception.
+    # EXCEPT Supervisors + Management, where the GM bot is the PERMANENT sole writer.
+    # OWNER DECISION (final): the listener account (TheWineBakery24PP) must NEVER join those
+    # groups — junior staff use that account and must not read senior messages. Bot API can't
+    # backfill history, so the watchdog also monitors the twbshop-gm service itself.
     if chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
         try:
             media_type = ("photo" if msg.photo else
