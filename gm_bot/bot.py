@@ -37,6 +37,7 @@ from shared.database import (
     ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
+    no_show_record, no_show_reverse,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1937,6 +1938,44 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជា 🤍 សម្រាកថ្ងៃនេះ។")
 
 
+async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily 08:00 PP (gated): yesterday's scheduled staff who never checked in AND had no
+    approved leave/sick = no-show → record + points event + owner note (1 day's pay, owner-gated)."""
+    if not _attendance_live():
+        return
+    from gm_bot import attendance_ui as ui
+    from gm_bot.attendance import to_min
+    yday = (datetime.now(finance.PP_TZ).date() - timedelta(days=1))
+    for p in staff_all("active"):
+        if p.get("org") != "TWB" or p["canonical_name"] == "Tyty":
+            continue
+        # did they work yesterday's shift? (schedule, honoring overrides + leave)
+        try:
+            ev = ui.compute_day_events(yday)
+        except Exception:
+            ev = []
+        names = {n for _m, n, _l, _t in ev}
+        nm = p.get("call_name") or p["canonical_name"]
+        if nm not in names:
+            continue   # not scheduled (day-off/AL/PH) — not a no-show
+        sess = att_get_session(p["id"], yday.isoformat())
+        if sess and sess.get("checked_in_at"):
+            continue   # they checked in
+        if no_show_record(p["id"], yday.isoformat()):
+            ws, we = to_min(p.get("work_start")), to_min(p.get("work_end"))
+            shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
+            try:
+                points_record(p["id"], "no_show", shift_min, yday.isoformat())
+            except Exception:
+                pass
+            try:
+                await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+                    "🚫 NO-SHOW: %s, %s. Suggested: cut 1 day's pay + bonus not earned (your call)."
+                    % (nm, yday.strftime("%a %d/%m")))
+            except Exception:
+                pass
+
+
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily (gated): provisional own-sick cases past the 3-day papers grace with no papers →
     the missed shift becomes payback debt (the paperless rule)."""
@@ -3240,6 +3279,23 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error("leave handling failed: %s", e)
 
+    # GROUP-REDIRECT (session 28, gated): attendance talk posted in an internal group → point the
+    # person to DM the GM (no processing here — forces the private channel). Keyword, zero-API.
+    if (_attendance_live() and text.strip()
+            and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID)):
+        try:
+            kws = ("late", "មកយឺត", "off ", "day off", "ឈប់", "leave", "al ", "sick", "ឈឺ", "ច្បាប់")
+            if any(k in text.lower() for k in kws):
+                sender_staff = staff_get_by_uid(msg.from_user.id) if msg.from_user else None
+                if sender_staff and sender_staff.get("status") == "active":
+                    await context.bot.send_message(
+                        chat_id,
+                        "Please message @twb_gm_bot directly about this.\n"
+                        "សូមផ្ញើសារទៅ @twb_gm_bot ដោយផ្ទាល់អំពីរឿងនេះ។",
+                        reply_to_message_id=msg.message_id)
+        except Exception as e:
+            logger.error("group redirect failed: %s", e)
+
     # TWB REPORT group: receipt photos, clarification replies, daily-report parsing
     if chat_id == config.DAILY_REPORT_CHAT_ID:
         if msg.reply_to_message and text.strip():
@@ -3423,6 +3479,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_sick_papers_deadline_job,
                             time=__import__("datetime").time(hour=0, minute=20),
                             name="gm_sick_papers_deadline")
+    # no-show sweep: daily 08:00 PP (01:00 UTC), gated
+    app.job_queue.run_daily(_no_show_sweep_job,
+                            time=__import__("datetime").time(hour=1, minute=0),
+                            name="gm_no_show_sweep")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

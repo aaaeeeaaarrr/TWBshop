@@ -2312,6 +2312,15 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: no-show records (unblocks slips, retroactive reversal, no-show points)
+                CREATE TABLE IF NOT EXISTS no_show_records (
+                    id         SERIAL PRIMARY KEY,
+                    staff_id   INTEGER REFERENCES staff_registry(id),
+                    shift_date DATE,
+                    status     TEXT DEFAULT 'open',   -- open | reversed (papers later)
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (staff_id, shift_date)
+                );
                 -- session 28: special leaves (marriage / death / birth) — funded from AL (negative ok)
                 CREATE TABLE IF NOT EXISTS special_leaves (
                     id          SERIAL PRIMARY KEY,
@@ -2675,6 +2684,22 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def no_show_record(staff_id: int, shift_date: str) -> bool:
+    """Record a no-show (idempotent). Returns True if newly recorded."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO no_show_records (staff_id, shift_date) VALUES (%s,%s)
+                ON CONFLICT (staff_id, shift_date) DO NOTHING RETURNING id""", (staff_id, shift_date))
+            return cur.fetchone() is not None
+
+
+def no_show_reverse(staff_id: int, shift_date: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE no_show_records SET status='reversed' WHERE staff_id=%s AND shift_date=%s",
+                        (staff_id, shift_date))
 
 
 def special_leave_create(staff_id, kind, who, start_date, days) -> int:

@@ -70,6 +70,11 @@ watchdogs · data backfill.
   sick_cases table + helpers; paperless-deadline daily job (provisional→payback after 3 days, gated).
   PENDING 5c: marriage / family-death two-tier / wife-birth. The sick-declare staff UI (take-a-pill
   ladder) wires in Wave 7.
+- **WAVE 6a (cross-cutting):** ✅ no_show_records table + daily no-show sweep (yesterday's scheduled
+  staff with no check-in & no leave → record + no_show points event + owner note 1-day-pay) — also
+  UNBLOCKS retroactive reversal (no_show_reverse helper ready) + slips. ✅ group-redirect (gated,
+  keyword, bilingual) in Supervisors/Management. PENDING 6b: call-outs (frequency dossier → Sonnet
+  private/Opus group), slips/payroll table+review, voice/photo reason capture, broad 👍 ack.
 - **WAVE 5c (marriage/death/birth):** ✅ special.py pure (+5 tests) + special_leaves table; book_family_death
   (instant, condolence, Supervisors notice w/ relation, AL deduct negative-ok, compassion-tier 1d→owner
   upgrade card+callback), book_wife_birth (2d notify), marriage routes through the AL approval engine
