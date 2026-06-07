@@ -1123,7 +1123,9 @@ async def _resolve_report_math_if_fixed(context, chat_id: int, full: dict, fixed
         gm_answer_clarification(c["id"], "(report corrected via %s — math checks out)" % via)
     try:
         await context.bot.send_message(
-            chat_id=chat_id, text="✓ Corrected — it checks out now, thank you!",
+            chat_id=chat_id,
+            text="✓ Corrected — it checks out now, thank you!\n"
+                 "✓ កែរួចហើយ — ឥឡូវនេះត្រឹមត្រូវហើយ អរគុណ!",
             reply_to_message_id=fixed_msg.message_id,
         )
     except Exception:
@@ -1968,7 +1970,8 @@ async def _judge_clarification(context, clar: dict, answer: str, answer_msg=None
     if verdict.get("resolved", True):
         try:
             await context.bot.send_message(
-                chat_id=clar["chat_id"], text="✓ Got it — thank you!",
+                chat_id=clar["chat_id"],
+                text="✓ Got it — thank you!\n✓ បានទទួលហើយ — អរគុណ!",
                 reply_to_message_id=answer_msg.message_id if answer_msg else None,
             )
         except Exception:

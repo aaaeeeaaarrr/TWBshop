@@ -180,50 +180,63 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
     ]
 
 
-def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
-    """Dry-run 2: the LATE + PAYBACK lifecycle — every distinct message, once.
-    (KH pending) = English final, Khmer goes in the next ChatGPT batch."""
-    slots_kb = InlineKeyboardMarkup([
+_PLUS10 = ("Come 5 minutes early and you earn +10 points ⭐\n"
+           "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐")
+
+
+def _slots_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("Mon 09/06 7:30pm-9pm", callback_data="att:noop")],
         [InlineKeyboardButton("Tue 10/06 6-7:30am", callback_data="att:noop")],
-        [InlineKeyboardButton("Thu (day off) 11:30pm-1am", callback_data="att:noop")],
-        [InlineKeyboardButton("Pay 1 hour only", callback_data="att:noop")],
+        [InlineKeyboardButton("Thu 11/06 (ថ្ងៃឈប់) 11:30pm-1am", callback_data="att:noop")],
+        [InlineKeyboardButton("Pay 1 hour only · សងតែ 1h", callback_data="att:noop")],
     ])
+
+
+def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 2: the LATE + PAYBACK lifecycle — every distinct message, once.
+    Bilingual finals (batch-33, session 28)."""
     return [
         ("① late declared (they picked 9:30pm) — confirmation + group heads-up",
-         "Noted — see you ~9:30pm 🤍 (KH pending)\n\n"
+         "Noted — see you ~9:30pm 🤍\nកត់ចំណាំហើយ — ជួបគ្នា ~9:30pm 🤍\n\n"
          "[TEST PREVIEW → SUPERVISORS group]\n"
-         "“Davy will be ~30 min late for the 9pm shift today.”  ← name+time only, never the reason",
+         "“Davy will be ~30 min late for the 9pm shift today.\n"
+         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។”  ← name+time only, never the reason",
          None),
         ("② arrival watch — declared time passed, no location yet (repeats 4× every 15 min)",
-         "Are you there yet? (KH pending)\n" + _CI_HOWTO, None),
+         "Are you there yet?\nមកដល់ហើយឬនៅ?\n" + _CI_HOWTO, None),
         ("③ they arrive — verdict + reason ask",
          "(same messages as Dry-run 1 steps ④–⑥ — already approved)", None),
         ("④ payback slot picker (right after the reason; no AL option — late = time)",
          "You owe 90 min. Pick when to work it off — these are the times we need you most:\n"
-         "(KH pending)", slots_kb),
+         "អ្នកនៅត្រូវសង 90 min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖",
+         _slots_kb()),
         ("⑤ booked confirmation (self-picked or auto) — always encouraging",
-         "Booked ✓ — Mon 09/06, 7:30pm–9pm. (KH pending)\n"
-         "Come 5 minutes early and you earn +10 points ⭐\n"
-         "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐", None),
+         "Booked ✓ — Mon 09/06, 7:30pm–9pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–9pm។\n" + _PLUS10,
+         None),
         ("⑥ 12h-before reminder (any booked event)",
-         "Reminder — your payback time is tomorrow: 7:30pm–9pm. (KH pending)\n"
-         "Come 5 minutes early and you earn +10 points ⭐\n" + _CI_HOWTO, None),
+         "Reminder — your payback time is tomorrow: 7:30pm–9pm.\n"
+         "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺថ្ងៃស្អែក៖ 7:30pm–9pm។\n" + _PLUS10 + "\n" + _CI_HOWTO,
+         None),
         ("⑦ the slot itself = mini-shift (T−10, check-in, early ⭐) — same templates as Dry-run 1",
          "(reused — a payback slot greets, checks in and rewards exactly like a shift)", None),
         ("⑧ partial credit — worked 60 of 90 min",
-         "You paid back 60 min ✓ — 30 min stays on your balance. (KH pending)", None),
+         "You paid back 60 min ✓ — 30 min stays on your balance.\n"
+         "អ្នកបានសង 60 min ✓ — នៅសល់ 30 min ក្នុង balance របស់អ្នក។", None),
         ("⑨ unbooked debt — the daily line at check-in (never hourly)",
-         "Checked in ✓ — you still owe 90 min, pick a time: (KH pending)", slots_kb),
+         "Checked in ✓ — you still owe 90 min, pick a time:\n"
+         "ចុះវត្តមានរួច ✓ — អ្នកនៅត្រូវសង 90 min, សូមជ្រើសពេល៖", _slots_kb()),
         ("⑩ day 3 — the warning",
          "Pick before tomorrow, or I'll pick for you.\n"
-         "សូមជ្រើសរើសមុនថ្ងៃស្អែក បើមិនទាន់ទេ ខ្ញុំនឹងជ្រើសរើសជូនអ្នក។ (KH draft)", slots_kb),
+         "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។", _slots_kb()),
         ("⑪ day 4 — auto-booked",
-         "I booked you Mon 09/06, 7:30pm–9pm (you didn't choose). (KH pending)\n"
-         "Come 5 minutes early and you earn +10 points ⭐\n\n"
-         "[TEST PREVIEW → SUPERVISORS group]\n“Davy pays back Mon 09/06 7:30pm–9pm.”", None),
+         "I booked you Mon 09/06, 7:30pm–9pm (you didn't choose).\n"
+         "ខ្ញុំបានកក់ពេលឱ្យអ្នក Mon 09/06, 7:30pm–9pm (ព្រោះអ្នកមិនបានជ្រើស)។\n" + _PLUS10 + "\n\n"
+         "[TEST PREVIEW → SUPERVISORS group]\n“Davy pays back Mon 09/06, 7:30pm–9pm.\n"
+         "Davy ធ្វើម៉ោងសងវិញ Mon 09/06, 7:30pm–9pm។”", None),
         ("⑫ skipped the assigned slot — re-booked ONCE",
-         "You missed your payback time — new time: Tue 10/06, 6–7:30am. (KH pending)", None),
+         "You missed your payback time — new time: Tue 10/06, 6–7:30am.\n"
+         "អ្នកខកខានម៉ោងសងវិញ — ពេលថ្មី៖ Tue 10/06, 6–7:30am។", None),
         ("⑬ skipped twice — bonus consequence + owner digest",
          "[TEST PREVIEW → OWNER digest]\n"
          "“Davy skipped 2 assigned payback slots (90 min open since Jun 7) — next bonus not earned. "
@@ -231,8 +244,71 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          None),
         ("⑭ no-show day (never arrived at all) — the hardest message, tone matters",
          "You missed your whole shift yesterday. One day's pay is deducted, and this month's bonus "
-         "is not earned. If something serious happened, please tell me. (KH pending — wording open "
-         "to your tuning)", None),
+         "is not earned. If something serious happened, please tell me.\n"
+         "អ្នកខកខានវេនទាំងមូលម្សិលមិញ។ ប្រាក់ឈ្នួល 1 ថ្ងៃនឹងត្រូវដក ហើយ Bonus ខែនេះមិនបានទទួលទេ។ "
+         "បើមានរឿងធ្ងន់ធ្ងរកើតឡើង សូមប្រាប់ខ្ញុំ។", None),
+    ]
+
+
+def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 3: AL APPROVAL flow — you play requester AND senior."""
+    appr_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:noop")],
+        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:noop")],
+    ])
+    return [
+        ("① the SENIOR's approval card (each senior gets this privately)",
+         "Meng requests AL: Tue 23/06 → Thu 25/06. Reason: family trip\n"
+         "Meng ស្នើ AL: Tue 23/06 → Thu 25/06។ មូលហេតុ៖ family trip\n\n"
+         "Working her hours those days: Davy, Nak, Sey\n"
+         "អ្នកជំនួសម៉ោងការងារថ្ងៃទាំងនោះ៖ Davy, Nak, Sey", appr_kb),
+        ("② after 2 ✅ — the refreshed recap to all seniors",
+         "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។", None),
+        ("③ to the requester — approved",
+         "Your AL for Tue 23/06 → Thu 25/06 is approved ✓\n"
+         "AL របស់អ្នកសម្រាប់ Tue 23/06 → Thu 25/06 ត្រូវបានអនុម័តហើយ ✓", None),
+        ("④ to the requester — not approved (seniors-only recap, nothing to the group)",
+         "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
+        ("⑤ the SUPERVISORS group notice (the locked format — range, normal day off, back-at-work)",
+         "Meng on leave Tue 23/06 → Thu 25/06 (3 days).\n"
+         "Meng ឈប់សម្រាក Tue 23/06 → Thu 25/06 (3 ថ្ងៃ)។\n"
+         "Normal day off: Friday 26/06.\nថ្ងៃឈប់ធម្មតា៖ Friday 26/06។\n"
+         "Back at work: Saturday 27/06, 9pm.\nត្រឡប់មកធ្វើការ៖ Saturday 27/06, 9pm។", None),
+        ("⑥ cancelling an AL — refund confirmation",
+         "Your AL for Tue 23/06 is cancelled ✓ — 1 day(s) returned.\n"
+         "AL របស់អ្នកសម្រាប់ Tue 23/06 ត្រូវបានលុបចោលហើយ ✓ — 1 ថ្ងៃបានត្រឡប់ចូលវិញ។", None),
+    ]
+
+
+def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 4: SPECIAL LEAVE + GIVE OT build messages."""
+    take_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:noop")],
+        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:noop")],
+        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:noop")],
+    ])
+    return [
+        ("① family-sick day — seniors informed (no approval gate)",
+         "FYI: Kimying takes sick leave for her child today.\n"
+         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូន ថ្ងៃនេះ។", None),
+        ("② family-death leave — the group notice (reason NEVER appears)",
+         "Davy on leave Tue 09/06 → Thu 11/06 (family).\n"
+         "Davy ឈប់សម្រាក Tue 09/06 → Thu 11/06 (គ្រួសារ)។", None),
+        ("③ doctor papers arrived + you approved",
+         "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
+         "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍", None),
+        ("④ the 3 days passed with no papers",
+         "No papers came — the missed time goes to your pay-back balance.\n"
+         "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។", None),
+        ("⑤ Give OT — senior submitted, waiting on you",
+         "Sent to the owner for approval ✓\nបានផ្ញើទៅម្ចាស់ហាងសម្រាប់អនុម័តហើយ ✓", None),
+        ("⑥ you approved — staff banks the hours + buyback slots",
+         "+1h OT approved — your bank: 4.5h. Choose when to take it back:\n"
+         "+1h OT ត្រូវបានអនុម័តហើយ — OT bank របស់អ្នក៖ 4.5h។ សូមជ្រើសម៉ោងដើម្បីសម្រាកសងវិញ៖",
+         take_kb),
+        ("⑦ senior hits the 14h cap",
+         "Davy's OT bank is full (14h) — they need to take some back first.\n"
+         "OT bank របស់ Davy ពេញហើយ (14h) — ត្រូវសម្រាកសងខ្លះសិន។", None),
     ]
 
 
@@ -902,7 +978,11 @@ def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     rows = [[InlineKeyboardButton("🧪 Dry-run 1: check-in possibilities + today's schedule",
                                   callback_data="att:dr:go")],
             [InlineKeyboardButton("🧪 Dry-run 2: Late & payback lifecycle",
-                                  callback_data="att:dr:go2")]] if page == 0 else []
+                                  callback_data="att:dr:go2")],
+            [InlineKeyboardButton("🧪 Dry-run 3: AL approval flow",
+                                  callback_data="att:dr:go3")],
+            [InlineKeyboardButton("🧪 Dry-run 4: Special Leave + Give OT",
+                                  callback_data="att:dr:go4")]] if page == 0 else []
     rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
@@ -985,7 +1065,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text(text, reply_markup=kb)
 
     if action == "dr":
-        if len(data) > 2 and data[2] in ("go", "go2"):
+        if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4"):
             sample = _persona(context) or next(
                 (r for r in staff_all("active") if to_min(r.get("work_start")) is not None), None)
             if sample is None:
@@ -994,12 +1074,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if data[2] == "go":
                 events = build_catalogue(sample) + [
                     ("📅 schedule summary", schedule_summary(_today()), None)]
-                intro = ("🧪 Dry-run 1 — every distinct check-in message (one of each), "
-                         "then today's who/when summary. %d steps:")
-            else:
+                intro = "🧪 Dry-run 1 — check-in messages + today's who/when summary. %d steps:"
+            elif data[2] == "go2":
                 events = build_catalogue2(sample)
-                intro = ("🧪 Dry-run 2 — the LATE + PAYBACK lifecycle, every distinct message "
-                         "once. (KH pending) lines join the next ChatGPT batch. %d steps:")
+                intro = "🧪 Dry-run 2 — LATE + PAYBACK lifecycle, fully bilingual. %d steps:"
+            elif data[2] == "go3":
+                events = build_catalogue3(sample)
+                intro = ("🧪 Dry-run 3 — AL APPROVAL flow (you see both sides: requester + senior), "
+                         "fully bilingual. %d steps:")
+            else:
+                events = build_catalogue4(sample)
+                intro = "🧪 Dry-run 4 — SPECIAL LEAVE + GIVE OT messages, fully bilingual. %d steps:"
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
             await context.bot.send_message(update.effective_chat.id, intro % len(events))
