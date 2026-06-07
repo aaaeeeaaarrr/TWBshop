@@ -65,7 +65,12 @@ watchdogs · data backfill.
   STILL PENDING: (a) ARRIVAL-WATCH ("are you there yet?" 4×15min) deferred to bundle with the real
   Late-DECLARE staff entry (no declarations exist until that's wired); (b) auto-checkout if location
   stayed on all shift not yet done (only the request→share path); (c) check-out silent-close +30min
-  digest flag not yet wired; (d) slot NEED-RANKING still pending (coverage engine = Wave 2b).
+  digest flag not yet wired; (d) slot NEED-RANKING ✅ DONE Wave 2b.
+- **WAVE 2b:** ✅ coverage engine (gm_bot/coverage.py — requirements table, on-duty count, shortfall,
+  slot_score; +6 tests). Payback slots now RANKED neediest-first with ⚠ on shortfall≥2. Reused later for
+  swap-partner suggestions + heatmap + Vannary auto-recommends. NOTE: payback ranking passes leave=set()
+  for the on-duty calc (per-day on-AL exclusion in scoring is a later refinement; day-off + the
+  requester's own leave already handled).
 
 ## SYSTEM AUDIT RESOLUTIONS (session 28 — hole-hunt)
 - **H1 STATE PERSISTENCE (build #1):** every real ladder persists step+partial-data to a `gm_flow_state`

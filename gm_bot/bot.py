@@ -1135,17 +1135,27 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
     if ws is None or we is None:
         return None
-    leave = set()  # (live: pull approved AL/leave dates) — empty first-pass
-    days = pb.working_days_ahead(staff.get("day_off"), leave, datetime.now(finance.PP_TZ).date(), 7, 3)
-    rows = []
+    from gm_bot import coverage as cov
+    from gm_bot.attendance import to_min
+    leave = al_leave_days_set(staff["id"])
+    leave_isos = set(leave)
+    days = pb.working_days_ahead(staff.get("day_off"), leave_isos,
+                                 datetime.now(finance.PP_TZ).date(), 7, 3)
+    roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
+    expertise = staff.get("expertise") or []
+    # build (score, button) then sort neediest-first (the shop's most-needed times rise to the top)
+    scored = []
     for d in days:
+        wd = d.strftime("%a")
         for label, s_min, e_min in pb.slot_windows(ws, we, balance):
-            mins = balance
-            txt = "%s %s %s-%s" % (("🌅" if label == "before" else "🌙"),
-                                   d.strftime("%a %d/%m"),
-                                   _fmt_min(s_min), _fmt_min(e_min))
-            rows.append([InlineKeyboardButton(
-                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, mins))])
+            score = cov.slot_score(expertise, s_min, e_min, wd, roster, set(), to_min)
+            txt = "%s %s %s-%s%s" % (("🌅" if label == "before" else "🌙"),
+                                     d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
+                                     " ⚠" if score >= 2 else "")
+            scored.append((score, [InlineKeyboardButton(
+                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, balance))]))
+    scored.sort(key=lambda t: -t[0])
+    rows = [btn for _score, btn in scored]
     # partial options
     for part in (60, 120):
         if part < balance:
