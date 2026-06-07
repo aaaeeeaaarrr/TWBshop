@@ -318,6 +318,10 @@
        — they engaged in good faith, so the remaining minutes get a fresh day-0 (counted from when the
        partial slot was worked). The daily check-in line + day-3 warn + day-4 auto-book then apply to
        the smaller number. Self-booking stays available anytime via the menu.
+       **LADDER RUNS ON CALENDAR DAYS, not check-ins (owner Q):** a no-show doesn't pause it — day-3
+       warning arrives as a plain DM even with no check-in; day-4 auto-books regardless. NO-SHOW +
+       DEBT never mix: the missed shift is penalized in money/bonus (1 day's pay, bonus not earned,
+       −2/min points), NEVER added to the payback balance — the debt simply survives unchanged.
      - **PAYBACK SLOT = MINI-SHIFT (owner REVERSED the no-reward rule, session 28 — "encourage them,
        not just break them"):** a booked slot (self-picked OR auto-assigned) gets the FULL check-in
        treatment — T−10 pre-reminder (with the how-to + the +10 line), T0 prompt, location check-in —
