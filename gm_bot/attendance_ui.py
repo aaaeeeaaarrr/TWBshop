@@ -764,11 +764,15 @@ _CI_MSG_PLUS5 = ("We give everyone 5 free late minutes 😊 More than 5 — ever
                  "ទាំងអស់នឹងត្រូវរាប់៖ ជាម៉ោងសងវិញ និងដកពិន្ទុ។ ប្រាប់យើងកាន់តែឆាប់ ពិន្ទុដែលត្រូវដក"
                  "កាន់តែតិច។ ជួបគ្នាឆាប់ៗ!")
 
+_CI_HOWTO = "📍 Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់"
+
 _CI_MSG_OUT = ("Shift over — share your live location to check out.\n"
-               "វេនចប់ហើយ — សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។")
+               "វេនចប់ហើយ — សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។\n\n"
+               + _CI_HOWTO)
 
 _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\n"
-                "អ្នកចេញមុនម៉ោងមែនទេ? បើមិនមែន សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។")
+                "អ្នកចេញមុនម៉ោងមែនទេ? បើមិនមែន សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។\n\n"
+                + _CI_HOWTO)
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
