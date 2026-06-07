@@ -2257,6 +2257,15 @@ def init_attendance_db() -> None:
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS phone TEXT;
                 -- session 28: per-day AL deduction tracking ("take when the dates pass")
                 ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS deducted_days TEXT DEFAULT '[]';
+                -- session 28: flow-state persistence (H1) — one active ladder per uid, survives restart
+                CREATE TABLE IF NOT EXISTS gm_flow_state (
+                    uid        BIGINT PRIMARY KEY,
+                    flow       TEXT NOT NULL,        -- 'late' | 'al' | 'special' | 'ot_give' | 'dayoff' …
+                    step       TEXT NOT NULL,
+                    data       TEXT DEFAULT '{}',    -- JSON: accumulated picks
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    expires_at TIMESTAMPTZ
+                );
 
                 CREATE TABLE IF NOT EXISTS al_requests (
                     id           SERIAL PRIMARY KEY,
@@ -2533,6 +2542,72 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def flow_save(uid: int, flow: str, step: str, data: dict | None = None,
+              ttl_min: int | None = None) -> None:
+    """Start/replace the active flow for a uid (one active flow per uid — last wins)."""
+    import json as _json
+    from gm_bot.flow import DEFAULT_TTL_MIN, new_expiry
+    ttl = ttl_min if ttl_min is not None else DEFAULT_TTL_MIN
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO gm_flow_state (uid, flow, step, data, updated_at, expires_at)
+                VALUES (%s,%s,%s,%s,NOW(),%s)
+                ON CONFLICT (uid) DO UPDATE SET flow=EXCLUDED.flow, step=EXCLUDED.step,
+                    data=EXCLUDED.data, updated_at=NOW(), expires_at=EXCLUDED.expires_at
+            """, (uid, flow, step, _json.dumps(data or {}), new_expiry(ttl)))
+
+
+def flow_load(uid: int) -> dict | None:
+    """The uid's active flow, or None. Expired rows are auto-purged and return None
+    (so the caller just opens the main menu — never a dead half-flow)."""
+    import json as _json
+    from gm_bot.flow import is_expired
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT uid, flow, step, data, expires_at FROM gm_flow_state WHERE uid=%s",
+                        (uid,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            exp = row["expires_at"]
+            if is_expired(exp.isoformat() if hasattr(exp, "isoformat") else exp):
+                cur.execute("DELETE FROM gm_flow_state WHERE uid=%s", (uid,))
+                return None
+            d = dict(row)
+            try:
+                d["data"] = _json.loads(d.get("data") or "{}")
+            except Exception:
+                d["data"] = {}
+            return d
+
+
+def flow_patch(uid: int, step: str | None = None, data_patch: dict | None = None,
+               ttl_min: int | None = None) -> dict | None:
+    """Advance the active flow: set step, merge picks, refresh TTL. No-op if no active flow."""
+    import json as _json
+    from gm_bot.flow import DEFAULT_TTL_MIN, merge_data, new_expiry
+    cur_state = flow_load(uid)
+    if not cur_state:
+        return None
+    new_step = step or cur_state["step"]
+    new_data = merge_data(cur_state["data"], data_patch)
+    ttl = ttl_min if ttl_min is not None else DEFAULT_TTL_MIN
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE gm_flow_state SET step=%s, data=%s, updated_at=NOW(),
+                           expires_at=%s WHERE uid=%s""",
+                        (new_step, _json.dumps(new_data), new_expiry(ttl), uid))
+    cur_state["step"], cur_state["data"] = new_step, new_data
+    return cur_state
+
+
+def flow_clear(uid: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM gm_flow_state WHERE uid=%s", (uid,))
 
 
 def staff_bind_uid(staff_id: int, uid: int) -> None:
