@@ -77,6 +77,14 @@ watchdogs · data backfill.
 - **WAVE 6b:** ✅ call-outs (frequency.py +5 tests; ai_client.generate_callout Sonnet-private/Opus-group;
   weekly _callout_job Mondays, throttled per ISO-week, CC owner+Tyty) + voice/photo/sticker reason
   capture (on a reason-wait → store + Supervisors).
+- **WAVE 7a:** ✅ My-schedule dashboard now shows REAL data (AL left, payback debt, OT bank, upcoming
+  approved AL) + per-AL cancel buttons (refund 1 day; cutoff = can't cancel once the date started).
+  PENDING 7b (the FINAL integration before go-live): real STAFF entry — when attendance_live, a
+  non-owner staff's text/Start opens the real main menu acting as THEMSELVES (reuse the screen builders
+  with p=their record), with terminal actions calling the real submit_* (submit_al_request, submit_swap,
+  submit_ot_grant, book_family_death/birth, payback offer, sick declare, late_declare) via flow_state
+  instead of the [TEST PREVIEW] stubs. Today those submits are reachable only programmatically; the
+  /test shell remains owner-only preview. This is the last wire — do it right before flipping the switch.
 - **WAVE 6c:** ✅ payroll.py pure (+5 tests; day-pay, compute_slip — no-show cuts pay1 + voids bonus,
   earned/not-earned, bonus on pay2) + /payroll owner command (work-month preview table, owner+Tyty).
   PENDING: interactive edit + send-to-staff slips (owner taps name → edit → Approve & send) + bonus

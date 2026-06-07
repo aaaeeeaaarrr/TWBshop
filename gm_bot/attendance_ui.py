@@ -1005,16 +1005,42 @@ _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Live personal dashboard — real balances from the DB (AL, payback debt, OT bank, upcoming)."""
+    import json as _json
+    from shared.database import (_db, payback_open_debt, ot_bank_balance)
     exp = ", ".join(p.get("expertise") or []) or "-"
+    debt = payback_open_debt(p["id"])
+    debt_min = debt["balance"] if debt else 0
+    bank_min = ot_bank_balance(p["id"])
+    # upcoming approved AL/special dates
+    upcoming = []
+    rows = [_back_row("att:am")]
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""SELECT id, days FROM al_requests
+                               WHERE staff_id=%s AND status='approved'""", (p["id"],))
+                for r in cur.fetchall():
+                    for d in _json.loads(r["days"] or "[]"):
+                        if d >= _today().isoformat():
+                            upcoming.append((d, r["id"]))
+    except Exception:
+        pass
+    upcoming.sort()
+    up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
+    for d, rid in upcoming[:6]:
+        rows.append([InlineKeyboardButton("✕ Cancel AL %s" % day_label(date.fromisoformat(d)),
+                                          callback_data="att:my:cancel:%s:%d" % (d, rid))])
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
                    "AL left · AL នៅសល់: %s days\n"
-                   "Payback debt · ជំពាក់ម៉ោងសងវិញ: 0 min 🚧\n"
-                   "OT bank · OT សន្សំ: 0h 🚧\n"
-                   "Upcoming AL · AL ខាងមុខ: 🚧 (reads al_requests next build)"
+                   "Payback debt · ជំពាក់ម៉ោងសងវិញ: %d min\n"
+                   "OT bank · OT សន្សំ: %gh\n"
+                   "Upcoming AL · AL ខាងមុខ: %s"
                 % (p.get("work_start") or "?", p.get("work_end") or "?",
-                   p.get("day_off") or "?", exp, p.get("al_left", "?"))), \
-        InlineKeyboardMarkup([_back_row("att:am")])
+                   p.get("day_off") or "?", exp, p.get("al_left", "?"),
+                   debt_min, bank_min / 60, up_txt)), \
+        InlineKeyboardMarkup(rows)
 
 
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
@@ -1307,5 +1333,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await context.bot.send_message(chat_id, _CI_MSG_OUT2)
         return
     if action == "my":
+        if len(data) > 2 and data[2] == "cancel":
+            iso, rid = data[3], int(data[4])
+            from shared.database import al_get_request, al_set_status, al_deduct
+            # cutoff: can't cancel once the AL date has started (today or past)
+            if iso <= _today().isoformat():
+                await query.answer("Too late to cancel — that day has started", show_alert=True)
+                return await show(my_screen(p))
+            req = al_get_request(rid)
+            if req:
+                al_set_status(rid, "cancelled")
+                al_deduct(p["id"], -1)   # refund 1 day (full-day AL; hours-AL refund = refinement)
+            return await show(my_screen(p))
         return await show(my_screen(p))
     # att:noop and anything unknown: stay put
