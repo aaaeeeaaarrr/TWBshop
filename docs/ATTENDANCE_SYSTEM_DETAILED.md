@@ -136,6 +136,16 @@
   The ONLY typed text is the reason fields (passed verbatim to seniors, not AI-read). Haiku is needed only
   for the group-redirect detection and understand-without-reply edges. (Telegram Bot API itself — messages,
   buttons, edits, reacts — is FREE; "API $" only ever means AI calls.)
+- **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
+  exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
+  **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
+  late-reason → recorded "(no reason given)" (digest signal); unsettled debts live in the deadline
+  machinery, never blocking. Abandoned button-flows just sit in scroll-back (tap-time validation).
+  Reason-step abandoned mid-request = a DRAFT: never sent to seniors, quietly expires after 24h.
+  One text-wait at a time — a new flow's reason step replaces the old wait (last intention wins).
+- **SETTLE MENU AL GUARD (owner, session 28):** `[🏖 Take from AL]` is HIDDEN when al_left < 7 —
+  scarce AL is for real leave; payback only. 🔒 owner: should the 14-day deadline auto-settle respect
+  the same floor (eat AL only down to 7, remainder from salary)? (recommended yes.)
 - **👍 ACK RULES (updated session 28):**
   - **OWNER: ALWAYS 👍** any typed owner message the GM understood — no exceptions. (Born from the Lim
     Soleng case: owner typed "Yes she's finished", GM acted but never confirmed.) PLUS when an owner
