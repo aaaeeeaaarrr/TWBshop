@@ -68,9 +68,14 @@ watchdogs · data backfill.
   digest flag not yet wired; (d) slot NEED-RANKING ✅ DONE Wave 2b.
 - **WAVE 5a (Special Leave — sick core):** ✅ sick.py pure (papers grace, family pool, who-KH) +3 tests;
   sick_cases table + helpers; paperless-deadline daily job (provisional→payback after 3 days, gated).
-  PENDING 5b: papers AI reader (read_medical_paper) + owner card + undated playbook + recovery ask +
-  retroactive reversal + part-duty + family-sick declare flow. PENDING 5c: marriage / family-death
-  two-tier / wife-birth. The sick-declare staff UI (take-a-pill ladder) wires in Wave 7.
+  PENDING 5c: marriage / family-death two-tier / wife-birth. The sick-declare staff UI (take-a-pill
+  ladder) wires in Wave 7.
+- **WAVE 5b (sick papers):** ✅ ai_client.read_medical_paper (Opus vision — is_medical, hospital/doctor/
+  patient/date, rest_days, contagious, part_duty, advice); _handle_sick_paper (staff photo on an open
+  sick case → Opus → OWNER+TYTY card, papers forwarded) + _sick_paper_callback (cover Nd / 💺 part-duty /
+  skip / come / rest; recovery ask; +15 return; senior light-duty memo); _private_photo_router.
+  PENDING: (a) RETROACTIVE reversal needs a no-show record table (not built) — defer; (b) part-duty
+  relaxed-checkout flag; (c) undated→nightly-nudge loop ties to the own-sick night nudge (Wave 7 UI).
 - **WAVE 4 (Give OT):** ✅ ot.py pure (cap 14h, duration options) + coverage.surplus/slot_surplus (+5
   tests); ot_bank/ot_grants/ot_buyback tables + helpers. Orchestration: submit_ot_grant → OWNER card
   (approve/reject+memo both) → NOW banks immediately + buyback offer (safest/most-surplus slots first);

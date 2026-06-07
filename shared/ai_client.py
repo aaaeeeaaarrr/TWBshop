@@ -1056,6 +1056,52 @@ async def assess_receipt_photo(image_bytes: bytes,
 
 
 # Bounded short-context judgment (one question + one reply) — Sonnet is the right tier.
+MEDICAL_PAPER_MODEL = "claude-opus-4-8"   # rare, high-judgment (undated papers, part-duty advice)
+
+
+async def read_medical_paper(image_bytes: bytes) -> dict:
+    """Read a staff sick-leave document → advise the owner. NEVER decides — owner taps.
+    Returns {is_medical, hospital, doctor, patient_name, doc_date, rest_days|null,
+             contagious, part_duty_possible, suggested_jobs, confidence, reasoning}.
+    Used only when a staff with an open sick case sends a photo (rare → Opus is justified)."""
+    prompt = (
+        "This is a photo a bakery staff member sent as sick-leave proof. Read it and ADVISE the "
+        "owner (you never decide). Extract:\n"
+        "- is_medical: is this a genuine clinic/hospital/doctor document? (true/false)\n"
+        "- hospital, doctor, patient_name, doc_date (strings; empty if absent)\n"
+        "- rest_days: integer ONLY if the paper states a rest period, else null\n"
+        "- contagious: true if the condition is likely contagious (fever/flu/infection) — then NO "
+        "come-in suggestion\n"
+        "- part_duty_possible: true if they could do light work (e.g. leg injury → seated; hand "
+        "injury → one-hand) — false for contagious/serious\n"
+        "- suggested_jobs: short e.g. 'seated cashier/prep' or 'one-hand cashier' or ''\n"
+        "- confidence: 0..1; reasoning: one short line (treatment + likely days)\n"
+        "Respond ONLY JSON with exactly those keys."
+    )
+    try:
+        resp = await _get_client().messages.create(
+            model=MEDICAL_PAPER_MODEL, max_tokens=400,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                             "data": _encode(image_bytes)}},
+                {"type": "text", "text": prompt}]}])
+        r = _parse_json(resp.content[0].text)
+        return {
+            "is_medical": bool(r.get("is_medical", False)),
+            "hospital": r.get("hospital", ""), "doctor": r.get("doctor", ""),
+            "patient_name": r.get("patient_name", ""), "doc_date": r.get("doc_date", ""),
+            "rest_days": r.get("rest_days"),
+            "contagious": bool(r.get("contagious", False)),
+            "part_duty_possible": bool(r.get("part_duty_possible", False)),
+            "suggested_jobs": r.get("suggested_jobs", ""),
+            "confidence": r.get("confidence", 0), "reasoning": r.get("reasoning", ""),
+        }
+    except Exception as exc:
+        logger.error("read_medical_paper failed: %s", exc)
+        return {"is_medical": False, "rest_days": None, "contagious": False,
+                "part_duty_possible": False, "_error": True}
+
+
 CLARIFICATION_JUDGE_MODEL = "claude-sonnet-4-6"
 
 _CLARIFY_JUDGE_SYSTEM = (

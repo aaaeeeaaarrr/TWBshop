@@ -60,7 +60,7 @@ from shared.ai_client import (
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
     extract_daily_report_ai, generate_attendance_digest, detect_leave_request,
-    classify_stock_photo, read_stock_sheet,
+    classify_stock_photo, read_stock_sheet, read_medical_paper,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
 from gm_bot import finance, clarify, lateness, mentions, reconcile, sales, stock
@@ -1072,6 +1072,14 @@ async def _send_reconciliation(context, business_day: str) -> None:
         logger.error("reconciliation failed for %s: %s", business_day, e)
 
 
+async def _private_photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Private photo: staff sick papers (gated). Harmless no-op otherwise."""
+    try:
+        await _handle_sick_paper(update, context)
+    except Exception as e:
+        logger.error("sick paper handling failed: %s", e)
+
+
 async def _private_location_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Staff check-in (gated/live) takes precedence; otherwise the owner-only test handler."""
     try:
@@ -1723,6 +1731,128 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                            d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         except Exception as e:
             logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
+
+
+def _open_sick_case(staff_id: int) -> dict | None:
+    """Most recent open/provisional own-sick case for a staff (papers attach to it)."""
+    for c in sick_provisional_open():
+        if c["staff_id"] == staff_id:
+            return c
+    return None
+
+
+async def _handle_sick_paper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Gated: a staff with an open own-sick case sends a photo → Opus reads it → owner card.
+    Returns True if handled. Papers go ONLY to owner+Tyty; never analysed in a death context."""
+    if not _attendance_live():
+        return False
+    msg = update.message
+    if not msg or not msg.photo or not update.effective_user:
+        return False
+    staff = staff_get_by_uid(update.effective_user.id)
+    if not staff or staff.get("status") != "active":
+        return False
+    case = _open_sick_case(staff["id"])
+    if not case:
+        return False
+    sick_set(case["id"], papers_seen=True)
+    await msg.reply_text("Got your papers ✓ sending to the owner.\nទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។")
+    try:
+        photo = await msg.photo[-1].get_file()
+        data = bytes(await photo.download_as_bytearray())
+        info = await read_medical_paper(data)
+    except Exception as e:
+        logger.error("sick paper read failed: %s", e)
+        info = {"is_medical": False, "_error": True, "rest_days": None,
+                "contagious": False, "part_duty_possible": False}
+    name = staff.get("call_name") or staff["canonical_name"]
+    adv = ("🩺 %s — sick papers\n" % name)
+    if info.get("_error"):
+        adv += "(couldn't read — see the photo)\n"
+    else:
+        adv += ("Opus: %s · %s · likely %s · %s\n"
+                % (info.get("hospital") or "?", info.get("reasoning") or "—",
+                   ("%sd" % info["rest_days"]) if info.get("rest_days") else "no period stated",
+                   "CONTAGIOUS — no come-in" if info.get("contagious") else "not contagious"))
+    rows = [[InlineKeyboardButton("✓ Accept (cover %s)" % (("%sd" % info["rest_days"])
+                                                           if info.get("rest_days") else "1d"),
+                                  callback_data="att:sp:cov:%d:%d" % (case["id"], info.get("rest_days") or 1))],
+            [InlineKeyboardButton("1d", callback_data="att:sp:cov:%d:1" % case["id"]),
+             InlineKeyboardButton("2d", callback_data="att:sp:cov:%d:2" % case["id"]),
+             InlineKeyboardButton("3d", callback_data="att:sp:cov:%d:3" % case["id"])]]
+    if info.get("part_duty_possible") and not info.get("contagious"):
+        rows.append([InlineKeyboardButton("💺 Offer part-duty (%s)" % (info.get("suggested_jobs") or "light"),
+                                          callback_data="att:sp:duty:%d" % case["id"])])
+    rows.append([InlineKeyboardButton("Skip → nightly nudges", callback_data="att:sp:cov:%d:0" % case["id"])])
+    # papers go to owner + Tyty only
+    for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        if not oid:
+            continue
+        try:
+            await context.bot.send_message(oid, adv, reply_markup=InlineKeyboardMarkup(rows))
+            await context.bot.forward_message(oid, msg.chat_id, msg.message_id)
+        except Exception:
+            pass
+    return True
+
+
+def _tyty_uid() -> int | None:
+    t = next((s for s in staff_all() if s["canonical_name"] == "Tyty"), None)
+    ids = (t or {}).get("telegram_ids") or []
+    return ids[0] if ids else None
+
+
+async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:sp:cov:{case}:{days} | att:sp:duty:{case} — owner decides on sick papers."""
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    parts = query.data.split(":")
+    sub, case_id = parts[2], int(parts[3])
+    case = sick_get(case_id)
+    if not case:
+        return
+    staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
+    uid = (staff.get("telegram_ids") or [None])[0] if staff else None
+    if sub == "cov":
+        days = int(parts[4])
+        sick_set(case_id, status="papered" if days else "provisional", covered_days=days or None)
+        await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd." % days if days
+                                                            else "\n\n→ nightly nudges (no fixed days)."))
+        if uid and days:
+            await context.bot.send_message(uid,
+                "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
+                "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍")
+    elif sub == "duty":
+        await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
+        if uid:
+            await context.bot.send_message(uid,
+                "Feeling a little better? If you're up to it, there's light work today (+15 points ⭐) — "
+                "only if you truly feel able 🤍\n"
+                "បើធូរស្បើយបន្តិច ហើយអ្នកអាចបាន មានការងារស្រាលៗថ្ងៃនេះ (+15 ពិន្ទុ ⭐) — តែបើអ្នកពិតជាអាច 🤍",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("💪 I can come", callback_data="att:sp:come:%d" % case_id)],
+                    [InlineKeyboardButton("🛌 Rest today", callback_data="att:sp:rest:%d" % case_id)]]))
+    elif sub == "come":
+        # staff opted into part-duty (whole day stays papered; +15 gift; relaxed check-out)
+        try:
+            points_record(case["staff_id"], "return_after_doctor", 1, "part_duty")
+        except Exception:
+            pass
+        await query.edit_message_text(
+            "Thank you for coming in 🤍 light duty only — a senior will point you to seated/easy work.\n"
+            "អរគុណដែលបានមក 🤍 ការងារស្រាលៗ — បងៗនឹងណែនាំការងារ។")
+        # tell on-shift seniors
+        for sen in _seniors(exclude_staff_id=case["staff_id"]):
+            try:
+                await context.bot.send_message(sen["telegram_ids"][0],
+                    "%s is coming on LIGHT DUTY today — please give easy/seated work only."
+                    % ((staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"))
+            except Exception:
+                pass
+    elif sub == "rest":
+        await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជា 🤍 សម្រាកថ្ងៃនេះ។")
 
 
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3187,6 +3317,10 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
     app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
+    app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
+    # private photo from staff → sick papers (gated); falls through harmlessly otherwise
+    app.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)
