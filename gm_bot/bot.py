@@ -28,6 +28,7 @@ from shared.database import (
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
     gm_append_refinement_note, save_ops_message, al_apply_due_deductions,
     att_get_session, att_check_in, att_record_ping,
+    late_declare, payback_open_debt, payback_add_debt, payback_credit, payback_book, payback_all_open,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1119,6 +1120,53 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.error("checkin send to %s failed: %s", name, e)
 
 
+def _payback_slot_keyboard(staff: dict, balance: int):
+    """Build payback slot buttons: before/after each of the next working days + day-off option +
+    partial buttons. callback att:pb:book:{date}:{start}:{end}:{mins}."""
+    from gm_bot import payback as pb
+    from gm_bot.attendance import to_min
+    ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+    if ws is None or we is None:
+        return None
+    leave = set()  # (live: pull approved AL/leave dates) — empty first-pass
+    days = pb.working_days_ahead(staff.get("day_off"), leave, datetime.now(finance.PP_TZ).date(), 7, 3)
+    rows = []
+    for d in days:
+        for label, s_min, e_min in pb.slot_windows(ws, we, balance):
+            mins = balance
+            txt = "%s %s %s-%s" % (("🌅" if label == "before" else "🌙"),
+                                   d.strftime("%a %d/%m"),
+                                   _fmt_min(s_min), _fmt_min(e_min))
+            rows.append([InlineKeyboardButton(
+                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, mins))])
+    # partial options
+    for part in (60, 120):
+        if part < balance:
+            rows.append([InlineKeyboardButton("Pay %dh only · សងតែ %dh" % (part // 60, part // 60),
+                                              callback_data="att:pb:part:%d" % part)])
+    return InlineKeyboardMarkup(rows) if rows else None
+
+
+def _fmt_min(m: int) -> str:
+    m %= 1440
+    h, mm = divmod(m, 60)
+    sfx = "am" if h < 12 else "pm"
+    h12 = h % 12 or 12
+    return ("%d:%02d%s" % (h12, mm, sfx)) if mm else ("%d%s" % (h12, sfx))
+
+
+async def _offer_payback(context, staff: dict, balance: int, uid: int) -> None:
+    """Send the payback slot picker (the locked bilingual line)."""
+    kb = _payback_slot_keyboard(staff, balance)
+    text = ("You owe %d min. Pick when to work it off — these are the times we need you most:\n"
+            "អ្នកនៅត្រូវសង %d min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+            % (balance, balance))
+    try:
+        await context.bot.send_message(uid, text, reply_markup=kb)
+    except Exception as e:
+        logger.error("offer payback failed: %s", e)
+
+
 async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Real staff check-in via live location. GATED. Returns True if handled (so the test
     handler doesn't also fire). Records the ping (secret feed) always-on; on first in-zone
@@ -1161,9 +1209,98 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
             await msg.reply_text(ui._V_EARLY % (early, early))
         elif state == "late":
             await msg.reply_text(ui._V_LATE % (late, late))
+            # late arrival → create/grow the payback debt + offer slots
+            try:
+                payback_add_debt(staff["id"], late, "late arrival", shift_date)
+                d = payback_open_debt(staff["id"])
+                if d:
+                    await _offer_payback(context, staff, d["balance"], user.id)
+            except Exception as e:
+                logger.error("payback debt create failed: %s", e)
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
+
+
+async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:pb:book:{date}:{start}:{end}:{mins} | att:pb:part:{mins} — staff books a payback slot."""
+    query = update.callback_query
+    await query.answer()
+    user = update.effective_user
+    staff = staff_get_by_uid(user.id)
+    if not staff:
+        return
+    data = query.data.split(":")
+    sub = data[2] if len(data) > 2 else ""
+    debt = payback_open_debt(staff["id"])
+    if not debt:
+        await query.edit_message_text("Your payback is already cleared ✓ / សងរួចរាល់ហើយ ✓")
+        return
+    if sub == "part":
+        part = min(int(data[3]), debt["balance"])
+        kb = _payback_slot_keyboard({**staff}, part)
+        await query.edit_message_text(
+            "Pick a time for %d min:\nសូមជ្រើសពេលសម្រាប់ %d min៖" % (part, part), reply_markup=kb)
+        return
+    if sub == "book":
+        slot_date, s_min, e_min, mins = data[3], int(data[4]), int(data[5]), int(data[6])
+        payback_book(debt["id"], staff["id"], slot_date, s_min, e_min, mins)
+        from datetime import date as _date
+        d = _date.fromisoformat(slot_date)
+        await query.edit_message_text(
+            "Booked ✓ — %s %s-%s.\nបានកក់រួច ✓ — %s %s-%s។\n"
+            "Come 5 minutes early and you earn +10 points ⭐\n"
+            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
+            % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
+               d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
+        # plain Supervisors notice
+        try:
+            await context.bot.send_message(
+                config.SUPERVISORS_CHAT_ID,
+                "%s pays back %s %s-%s." % (staff.get("call_name") or staff["canonical_name"],
+                                           d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
+        except Exception:
+            pass
+
+
+async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily (gated): advance the ignore-ladder for unbooked debts — day-3 warn, day-4 auto-book.
+    (The calm daily check-in line is delivered by the check-in flow; this job handles warn/autobook.)"""
+    if not _attendance_live():
+        return
+    from gm_bot import payback as pb
+    today = datetime.now(finance.PP_TZ).date()
+    for debt in payback_all_open():
+        staff = next((s for s in staff_all("active") if s["id"] == debt["staff_id"]), None)
+        if not staff or not (staff.get("telegram_ids") or []):
+            continue
+        uid = staff["telegram_ids"][0]
+        # ladder_days counts legitimate working days elapsed (simplified: calendar days here)
+        days = (today - debt["created_date"]).days if debt.get("created_date") else 0
+        stage = pb.ignore_stage(days)
+        try:
+            if stage == "warn":
+                await context.bot.send_message(
+                    uid, "Pick before tomorrow, or I'll pick for you.\n"
+                         "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។",
+                    reply_markup=_payback_slot_keyboard(staff, debt["balance"]))
+            elif stage == "autobook":
+                from gm_bot import payback as _pb
+                from gm_bot.attendance import to_min
+                ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+                days_ahead = _pb.working_days_ahead(staff.get("day_off"), set(), today, 7, 1)
+                if ws is not None and days_ahead:
+                    d0 = days_ahead[0]
+                    _lbl, s_min, e_min = _pb.slot_windows(ws, we, debt["balance"])[0]
+                    payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
+                                 debt["balance"], auto_booked=True)
+                    await context.bot.send_message(
+                        uid, "I booked you %s %s-%s (you didn't choose).\n"
+                             "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"
+                        % (d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
+                           d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
+        except Exception as e:
+            logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
 
 
 async def _al_deduction_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2527,6 +2664,7 @@ def build_app() -> Application:
     # attendance role-play shell — OWNER ONLY, test mode (no staff interaction at all)
     from gm_bot import attendance_ui
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
+    app.add_handler(CallbackQueryHandler(_payback_callback, pattern=r"^att:pb:"))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)
@@ -2535,6 +2673,10 @@ def build_app() -> Application:
     # per-minute check-in scheduler (gated; inert until attendance_live='true')
     app.job_queue.run_repeating(_checkin_scheduler_job, interval=60, first=30,
                                 name="gm_checkin_scheduler")
+    # payback ignore-ladder: daily 07:10 PP (00:10 UTC), gated
+    app.job_queue.run_daily(_payback_ladder_job,
+                            time=__import__("datetime").time(hour=0, minute=10),
+                            name="gm_payback_ladder")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

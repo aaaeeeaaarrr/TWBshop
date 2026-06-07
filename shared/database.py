@@ -2297,6 +2297,33 @@ def init_attendance_db() -> None:
                     reported_at  TIMESTAMPTZ DEFAULT NOW(),
                     arrived_at   TIMESTAMPTZ
                 );
+                ALTER TABLE lateness_records ADD COLUMN IF NOT EXISTS informed_before BOOLEAN DEFAULT FALSE;
+                ALTER TABLE lateness_records ADD COLUMN IF NOT EXISTS expected_min INTEGER;
+                ALTER TABLE lateness_records ADD COLUMN IF NOT EXISTS reason TEXT;
+                -- session 28: payback debts (TIME owed for lateness) + their booked slots
+                CREATE TABLE IF NOT EXISTS payback_debts (
+                    id            SERIAL PRIMARY KEY,
+                    staff_id      INTEGER REFERENCES staff_registry(id),
+                    minutes_owed  INTEGER NOT NULL,
+                    minutes_paid  INTEGER DEFAULT 0,
+                    reason        TEXT,
+                    created_date  DATE,
+                    ladder_days   INTEGER DEFAULT 0,   -- working days counted toward the ignore ladder
+                    status        TEXT DEFAULT 'open',  -- open | cleared
+                    created_at    TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS payback_bookings (
+                    id          SERIAL PRIMARY KEY,
+                    debt_id     INTEGER REFERENCES payback_debts(id),
+                    staff_id    INTEGER REFERENCES staff_registry(id),
+                    slot_date   DATE,
+                    start_min   INTEGER,
+                    end_min     INTEGER,
+                    minutes     INTEGER,
+                    auto_booked BOOLEAN DEFAULT FALSE,
+                    status      TEXT DEFAULT 'booked',  -- booked | done | missed
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                );
                 CREATE TABLE IF NOT EXISTS attendance_sessions (
                     id            SERIAL PRIMARY KEY,
                     staff_id      INTEGER REFERENCES staff_registry(id),
@@ -2558,6 +2585,77 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) -> int:
+    """Record a proactive lateness declaration (informed BEFORE = the cheaper points rate)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO lateness_records
+                (staff_id, for_shift, expected_min, reason, informed_before, reported_at)
+                VALUES (%s,%s,%s,%s,TRUE,NOW()) RETURNING id""",
+                (staff_id, for_shift, expected_min, reason))
+            return cur.fetchone()["id"]
+
+
+def payback_open_debt(staff_id: int) -> dict | None:
+    """The staff's single open payback debt (balance = owed-paid), or None."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT *, (minutes_owed - minutes_paid) AS balance
+                           FROM payback_debts WHERE staff_id=%s AND status='open'
+                           ORDER BY id LIMIT 1""", (staff_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def payback_add_debt(staff_id: int, minutes: int, reason: str, created_date: str) -> int:
+    """Add owed minutes — merges into the existing open debt if any (one balance per person)."""
+    existing = payback_open_debt(staff_id)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if existing:
+                cur.execute("UPDATE payback_debts SET minutes_owed=minutes_owed+%s WHERE id=%s",
+                            (minutes, existing["id"]))
+                return existing["id"]
+            cur.execute("""INSERT INTO payback_debts (staff_id, minutes_owed, reason, created_date)
+                           VALUES (%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, minutes, reason, created_date))
+            return cur.fetchone()["id"]
+
+
+def payback_credit(debt_id: int, minutes: int) -> dict:
+    """Credit worked minutes; clear the debt when fully paid. Returns {balance, status}."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE payback_debts SET minutes_paid=minutes_paid+%s WHERE id=%s",
+                        (minutes, debt_id))
+            cur.execute("SELECT minutes_owed, minutes_paid FROM payback_debts WHERE id=%s", (debt_id,))
+            r = cur.fetchone()
+            bal = r["minutes_owed"] - r["minutes_paid"]
+            if bal <= 0:
+                cur.execute("UPDATE payback_debts SET status='cleared' WHERE id=%s", (debt_id,))
+            return {"balance": max(bal, 0), "status": "cleared" if bal <= 0 else "open"}
+
+
+def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, end_min: int,
+                 minutes: int, auto_booked: bool = False) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO payback_bookings
+                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked))
+            return cur.fetchone()["id"]
+
+
+def payback_all_open() -> list[dict]:
+    """All open debts (for the daily ignore-ladder job)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT *, (minutes_owed - minutes_paid) AS balance
+                           FROM payback_debts WHERE status='open' ORDER BY staff_id""")
+            return [dict(r) for r in cur.fetchall()]
 
 
 def att_record_ping(staff_id: int, lat: float, lng: float, in_zone: bool, ts: str | None = None) -> None:
