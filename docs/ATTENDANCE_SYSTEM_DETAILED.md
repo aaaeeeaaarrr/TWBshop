@@ -134,17 +134,25 @@
        OT time starts** → GM ASKS the owner for an optional reason (`type` / `skip`) → BOTH senior AND
        staff get the memo (with the reason if given). **REJECT AFTER it started** → too late, staff is
        PAID/banked (they stayed in good faith) — owner just sees "already worked, banked".
-     - **NOW-OT consent:** staff still gets asked *"Senior gave you {Xh} OT now ({window}) — ok?"*
-       `[✅ Yes][❌ Can't]` (they may decline). No answer in **15 min → the SENIOR is nudged to remind
-       them in person** (they're right there). The tap = agreement; their **live location = proof of the
-       hours** → banked on completion. Decline → nothing banks.
-     - **LATE GRANT IS FINE (owner Q):** senior sets OT 4–5pm but the button is pressed at 4:30 → because
-       the staff is already present with continuous location, the window (4–5pm) is credited from location
-       RETROACTIVELY — press time doesn't matter; credit = location ∩ the senior's window.
+     - **NOW-OT consent:** staff gets asked *"Senior gave you {Xh} OT now ({window}) — ok?"*
+       `[✅ Yes][❌ Can't]`; no answer in **15 min → SENIOR nudged to remind in person**. Decline →
+       nothing banks.
+     - **PROOF OF OT HOURS (owner correction, session 28 — location is CHECK-IN-ONLY, NOT continuous):**
+       cannot assume location runs through the window. On accept, GM asks *"Share your live location for
+       your OT so it counts"* (the standard how-to line) → location ∩ window = credited. **FALLBACK: the
+       GRANTING SENIOR confirms completion** at OT end — *"Did {staff} finish the OT? [✅ Done][Partial][No]"*
+       — the senior is the on-site witness, so location-off never loses an honest worker.
+     - **LATE GRANT (owner Q, corrected):** senior sets 4–5pm, pressed 4:30 → from 4:30 the staff shares
+       location (or it was on) = proven; the gap 4:00–4:30 (location off) is covered by the SENIOR's
+       completion confirm. So late press never costs the staff, but proof = location where present +
+       senior word for the rest.
      - **FUTURE-OT:** owner approves → staff *"You're asked for OT on {when} — can you?"* `[✅ Yes][❌ Can't]`
-       (voluntary; accept expires when the day arrives = didn't happen, no harm; **accepted-then-no-show =
-       just doesn't bank, NO penalty** — it's extra, not a duty) → on Yes a scheduled WORK SLOT (T−10,
-       check-in, +10 if early) → worked → banked → buyback.
+       (voluntary; un-answered accept just expires when the day comes = no harm) → on Yes a scheduled WORK
+       SLOT (T−10, check-in/share-location, +10 if early) → worked → banked → buyback.
+     - **ACCEPTED OT = A COMMITMENT (owner correction, session 28):** once a staff taps ✅ (now OR future),
+       a no-show on it IS penalized — it's part of work now, not optional. Penalty = points hit + dossier
+       flag + senior & owner notified (NO money/AL — OT is the time-bank world; points-based, values
+       pending). Distinct from never-accepting (which carries no penalty — declining is free).
      - Tyty + Delis never appear in the Give-OT staff list.
        **OT ON AN AL DAY (owner decision, session 28):** ALLOWED outside the leave window (AL already
        deducted, no refund — their choice), with a FLAG LINE on the owner card: *"Note: receiver is on AL
