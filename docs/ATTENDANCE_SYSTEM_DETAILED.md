@@ -159,6 +159,12 @@
      **STYLE (owner, session 28): private DMs address the person by CALL NAME — once, at the opening
      ("Hi Davy — …"), so it feels personal; NOT repeated in every sentence.** Goes into the Sonnet
      call-out prompt as a hard style rule (and is the house style for all personal GM DMs).
+     **RESPONSES TO CALL-OUTS (session 28):** each call-out opens a ~48h listening window.
+     PRIVATE: any reply → dossier verbatim + 👍 (no 👍 if it's a fight/problem) + forwarded to both
+     owners; GM stays warm + non-committal ("Thank you for telling me 🤍") — never negotiates; fixable
+     causes (schedule clashes) surface to owners with the data. GROUP: reply-tagged responses (anyone)
+     + UNTAGGED messages from THE TARGETED PERSON in-window → recorded + forwarded; all other banter
+     IGNORED — the GM says the wink once and goes quiet, never engages the thread.
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
