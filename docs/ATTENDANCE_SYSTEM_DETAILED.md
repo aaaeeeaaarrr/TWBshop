@@ -510,6 +510,34 @@
    lines embed the same English form (no Khmer weekday names, no Khmer numerals, NO Khmer-weekday
    helper). Identical in every flow.
 
+## 8a. COVERAGE REQUIREMENTS — THE TABLE (owner interview, session 28) 🔒FINAL
+> Powers: availability pictures, swap suggestions, payback need-slots, heatmap, Vannary-style
+> auto-recommendations. ALL pure logic, zero API. PUSH-HIGH PRINCIPLE: ranges always target the
+> high number (emergency headroom); below-min = critical flag, below-target = caution.
+- **Windows:** morning 6–11 · lunch 11–14 · afternoon 14–17 · dinner/bar 17–21 · night 21–6.
+  Busy-busy: Sat+Sun lunch, Fri+Sat dinner.
+- **FRONT (pooled — bar/service can always cashier; some kitchen-mains can cashier but NOT
+  service/bar; skills per registry):** lunch+dinner 3–4 (target 4) · morning/afternoon 2–3 (target 3) ·
+  night 1–2 (1 normal — one person makes drinks; 2 = big-group speed).
+- **KITCHEN:** lunch+dinner 3–4 (target 4; front/kitchen can split 3/4 or 4/3) · quiet windows 2–3 ·
+  night: NO rule — intentional buffer crew (offs/emergencies; light deliveries + checks + preps);
+  Heng = night-kitchen overflow helper.
+- **BAKERY (night 9pm–6am + Samphass 6pm–6am): ESSENTIAL, immovable** — bakers never get moved to
+  other times; ≥3 every night, Fri+Sat target 4 (fallback: borrow 1 kitchen hand when 3).
+  Roster note: exactly 4 bakers whose day-offs never collide and all 4 align Fri+Sat — preserve this
+  pattern when changing baker day-offs.
+- **BAR: ≥1 bar-skilled present AT ALL TIMES** (drinkers = profit boost, serve fast).
+- **PREP (daytime cake preparations — crusts etc., feeds the Cake makers): ≥2 prep-capable 10:00–19:00.**
+  Prep-capable = explicit 'prep' skill + ALL daytime service people EXCEPT late-night service, Por and
+  Rath (seniors anchor/supervise: Por watches-while-working; Rath = the main guy, does everything except
+  Cake, directs preps, backed owner up since forever — moved to 6am–6pm because post-Lina the 6–7am
+  crew are newbies).
+- **CAKE: Thyda + Tyty only.** They CAN prep but shouldn't (cake output drops). Thyda also real bakery,
+  helps nights 9pm–12am. Tyty mass-produces before her holidays (manual arrangement, no rule).
+- **A PERSON FILLS ONE SLOT AT A TIME** — skills = where they CAN stand; minimums = bodies per station.
+- **KNOWN SOFT SPOT (accepted/pending):** Wed+Fri 17–19h prep = 1 (Seth/Failin alternate day-offs) —
+  owner to rule if the late prep tail matters.
+
 ## 8. COVERAGE GUARDRAIL + RIPPLE CHECK (standing) ⏳ — LOCKED IN (owner session 28)
 - Weekly skill map from expertise + schedules; warns BEFORE an AL/day-off/swap opens an expertise hole.
 - Used inside AL approval (§5.7), swap-partner suggestion (§7.2), payback need-slots (§4.7); owner report.
