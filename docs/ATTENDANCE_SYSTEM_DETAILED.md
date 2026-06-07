@@ -224,7 +224,12 @@
    Beyond the 2h-before-end cap = effectively absent → Emergency AL or no-show rules.
 3. **Reason — asked ON ARRIVAL, FREE TEXT (owner reversed quick-reasons, session 28):** the second their
    location confirms arrival, GM asks *"Why were you late?"* (bilingual) — they TYPE the answer, stored
-   verbatim. NO preset reason buttons anywhere ("a menu of excuses is a menu of permission" — presets
+   verbatim. **MECHANICS (owner Qs, session 28):** NO reply/tag needed — private 1-on-1, the ask opens an
+   awaiting-reason state and the next text IS the reason (menu-on-any-text is suspended while awaiting —
+   no menu spam). First message → 👍 + the settle menu (`[💪 Pay back]` `[🏖 Take from AL (X left)]`);
+   **further texts until a settle button is tapped (or ~10 min) APPEND to the stored reason** — Khmer
+   burst-texting ("moto broke" / "on bridge" / "sorry boss") lands as ONE reason, no re-asks, no second 👍.
+   Ignoring the settle menu → the 14-day deadline machinery. NO preset reason buttons anywhere ("a menu of excuses is a menu of permission" — presets
    would teach staff which excuses are acceptable; the reason never changes the penalty, so its only
    value is honest signal). Categorization happens at ANALYSIS time (digest/Opus-on-subscription), never
    at confession time. Why on arrival: they're rushing/driving at the Late tap.
