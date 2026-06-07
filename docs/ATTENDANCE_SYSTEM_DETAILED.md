@@ -322,6 +322,13 @@
        warning arrives as a plain DM even with no check-in; day-4 auto-books regardless. NO-SHOW +
        DEBT never mix: the missed shift is penalized in money/bonus (1 day's pay, bonus not earned,
        −2/min points), NEVER added to the payback balance — the debt simply survives unchanged.
+       **LEGITIMATE-LEAVE FREEZE (owner Q, session 28): "earned absence pauses the clock; stolen
+       absence doesn't."** Approved AL / special leave (death, marriage, birth, family-sick) / PH /
+       claimed sick days (papers OR paperless — the paper only prices the sick day itself) do NOT
+       count as ladder days and receive NO nudges; the clock resumes on the next scheduled working
+       day. Regular day-offs COUNT (calendar rule); no-show days COUNT. No exploit: faking sick to
+       dodge an auto-book creates a full shift of new paperless debt to delay minutes. Auto-book
+       never PLACES slots on leave days (per-date schedule resolution + ripple re-validation).
      - **PAYBACK SLOT = MINI-SHIFT (owner REVERSED the no-reward rule, session 28 — "encourage them,
        not just break them"):** a booked slot (self-picked OR auto-assigned) gets the FULL check-in
        treatment — T−10 pre-reminder (with the how-to + the +10 line), T0 prompt, location check-in —
