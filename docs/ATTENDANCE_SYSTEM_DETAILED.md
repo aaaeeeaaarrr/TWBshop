@@ -500,7 +500,19 @@
     you come?" time buttons over remaining hours → arrival watch; the WHOLE day stays papered — no
     payback/points for the gap, returning is a gift) · `[🛌 Resting today]` or SILENCE (→ "Get well 🤍",
     full covered day, night nudge next). Dossier records came-vs-rested as pattern data, never judged
-    in the moment. Points-tuning candidate (pending): small + for returning after a doctor visit.
+    in the moment.
+    **RETURN BONUS (owner approved, session 28): +15 points** (pending tuning), folded into the ask:
+    *"Feeling better? If you come in, there's +15 points waiting ⭐ — but only if you're truly up for
+    it 🤍"* — the no-pressure clause is mandatory (never incentivize working while genuinely sick).
+    **OPUS ON UNDATED PAPERS (owner, session 28):** papers without a rest period trigger ONE Opus call
+    (extraction + role + history) that ADVISES on the owner card: suggested coverage days + PART-DUTY
+    options ("leg injury → seated cashier/prep work") → buttons [Cover 1d/2d/3d] [💺 Offer seated work]
+    — systematizing the owner's real practice of one-hand/seated jobs. Rare ⇒ ~$0.10/case.
+    **SILENT NUDGE ON A PAPERED CASE:** softer than paperless — silence = ONE more covered day + gentle
+    morning line; a 2nd silent day → owner card with the Opus summary. Never no-show machinery while a
+    papered case is open. (Paperless silence keeps the strict path.)
+    **SICK DURING BOOKED BUYBACK REST (owner Q):** the buyback auto-cancels and the HOURS STAY BANKED —
+    sickness never burns earned rest; the sick day runs under normal sick rules; rebook when healthy.
     (New strings → pending KH batch.)
     **OWNER SKIPS THE DURATION QUESTION (owner, session 28):** no days set → the system simply runs
     the paperless-style nightly nudges day-by-day ("feeling better? / Again tomorrow / Better") with
