@@ -534,9 +534,13 @@
     - SENIOR HAND-OFF (owner picked #3): part-duty return → plain Supervisors line ("Davy on light duty
       this afternoon, seated") + DM the on-shift senior ("point her to seated tasks" `[👍 Got it]`) +
       arrival ping ("Davy, light duty, has arrived").
-    - OPUS-WRONG/UNREADABLE: low confidence or AI/bot down → plain `[Cover 1d][2d][3d][Skip]` card to
-      OWNER (+Tyty), ZERO API, owner decides from the photo. NEVER routed to a group (privacy). Papers
-      don't expire; if GM is down the approval waits (watchdog pings owner ≤30min) — not time-critical.
+    - OWNER CARD (goes to owner + Tyty; Opus advises, buttons are the veto): line of Opus read
+      (likely days · semi-job? · contagious?) + `[📷 View paper]` · `[✓ Accept Opus]` (one-tap) ·
+      `[1d][2d][3d][4+…]` (override duration) · `[💺 Semi-job ON/OFF]` (toggle) · `[🚫 No come-in /
+      rest only]` (contagion override) · `[Skip → nightly nudges]`.
+    - OPUS-WRONG/UNREADABLE/down: same card minus the advice line → plain `[1d][2d][3d][Skip]`, ZERO
+      API. NEVER routed to a group (privacy). Papers don't expire; GM down → approval waits (watchdog
+      pings ≤30min) — not time-critical.
     - POINTS↔BONUS: keep DISCONNECTED for now (owner aim: eventually positive-points ⇒ earns bonus,
       after observing real behavior — Claude to flag thoughts meanwhile).
     (New strings → pending KH batch.)
