@@ -1048,7 +1048,7 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     loc = msg.location
     if getattr(loc, "live_period", None):
-        from gm_bot.attendance import TWB_LAT, TWB_LNG, haversine_m
+        from gm_bot.attendance import TWB_LAT, TWB_LNG, WORK_ZONE_RADIUS_M, haversine_m
         dist = haversine_m(loc.latitude, loc.longitude, TWB_LAT, TWB_LNG)
         # ARMED check-in simulation: judge this live location as the persona's check-in
         if context.user_data.get("att_ci_armed"):
@@ -1056,7 +1056,7 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
             p = _persona(context)
             ws = to_min(p.get("work_start")) if p else None
             if p and ws is not None:
-                if dist > 200:
+                if dist > WORK_ZONE_RADIUS_M:
                     await msg.reply_text(_V_FAR + "\n[test: %dm from TWB]" % round(dist))
                     return
                 rel = (_now_min() - ws) % 1440
@@ -1071,7 +1071,8 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
                 return
         await msg.reply_text(
             "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"
-            % (round(dist), "INSIDE the 200m zone ✅" if dist <= 200 else "outside the zone ❌"))
+            % (round(dist), "INSIDE the %dm zone ✅" % WORK_ZONE_RADIUS_M if dist <= WORK_ZONE_RADIUS_M
+               else "outside the zone ❌"))
         return
     # static pin (always a NEW message) — the locked bilingual response
     await msg.reply_text(_PIN_RESPONSE)

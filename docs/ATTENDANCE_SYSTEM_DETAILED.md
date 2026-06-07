@@ -2,7 +2,39 @@
 
 > Companion to ATTENDANCE_SYSTEM_MAP.md. Every step, branch, message, timer, and edge case.
 > Tags: [Haiku] [Sonnet] [Logic] [Telegram]. Status: ✅ built · ⏳ pending · 🔒 owner input.
-> Confirmed: 2 senior approvals · 200m geofence · seniors set new-staff day-offs · Tyty exempt · Delis excluded.
+> Confirmed: 2 senior approvals · 100m geofence (TWB) · seniors set new-staff day-offs · Tyty exempt · Delis excluded.
+
+## SYSTEM AUDIT RESOLUTIONS (session 28 — hole-hunt)
+- **H1 STATE PERSISTENCE (build #1):** every real ladder persists step+partial-data to a `gm_flow_state`
+  table (uid → flow, step, data JSON, expires_at), written each step. Bot restart mid-flow → next tap
+  RESUMES from DB. No flow ever lives only in RAM. (The /test shell uses user_data; production must not.)
+- **H2 WATCHDOG → every 1 min** (cron `* * * * *`) — fastest practical down-detection (systemd
+  Restart=always already auto-recovers crashes; watchdog catches wedged/failed/DB-down). Rule: NEVER
+  penalize a check-in window the GM was provably down for.
+- **H3 GEOFENCE = 100m TWB** (was 200). DELIS: not integrated; staff live in the building → revisit
+  geofence method when Delis joins (REMIND OWNER).
+- **H4 day-off swap ladder:** needs full build+dry-run; partner SILENCE (not just decline) is a path —
+  no partner ✅ in window → swap does not happen, requester told, seniors never bothered.
+- **H5 two-open-cases:** mostly solved by "one text-wait, last-wins"; residual = an open lateness case
+  + open clarification both listening → a plain message attaches to the MOST RECENT open case; if truly
+  ambiguous the GM asks "is this about X or Y?".
+- **H6 MONTHLY AL ACCRUAL job (build):** +1.5 on the 1st for active staff, ARREARS rules for new hires
+  (recovers negative balances over time).
+- **H7 OT timers:** owner approval window 1h → then nudge owner; after owner ✅, nudge the OT staff every
+  5 min until they accept/choose buyback (they usually coordinate live). Full ladder re-walked below.
+- **H8 voice/photo/sticker reason:** ACCEPT + store verbatim + post to Supervisors tagged with it
+  (lateness reasons only; medical never to group).
+- **H9 split shifts:** parked (owner: later).
+- **H10 Late on a day-off:** tapping Late does nothing — menu stays put.
+- **H11 overlapping AL:** block the overlapping dates, show the person WHY. **MY SCHEDULE becomes the
+  personal dashboard** — shows upcoming AL, payback debt, OT bank, special leaves; tap an upcoming item
+  to CANCEL it.
+- **H12/H13 cancel AL/marriage/death:** refund only the UN-taken days; reachable via My schedule.
+- **H14 changed Telegram account:** the bot can't know automatically — a message from an unknown uid →
+  OWNER BIND CARD ("{name?} (uid …) messaged — bind to which staff? [buttons]"); owner taps, the new
+  uid joins that person's record (the roll-call mechanism).
+- **H15 stale buttons:** no hard expiry needed — validate at TAP time, show a fresh menu if stale; senior
+  approval cards expire when the case resolves/escalates. (Per-flow specifics during each build.)
 > **v2 CHANGES (owner 2026-06-04):** whole-shift live location DROPPED → check-in-at-start model;
 > entire private chat becomes BUTTON-DRIVEN; new flows: Late ladder w/ payback, Emergency AL,
 > Change-day-off w/ partner approval; points catalogued but PENDING activation.

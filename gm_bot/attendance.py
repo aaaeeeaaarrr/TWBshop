@@ -17,7 +17,8 @@ import math
 # The Wine Bakery coordinates (same as the B2B bakery origin).
 TWB_LAT = 11.5387774
 TWB_LNG = 104.9147998
-WORK_ZONE_RADIUS_M = 200      # GPS-accuracy buffer
+WORK_ZONE_RADIUS_M = 100      # owner session 28: tightened 200->100 for TWB (Delis TBD — staff live
+                             # in the building there; revisit when Delis is integrated)
 OUTSIDE_BUDGET_MIN = 30       # total minutes a staff may be outside the zone per shift
 
 
