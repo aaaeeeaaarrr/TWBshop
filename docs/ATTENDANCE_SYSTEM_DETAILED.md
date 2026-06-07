@@ -146,10 +146,13 @@
      you want the cause shown.
   2. FREQUENCIES learned over time at analysis-time ("traffic ×14 this month", "sick: 3rd Monday"),
      surfacing in the owner digest/dossiers.
-  3. **CALL-OUT GATE: the GM NEVER confronts a staff member about a reason pattern on its own.**
-     It messages the OWNER first with the dossier; only on the owner's explicit go (and his wording
-     preference) does anything reach the person. Nice to their face, evidence to the owner, the bam
-     is always a human decision.
+  3. **CALL-OUTS — FULLY AUTONOMOUS (owner final, session 28 late — replaces the owner-gate):**
+     when a frequency pattern confirms, the GM calls out WITHOUT owner involvement, on BOTH channels
+     at once: (a) PRIVATE DM — warm-but-unmistakable ("We noticed Mondays are hard for you lately —
+     3 of your last 4 lates. Everything okay? Let's fix Mondays together."); (b) GROUP — never naming,
+     unmistakable to the person, light to everyone else ("Friendly reminder: we track lateness patterns
+     and reasons. Some Mondays have been popular lately 😉"). Owner is CC'd copies as they send (informed,
+     never asked). AI-crafted per case (model: Opus vs Sonnet — owner deciding); rare ⇒ <$1/month either way.
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
@@ -245,9 +248,10 @@
    2 hours before shift end**. (Offsets: +5,10,15,20,30,45,60,75,90,120, then +30 steps.) Generated from
    their schedule. NO "don't know yet" option (owner: the store team must know a time to manage around).
    Beyond the 2h-before-end cap = effectively absent → Emergency AL or no-show rules.
-3. **Reason — asked ON ARRIVAL, FREE TEXT (owner reversed quick-reasons, session 28):** the second their
-   location confirms arrival, GM asks *"Why were you late?"* (bilingual) — they TYPE the answer, stored
-   verbatim. **MECHANICS (owner Qs, session 28):** NO reply/tag needed — private 1-on-1, the ask opens an
+3. **Reason — asked AT DECLARE-TIME (owner re-reversed, session 28 late: "we need a reason for late
+   always"):** time buttons → *"Why?"* (typed, free text) → the Supervisors heads-up goes out WITH the
+   reason. The ON-ARRIVAL ask remains only for SILENT arrivers who never declared (their reason is then
+   posted to Supervisors as a reply to nothing/standalone). **MECHANICS (owner Qs, session 28):** NO reply/tag needed — private 1-on-1, the ask opens an
    awaiting-reason state and the next text IS the reason (menu-on-any-text is suspended while awaiting —
    no menu spam). First message → 👍 + the payback SLOT BUTTONS directly (no AL option — late = time);
    **further texts until a slot button is tapped (or ~10 min) APPEND to the stored reason** — Khmer
@@ -398,8 +402,13 @@
   Take care 🤍"). ·
   💍 Marriage → My marriage /
   My child's marriage (**BOTH: dates hidden for first 30 days** — owner rule, weddings are planned) ·
-  🕊 Family death → Child / Parent / Spouse → start date → **duration buttons 3–7 days, chosen ONCE at
-  booking** (owner+session 28: no re-applying mid-funeral; need more later → just re-enter Special Leave) ·
+  🕊 Family death → **TWO TIERS (owner approved session 28 late):** Tier 1 (law): Child / Parent /
+  Spouse → start date → duration 3–7 chosen once (AL→negative ok, never money). **Tier 2 (compassion):
+  Sibling / Grandparent → 1 day granted IMMEDIATELY, zero questions** (never interrogate the bereaved —
+  "brother" may be village-brother, grandma may be the real parent) **→ GM pings OWNER with the case;
+  owner upgrades to parent-tier with one tap when the relationship warrants, or leaves 1 day + normal
+  AL.** Group notice MAY name the relation ("his father") — "(family)" masking dropped (owner). Death-
+  context PHOTOS → forwarded privately to OWNER (no AI ever touches them; condolence-only to sender). ·
   👶 Wife giving birth. **Death-photo reply FINAL bilingual:** *"You don't need to send anything — we're
   so sorry for your loss 🤍 / អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍"*.
   ALL Special Leave strings now FINAL bilingual in the shell (ChatGPT batch session 28, via khmer_inbox).
