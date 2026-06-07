@@ -2587,6 +2587,86 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
     return out
 
 
+def al_create_request(staff_id: int, kind: str, days: list[str], hours_start: str | None,
+                      hours_end: str | None, reason: str, requested_by_uid: int) -> int:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO al_requests
+                (staff_id, requested_by_uid, kind, days, hours_start, hours_end, reason, status)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,'pending') RETURNING id""",
+                (staff_id, requested_by_uid, kind, _json.dumps(days), hours_start, hours_end, reason))
+            return cur.fetchone()["id"]
+
+
+def al_get_request(req_id: int) -> dict | None:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM al_requests WHERE id=%s", (req_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["days"] = _json.loads(d.get("days") or "[]")
+            except Exception:
+                d["days"] = []
+            return d
+
+
+def al_add_approval(req_id: int, senior_id: int, senior_uid: int, decision: str) -> list[str]:
+    """Record a senior decision (idempotent per senior). Returns all decisions so far."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO al_approvals (request_id, senior_id, senior_uid, decision)
+                VALUES (%s,%s,%s,%s)
+                ON CONFLICT (request_id, senior_uid) DO UPDATE SET decision=EXCLUDED.decision,
+                    decided_at=NOW()""", (req_id, senior_id, senior_uid, decision))
+            cur.execute("SELECT decision FROM al_approvals WHERE request_id=%s", (req_id,))
+            return [r["decision"] for r in cur.fetchall()]
+
+
+def al_get_approvals(req_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT a.*, s.canonical_name, s.call_name FROM al_approvals a
+                           JOIN staff_registry s ON s.id=a.senior_id WHERE a.request_id=%s""", (req_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def al_set_status(req_id: int, status: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE al_requests SET status=%s, decided_at=NOW() WHERE id=%s",
+                        (status, req_id))
+
+
+def al_pending_requests() -> list[dict]:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM al_requests WHERE status='pending' ORDER BY id")
+            out = []
+            for r in cur.fetchall():
+                d = dict(r)
+                try:
+                    d["days"] = _json.loads(d.get("days") or "[]")
+                except Exception:
+                    d["days"] = []
+                out.append(d)
+            return out
+
+
+def al_deduct(staff_id: int, amount: float) -> float:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET al_left = COALESCE(al_left,0)-%s, updated_at=NOW() "
+                        "WHERE id=%s RETURNING al_left", (amount, staff_id))
+            r = cur.fetchone()
+            return float(r["al_left"]) if r else 0.0
+
+
 def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) -> int:
     """Record a proactive lateness declaration (informed BEFORE = the cheaper points rate)."""
     with _db() as conn:

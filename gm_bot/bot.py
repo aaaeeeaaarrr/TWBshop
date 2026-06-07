@@ -29,6 +29,8 @@ from shared.database import (
     gm_append_refinement_note, save_ops_message, al_apply_due_deductions,
     att_get_session, att_check_in, att_record_ping,
     late_declare, payback_open_debt, payback_add_debt, payback_credit, payback_book, payback_all_open,
+    al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
+    al_pending_requests, al_deduct,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1220,6 +1222,133 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
+
+
+def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
+    return [s for s in staff_all("active")
+            if s.get("is_senior") and s["id"] != exclude_staff_id and (s.get("telegram_ids") or [])]
+
+
+def _al_availability_lines(requester: dict, days: list[str]) -> str:
+    """Per AL day: who works the requester's hours that day (excl day-off + on-AL)."""
+    from gm_bot.attendance import available_staff, to_min
+    from datetime import date as _date
+    ws, we = to_min(requester.get("work_start")), to_min(requester.get("work_end"))
+    if ws is None or we is None:
+        return ""
+    scheds = [{"name": s.get("call_name") or s["canonical_name"],
+               "work_start": to_min(s.get("work_start")), "work_end": to_min(s.get("work_end")),
+               "day_off": s.get("day_off")} for s in staff_all("active") if s["id"] != requester["id"]]
+    # who's on AL each day (from approved requests)
+    on_al_by_day = {}
+    for r in al_pending_requests():  # pending don't count; use approved below
+        pass
+    lines = []
+    for iso in days:
+        wd = _date.fromisoformat(iso).strftime("%a")
+        names = available_staff(ws, we, wd, scheds, set())
+        lines.append("%s: %s" % (_date.fromisoformat(iso).strftime("%a %d/%m"),
+                                 ", ".join(names) or "—"))
+    return "\n".join(lines)
+
+
+async def submit_al_request(context, requester: dict, kind: str, days: list[str],
+                            hours_start: str | None, hours_end: str | None, reason: str,
+                            requested_by_uid: int) -> int:
+    """Create the AL request and DM every senior an approval card (gated by caller)."""
+    req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
+                               reason, requested_by_uid)
+    name = requester.get("call_name") or requester["canonical_name"]
+    days_txt = ", ".join(__import__("datetime").date.fromisoformat(d).strftime("%a %d/%m") for d in days)
+    avail = _al_availability_lines(requester, days)
+    body = ("%s requests AL: %s. Reason: %s\n%s ស្នើ AL: %s។ មូលហេតុ៖ %s\n\n"
+            "Working those hours: %s\nអ្នកធ្វើការម៉ោងនោះ៖ %s"
+            % (name, days_txt, reason, name, days_txt, reason, avail, avail))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:alapp:%d:approve" % req_id)],
+        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:alapp:%d:not_approve" % req_id)],
+    ])
+    for sen in _seniors(exclude_staff_id=requester["id"]):
+        try:
+            await context.bot.send_message(sen["telegram_ids"][0], body, reply_markup=kb)
+        except Exception as e:
+            logger.error("AL card to senior %s failed: %s", sen["canonical_name"], e)
+    return req_id
+
+
+async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:alapp:{req}:{approve|not_approve} — a senior decides."""
+    query = update.callback_query
+    await query.answer()
+    sen = staff_get_by_uid(update.effective_user.id)
+    if not sen or not sen.get("is_senior"):
+        return
+    _, _, req_s, decision = query.data.split(":")
+    req = al_get_request(int(req_s))
+    if not req or req["status"] != "pending":
+        await query.edit_message_text(query.message.text + "\n\n(already decided)")
+        return
+    if sen["id"] == req["staff_id"]:
+        await query.answer("Can't approve your own AL", show_alert=True)
+        return
+    from gm_bot import al as alm
+    decisions = al_add_approval(int(req_s), sen["id"], update.effective_user.id, decision)
+    await query.edit_message_text(query.message.text + "\n\n✓ You voted: %s" % decision)
+    if alm.quorum_reached(decisions):
+        await _al_finalize(context, req, approved=True)
+    elif alm.quorum_rejected(decisions):
+        await _al_finalize(context, req, approved=False)
+
+
+async def _al_finalize(context, req: dict, approved: bool) -> None:
+    """On 2 ✅ or 2 ❌: recap to seniors, notify requester, (if approved) Supervisors notice + deduct."""
+    if al_get_request(req["id"])["status"] != "pending":
+        return  # race guard
+    al_set_status(req["id"], "approved" if approved else "rejected")
+    requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
+    if not requester:
+        return
+    name = requester.get("call_name") or requester["canonical_name"]
+    days = req["days"]
+    days_txt = ", ".join(__import__("datetime").date.fromisoformat(d).strftime("%a %d/%m") for d in days)
+    voters = [a for a in al_get_approvals(req["id"])
+              if a["decision"] == ("approve" if approved else "not_approve")]
+    vnames = " and ".join(v.get("call_name") or v["canonical_name"] for v in voters[:2])
+    runc = requester.get("telegram_ids") or []
+    if approved:
+        from gm_bot import al as alm
+        from gm_bot.attendance import to_min
+        sl = (to_min(requester.get("work_end")) - to_min(requester.get("work_start"))) % 1440 or 1440
+        frac = alm.fractional_al(to_min(req["hours_start"]), to_min(req["hours_end"]), sl) \
+            if req["kind"] == "hours" and req.get("hours_start") else 1.0
+        amount = alm.al_day_count(days, req["kind"], frac)
+        new_bal = al_deduct(req["staff_id"], amount)
+        for sen in _seniors(exclude_staff_id=req["staff_id"]):
+            try:
+                await context.bot.send_message(sen["telegram_ids"][0],
+                    "Approved by %s.\nអនុម័តដោយ %s។" % (vnames, vnames))
+            except Exception:
+                pass
+        if runc:
+            await context.bot.send_message(runc[0],
+                "Your AL for %s is approved ✓\nAL របស់អ្នកសម្រាប់ %s ត្រូវបានអនុម័តហើយ ✓" % (days_txt, days_txt))
+        try:
+            day_off = requester.get("day_off") or "—"
+            await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
+                "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\nReason: %s\nNormal day off: %s"
+                % (name, days_txt, name, days_txt, req.get("reason") or "—", day_off))
+        except Exception:
+            pass
+    else:
+        for sen in _seniors(exclude_staff_id=req["staff_id"]):
+            try:
+                await context.bot.send_message(sen["telegram_ids"][0],
+                    "Not approved by %s.\nមិនអនុម័តដោយ %s។" % (vnames, vnames))
+            except Exception:
+                pass
+        if runc:
+            await context.bot.send_message(runc[0],
+                "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")
 
 
 async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2665,6 +2794,7 @@ def build_app() -> Application:
     from gm_bot import attendance_ui
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(_payback_callback, pattern=r"^att:pb:"))
+    app.add_handler(CallbackQueryHandler(_al_approval_callback, pattern=r"^att:alapp:"))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)
