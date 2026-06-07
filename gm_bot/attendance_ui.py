@@ -320,8 +320,9 @@ def sick_family_fulltime(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboa
                                           callback_data="att:sp:famf:%s:%s" % (who, iso))])
     rows.append([InlineKeyboardButton("Choose time · ជ្រើសម៉ោង",
                                       callback_data="att:sp:famt:%s:%s" % (who, iso))])
-    txt = "Sick leave for your %s — %s\nFull day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?" \
-          % (who, d)
+    txt = ("Sick leave for your %s — %s\nច្បាប់ឈឺសម្រាប់%s — %s\n"
+           "Full day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?"
+           % (who, d, _WHO_KH.get(who, who), d))
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 
