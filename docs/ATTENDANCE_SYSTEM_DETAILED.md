@@ -471,6 +471,15 @@
     leave, separate from AL — never deduct)**.
     Job legally protected up to ~6 months certified. 🔒 minor: papers-day paid or unpaid = owner policy
     (recommend paid — rare once paperless costs payback). OLD "suggest 0.5 AL" practice = DEAD.
+  - **OWN-SICK NIGHT NUDGE (owner gap-find, session 28):** after ANY own-sick day (papers or paperless),
+    if no return signal exists, the GM nudges **12h before their next shift** (same timing + quiet-hours
+    slide as the family nudge): *"Hi {name} — feeling better?"* → `[Again tomorrow · ស្អែកទៀត]` (books
+    another sick day — paperless = another provisional debt day; the papers window keeps running) ·
+    `[👍 Better · ធូរស្បើយហើយ]` (→ *"Great news — see you at 9pm 🤍"*). NO ANSWER → next morning runs
+    the NORMAL sequence (T−10/T0/T+5 → silence becomes the no-show machinery — the open sick case gives
+    the owner context, and the owner-override covers true emergencies like hospitalization).
+    **Certified multi-day sickness:** if the papers state a rest period, those days book at once,
+    freeze everything, and the nudge fires only before the stated return day.
   - **FREQUENCY DOSSIER (paperless only — nice until bam, owner):** flags → owner card with full history
     (dates, weekday, papers ratio, came-vs-full-day, debt status): 2-in-7d (burst) · 3-in-30d (drip,
     even spread) · 5-in-90d (chronic) · 3-of-last-4 same weekday ("every Monday") · 2-in-60d adjacent to
