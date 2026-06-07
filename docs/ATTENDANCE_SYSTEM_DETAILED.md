@@ -487,6 +487,10 @@
     covered days gets the boundary message: *"Your paper covered {N} day(s). If you're still sick, a
     new paper will cover the extra days — otherwise the time joins your pay-back balance. Get well 🤍"*
     — so one vague clinic slip can never fund an open-ended week off.
+    **OWNER SKIPS THE DURATION QUESTION (owner, session 28):** no days set → the system simply runs
+    the paperless-style nightly nudges day-by-day ("feeling better? / Again tomorrow / Better") with
+    no fixed boundary — the approval wiped the claimed day(s), each further day is nudged, and the
+    case length stays visible in the dossier for the owner to intervene whenever it smells long.
   - **FREQUENCY DOSSIER (paperless only — nice until bam, owner):** flags → owner card with full history
     (dates, weekday, papers ratio, came-vs-full-day, debt status): 2-in-7d (burst) · 3-in-30d (drip,
     even spread) · 5-in-90d (chronic) · 3-of-last-4 same weekday ("every Monday") · 2-in-60d adjacent to
