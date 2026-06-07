@@ -64,7 +64,7 @@ def main() -> None:
     # twbshop-gm matters doubly: it is the ONLY recorder of Supervisors + Management
     # (owner decision: the listener account stays out of senior rooms — junior staff use it).
     # Bot API can't backfill history, so GM downtime there = permanent loss; detect fast.
-    for svc in ("twbshop-listener", "twbshop-gm"):
+    for svc in ("twbshop-listener", "twbshop-gm", "twbshop-hire"):
         try:
             active = subprocess.run(["systemctl", "is-active", svc],
                                     capture_output=True, text=True).stdout.strip()

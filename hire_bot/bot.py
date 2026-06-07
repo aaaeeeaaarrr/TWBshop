@@ -1300,12 +1300,37 @@ async def cmd_reopen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(f"Failed: {e}")
 
 
+async def _backup_recorder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Backup recorder for the two listener-blind senior groups (session 28).
+    The GM bot is the primary writer; both bots see the SAME per-chat message_ids, so
+    ON CONFLICT DO NOTHING makes dual writing naturally duplicate-free. The hire bot is
+    rarely redeployed, so its uptime barely correlates with the GM's — real redundancy.
+    Requires: bot added to the groups + BotFather privacy mode DISABLED."""
+    msg = update.message or update.edited_message
+    if not msg or msg.chat_id not in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID):
+        return
+    try:
+        from shared.database import save_ops_message
+        media = ("photo" if msg.photo else "video" if msg.video else
+                 "document" if msg.document else None)
+        save_ops_message(msg.chat_id, msg.message_id, msg.chat.title or None,
+                         msg.from_user.id if msg.from_user else None,
+                         msg.from_user.full_name if msg.from_user else None,
+                         msg.text or msg.caption or "", media,
+                         msg.date.isoformat() if msg.date else None)
+    except Exception:
+        logger.exception("backup recorder failed")
+
+
 # ── Application builder ───────────────────────────────────────────────────────
 
 def build_application(token: str) -> Application:
     questions.load_all_questions()
 
     app = Application.builder().token(token).build()
+
+    # Backup recorder for the senior groups — its own handler group, never interferes
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, _backup_recorder), group=-2)
 
     # Intake handlers (group=-1 = higher priority than quiz handlers)
     app.add_handler(
