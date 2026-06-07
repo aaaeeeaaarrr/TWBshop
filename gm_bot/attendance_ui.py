@@ -162,21 +162,54 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
     return events
 
 
+def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Every DISTINCT message the check-in system can send — once each (owner, session 28:
+    same template goes to every staff, so one of each possibility is the whole test)."""
+    t0_text, t0_kb = _ci_msg_start()
+    return [
+        ("① T−10 pre-reminder", _ci_msg_pre(p), None),
+        ("② T0 shift-start prompt (only if not checked in)", t0_text, t0_kb),
+        ("③ T+5 free-minutes (only if still not checked in)", _CI_MSG_PLUS5, None),
+        ("④ check-in verdict — EARLY ⭐", _V_EARLY % (12, 12), None),
+        ("⑤ check-in verdict — ON TIME", _V_ONTIME, None),
+        ("⑥ check-in verdict — LATE → reason ask", _V_LATE % (25, 25), None),
+        ("⑦ live location shared but still far", _V_FAR, None),
+        ("⑧ static pin sent instead", _PIN_RESPONSE, None),
+        ("⑨ shift-end check-out request", _CI_MSG_OUT, None),
+        ("⑩ +10min leave-early ask (only if no check-out)", _CI_MSG_OUT2, None),
+    ]
+
+
+def schedule_summary(target: date) -> str:
+    """Today's who/when in ONE message — the schedule math, compressed."""
+    from collections import defaultdict
+    ev = compute_day_events(target)
+    by: dict = defaultdict(list)
+    for minute, name, label, _ in ev:
+        by[(minute, label.split(" ")[0])].append(name)
+    lines = ["📅 Today's actual schedule (%s) — %d sends, same texts as above:"
+             % (day_label(target), len(ev))]
+    for (minute, kind), names in sorted(by.items()):
+        lines.append("%s %s ×%d: %s" % (fmt12(minute), kind, len(names), ", ".join(names)))
+    return "\n".join(lines)
+
+
 async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     events = context.user_data.get("att_dr_events") or []
     i = context.user_data.get("att_dr_i", 0)
     chat_id = update.effective_chat.id
     if i >= len(events):
-        await context.bot.send_message(chat_id, "📅 Dry-run finished — %d messages walked." % len(events))
+        await context.bot.send_message(chat_id, "✅ Dry-run finished — %d possibilities walked."
+                                       % len(events))
         return
-    minute, name, label, text = events[i]
+    label, text, kb = events[i]
     context.user_data["att_dr_i"] = i + 1
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-        "Next ▶ (%d/%d)" % (i + 2, len(events)), callback_data="att:dr:next")]]) \
-        if i + 1 < len(events) else None
-    await context.bot.send_message(
-        chat_id, "🕘 %s → %s — %s\n────────────\n%s" % (fmt12(minute), name, label, text),
-        reply_markup=kb)
+    rows = [list(r) for r in kb.inline_keyboard] if kb else []
+    if i + 1 < len(events):
+        rows.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (i + 2, len(events)),
+                                          callback_data="att:dr:next")])
+    await context.bot.send_message(chat_id, "🧪 %s\n────────────\n%s" % (label, text),
+                                   reply_markup=InlineKeyboardMarkup(rows) if rows else None)
 
 
 # ---------------------------------------------------------------- shell state
@@ -767,6 +800,20 @@ _CI_MSG_PLUS5 = ("We give everyone 5 free late minutes 😊 More than 5 — ever
 
 _CI_HOWTO = "📍 Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់"
 
+# check-in verdicts — shared by the armed simulator and the dry-run catalogue (no drift)
+_V_EARLY = ("Checked in ✓ — %d min early. +10 points ⭐\n"
+            "ចុះវត្តមានរួច ✓ — មុន %d នាទី។ +10 points ⭐")
+_V_ONTIME = "Checked in ✓\nចុះវត្តមានរួច ✓"
+_V_LATE = ("Checked in ✓ — %d min late (counts as pay-back).\n"
+           "ចុះវត្តមានរួច ✓ — យឺត %d នាទី (រាប់ជាម៉ោងសងវិញ)។\n\n"
+           "Why were you late?\nហេតុអ្វីបានជាអ្នកមកយឺត?")
+_V_FAR = ("You're not at the shop yet — it will count when you arrive.\n"
+          "អ្នកមិនទាន់នៅហាងទេ — ចុះវត្តមាននឹងរាប់ពេលអ្នកមកដល់។")
+_PIN_RESPONSE = ("Sending a pin does not count as check-in to work.\n"
+                 "ការផ្ញើទីតាំងជា Pin មិនរាប់ជាការចុះវត្តមានចូលធ្វើការទេ។\n\n"
+                 "Do this instead:\nសូមធ្វើតាមនេះវិញ៖\n\n"
+                 "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់")
+
 _CI_MSG_OUT = ("Shift over — share your live location to check out.\n"
                "វេនចប់ហើយ — សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។\n\n"
                + _CI_HOWTO)
@@ -792,7 +839,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     staff = [r for r in staff_all("active")]
     chunk = staff[page * 8:(page + 1) * 8]
-    rows = [[InlineKeyboardButton("📅 Dry-run today's check-in messages (whole roster)",
+    rows = [[InlineKeyboardButton("🧪 Dry-run: all check-in possibilities + today's schedule",
                                   callback_data="att:dr:go")]] if page == 0 else []
     rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
@@ -831,36 +878,24 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
             ws = to_min(p.get("work_start")) if p else None
             if p and ws is not None:
                 if dist > 200:
-                    await msg.reply_text(
-                        "You're not at the shop yet — it will count when you arrive.\n"
-                        "អ្នកមិនទាន់នៅហាងទេ — ចុះវត្តមាននឹងរាប់ពេលអ្នកមកដល់។\n"
-                        "[test: %dm from TWB]" % round(dist))
+                    await msg.reply_text(_V_FAR + "\n[test: %dm from TWB]" % round(dist))
                     return
                 rel = (_now_min() - ws) % 1440
                 early = 1440 - rel if rel > 720 else 0
                 late = rel if rel <= 720 else 0
                 if early >= 5:
-                    await msg.reply_text(
-                        "Checked in ✓ — %d min early. +10 points ⭐\n"
-                        "ចុះវត្តមានរួច ✓ — មុន %d នាទី។ +10 points ⭐" % (early, early))
+                    await msg.reply_text(_V_EARLY % (early, early))
                 elif late <= 5:
-                    await msg.reply_text("Checked in ✓\nចុះវត្តមានរួច ✓")
+                    await msg.reply_text(_V_ONTIME)
                 else:
-                    await msg.reply_text(
-                        "Checked in ✓ — %d min late (counts as pay-back).\n"
-                        "ចុះវត្តមានរួច ✓ — យឺត %d នាទី (រាប់ជាម៉ោងសងវិញ)។\n\n"
-                        "Why were you late?\nហេតុអ្វីបានជាអ្នកមកយឺត?" % (late, late))
+                    await msg.reply_text(_V_LATE % (late, late))
                 return
         await msg.reply_text(
             "🧪 [TEST] Live location received ✓\nDistance from TWB: %dm — %s"
             % (round(dist), "INSIDE the 200m zone ✅" if dist <= 200 else "outside the zone ❌"))
         return
     # static pin (always a NEW message) — the locked bilingual response
-    await msg.reply_text(
-        "Sending a pin does not count as check-in to work.\n"
-        "ការផ្ញើទីតាំងជា Pin មិនរាប់ជាការចុះវត្តមានចូលធ្វើការទេ។\n\n"
-        "Do this instead:\nសូមធ្វើតាមនេះវិញ៖\n\n"
-        "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់")
+    await msg.reply_text(_PIN_RESPONSE)
 
 
 async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -889,13 +924,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "dr":
         if len(data) > 2 and data[2] == "go":
-            events = compute_day_events(_today())
+            events = build_catalogue(p) + [
+                ("📅 schedule summary", schedule_summary(_today()), None)]
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
             await context.bot.send_message(
                 update.effective_chat.id,
-                "📅 Dry-run for %s — %d messages the engine would send today (skipping day-offs, "
-                "AL, Tyty, Delis). Tap through:" % (day_label(_today()), len(events)))
+                "🧪 Dry-run — every distinct message the check-in system can send "
+                "(one of each; all staff get the same templates), then today's "
+                "who/when summary. %d steps:" % len(events))
         await _dryrun_next(update, context)
         return
     if action == "pick":
