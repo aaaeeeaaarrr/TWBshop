@@ -2855,6 +2855,36 @@ async def cmd_rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("\n".join(lines))
 
 
+async def cmd_payroll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/payroll [YYYY-MM] — owner: payslip preview for a WORK-month (defaults to last month).
+    Read-only table (salary, pay1/pay2, bonus earned/not-earned, no-show cuts). Edit/send = later."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    from gm_bot import payroll as pr
+    from shared.database import no_show_count_month
+    args = (context.args or [])
+    if args and "-" in args[0]:
+        y, m = (int(x) for x in args[0].split("-")[:2])
+    else:
+        now = datetime.now(finance.PP_TZ)
+        m = now.month - 1 or 12
+        y = now.year if now.month > 1 else now.year - 1
+    lines = ["📋 Payroll preview — work month %04d-%02d (paid the following month #1 + #2)" % (y, m)]
+    for s in sorted(staff_all("active"), key=lambda r: r["canonical_name"]):
+        if s.get("org") != "TWB" or s["canonical_name"] == "Tyty" or s.get("salary_usd") is None:
+            continue
+        ns = no_show_count_month(s["id"], y, m)
+        slip = pr.compute_slip(float(s.get("salary_usd") or 0), float(s.get("bonus_usd") or 0),
+                               float(s.get("first_pay_usd") or 0), float(s.get("second_pay_usd") or 0),
+                               ns)
+        lines.append(pr.slip_line(s.get("call_name") or s["canonical_name"], slip))
+    lines.append("\n(preview — editing + send-to-staff slips is the next build)")
+    # chunk to stay under Telegram's message limit
+    text = "\n".join(lines)
+    for i in range(0, len(text), 3500):
+        await update.message.reply_text(text[i:i + 3500])
+
+
 async def cmd_vendor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/vendor — owner manages per-vendor receipt knowledge.
     /vendor                      -> list
@@ -3518,6 +3548,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("exstaff",   cmd_exstaff))
     app.add_handler(CommandHandler("vendor",    cmd_vendor))
     app.add_handler(CommandHandler("rollcall",  cmd_rollcall))
+    app.add_handler(CommandHandler("payroll",   cmd_payroll))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall

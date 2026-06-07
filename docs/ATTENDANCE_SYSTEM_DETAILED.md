@@ -76,8 +76,11 @@ watchdogs · data backfill.
   keyword, bilingual) in Supervisors/Management.
 - **WAVE 6b:** ✅ call-outs (frequency.py +5 tests; ai_client.generate_callout Sonnet-private/Opus-group;
   weekly _callout_job Mondays, throttled per ISO-week, CC owner+Tyty) + voice/photo/sticker reason
-  capture (on a reason-wait → store + Supervisors). PENDING 6c: slips/payroll table + pay-day review;
-  broad 👍 ack beyond clarifications.
+  capture (on a reason-wait → store + Supervisors).
+- **WAVE 6c:** ✅ payroll.py pure (+5 tests; day-pay, compute_slip — no-show cuts pay1 + voids bonus,
+  earned/not-earned, bonus on pay2) + /payroll owner command (work-month preview table, owner+Tyty).
+  PENDING: interactive edit + send-to-staff slips (owner taps name → edit → Approve & send) + bonus
+  earned-language slip to each staff on the 2nd pay; broad 👍 ack beyond clarifications.
 - **WAVE 5c (marriage/death/birth):** ✅ special.py pure (+5 tests) + special_leaves table; book_family_death
   (instant, condolence, Supervisors notice w/ relation, AL deduct negative-ok, compassion-tier 1d→owner
   upgrade card+callback), book_wife_birth (2d notify), marriage routes through the AL approval engine

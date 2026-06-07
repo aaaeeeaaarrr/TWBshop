@@ -2686,6 +2686,17 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
     return out
 
 
+def no_show_count_month(staff_id: int, year: int, month: int) -> int:
+    """Open (non-reversed) no-shows for a staff in a work-month."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT COUNT(*) AS n FROM no_show_records
+                           WHERE staff_id=%s AND status='open'
+                           AND EXTRACT(YEAR FROM shift_date)=%s AND EXTRACT(MONTH FROM shift_date)=%s""",
+                        (staff_id, year, month))
+            return int((cur.fetchone() or {}).get("n", 0))
+
+
 def lateness_dates(staff_id: int, days: int = 90) -> list[str]:
     """Recent lateness event dates (for the frequency engine)."""
     with _db() as conn:
