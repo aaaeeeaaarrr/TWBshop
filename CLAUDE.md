@@ -533,7 +533,40 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-06-06 (session 28 — attendance v2 design COMPLETE + registry fully bound + roll-call handler built & deployed)
+**Last updated:** 2026-06-07 (session 28 cont. — shell fully bilingual, dry-run v2 catalogue, GM clarification
+fixes live, data-reliability package live, Level-1 reconciliation live, lateness=time-only model locked)
+
+**Session 28 (Jun 7) additions on top of the block below:**
+- **GM clarification fixes LIVE (the deaf-GM bugs from REPORT):** replies to nudges resolve (nudge_msg_ids);
+  understand-without-reply (single open case accepts loose messages); EDITED reports re-parsed + auto-resolve
+  + "✓ Corrected — thank you!"; edited ANSWERS resolve too; judged-good answers acked in-group; receipt
+  vendor knowledge (gm_receipt_vendors + /vendor cmd, Atlas seeded, prompt injection + skip mode).
+- **DATA RELIABILITY LIVE (May 28/29 lesson):** listener self-heals on startup (_catch_up backfills missed
+  history, proved on first run); GM bot no longer writes ops_messages (listener = single canonical writer);
+  dedupe ran (REPORT 28, Stock 117, COMMS 764 rows); May 28+29 fully backfilled (52 msgs, 4 reports);
+  run_collection_watchdog.py on cron */30 (alerts owner if listener dead or no rows 3h).
+- **LEVEL-1 RECONCILIATION LIVE (validated by hand on 5 real days, 12/12 exact):** same Haiku receipt call
+  now classifies expense_sheet/pos_screen + extracts totals → gm_report_docs; on every FINAL report owner
+  gets the reconciliation DM (cash sheet vs mid, day+night vs final, ABA sheet, POS GRAND TOTAL vs sales);
+  existence watchdog jobs (no mid by 17:30 PP / no final by 06:30 PP → owner). gm_bot/reconcile.py pure+7 tests.
+- **Shell wording COMPLETE:** batch-30 Khmer finals wired (all check-in/out msgs, verdicts, AL/day-off/OT
+  screens, My-schedule labels); Special Leave branch fully bilingual; one shared 📍 how-to line on every
+  location-asking message; T−10+T0+T+5 carry [I'm late] while undeclared (suppressed once declared);
+  no Sick button by design (type → menu → Special Leave). Dry-run v2 = possibility catalogue (10 distinct
+  messages once each + one schedule-summary message) — owner rule: walk possibilities, summarize repetition.
+- **LATENESS = TIME ONLY (owner final):** no AL option ever; reason on arrival (no tag needed, 30-min
+  text-wait, burst messages append, "buttons never block" principle); ignore-the-planner ladder: daily
+  check-in line → day-3 "Pick before tomorrow, or I'll pick for you" → day-4 auto-book #1 need slot →
+  skip×2 = next bonus not earned + owner digest. Payback slot = MINI-SHIFT: T−10/T0/check-in + early
+  +10 points (owner: encourage, not just break); booked-confirm carries the ⭐ line; 12h-before reminder
+  for all booked events (+10 = work slots only, reminder = both work + buyback rest).
+- **Registry live updates:** Sun Kimying added (Jun 4 start, $160/$15, 145/30 split, 6am-3pm, Wed off,
+  uid 7376569669 pre-bound + pressed Start); Failin shift→11am-9pm; Anan→7am-5pm; roll-call 31/33
+  (missing: Seth, Vann Failin); /rollcall owner command live. Khmer naming rule: LEFT=surname,
+  RIGHT=given (call names from right name).
+- **Pending ChatGPT batch (build-time strings):** day-3 warning, booked-confirm frame, 12h reminder,
+  check-in debt line, auto-book notice, arrival watch — drafts in docs/ATTENDANCE_SYSTEM_DETAILED.md.
+- Suite green: 297.
 
 **▶ RESUME HERE (session 28 end): ATTENDANCE BUILD IN PROGRESS.**
 - **DESIGN 100% CLOSED — docs/ATTENDANCE_SYSTEM_DETAILED.md is the build spec.** Owner answered every 🔒
