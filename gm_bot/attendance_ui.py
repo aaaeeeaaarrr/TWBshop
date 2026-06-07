@@ -133,7 +133,15 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
                 except Exception:
                     pass
 
+    from shared.database import dayoff_override_for
+
     def works_on(p: dict, day: date) -> bool:
+        # dated day-off override (a swap) wins over the normal weekday rule
+        ov = dayoff_override_for(p["id"], day.isoformat())
+        if ov == "off":
+            return False
+        if ov == "work":
+            return day.isoformat() not in al_days.get(p["id"], set())
         if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == day.weekday():
             return False
         return day.isoformat() not in al_days.get(p["id"], set())

@@ -32,6 +32,8 @@ from shared.database import (
     al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
     al_pending_requests, al_deduct, points_record, points_seed_catalogue,
     al_leave_days_set, payback_bookings_due_reminder, payback_mark_reminded,
+    dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
+    swap_add_senior_vote, swap_set_status,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1256,6 +1258,125 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
+
+
+async def submit_swap(context, requester: dict, partner: dict, req_off_date: str,
+                      partner_off_date: str, reason: str) -> int:
+    """Create a day-off swap and ask the PARTNER first (their veto is cheapest)."""
+    swap_id = swap_create(requester["id"], partner["id"], req_off_date, partner_off_date, reason)
+    from datetime import date as _date
+    rn = requester.get("call_name") or requester["canonical_name"]
+    d1 = _date.fromisoformat(req_off_date).strftime("%a %d/%m")
+    d2 = _date.fromisoformat(partner_off_date).strftime("%a %d/%m")
+    body = ("%s wants to swap day off: %s takes %s off, you take %s — same week. Reason: %s\n"
+            "%s ស្នើសុំប្តូរថ្ងៃឈប់៖ %s ឈប់ %s ហើយអ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។ មូលហេតុ៖ %s"
+            % (rn, rn, d1, d2, reason, rn, rn, d1, d2, reason))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:swp:%d:agree" % swap_id)],
+        [InlineKeyboardButton("✋ No · មិនព្រម", callback_data="att:swp:%d:no" % swap_id)],
+    ])
+    pids = partner.get("telegram_ids") or []
+    if pids:
+        await context.bot.send_message(pids[0], body, reply_markup=kb)
+    return swap_id
+
+
+async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:swp:{id}:{agree|no} — partner decides FIRST."""
+    query = update.callback_query
+    await query.answer()
+    sw = swap_get(int(query.data.split(":")[2]))
+    if not sw or sw["status"] != "pending":
+        await query.edit_message_text(query.message.text + "\n\n(already decided)")
+        return
+    if update.effective_user.id != (staff_get_by_uid(update.effective_user.id) or {}).get("dummy", 1) \
+            and staff_get_by_uid(update.effective_user.id) \
+            and staff_get_by_uid(update.effective_user.id)["id"] != sw["partner_id"]:
+        return
+    decision = query.data.split(":")[3]
+    if decision == "no":
+        swap_set_partner(int(sw["id"]), False)
+        await query.edit_message_text(query.message.text + "\n\n✋ You declined — thanks for telling us.")
+        req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
+        if req and (req.get("telegram_ids") or []):
+            await context.bot.send_message(req["telegram_ids"][0],
+                "Your day-off swap wasn't accepted by your partner.\n"
+                "ការប្តូរថ្ងៃឈប់របស់អ្នកមិនត្រូវបានទទួលយកដោយដៃគូទេ។")
+        return
+    swap_set_partner(int(sw["id"]), True)
+    await query.edit_message_text(query.message.text + "\n\n✅ You agreed — sending to seniors.")
+    # now seniors
+    req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
+    from datetime import date as _date
+    body = ("Day-off swap: %s ↔ %s. Reason: %s"
+            % (req.get("call_name") if req else "?",
+               (staff_get_by_uid(update.effective_user.id) or {}).get("call_name", "partner"),
+               sw.get("reason") or "—"))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:swps:%d:approve" % sw["id"])],
+        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:swps:%d:not_approve" % sw["id"])],
+    ])
+    for sen in _seniors(exclude_staff_id=sw["requester_id"]):
+        try:
+            await context.bot.send_message(sen["telegram_ids"][0], body, reply_markup=kb)
+        except Exception:
+            pass
+
+
+async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:swps:{id}:{approve|not_approve} — seniors decide AFTER the partner agreed."""
+    query = update.callback_query
+    await query.answer()
+    sen = staff_get_by_uid(update.effective_user.id)
+    if not sen or not sen.get("is_senior"):
+        return
+    sw = swap_get(int(query.data.split(":")[2]))
+    if not sw or sw["status"] != "partner_ok":
+        await query.edit_message_text(query.message.text + "\n\n(already decided)")
+        return
+    from gm_bot import al as alm
+    votes = swap_add_senior_vote(int(sw["id"]), query.data.split(":")[3])
+    await query.edit_message_text(query.message.text + "\n\n✓ voted: %s" % query.data.split(":")[3])
+    if alm.quorum_reached(votes):
+        await _swap_apply(context, sw, approved=True)
+    elif alm.quorum_rejected(votes):
+        await _swap_apply(context, sw, approved=False)
+
+
+async def _swap_apply(context, sw: dict, approved: bool) -> None:
+    if swap_get(sw["id"])["status"] != "partner_ok":
+        return
+    swap_set_status(sw["id"], "approved" if approved else "rejected")
+    req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
+    partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
+    if not req or not partner:
+        return
+    if approved:
+        # dated overrides: requester off on req_off_date, partner off on partner_off_date; each works
+        # the other's normal day-off date that week (the override 'work' is implied by absence of 'off').
+        dayoff_set_override(req["id"], str(sw["req_off_date"]), "off", "swap")
+        dayoff_set_override(req["id"], str(sw["partner_off_date"]), "work", "swap")
+        dayoff_set_override(partner["id"], str(sw["partner_off_date"]), "off", "swap")
+        dayoff_set_override(partner["id"], str(sw["req_off_date"]), "work", "swap")
+        for s in (req, partner):
+            if s.get("telegram_ids"):
+                await context.bot.send_message(s["telegram_ids"][0],
+                    "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកត្រូវបានអនុម័ត ✓")
+        try:
+            from datetime import date as _date
+            await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
+                "Day-off swap: %s off %s, %s off %s."
+                % (req.get("call_name") or req["canonical_name"],
+                   _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m"),
+                   partner.get("call_name") or partner["canonical_name"],
+                   _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")))
+        except Exception:
+            pass
+    else:
+        for s in (req, partner):
+            if s.get("telegram_ids"):
+                await context.bot.send_message(s["telegram_ids"][0],
+                    "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនត្រូវបានអនុម័តទេ។")
 
 
 def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
@@ -2904,6 +3025,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(_payback_callback, pattern=r"^att:pb:"))
     app.add_handler(CallbackQueryHandler(_al_approval_callback, pattern=r"^att:alapp:"))
+    app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))
+    app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
     # else the owner-only test handler (pin template + geofence readout)

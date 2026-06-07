@@ -66,6 +66,13 @@ watchdogs · data backfill.
   Late-DECLARE staff entry (no declarations exist until that's wired); (b) auto-checkout if location
   stayed on all shift not yet done (only the request→share path); (c) check-out silent-close +30min
   digest flag not yet wired; (d) slot NEED-RANKING ✅ DONE Wave 2b.
+- **WAVE 3 (day-off swap):** ✅ dayoff_overrides (dated, schedule-resolvers consult them — works_on now
+  honors swaps) + dayoff_swaps + swap.py pure (within-7-days, partner-eligible) +4 tests. Orchestration:
+  submit_swap → PARTNER card first (agree/no) → on agree, senior cards → 2 votes → apply overrides +
+  Supervisors notice. PENDING: (a) coverage-safe partner SUGGESTION not yet wired into a staff entry
+  (partner_eligible is similar-shift only; add coverage non-bottleneck filter + the staff date/partner
+  pickers); (b) ripple re-validation when a swap lands on an existing payback/AL not yet wired;
+  (c) override consulted in compute_day_events ✅ but NOT yet in coverage.on_duty/available_staff.
 - **WAVE 2b:** ✅ coverage engine (gm_bot/coverage.py — requirements table, on-duty count, shortfall,
   slot_score; +6 tests). Payback slots now RANKED neediest-first with ⚠ on shortfall≥2. Reused later for
   swap-partner suggestions + heatmap + Vannary auto-recommends. NOTE: payback ranking passes leave=set()

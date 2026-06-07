@@ -2312,6 +2312,28 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: dated day-off overrides (swaps) — schedule resolvers consult these
+                CREATE TABLE IF NOT EXISTS dayoff_overrides (
+                    id        SERIAL PRIMARY KEY,
+                    staff_id  INTEGER REFERENCES staff_registry(id),
+                    the_date  DATE,
+                    kind      TEXT,   -- 'off' | 'work'
+                    reason    TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (staff_id, the_date)
+                );
+                CREATE TABLE IF NOT EXISTS dayoff_swaps (
+                    id            SERIAL PRIMARY KEY,
+                    requester_id  INTEGER REFERENCES staff_registry(id),
+                    partner_id    INTEGER REFERENCES staff_registry(id),
+                    req_off_date  DATE,   -- the new date the requester wants off
+                    partner_off_date DATE, -- the requester's normal day-off date the partner takes
+                    reason        TEXT,
+                    partner_ok    BOOLEAN,
+                    senior_votes  TEXT DEFAULT '[]',   -- JSON list of 'approve'/'not_approve'
+                    status        TEXT DEFAULT 'pending',  -- pending|partner_ok|approved|rejected
+                    created_at    TIMESTAMPTZ DEFAULT NOW()
+                );
                 -- session 28: points — raw events now, values derived from rules later (owner-tuned)
                 CREATE TABLE IF NOT EXISTS points_rules (
                     cause   TEXT PRIMARY KEY,
@@ -2602,6 +2624,69 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def dayoff_set_override(staff_id: int, the_date: str, kind: str, reason: str = "") -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason)
+                VALUES (%s,%s,%s,%s) ON CONFLICT (staff_id, the_date)
+                DO UPDATE SET kind=EXCLUDED.kind, reason=EXCLUDED.reason""",
+                (staff_id, the_date, kind, reason))
+
+
+def dayoff_override_for(staff_id: int, the_date: str) -> str | None:
+    """'off' / 'work' override for that date, or None (use the normal weekday day-off)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT kind FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s",
+                        (staff_id, the_date))
+            r = cur.fetchone()
+            return r["kind"] if r else None
+
+
+def swap_create(requester_id, partner_id, req_off_date, partner_off_date, reason) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO dayoff_swaps
+                (requester_id, partner_id, req_off_date, partner_off_date, reason)
+                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                (requester_id, partner_id, req_off_date, partner_off_date, reason))
+            return cur.fetchone()["id"]
+
+
+def swap_get(swap_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM dayoff_swaps WHERE id=%s", (swap_id,))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def swap_set_partner(swap_id: int, ok: bool) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE dayoff_swaps SET partner_ok=%s, status=%s WHERE id=%s",
+                        (ok, "partner_ok" if ok else "rejected", swap_id))
+
+
+def swap_add_senior_vote(swap_id: int, decision: str) -> list:
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT senior_votes FROM dayoff_swaps WHERE id=%s", (swap_id,))
+            row = cur.fetchone()
+            votes = _json.loads(row["senior_votes"] or "[]") if row else []
+            votes.append(decision)
+            cur.execute("UPDATE dayoff_swaps SET senior_votes=%s WHERE id=%s",
+                        (_json.dumps(votes), swap_id))
+            return votes
+
+
+def swap_set_status(swap_id: int, status: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE dayoff_swaps SET status=%s WHERE id=%s", (status, swap_id))
 
 
 def points_seed_catalogue() -> None:
