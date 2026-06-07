@@ -513,6 +513,32 @@
     papered case is open. (Paperless silence keeps the strict path.)
     **SICK DURING BOOKED BUYBACK REST (owner Q):** the buyback auto-cancels and the HOURS STAY BANKED —
     sickness never burns earned rest; the sick day runs under normal sick rules; rebook when healthy.
+    **UNDATED-PAPERS PLAYBOOK (owner-confirmed session 28):**
+    - OPENING ALWAYS (any case): "papers received ✓, nothing owed, get well 🤍". The +15 come-in
+      INVITATION is conditional — only when a safe role (full or semi) exists; suppressed for
+      contagious/serious (Opus flags).
+    - SEMI-JOB phrasing (owner): leg/seated → "seated prep and other seated work"; one-hand → "cashier,
+      check phones, any easy one-hand work"; mild → "look for any easy work, the staff can help". Opus
+      offers the semi-job FIRST when applicable; staff opt-in only, a human senior assigns the actual task.
+    - SEMI-JOB OFFER FLOOR: only if **>2.5 h remain** on the shift (else skip to "rest, get well").
+    - NUDGE WINDOW: NO come-in nudge during the MIN heal days; nightly nudges run MIN→MAX day, each
+      carrying the semi-job option; past MAX with no return/silence → escalate to OWNER.
+    - SEMI-DUTY RETURN: whole day stays papered, **+15 points (gift model — no extra pay, no payroll
+      line; owner picked A)**; **relaxed check-out** — no location nag, no early-leave flag, they may
+      leave anytime (`[🩺 Leaving]` or just go) — it's a gift day. Multi-day one-hand returns keep
+      earning points (owner: they deserve it).
+    - PRIVACY (owner LOCKED): the medical PAPERS go ONLY to owner + Tyty, EVER. Supervisors get
+      OPERATIONAL facts only ("Davy off ~2d, can do seated work, back ~Thu") — never a diagnosis,
+      never the document. (This removes the "embarrassing disease" judgment entirely — no diagnosis
+      ever reaches a group.)
+    - SENIOR HAND-OFF (owner picked #3): part-duty return → plain Supervisors line ("Davy on light duty
+      this afternoon, seated") + DM the on-shift senior ("point her to seated tasks" `[👍 Got it]`) +
+      arrival ping ("Davy, light duty, has arrived").
+    - OPUS-WRONG/UNREADABLE: low confidence or AI/bot down → plain `[Cover 1d][2d][3d][Skip]` card to
+      OWNER (+Tyty), ZERO API, owner decides from the photo. NEVER routed to a group (privacy). Papers
+      don't expire; if GM is down the approval waits (watchdog pings owner ≤30min) — not time-critical.
+    - POINTS↔BONUS: keep DISCONNECTED for now (owner aim: eventually positive-points ⇒ earns bonus,
+      after observing real behavior — Claude to flag thoughts meanwhile).
     (New strings → pending KH batch.)
     **OWNER SKIPS THE DURATION QUESTION (owner, session 28):** no days set → the system simply runs
     the paperless-style nightly nudges day-by-day ("feeling better? / Again tomorrow / Better") with
