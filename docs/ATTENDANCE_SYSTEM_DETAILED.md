@@ -125,8 +125,18 @@
        insight as payback placement). START-TIME CONSTRAINTS (owner, session 28): never show times inside
        the receiver's scheduled shift; only starts where start+duration ends BEFORE their next shift
        begins (gap between shifts; whole day if day-off) → **why: typed** (verbatim rule) → goes to the
-       OWNER. FINAL why-prompt (owner+ChatGPT): *"Please type the reason why this OT is needed."* /
-       *"សូមវាយបញ្ចូលហេតុផលថា ហេតុអ្វីបានជាត្រូវការ OT នេះ។"*
+       OWNER. WHY-PROMPT (owner reworded session 28 — "to the owners"): *"Type the reason for the
+       owners."* / *"សូមវាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"* (→ pending KH polish.)
+     - **TWO OT TYPES (owner final, session 28 — solves the forgot-to-tap problem):**
+       · **NOW-OT** (staff is present, senior gives on the spot): owner approves (or ignores = approved;
+         late-reject still PAYS the staff — they stayed in good faith) → **their live location through the
+         OT window IS both the proof and the consent** → AUTO-BANKED, NO accept button (nothing to forget;
+         if they're too busy to tap, location covers them; check-out at OT end as usual). They just get
+         "+Xh OT banked ✓" + buyback slots.
+       · **FUTURE-OT** (senior schedules someone NOT present, another day/time): owner approves → staff
+         gets *"You're asked for OT on {when} — can you?"* `[✅ Yes][❌ Can't]` (voluntary extra, may
+         decline; accept expires when the OT day arrives = didn't happen, no harm) → on Yes it becomes a
+         scheduled WORK SLOT (T−10, check-in, +10 if early) → worked → banked → buyback.
        **OT ON AN AL DAY (owner decision, session 28):** ALLOWED outside the leave window (AL already
        deducted, no refund — their choice), with a FLAG LINE on the owner card: *"Note: receiver is on AL
        this day ({window})."* **BLOCKED when overlapping the leave hours themselves** — one person can't
@@ -144,9 +154,10 @@
        niceness, even for big banks), glued to their shift (come late / leave early), next 7 days, full
        amount first + partial `Take 1 hour only` buttons — exact inverse of §4.7. **NO senior approval for
        the take-back**; plain Supervisors notice when booked.
-     - **IGNORED? Daily reminder, clean chat (owner):** if they don't pick, GM reminds ONCE A DAY, during
-       their shift, **deleting the previous reminder message first** (no chat clutter), showing fresh
-       slots for the next 7 days. Repeats until they choose.
+     - **IGNORED BUYBACK = REWARD TONE, NOT THREAT (owner, session 28):** buyback is earned REST, never a
+       debt — so the reminders encourage, they don't warn. Daily-at-shift line (self-deleting previous):
+       *"Don't forget your earned rest 🌴 — pick a time, or I'll suggest a good one for you."* / KH. Same
+       auto-suggest safety net as payback, OPPOSITE tone. (Contrast payback's firm "or I'll pick for you.")
      - **BANK CAP = 14 HOURS (owner):** a grant that would push the bank past 14h is trimmed/blocked at
        the Give-OT step (duration buttons beyond the remaining headroom hidden). No expiry — the daily
        reminder is the anti-stale mechanism.
