@@ -154,7 +154,8 @@
      and reasons. Some Mondays have been popular lately 😉"). Owner is CC'd copies as they send (informed,
      never asked). **MODELS (owner final): SONNET writes the private DM, OPUS writes the group post** —
      both ALWAYS bilingual EN+KH (~$0.015 private, ~$0.10–0.15 group; Khmer tokenizes heavier).
-     Rare ⇒ <$1/month.
+     Rare ⇒ <$1/month. **CC copies go to BOTH owners: Ahmed + Tyty (co-owner, uid 1067974900 —
+     already pressed Start, reachable).**
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
