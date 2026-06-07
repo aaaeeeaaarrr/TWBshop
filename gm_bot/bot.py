@@ -30,7 +30,7 @@ from shared.database import (
     att_get_session, att_check_in, att_record_ping,
     late_declare, payback_open_debt, payback_add_debt, payback_credit, payback_book, payback_all_open,
     al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
-    al_pending_requests, al_deduct,
+    al_pending_requests, al_deduct, points_record, points_seed_catalogue,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1206,6 +1206,16 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     late = mins if state == "late" else 0
     early = mins if state == "early" else 0
     first = att_check_in(staff["id"], shift_date, now_pp.isoformat(), True, late, early)
+    if first:
+        # record raw points events (values derived later — owner-tuned; nothing connected yet)
+        try:
+            if state == "early":
+                points_record(staff["id"], "early_arrival", 1, shift_date)
+            elif state == "late":
+                informed = bool(att_get_session(staff["id"], shift_date))  # placeholder; declare-flag later
+                points_record(staff["id"], "late_uninformed", late, shift_date)
+        except Exception:
+            pass
     if first and not update.edited_message:
         if state == "early":
             await msg.reply_text(ui._V_EARLY % (early, early))
@@ -1430,6 +1440,36 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                            d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         except Exception as e:
             logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
+
+
+async def _al_accrual_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Monthly +1.5 AL on the 1st (Phnom Penh) for active TWB staff (arrears: a new hire's
+    first 1.5 lands the month after their first FULL calendar month). Idempotent via gm_state
+    stamp so a restart on the 1st can't double-credit. Gated off the live switch is NOT needed —
+    accrual is bookkeeping, safe to run regardless, but we still skip if attendance not set up."""
+    now_pp = datetime.now(finance.PP_TZ)
+    if now_pp.day != 1:
+        return
+    stamp = "al_accrual_done:%s" % now_pp.strftime("%Y-%m")
+    if gm_get_state(stamp) == "true":
+        return
+    credited = []
+    for s in staff_all("active"):
+        if s.get("org") != "TWB" or s["canonical_name"] == "Tyty":
+            continue
+        # arrears: skip if their first full month hasn't elapsed (no created/start date tracked yet →
+        # credit everyone seeded; new hires handled when join-date field exists). Conservative: credit.
+        try:
+            al_deduct(s["id"], -1.5)   # negative deduct = credit
+            credited.append(s.get("call_name") or s["canonical_name"])
+        except Exception as e:
+            logger.error("accrual for %s failed: %s", s["canonical_name"], e)
+    gm_set_state(stamp, "true")
+    try:
+        await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+            "🏖 Monthly AL accrual +1.5 applied to %d staff (%s)." % (len(credited), now_pp.strftime("%b %Y")))
+    except Exception:
+        pass
 
 
 async def _al_deduction_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2870,6 +2910,12 @@ def build_app() -> Application:
         _al_deduction_job,
         time=__import__("datetime").time(hour=0, minute=5),
         name="gm_al_deduction",
+    )
+    # Monthly AL accrual: runs daily 07:15 PP (00:15 UTC), credits only on the 1st.
+    app.job_queue.run_daily(
+        _al_accrual_job,
+        time=__import__("datetime").time(hour=0, minute=15),
+        name="gm_al_accrual",
     )
     # Report existence watchdog (session 28): mid by 17:30 PP (10:30 UTC),
     # final for the just-closed day by 06:30 PP (23:30 UTC).

@@ -38,6 +38,8 @@ init_gm_leave_db()
 init_stock_db()
 init_staff_registry_db()
 init_attendance_db()
+from shared.database import points_seed_catalogue
+points_seed_catalogue()
 
 app = build_app()
 logging.info("GM Manager bot starting...")

@@ -2312,6 +2312,21 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: points — raw events now, values derived from rules later (owner-tuned)
+                CREATE TABLE IF NOT EXISTS points_rules (
+                    cause   TEXT PRIMARY KEY,
+                    value   NUMERIC,
+                    active  BOOLEAN DEFAULT FALSE
+                );
+                CREATE TABLE IF NOT EXISTS points_events (
+                    id         SERIAL PRIMARY KEY,
+                    staff_id   INTEGER REFERENCES staff_registry(id),
+                    cause      TEXT,
+                    quantity   INTEGER DEFAULT 1,
+                    ref        TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_points_events_staff ON points_events (staff_id, created_at);
                 CREATE TABLE IF NOT EXISTS payback_bookings (
                     id          SERIAL PRIMARY KEY,
                     debt_id     INTEGER REFERENCES payback_debts(id),
@@ -2585,6 +2600,44 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def points_seed_catalogue() -> None:
+    """Idempotent: ensure every catalogue cause exists (inactive, default value). Never clobbers
+    an owner-edited value/active flag (DO NOTHING)."""
+    from gm_bot.points import CATALOGUE
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for cause, (val, _desc) in CATALOGUE.items():
+                cur.execute("INSERT INTO points_rules (cause, value, active) VALUES (%s,%s,FALSE) "
+                            "ON CONFLICT (cause) DO NOTHING", (cause, val))
+
+
+def points_record(staff_id: int, cause: str, quantity: int = 1, ref: str | None = None) -> None:
+    """Store a raw points event (value derived later from points_rules)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref) "
+                        "VALUES (%s,%s,%s,%s)", (staff_id, cause, quantity, ref))
+
+
+def points_rules_map() -> dict:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT cause, value, active FROM points_rules")
+            return {r["cause"]: {"value": float(r["value"]), "active": r["active"]}
+                    for r in cur.fetchall()}
+
+
+def points_events_for(staff_id: int, since_iso: str | None = None) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if since_iso:
+                cur.execute("SELECT cause, quantity FROM points_events WHERE staff_id=%s "
+                            "AND created_at>=%s", (staff_id, since_iso))
+            else:
+                cur.execute("SELECT cause, quantity FROM points_events WHERE staff_id=%s", (staff_id,))
+            return [dict(r) for r in cur.fetchall()]
 
 
 def al_create_request(staff_id: int, kind: str, days: list[str], hours_start: str | None,
