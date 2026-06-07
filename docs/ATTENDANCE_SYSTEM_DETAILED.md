@@ -42,6 +42,25 @@ watchdogs · data backfill.
 17. ✅/🔒 **Launch gate:** role-play sign-off (owner walks every ladder) → brief staff → everyone pressed
     Start (DONE 33/33) → flip `attendance_live`. Live-location REQUIREMENT waits until owner explains it.
 
+## 🔧 BUILD CONCERNS / FIRST-VERSION NOTES (running log — fix before go-live)
+> Honest caveats logged as each wave is built (owner: "remember all your concerns turn by turn").
+> These are things that WORK but are first-version / not-yet-wired — must be resolved before
+> attendance_live flips. Cross-ref the GO-LIVE checklist above.
+
+- **CHECK-IN:** stateless (fine, no flow_state needed). ✅ wired to Late ladder via [I'm late].
+- **LATE/PAYBACK:** (a) slot NEED-RANKING not done — slots correct but unranked by coverage; (b) ignore
+  ladder day-count uses CALENDAR days — must subtract legitimate-leave days (freeze rule); (c) the
+  real STAFF date-pick→submit entry isn't wired (shell pickers exist) — needs gated flow_state entry.
+- **AL APPROVAL:** (a) availability picture passes on_al=set() — does NOT yet exclude people already on
+  approved AL that day (real gap, wire from al_requests approved); (b) senior nudge/escalate job not
+  wired (al.senior_timers is pure, no driver job yet); (c) staff date-pick→submit_al_request entry not
+  wired (uses shell). The approval ENGINE (cards→tally→outcomes→deduct) IS real.
+- **POINTS:** (a) late always recorded 'late_uninformed' — must cross-ref the declare flag
+  (informed_before) to pick the −1 rate; (b) no_show / return_after_doctor / ot_no_show events not yet
+  recorded (their flows pending); values all PENDING/inactive by design.
+- **AL ACCRUAL:** arrears for NEW HIRES not implemented (no join_date column) — currently credits all
+  active TWB equally; add start_date + arrears logic before relying on balances for new staff.
+
 ## SYSTEM AUDIT RESOLUTIONS (session 28 — hole-hunt)
 - **H1 STATE PERSISTENCE (build #1):** every real ladder persists step+partial-data to a `gm_flow_state`
   table (uid → flow, step, data JSON, expires_at), written each step. Bot restart mid-flow → next tap
