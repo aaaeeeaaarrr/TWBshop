@@ -740,20 +740,21 @@ def ci_sim_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def _ci_msg_pre(p: dict) -> str:
     ws = to_min(p.get("work_start"))
     t = fmt12(ws) if ws is not None else "?"
-    return ("Your shift starts in 10 minutes (%s). Check in by sharing your live location.\n"
-            "វេនការងាររបស់អ្នកនឹងចាប់ផ្តើមក្នុង 10 នាទីទៀត (%s)។ សូមចុះវត្តមានដោយចែករំលែក"
-            "ទីតាំងបន្តផ្ទាល់។\n\n"
+    return ("Your shift starts in 10 minutes (%s).\n"
+            "វេនការងាររបស់អ្នកនឹងចាប់ផ្តើមក្នុង 10 នាទីទៀត (%s)។\n"
+            + _CI_HOWTO + "\n\n"
             "Arrive 5 minutes early and you earn +10 points ⭐\n"
-            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐" % (t, t))
+            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐") % (t, t)
 
 
 def _ci_msg_start() -> tuple[str, InlineKeyboardMarkup]:
+    # how-to is inline (the recognizable line) -> no separate How-to button needed
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🕘 I'm late · ខ្ញុំមកយឺត", callback_data="att:late")],
-        [InlineKeyboardButton("📍 How to check in · របៀបចុះវត្តមាន", callback_data="att:ci")],
     ])
-    return ("Your shift just started. Please share your live location to check in.\n"
-            "វេនការងាររបស់អ្នកទើបតែចាប់ផ្តើមហើយ។ សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមាន។\n\n"
+    return ("Your shift just started — check in now.\n"
+            "វេនការងាររបស់អ្នកទើបតែចាប់ផ្តើមហើយ — សូមចុះវត្តមាន។\n"
+            + _CI_HOWTO + "\n\n"
             "Running late? Tap below.\nកំពុងមកយឺតមែនទេ? សូមចុចខាងក្រោម។"), kb
 
 

@@ -166,6 +166,12 @@
      *"Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់"*
      Check-in screen itself is SHORT: the same slash-style instruction line + "Shift: HH:MM–HH:MM",
      no zone talk.
+   - **GLOBAL HOW-TO RULE (owner, session 28):** EVERY message that asks for a location carries the ONE
+     recognizable line (shared constant _CI_HOWTO): *"📍 Tap 📎 (Attach) → Location / ទីតាំង → Share Live
+     Location / ចែករំលែកទីតាំងបន្តផ្ទាល់"* — it REPLACES wordy "please share your live location" sentences
+     (shorter, not longer). Applied: T−10 pre-reminder, T0 prompt (whose separate How-to button was
+     dropped — inline beats a tap), check-out request, leave-early ask, pin response, check-in screen.
+     Build note: the Late flow's arrival-watch ("Are you there yet?") must use it too.
    - shared but outside zone → *"You're not at the shop yet — it will count when you arrive."* (keep watching)
 3. **EARLY BIRD:** in zone >5 min before start → **+10 points** (points PENDING — record raw arrival time
    now, points computed later; see §9).
