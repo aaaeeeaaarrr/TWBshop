@@ -180,6 +180,62 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
     ]
 
 
+def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 2: the LATE + PAYBACK lifecycle — every distinct message, once.
+    (KH pending) = English final, Khmer goes in the next ChatGPT batch."""
+    slots_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Mon 09/06 7:30pm-9pm", callback_data="att:noop")],
+        [InlineKeyboardButton("Tue 10/06 6-7:30am", callback_data="att:noop")],
+        [InlineKeyboardButton("Thu (day off) 11:30pm-1am", callback_data="att:noop")],
+        [InlineKeyboardButton("Pay 1 hour only", callback_data="att:noop")],
+    ])
+    return [
+        ("① late declared (they picked 9:30pm) — confirmation + group heads-up",
+         "Noted — see you ~9:30pm 🤍 (KH pending)\n\n"
+         "[TEST PREVIEW → SUPERVISORS group]\n"
+         "“Davy will be ~30 min late for the 9pm shift today.”  ← name+time only, never the reason",
+         None),
+        ("② arrival watch — declared time passed, no location yet (repeats 4× every 15 min)",
+         "Are you there yet? (KH pending)\n" + _CI_HOWTO, None),
+        ("③ they arrive — verdict + reason ask",
+         "(same messages as Dry-run 1 steps ④–⑥ — already approved)", None),
+        ("④ payback slot picker (right after the reason; no AL option — late = time)",
+         "You owe 90 min. Pick when to work it off — these are the times we need you most:\n"
+         "(KH pending)", slots_kb),
+        ("⑤ booked confirmation (self-picked or auto) — always encouraging",
+         "Booked ✓ — Mon 09/06, 7:30pm–9pm. (KH pending)\n"
+         "Come 5 minutes early and you earn +10 points ⭐\n"
+         "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐", None),
+        ("⑥ 12h-before reminder (any booked event)",
+         "Reminder — your payback time is tomorrow: 7:30pm–9pm. (KH pending)\n"
+         "Come 5 minutes early and you earn +10 points ⭐\n" + _CI_HOWTO, None),
+        ("⑦ the slot itself = mini-shift (T−10, check-in, early ⭐) — same templates as Dry-run 1",
+         "(reused — a payback slot greets, checks in and rewards exactly like a shift)", None),
+        ("⑧ partial credit — worked 60 of 90 min",
+         "You paid back 60 min ✓ — 30 min stays on your balance. (KH pending)", None),
+        ("⑨ unbooked debt — the daily line at check-in (never hourly)",
+         "Checked in ✓ — you still owe 90 min, pick a time: (KH pending)", slots_kb),
+        ("⑩ day 3 — the warning",
+         "Pick before tomorrow, or I'll pick for you.\n"
+         "សូមជ្រើសរើសមុនថ្ងៃស្អែក បើមិនទាន់ទេ ខ្ញុំនឹងជ្រើសរើសជូនអ្នក។ (KH draft)", slots_kb),
+        ("⑪ day 4 — auto-booked",
+         "I booked you Mon 09/06, 7:30pm–9pm (you didn't choose). (KH pending)\n"
+         "Come 5 minutes early and you earn +10 points ⭐\n\n"
+         "[TEST PREVIEW → SUPERVISORS group]\n“Davy pays back Mon 09/06 7:30pm–9pm.”", None),
+        ("⑫ skipped the assigned slot — re-booked ONCE",
+         "You missed your payback time — new time: Tue 10/06, 6–7:30am. (KH pending)", None),
+        ("⑬ skipped twice — bonus consequence + owner digest",
+         "[TEST PREVIEW → OWNER digest]\n"
+         "“Davy skipped 2 assigned payback slots (90 min open since Jun 7) — next bonus not earned. "
+         "This is a person-problem now.”  ← staff see the bonus line on the May#2 slip, never mid-month",
+         None),
+        ("⑭ no-show day (never arrived at all) — the hardest message, tone matters",
+         "You missed your whole shift yesterday. One day's pay is deducted, and this month's bonus "
+         "is not earned. If something serious happened, please tell me. (KH pending — wording open "
+         "to your tuning)", None),
+    ]
+
+
 def schedule_summary(target: date) -> str:
     """Today's who/when in ONE message — the schedule math, compressed."""
     from collections import defaultdict
@@ -843,8 +899,10 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     staff = [r for r in staff_all("active")]
     chunk = staff[page * 8:(page + 1) * 8]
-    rows = [[InlineKeyboardButton("🧪 Dry-run: all check-in possibilities + today's schedule",
-                                  callback_data="att:dr:go")]] if page == 0 else []
+    rows = [[InlineKeyboardButton("🧪 Dry-run 1: check-in possibilities + today's schedule",
+                                  callback_data="att:dr:go")],
+            [InlineKeyboardButton("🧪 Dry-run 2: Late & payback lifecycle",
+                                  callback_data="att:dr:go2")]] if page == 0 else []
     rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
@@ -927,21 +985,24 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text(text, reply_markup=kb)
 
     if action == "dr":
-        if len(data) > 2 and data[2] == "go":
+        if len(data) > 2 and data[2] in ("go", "go2"):
             sample = _persona(context) or next(
                 (r for r in staff_all("active") if to_min(r.get("work_start")) is not None), None)
             if sample is None:
                 await query.answer("No staff with shifts found")
                 return
-            events = build_catalogue(sample) + [
-                ("📅 schedule summary", schedule_summary(_today()), None)]
+            if data[2] == "go":
+                events = build_catalogue(sample) + [
+                    ("📅 schedule summary", schedule_summary(_today()), None)]
+                intro = ("🧪 Dry-run 1 — every distinct check-in message (one of each), "
+                         "then today's who/when summary. %d steps:")
+            else:
+                events = build_catalogue2(sample)
+                intro = ("🧪 Dry-run 2 — the LATE + PAYBACK lifecycle, every distinct message "
+                         "once. (KH pending) lines join the next ChatGPT batch. %d steps:")
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
-            await context.bot.send_message(
-                update.effective_chat.id,
-                "🧪 Dry-run — every distinct message the check-in system can send "
-                "(one of each; all staff get the same templates), then today's "
-                "who/when summary. %d steps:" % len(events))
+            await context.bot.send_message(update.effective_chat.id, intro % len(events))
         await _dryrun_next(update, context)
         return
     if action == "pick":
