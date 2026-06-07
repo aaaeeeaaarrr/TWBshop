@@ -156,6 +156,9 @@
      both ALWAYS bilingual EN+KH (~$0.015 private, ~$0.10–0.15 group; Khmer tokenizes heavier).
      Rare ⇒ <$1/month. **CC copies go to BOTH owners: Ahmed + Tyty (co-owner, uid 1067974900 —
      already pressed Start, reachable).**
+     **STYLE (owner, session 28): private DMs address the person by CALL NAME — once, at the opening
+     ("Hi Davy — …"), so it feels personal; NOT repeated in every sentence.** Goes into the Sonnet
+     call-out prompt as a hard style rule (and is the house style for all personal GM DMs).
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
