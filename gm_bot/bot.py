@@ -26,7 +26,7 @@ from shared.database import (
     gm_set_proposal_msg_id, gm_get_points_summary, _db,
     gm_get_approved_policy_for_type,
     gm_skip_proposal, gm_get_stale_draft_proposals, gm_purge_lower_ranked_drafts,
-    gm_append_refinement_note, save_ops_message,
+    gm_append_refinement_note, save_ops_message, al_apply_due_deductions,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1061,6 +1061,21 @@ async def _send_reconciliation(context, business_day: str) -> None:
         )
     except Exception as e:
         logger.error("reconciliation failed for %s: %s", business_day, e)
+
+
+async def _al_deduction_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """07:05 PP daily: deduct planned-AL days that have passed (owner, session 28).
+    PH-compensation leaves are never deducted. Owner gets a one-line note per deduction."""
+    today = datetime.now(finance.PP_TZ).date().isoformat()
+    try:
+        applied = al_apply_due_deductions(today)
+        for a in applied:
+            await context.bot.send_message(
+                chat_id=config.OWNER_TELEGRAM_ID,
+                text="🏖 AL deducted: %s −%d (%s) → %.1f left"
+                     % (a["name"], len(a["days"]), ", ".join(a["days"]), a["new_balance"]))
+    except Exception as e:
+        logger.error("AL deduction job failed: %s", e)
 
 
 async def _missing_mid_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2417,6 +2432,12 @@ def build_app() -> Application:
         _weekly_attendance_digest_job,
         time=__import__("datetime").time(hour=1, minute=30),
         name="gm_weekly_attendance_digest",
+    )
+    # Planned-AL deduction: 07:05 PP (00:05 UTC) — take passed AL days off balances.
+    app.job_queue.run_daily(
+        _al_deduction_job,
+        time=__import__("datetime").time(hour=0, minute=5),
+        name="gm_al_deduction",
     )
     # Report existence watchdog (session 28): mid by 17:30 PP (10:30 UTC),
     # final for the just-closed day by 06:30 PP (23:30 UTC).

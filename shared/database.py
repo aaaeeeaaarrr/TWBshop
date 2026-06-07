@@ -2255,6 +2255,8 @@ def init_attendance_db() -> None:
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS salary_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS bonus_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS phone TEXT;
+                -- session 28: per-day AL deduction tracking ("take when the dates pass")
+                ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS deducted_days TEXT DEFAULT '[]';
 
                 CREATE TABLE IF NOT EXISTS al_requests (
                     id           SERIAL PRIMARY KEY,
@@ -2496,6 +2498,41 @@ def staff_get_by_uid(uid: int) -> dict | None:
         if uid in rec.get("telegram_ids", []):
             return rec
     return None
+
+
+def al_apply_due_deductions(today_iso: str) -> list[dict]:
+    """Deduct 1.0 AL for every approved planned-AL day that has passed and wasn't
+    deducted yet (owner, session 28: 'start taking when the dates pass'). PH-compensation
+    leaves are never deducted. Returns [{name, days, new_balance}] for the owner note."""
+    import json as _json
+
+    from gm_bot.attendance import days_due
+    out = []
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT a.id, a.staff_id, a.days, a.deducted_days, a.reason,
+                       s.canonical_name, s.call_name, s.al_left
+                FROM al_requests a JOIN staff_registry s ON s.id = a.staff_id
+                WHERE a.status = 'approved' AND a.kind = 'days'
+            """)
+            for r in cur.fetchall():
+                try:
+                    days = _json.loads(r["days"] or "[]")
+                    deducted = _json.loads(r["deducted_days"] or "[]")
+                except Exception:
+                    continue
+                due = days_due(days, deducted, today_iso, r["reason"])
+                if not due:
+                    continue
+                new_bal = float(r["al_left"] or 0) - len(due)
+                cur.execute("UPDATE staff_registry SET al_left=%s, updated_at=NOW() WHERE id=%s",
+                            (new_bal, r["staff_id"]))
+                cur.execute("UPDATE al_requests SET deducted_days=%s WHERE id=%s",
+                            (_json.dumps(sorted(deducted + due)), r["id"]))
+                out.append({"name": r["call_name"] or r["canonical_name"],
+                            "days": due, "new_balance": new_bal})
+    return out
 
 
 def staff_bind_uid(staff_id: int, uid: int) -> None:

@@ -36,6 +36,14 @@ def in_work_zone(lat: float, lng: float, radius_m: float = WORK_ZONE_RADIUS_M) -
     return haversine_m(lat, lng, TWB_LAT, TWB_LNG) <= radius_m
 
 
+def days_due(days: list[str], deducted: list[str], today_iso: str, reason: str | None) -> list[str]:
+    """Which planned-AL days should be deducted now: the date has PASSED (day < today),
+    wasn't deducted yet, and the leave isn't PH compensation (never deducted). Pure."""
+    if reason and reason.upper().startswith("PH"):
+        return []
+    return sorted(d for d in days if d < today_iso and d not in deducted)
+
+
 def to_min(hhmm) -> int | None:
     """'HH:MM' (or 'H:MM', or an int already) -> minutes from midnight. None if unparseable."""
     if hhmm is None:
