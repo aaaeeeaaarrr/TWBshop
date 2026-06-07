@@ -127,16 +127,25 @@
        begins (gap between shifts; whole day if day-off) → **why: typed** (verbatim rule) → goes to the
        OWNER. WHY-PROMPT (owner reworded session 28 — "to the owners"): *"Type the reason for the
        owners."* / *"សូមវាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"* (→ pending KH polish.)
-     - **TWO OT TYPES (owner final, session 28 — solves the forgot-to-tap problem):**
-       · **NOW-OT** (staff is present, senior gives on the spot): owner approves (or ignores = approved;
-         late-reject still PAYS the staff — they stayed in good faith) → **their live location through the
-         OT window IS both the proof and the consent** → AUTO-BANKED, NO accept button (nothing to forget;
-         if they're too busy to tap, location covers them; check-out at OT end as usual). They just get
-         "+Xh OT banked ✓" + buyback slots.
-       · **FUTURE-OT** (senior schedules someone NOT present, another day/time): owner approves → staff
-         gets *"You're asked for OT on {when} — can you?"* `[✅ Yes][❌ Can't]` (voluntary extra, may
-         decline; accept expires when the OT day arrives = didn't happen, no harm) → on Yes it becomes a
-         scheduled WORK SLOT (T−10, check-in, +10 if early) → worked → banked → buyback.
+     - **LADDER ORDER (owner final, session 28):** Give OT → **[⚡ Now] / [📅 Later]** FIRST →
+       · ⚡ Now → staff list = ONLY staff present right now → duration → why → owner.
+       · 📅 Later → any staff → day → start-time → duration → why → owner.
+     - **OWNER DECISION:** approve OR ignore = approved (ladder continues either way). **REJECT BEFORE the
+       OT time starts** → GM ASKS the owner for an optional reason (`type` / `skip`) → BOTH senior AND
+       staff get the memo (with the reason if given). **REJECT AFTER it started** → too late, staff is
+       PAID/banked (they stayed in good faith) — owner just sees "already worked, banked".
+     - **NOW-OT consent:** staff still gets asked *"Senior gave you {Xh} OT now ({window}) — ok?"*
+       `[✅ Yes][❌ Can't]` (they may decline). No answer in **15 min → the SENIOR is nudged to remind
+       them in person** (they're right there). The tap = agreement; their **live location = proof of the
+       hours** → banked on completion. Decline → nothing banks.
+     - **LATE GRANT IS FINE (owner Q):** senior sets OT 4–5pm but the button is pressed at 4:30 → because
+       the staff is already present with continuous location, the window (4–5pm) is credited from location
+       RETROACTIVELY — press time doesn't matter; credit = location ∩ the senior's window.
+     - **FUTURE-OT:** owner approves → staff *"You're asked for OT on {when} — can you?"* `[✅ Yes][❌ Can't]`
+       (voluntary; accept expires when the day arrives = didn't happen, no harm; **accepted-then-no-show =
+       just doesn't bank, NO penalty** — it's extra, not a duty) → on Yes a scheduled WORK SLOT (T−10,
+       check-in, +10 if early) → worked → banked → buyback.
+     - Tyty + Delis never appear in the Give-OT staff list.
        **OT ON AN AL DAY (owner decision, session 28):** ALLOWED outside the leave window (AL already
        deducted, no refund — their choice), with a FLAG LINE on the owner card: *"Note: receiver is on AL
        this day ({window})."* **BLOCKED when overlapping the leave hours themselves** — one person can't
