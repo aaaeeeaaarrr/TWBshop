@@ -186,10 +186,43 @@ _PLUS10 = ("Come 5 minutes early and you earn +10 points ⭐\n"
 
 def _slots_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Mon 09/06 7:30pm-9pm", callback_data="att:noop")],
-        [InlineKeyboardButton("Tue 10/06 6-7:30am", callback_data="att:noop")],
-        [InlineKeyboardButton("Thu 11/06 (ថ្ងៃឈប់) 11:30pm-1am", callback_data="att:noop")],
-        [InlineKeyboardButton("Pay 1 hour only · សងតែ 1h", callback_data="att:noop")],
+        [InlineKeyboardButton("Mon 09/06 7:30pm-9pm", callback_data="att:drs:slot")],
+        [InlineKeyboardButton("Tue 10/06 6-7:30am", callback_data="att:drs:slot")],
+        [InlineKeyboardButton("Thu 11/06 (ថ្ងៃឈប់) 11:30pm-1am", callback_data="att:drs:slot")],
+        [InlineKeyboardButton("Pay 1 hour only · សងតែ 1h", callback_data="att:drs:part")],
+    ])
+
+
+_DRS = {
+    "slot": ("→ tapping a full slot books it:",
+             "Booked ✓ — Mon 09/06, 7:30pm–9pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–9pm។\n"
+             + "Come 5 minutes early and you earn +10 points ⭐\n"
+               "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐\n\n"
+               "(then: the 12h-before reminder → the slot runs as a mini-shift)"),
+    "pslot": ("→ tapping a 1-hour slot books the partial:",
+              "Booked ✓ — Mon 09/06, 7:30pm–8:30pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–8:30pm។\n"
+              "Come 5 minutes early and you earn +10 points ⭐\n"
+              "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐\n\n"
+              "You still owe 30 min — pick another time anytime.\n"
+              "អ្នកនៅត្រូវសង 30 min — អាចជ្រើសពេលបន្ថែមនៅពេលណាក៏បាន។"),
+    "appr": ("→ your ✅ counts (1/2) — when the 2nd senior approves:",
+             "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។\n\n"
+             "(requester gets her ✓ message; Supervisors get the plain notice — steps ③+⑤)"),
+    "rej": ("→ your ❌ counts — if a 2nd senior also rejects:",
+            "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។\n\n"
+            "(requester only; seniors get the recap; NOTHING goes to the group)"),
+    "take": ("→ tapping a buyback slot books the rest:",
+             "Booked ✓ — Tue 10/06, 2pm–3pm.\nបានកក់រួច ✓ — Tue 10/06, 2pm–3pm។\n"
+             "OT bank របស់អ្នក៖ 3.5h\n\n"
+             "(then: the 12h-before reminder; no check-in — it's rest, not work)"),
+}
+
+
+def _kb_part_slots() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Mon 09/06 7:30pm-8:30pm", callback_data="att:drs:pslot")],
+        [InlineKeyboardButton("Tue 10/06 6-7am", callback_data="att:drs:pslot")],
+        [InlineKeyboardButton("Thu 11/06 (ថ្ងៃឈប់) 11:30pm-12:30am", callback_data="att:drs:pslot")],
     ])
 
 
@@ -253,8 +286,8 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
     """Dry-run 3: AL APPROVAL flow — you play requester AND senior."""
     appr_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:noop")],
-        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:noop")],
+        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:appr")],
+        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:rej")],
     ])
     return [
         ("① the SENIOR's approval card (each senior gets this privately)",
@@ -283,9 +316,9 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
     """Dry-run 4: SPECIAL LEAVE + GIVE OT build messages."""
     take_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:noop")],
-        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:noop")],
-        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:noop")],
+        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:drs:take")],
+        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:drs:take")],
+        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:drs:take")],
     ])
     return [
         ("① family-sick day — seniors informed (no approval gate)",
@@ -1064,6 +1097,21 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = pair
         await query.edit_message_text(text, reply_markup=kb)
 
+    if action == "drs":
+        # dry-run sample buttons demonstrate their consequence (owner: ladders must continue)
+        what = data[2] if len(data) > 2 else ""
+        if what == "part":
+            await context.bot.send_message(
+                update.effective_chat.id,
+                "→ partial chosen — 1-hour options at the shop's best times:",
+                reply_markup=_kb_part_slots())
+            return
+        if what in _DRS:
+            head, body = _DRS[what]
+            await context.bot.send_message(update.effective_chat.id,
+                                           "🧪 %s\n────────────\n%s" % (head, body))
+            return
+        return
     if action == "dr":
         if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4"):
             sample = _persona(context) or next(
