@@ -494,6 +494,14 @@
     covered days gets the boundary message: *"Your paper covered {N} day(s). If you're still sick, a
     new paper will cover the extra days — otherwise the time joins your pay-back balance. Get well 🤍"*
     — so one vague clinic slip can never fund an open-ended week off.
+    **POST-PAPERS RECOVERY ASK (owner, session 28 — the IV-drip case):** papers approved for a TODAY
+    sick day with ≥~2 shift-hours left → GM asks: *"Hi {name} — papers received ✓ those hours are
+    covered, nothing owed. Are you feeling better now?"* → `[💪 Better — coming]` (→ "What time can
+    you come?" time buttons over remaining hours → arrival watch; the WHOLE day stays papered — no
+    payback/points for the gap, returning is a gift) · `[🛌 Resting today]` or SILENCE (→ "Get well 🤍",
+    full covered day, night nudge next). Dossier records came-vs-rested as pattern data, never judged
+    in the moment. Points-tuning candidate (pending): small + for returning after a doctor visit.
+    (New strings → pending KH batch.)
     **OWNER SKIPS THE DURATION QUESTION (owner, session 28):** no days set → the system simply runs
     the paperless-style nightly nudges day-by-day ("feeling better? / Again tomorrow / Better") with
     no fixed boundary — the approval wiped the claimed day(s), each further day is nudged, and the
