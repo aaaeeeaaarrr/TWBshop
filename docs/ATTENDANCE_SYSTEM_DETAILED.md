@@ -128,7 +128,11 @@
        OWNER. WHY-PROMPT (owner reworded session 28 — "to the owners"): *"Type the reason for the
        owners."* / *"សូមវាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"* (→ pending KH polish.)
      - **LADDER ORDER (owner final, session 28):** Give OT → **[⚡ Now] / [📅 Later]** FIRST →
-       · ⚡ Now → staff list = ONLY staff present right now → duration → why → owner.
+       · ⚡ Now → staff list = present-now **BY SCHEDULE** (shift active now OR ended within the last ~1h —
+         catches "stay after your shift") → duration → why → owner. **NOT by live location** (owner
+         correction: location is check-in-only/often off → a location filter would wrongly hide present
+         staff and break a late press; schedule never lies). So a 4:30 press for a 4–5pm OT still lists
+         the person whose shift ended at 4:00.
        · 📅 Later → any staff → day → start-time → duration → why → owner.
      - **OWNER DECISION:** approve OR ignore = approved (ladder continues either way). **REJECT BEFORE the
        OT time starts** → GM ASKS the owner for an optional reason (`type` / `skip`) → BOTH senior AND
