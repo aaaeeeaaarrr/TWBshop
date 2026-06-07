@@ -539,6 +539,10 @@
       papers OPTIONAL, never demanded — sent = attached to dossier; not sent = day still counts + still
       burns their AL (low abuse incentive since it costs their own AL). Owner may REQUEST a paper when a
       pattern smells off.
+      FAMILY-SICK CONFIRMATION (owner-approved wording, → pending KH batch): "🤒 Sick leave for your
+      {child} — noted, take care of them 🤍 / You don't need to send anything. But if you happen to have
+      a doctor's note, you're welcome to share it — it helps us keep good records. Either way is
+      completely fine." ({child} swaps per relation; KH draft sits in the batch.)
     - OWNER CARD (goes to owner + Tyty; Opus advises, buttons are the veto): line of Opus read
       (likely days · semi-job? · contagious?) + `[📷 View paper]` · `[✓ Accept Opus]` (one-tap) ·
       `[1d][2d][3d][4+…]` (override duration) · `[💺 Semi-job ON/OFF]` (toggle) · `[🚫 No come-in /
