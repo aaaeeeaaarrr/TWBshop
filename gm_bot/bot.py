@@ -1719,6 +1719,41 @@ async def _do_exstaff(context, staff: dict) -> None:
     logger.info("Ex-staff %s: removed=%s failed=%s", name, removed, leftover)
 
 
+async def cmd_rollcall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/rollcall — owner: who has pressed Start with the GM (first contact is stamped
+    even though the GM stays silent after the one greeting)."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    with __import__("shared.database", fromlist=["_db"])._db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT key, updated_at FROM gm_state
+                           WHERE key LIKE 'rollcall_greeted:%' ORDER BY updated_at DESC""")
+            rows = cur.fetchall()
+    greeted = {}
+    for r in rows:
+        try:
+            greeted[int(r["key"].split(":")[1])] = r["updated_at"]
+        except (ValueError, IndexError):
+            pass
+    active = staff_all("active")
+    started, missing = [], []
+    for p in active:
+        ts = next((greeted[u] for u in (p.get("telegram_ids") or []) if u in greeted), None)
+        name = p.get("call_name") or p["canonical_name"]
+        if ts is not None:
+            started.append((ts, name))
+        else:
+            missing.append(name + (" (Delis)" if p.get("org") == "DELIS" else ""))
+    started.sort(reverse=True)
+    lines = ["📋 Roll-call: %d / %d started" % (len(started), len(active))]
+    recent = started[:5]
+    if recent:
+        lines.append("Most recent: " + ", ".join(
+            "%s (%s)" % (n, str(t)[5:16]) for t, n in recent))
+    lines.append("Missing: " + (", ".join(sorted(missing)) or "— everyone in! ✅"))
+    await update.message.reply_text("\n".join(lines))
+
+
 async def cmd_vendor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/vendor — owner manages per-vendor receipt knowledge.
     /vendor                      -> list
@@ -2301,6 +2336,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("rules",     cmd_rules))
     app.add_handler(CommandHandler("exstaff",   cmd_exstaff))
     app.add_handler(CommandHandler("vendor",    cmd_vendor))
+    app.add_handler(CommandHandler("rollcall",  cmd_rollcall))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall
