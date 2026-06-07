@@ -152,7 +152,9 @@
      3 of your last 4 lates. Everything okay? Let's fix Mondays together."); (b) GROUP — never naming,
      unmistakable to the person, light to everyone else ("Friendly reminder: we track lateness patterns
      and reasons. Some Mondays have been popular lately 😉"). Owner is CC'd copies as they send (informed,
-     never asked). AI-crafted per case (model: Opus vs Sonnet — owner deciding); rare ⇒ <$1/month either way.
+     never asked). **MODELS (owner final): SONNET writes the private DM, OPUS writes the group post** —
+     both ALWAYS bilingual EN+KH (~$0.015 private, ~$0.10–0.15 group; Khmer tokenizes heavier).
+     Rare ⇒ <$1/month.
 - **BUTTONS NEVER BLOCK — TEXT-WAITS EXPIRE (owner "they do the opposite" rule, session 28):**
   exactly TWO text-wait kinds exist (late-reason ask; flow reason/why steps). A text-wait expires after
   **30 min** and dies instantly on ANY button tap — after that, typing → main menu as normal. Expired
