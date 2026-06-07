@@ -70,6 +70,11 @@ watchdogs · data backfill.
   sick_cases table + helpers; paperless-deadline daily job (provisional→payback after 3 days, gated).
   PENDING 5c: marriage / family-death two-tier / wife-birth. The sick-declare staff UI (take-a-pill
   ladder) wires in Wave 7.
+- **WAVE 5c (marriage/death/birth):** ✅ special.py pure (+5 tests) + special_leaves table; book_family_death
+  (instant, condolence, Supervisors notice w/ relation, AL deduct negative-ok, compassion-tier 1d→owner
+  upgrade card+callback), book_wife_birth (2d notify), marriage routes through the AL approval engine
+  (30+ days, AL-funded). PENDING: staff entry pickers (Wave 7); marriage's negative-AL allowance flag
+  (al_deduct already allows negative — fine).
 - **WAVE 5b (sick papers):** ✅ ai_client.read_medical_paper (Opus vision — is_medical, hospital/doctor/
   patient/date, rest_days, contagious, part_duty, advice); _handle_sick_paper (staff photo on an open
   sick case → Opus → OWNER+TYTY card, papers forwarded) + _sick_paper_callback (cover Nd / 💺 part-duty /

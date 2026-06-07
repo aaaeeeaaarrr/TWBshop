@@ -2312,6 +2312,17 @@ def init_attendance_db() -> None:
                     status        TEXT DEFAULT 'open',  -- open | cleared
                     created_at    TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 28: special leaves (marriage / death / birth) — funded from AL (negative ok)
+                CREATE TABLE IF NOT EXISTS special_leaves (
+                    id          SERIAL PRIMARY KEY,
+                    staff_id    INTEGER REFERENCES staff_registry(id),
+                    kind        TEXT,    -- 'marriage' | 'death' | 'birth'
+                    who         TEXT,    -- own/child/parent/spouse/sibling/grandparent (relation)
+                    start_date  DATE,
+                    days        INTEGER,
+                    status      TEXT DEFAULT 'booked',
+                    created_at  TIMESTAMPTZ DEFAULT NOW()
+                );
                 -- session 28: sick cases (own + family)
                 CREATE TABLE IF NOT EXISTS sick_cases (
                     id          SERIAL PRIMARY KEY,
@@ -2664,6 +2675,29 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 out.append({"name": r["call_name"] or r["canonical_name"],
                             "days": due, "new_balance": new_bal})
     return out
+
+
+def special_leave_create(staff_id, kind, who, start_date, days) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO special_leaves (staff_id, kind, who, start_date, days)
+                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, kind, who, start_date, days))
+            return cur.fetchone()["id"]
+
+
+def special_leave_set_days(leave_id: int, days: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE special_leaves SET days=%s WHERE id=%s", (days, leave_id))
+
+
+def special_leave_get(leave_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM special_leaves WHERE id=%s", (leave_id,))
+            r = cur.fetchone()
+            return dict(r) if r else None
 
 
 def sick_create(staff_id: int, who: str, the_date: str, status: str = "open") -> int:

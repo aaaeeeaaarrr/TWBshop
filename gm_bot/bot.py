@@ -36,6 +36,7 @@ from shared.database import (
     swap_add_senior_vote, swap_set_status,
     ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
+    special_leave_create, special_leave_set_days, special_leave_get,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1268,6 +1269,87 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
+
+
+async def book_family_death(context, staff: dict, who: str, start_date: str) -> int:
+    """Family death — NO approval, instant condolence + book + Supervisors notice + AL deduct
+    (negative ok). Compassion tier (sibling/grandparent) = 1 day → owner can upgrade."""
+    from gm_bot import special as sp
+    from datetime import date as _date, timedelta as _td
+    days = sp.death_default_days(who)
+    leave_id = special_leave_create(staff["id"], "death", who, start_date, days)
+    al_deduct(staff["id"], days)   # AL may go below zero for death
+    name = staff.get("call_name") or staff["canonical_name"]
+    d0 = _date.fromisoformat(start_date)
+    dn = (d0 + _td(days=days - 1)).strftime("%a %d/%m")
+    if staff.get("telegram_ids"):
+        await context.bot.send_message(staff["telegram_ids"][0],
+            "We're very sorry for your loss 🤍\n%d days of leave, %s → %s. No approval needed.\n"
+            "យើងសូមចូលរួមរំលែកទុក្ខ 🤍 សម្រាក %d ថ្ងៃ, %s → %s។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។"
+            % (days, d0.strftime("%a %d/%m"), dn, days, d0.strftime("%a %d/%m"), dn))
+    try:
+        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
+            "%s on leave %s → %s (death of %s)." % (name, d0.strftime("%a %d/%m"), dn, who))
+    except Exception:
+        pass
+    # compassion tier → let the owner upgrade to the full law-tier with one tap
+    if sp.death_tier(who) == "compassion":
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Upgrade to 3 days", callback_data="att:dth:%d:3" % leave_id)],
+            [InlineKeyboardButton("Keep 1 day", callback_data="att:dth:%d:1" % leave_id)]])
+        for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+            if oid:
+                try:
+                    await context.bot.send_message(oid,
+                        "%s reported a %s's death — gave 1 day (compassion). Upgrade?" % (name, who),
+                        reply_markup=kb)
+                except Exception:
+                    pass
+    return leave_id
+
+
+async def _death_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:dth:{leave}:{days} — owner upgrades a compassion-tier death leave."""
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    _, _, lid_s, days_s = query.data.split(":")
+    leave = special_leave_get(int(lid_s))
+    if not leave:
+        return
+    new_days = int(days_s)
+    extra = new_days - (leave["days"] or 1)
+    if extra > 0:
+        special_leave_set_days(int(lid_s), new_days)
+        al_deduct(leave["staff_id"], extra)
+        staff = next((s for s in staff_all("active") if s["id"] == leave["staff_id"]), None)
+        if staff and staff.get("telegram_ids"):
+            await context.bot.send_message(staff["telegram_ids"][0],
+                "Your leave is extended to %d days 🤍\nច្បាប់របស់អ្នកត្រូវបានបន្ថែមដល់ %d ថ្ងៃ 🤍"
+                % (new_days, new_days))
+    await query.edit_message_text(query.message.text + "\n\n✓ %d day(s)." % new_days)
+
+
+async def book_wife_birth(context, staff: dict, start_date: str) -> int:
+    """Wife giving birth — 2 days, notify only, AL deduct (negative ok)."""
+    from gm_bot import special as sp
+    from datetime import date as _date, timedelta as _td
+    leave_id = special_leave_create(staff["id"], "birth", "wife", start_date, sp.BIRTH_DAYS)
+    al_deduct(staff["id"], sp.BIRTH_DAYS)
+    name = staff.get("call_name") or staff["canonical_name"]
+    d0 = _date.fromisoformat(start_date)
+    dn = (d0 + _td(days=sp.BIRTH_DAYS - 1)).strftime("%a %d/%m")
+    if staff.get("telegram_ids"):
+        await context.bot.send_message(staff["telegram_ids"][0],
+            "Congratulations! 👶 2 days of leave, %s → %s.\nអបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, %s → %s។"
+            % (d0.strftime("%a %d/%m"), dn, d0.strftime("%a %d/%m"), dn))
+    try:
+        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
+            "%s on leave %s → %s (wife giving birth)." % (name, d0.strftime("%a %d/%m"), dn))
+    except Exception:
+        pass
+    return leave_id
 
 
 async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes: int,
@@ -3318,6 +3400,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
+    app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
     # private photo from staff → sick papers (gated); falls through harmlessly otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))
