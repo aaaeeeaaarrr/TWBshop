@@ -283,8 +283,18 @@
        · Skipped the assigned slot → re-book ONCE → skipped again → **next bonus not earned** +
          the case lands in the owner digest as a person-problem.
        Ignoring stops being a strategy: the only way out of the debt is through it.
-     - **+10 early points NEVER fire during a booked payback slot — CONFIRMED owner session 28** ("no
-       reward for running away then paying back").
+     - **PAYBACK SLOT = MINI-SHIFT (owner REVERSED the no-reward rule, session 28 — "encourage them,
+       not just break them"):** a booked slot (self-picked OR auto-assigned) gets the FULL check-in
+       treatment — T−10 pre-reminder (with the how-to + the +10 line), T0 prompt, location check-in —
+       and **arriving 5+ min early to a payback slot EARNS the +10 points** like any shift.
+     - **BOOKED CONFIRMATION always carries the encouragement line:** *"Booked ✓ — {slot}. Come 5
+       minutes early and you earn +10 points ⭐"* + approved KH (+10 line reuses the approved T−10
+       fragment មកដល់មុន 5 នាទី...).
+     - **12-HOUR-BEFORE REMINDER for any booked attendance event** (payback slot, assigned slot, OT
+       buyback): *"Reminder — your payback time is tomorrow: {slot}."* / KH draft *"រំលឹក — ម៉ោងសងវិញ
+       របស់អ្នកគឺថ្ងៃស្អែក៖ {slot}។"* + the +10 line + the 📍 how-to (both already approved). Same
+       quiet-hours slide rule as the family-sick nudge. (+10 applies to WORK slots — payback / granted
+       OT work — not to taking buyback rest, where there's nothing to check into.)
      - "My schedule" menu shows the live balance; weekly digest lists open debts.
 8. **NO-SHOW (FINAL, owner session 28):** never arrived during the whole shift (Late tapped or not) →
    **cut 1 DAY'S PAY** (internally: Cambodian law 1-for-1 — **NEVER mention the law to staff**; owner:
@@ -524,7 +534,7 @@
 
 | # | Cause | Points (owner-adjustable) |
 |---|-------|--------------------------|
-| P1 | Arrived >5 min early (live location in zone) | **+10** (not while a payback debt is open 🔒) |
+| P1 | Arrived >5 min early (live location in zone) — shifts AND booked payback/work slots (owner session 28: encourage, don't just break) | **+10** |
 | P2/P3 | LATE — **INFORM-TIME SPLIT (owner FINAL, session 28):** minutes BEFORE they told us = **−2 each**; minutes AFTER they told us = **−1 each** (informed before shift start ⇒ all −1). **TIGHTER variant chosen:** the −1 rate holds only until their DECLARED arrival time — past it, −2 resumes (the team is guessing again). **Arriving EARLIER than declared = always fine** — actual location-measured minutes are charged, never the declared ones; over-padding ("2 hours" then 30 min) costs nothing in points but declared-vs-actual gaps are TRACKED and chronic padders surface in the digest (human conversation, not math). ≤5 min late = FREE; >5 = all minutes count from minute 1. | −2 silent / −1 informed |
 | P4 | (existing) recognition/leaderboard points | unchanged |
 | P5 | (future, owner) stock checks done, other duties | TBD |
