@@ -198,6 +198,13 @@
      early-bird reward: arrive 5 min before start = **+10 points**. Carries the `[🕘 I'm late ·
      ខ្ញុំមកយឺត]` button (owner, session 28) — tapping it BEFORE start is exactly what earns the −1 rate.
    - **T0 (start):** still no in-zone location → the normal check-in prompt (+ I'm-late button).
+   - **I'M-LATE BUTTON RULE (owner, session 28):** T−10, T0 AND T+5 each carry `[🕘 I'm late ·
+     ខ្ញុំមកយឺត]` while NO lateness is declared for this shift — every nudge is another chance.
+     **Once declared (time chosen): the remaining prompts are SUPPRESSED entirely** — the arrival watch
+     at their declared time owns the timeline (no "check in now!" after they already told us 9:30).
+   - **NO SICK BUTTON on check-in prompts (owner, session 28 — deliberate friction):** a Sick button at
+     5:50am is an invitation. The genuinely sick TYPE anything → main menu → About Me → Special Leave →
+     Sick. (Parked for later: Haiku intent-routing of typed "sick" straight to the ladder.)
    - **T+5 min:** still nothing → the NICE message — FINAL bilingual (owner+ChatGPT via khmer_inbox):
      *"We give everyone 5 free late minutes 😊 More than 5 — every late minute counts: as pay-back time,
      and minus points. The sooner you tell us, the fewer points it costs. See you soon!"*
