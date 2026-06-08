@@ -2866,8 +2866,16 @@ def ot_bank_balance(staff_id: int) -> int:
 
 
 def ot_bank_add(staff_id: int, minutes: int) -> int:
+    """Add to the OT time bank. In TEST mode the real bank is NEVER mutated — returns the computed
+    (current + minutes) for display only, so the confirmation shows the new total without touching
+    real data."""
     with _db() as conn:
         with conn.cursor() as cur:
+            if _ATT_TEST:
+                cur.execute("SELECT COALESCE(balance_min,0) AS b FROM ot_bank WHERE staff_id=%s",
+                            (staff_id,))
+                r = cur.fetchone()
+                return int((r["b"] if r else 0) + minutes)
             cur.execute("""INSERT INTO ot_bank (staff_id, balance_min) VALUES (%s,%s)
                 ON CONFLICT (staff_id) DO UPDATE SET balance_min=ot_bank.balance_min+%s
                 RETURNING balance_min""", (staff_id, minutes, minutes))
@@ -2878,9 +2886,9 @@ def ot_grant_create(senior_id, staff_id, kind, minutes, when_date, start_min, re
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO ot_grants
-                (senior_id, staff_id, kind, minutes, when_date, start_min, reason)
-                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (senior_id, staff_id, kind, minutes, when_date, start_min, reason))
+                (senior_id, staff_id, kind, minutes, when_date, start_min, reason, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (senior_id, staff_id, kind, minutes, when_date, start_min, reason, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -2904,9 +2912,9 @@ def ot_grant_set(grant_id: int, status: str | None = None, staff_ok: bool | None
 def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO ot_buyback (staff_id, slot_date, start_min, end_min, minutes)
-                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                (staff_id, slot_date, start_min, end_min, minutes))
+            cur.execute("""INSERT INTO ot_buyback (staff_id, slot_date, start_min, end_min, minutes, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (staff_id, slot_date, start_min, end_min, minutes, _ATT_TEST))
             return cur.fetchone()["id"]
 
 

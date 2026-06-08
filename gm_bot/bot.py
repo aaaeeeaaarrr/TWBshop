@@ -1457,10 +1457,11 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ot_grant_set(int(gid_s), status="rejected")
         await query.edit_message_text(query.message.text + "\n\n❌ Rejected.")
         # memo both senior + staff (reject-before-start path)
-        for s in (staff, senior):
-            if s and (s.get("telegram_ids") or []):
-                await context.bot.send_message(s["telegram_ids"][0],
-                    "The OT was not approved this time.\nOT មិនត្រូវបានអនុម័តលើកនេះទេ។")
+        for s, role in ((staff, "Staff"), (senior, "Senior")):
+            if s:
+                await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
+                                s.get("call_name") or s["canonical_name"],
+                                "The OT was not approved this time.\nOT មិនត្រូវបានអនុម័តលើកនេះទេ។")
         return
     ot_grant_set(int(gid_s), status="approved")
     await query.edit_message_text(query.message.text + "\n\n✅ Approved.")
@@ -1477,9 +1478,10 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % int(gid_s))],
             [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % int(gid_s))],
         ])
-        await context.bot.send_message(staff["telegram_ids"][0],
+        await _att_send(context, staff["telegram_ids"][0], "Staff",
+            staff.get("call_name") or staff["canonical_name"],
             "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
-            % (g.get("when_date") or "?", g.get("when_date") or "?"), reply_markup=kb)
+            % (g.get("when_date") or "?", g.get("when_date") or "?"), kb=kb)
 
 
 async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1487,8 +1489,15 @@ async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     g = ot_grant_get(int(query.data.split(":")[3]))
-    staff = staff_get_by_uid(update.effective_user.id)
-    if not g or not staff or staff["id"] != g["staff_id"] or g["status"] != "approved":
+    if not g or g["status"] != "approved":
+        return
+    if _att_test_mode():
+        staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+    else:
+        staff = staff_get_by_uid(update.effective_user.id)
+        if not staff or staff["id"] != g["staff_id"]:
+            return
+    if not staff:
         return
     if query.data.split(":")[2] == "no":
         ot_grant_set(g["id"], status="rejected", staff_ok=False)
@@ -1520,24 +1529,31 @@ async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_add
                                         roster, set(), to_min)
                 txt = "%s %s-%s" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
                 scored.append((surp, [InlineKeyboardButton(
-                    txt, callback_data="att:otb:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, bank_min))]))
+                    txt, callback_data="att:otb:%d:%s:%d:%d:%d"
+                    % (staff["id"], d.isoformat(), s_min, e_min, bank_min))]))
         scored.sort(key=lambda t: -t[0])   # safest (most surplus) first
         rows = [b for _s, b in scored]
-    await context.bot.send_message(uid,
+    await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
         "+%s OT approved — your bank: %gh. Choose when to take it back:\n"
         "+%s OT ត្រូវបានអនុម័ត — OT bank៖ %gh។ សូមជ្រើសម៉ោងសម្រាកសងវិញ៖"
         % (label, bank_min / 60, label, bank_min / 60),
-        reply_markup=InlineKeyboardMarkup(rows) if rows else None)
+        kb=InlineKeyboardMarkup(rows) if rows else None)
 
 
 async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:otb:{date}:{start}:{end}:{bankmin} — staff books buyback rest."""
     query = update.callback_query
     await query.answer()
-    staff = staff_get_by_uid(update.effective_user.id)
+    # att:otb:{sid}:{date}:{start}:{end}:{bank}
+    _, _, sid_s, slot_date, s_min, e_min, _bank = query.data.split(":")
+    if _att_test_mode():
+        staff = next((s for s in staff_all("active") if s["id"] == int(sid_s)), None)
+    else:
+        staff = staff_get_by_uid(update.effective_user.id)
+        if not staff or staff["id"] != int(sid_s):
+            return
     if not staff:
         return
-    _, _, slot_date, s_min, e_min, _bank = query.data.split(":")
     ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), int(e_min) - int(s_min))
     from datetime import date as _date
     d = _date.fromisoformat(slot_date)
