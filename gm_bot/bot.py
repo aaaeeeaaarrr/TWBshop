@@ -1348,18 +1348,14 @@ async def book_family_death(context, staff: dict, who: str, start_date: str) -> 
     name = staff.get("call_name") or staff["canonical_name"]
     d0 = _date.fromisoformat(start_date)
     dn = (d0 + _td(days=days - 1)).strftime("%a %d/%m")
-    if staff.get("telegram_ids"):
-        await context.bot.send_message(staff["telegram_ids"][0],
-            "We're very sorry for your loss 🤍\n%d days of leave, %s → %s. No approval needed.\n"
-            "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍 សម្រាក %d ថ្ងៃ, %s → %s។ "
-            "មិនចាំបាច់រង់ចាំការអនុម័តទេ។"
-            % (days, d0.strftime("%a %d/%m"), dn, days, d0.strftime("%a %d/%m"), dn))
-    try:
-        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-            "%s on leave %s → %s (death of %s).\n%s ឈប់សម្រាក %s → %s (មរណភាព %s)។"
-            % (name, d0.strftime("%a %d/%m"), dn, who, name, d0.strftime("%a %d/%m"), dn, who))
-    except Exception:
-        pass
+    await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff", name,
+        "We're very sorry for your loss 🤍\n%d days of leave, %s → %s. No approval needed.\n"
+        "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍 សម្រាក %d ថ្ងៃ, %s → %s។ "
+        "មិនចាំបាច់រង់ចាំការអនុម័តទេ។"
+        % (days, d0.strftime("%a %d/%m"), dn, days, d0.strftime("%a %d/%m"), dn))
+    await _att_send(context, None, "Supervisors group", "",
+        "%s on leave %s → %s (death of %s).\n%s ឈប់សម្រាក %s → %s (មរណភាព %s)។"
+        % (name, d0.strftime("%a %d/%m"), dn, who, name, d0.strftime("%a %d/%m"), dn, who), group=True)
     # compassion tier → let the owner upgrade to the full law-tier with one tap
     if sp.death_tier(who) == "compassion":
         kb = InlineKeyboardMarkup([
@@ -1392,8 +1388,9 @@ async def _death_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_
         special_leave_set_days(int(lid_s), new_days)
         al_deduct(leave["staff_id"], extra)
         staff = next((s for s in staff_all("active") if s["id"] == leave["staff_id"]), None)
-        if staff and staff.get("telegram_ids"):
-            await context.bot.send_message(staff["telegram_ids"][0],
+        if staff:
+            await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff",
+                staff.get("call_name") or staff["canonical_name"],
                 "Your leave is extended to %d days 🤍\nច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ %d ថ្ងៃហើយ 🤍"
                 % (new_days, new_days))
     await query.edit_message_text(query.message.text + "\n\n✓ %d day(s)." % new_days)
@@ -1408,16 +1405,12 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
     name = staff.get("call_name") or staff["canonical_name"]
     d0 = _date.fromisoformat(start_date)
     dn = (d0 + _td(days=sp.BIRTH_DAYS - 1)).strftime("%a %d/%m")
-    if staff.get("telegram_ids"):
-        await context.bot.send_message(staff["telegram_ids"][0],
-            "Congratulations! 👶 2 days of leave, %s → %s.\nអបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, %s → %s។"
-            % (d0.strftime("%a %d/%m"), dn, d0.strftime("%a %d/%m"), dn))
-    try:
-        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-            "%s on leave %s → %s (wife giving birth).\n%s ឈប់សម្រាក %s → %s (ប្រពន្ធសម្រាលកូន)។"
-            % (name, d0.strftime("%a %d/%m"), dn, name, d0.strftime("%a %d/%m"), dn))
-    except Exception:
-        pass
+    await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff", name,
+        "Congratulations! 👶 2 days of leave, %s → %s.\nអបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, %s → %s។"
+        % (d0.strftime("%a %d/%m"), dn, d0.strftime("%a %d/%m"), dn))
+    await _att_send(context, None, "Supervisors group", "",
+        "%s on leave %s → %s (wife giving birth).\n%s ឈប់សម្រាក %s → %s (ប្រពន្ធសម្រាលកូន)។"
+        % (name, d0.strftime("%a %d/%m"), dn, name, d0.strftime("%a %d/%m"), dn), group=True)
     return leave_id
 
 

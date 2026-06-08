@@ -2792,9 +2792,9 @@ def no_show_reverse(staff_id: int, shift_date: str) -> None:
 def special_leave_create(staff_id, kind, who, start_date, days) -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO special_leaves (staff_id, kind, who, start_date, days)
-                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                        (staff_id, kind, who, start_date, days))
+            cur.execute("""INSERT INTO special_leaves (staff_id, kind, who, start_date, days, is_test)
+                           VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, kind, who, start_date, days, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
