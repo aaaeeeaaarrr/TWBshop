@@ -191,6 +191,16 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
         ("⑧ static pin sent instead", _PIN_RESPONSE, None),
         ("⑨ shift-end check-out request", _CI_MSG_OUT, None),
         ("⑩ +10min leave-early ask (only if no check-out)", _CI_MSG_OUT2, None),
+        ("⑪ checked out ✓ — shift closed",
+         "Checked out ✓ — thank you, rest well 🤍\n"
+         "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍", None),
+        ("⑫ left the zone mid-shift (location went off / wandered)",
+         "Did you leave work early? If not, please share your live location again.\n"
+         "តើអ្នកចេញពីកន្លែងធ្វើការមុនពេលឬ? បើអត់ទេ សូមចែករំលែកទីតាំងបន្តផ្ទាល់ម្តងទៀត។", None),
+        ("⑬ outside the shop too long (30-min allowance used up)",
+         "You've been outside the shop a while — what are you doing out? (30 min/shift allowance)\n"
+         "អ្នកនៅក្រៅហាងបន្តិចយូរហើយ — តើអ្នកកំពុងធ្វើអ្វីនៅក្រៅ? (អនុញ្ញាត 30 នាទី/វេន)  (KH pending review)",
+         None),
     ]
 
 
@@ -299,65 +309,249 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 
 
 def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
-    """Dry-run 3: AL APPROVAL flow — you play requester AND senior."""
+    """Dry-run 3: ANNUAL LEAVE — request → approval → notice, every variant we now support."""
     appr_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:appr")],
         [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:rej")],
     ])
     return [
-        ("① the SENIOR's approval card (each senior gets this privately)",
-         "Meng requests AL: Tue 23/06 → Thu 25/06. Reason: family trip\n"
-         "Meng ស្នើ AL: Tue 23/06 → Thu 25/06។ មូលហេតុ៖ family trip\n\n"
-         "Working her hours those days: Davy, Nak, Sey\n"
-         "អ្នកជំនួសម៉ោងការងារថ្ងៃទាំងនោះ៖ Davy, Nak, Sey", appr_kb),
-        ("② after 2 ✅ — the refreshed recap to all seniors",
+        ("① the SENIOR's approval card (every senior gets it privately — even on their day off)",
+         "Meng requests AL: Tue 23/06 → Thu 25/06 (full day). Reason: family trip\n"
+         "Meng ស្នើ AL: Tue 23/06 → Thu 25/06 (ពេញមួយថ្ងៃ)។ មូលហេតុ៖ family trip\n\n"
+         "Working those hours: Davy, Nak, Sey\nអ្នកធ្វើការម៉ោងនោះ៖ Davy, Nak, Sey", appr_kb),
+        ("② SHORT-NOTICE request (within 7 days) — costs points, computed total shown",
+         "⚠ Short notice (within 7 days) — about −54 points for a full day (−0.1/min).\n"
+         "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
+        ("③ HOURS-AL (part of a day) — fractional deduction",
+         "Hours AL: 9pm → 12am (3h of a 9h shift = 0.3 AL).\n"
+         "AL តាមម៉ោង៖ 9pm → 12am (3h ក្នុង 9h = 0.3 AL)។  (KH pending review)", None),
+        ("④ FROM-NOW (today, mid-shift) — 1 senior can let them leave, 2nd ratifies after",
+         "Asking to leave from now. One senior ✅ lets them go; a 2nd confirms after.\n"
+         "សុំចេញពីពេលនេះ។ បង 1 នាក់ ✅ អនុញ្ញាតឱ្យចេញ; បងទី 2 បញ្ជាក់តាមក្រោយ។  (KH pending review)", None),
+        ("⑤ INSUFFICIENT balance — owner flagged, seniors still decide",
+         "Note: Meng only has 1.5 AL days left but is requesting 3 — your call.\n"
+         "ចំណាំ៖ Meng នៅសល់ AL តែ 1.5 ថ្ងៃ តែស្នើ 3 ថ្ងៃ — សម្រេចតាមអ្នក។  (KH pending review)", None),
+        ("⑥ after 2 ✅ — the refreshed recap to all seniors",
          "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។", None),
-        ("③ to the requester — approved",
-         "Your AL for Tue 23/06 → Thu 25/06 is approved ✓\n"
-         "AL របស់អ្នកសម្រាប់ Tue 23/06 → Thu 25/06 ត្រូវបានអនុម័តហើយ ✓", None),
-        ("④ to the requester — not approved (seniors-only recap, nothing to the group)",
+        ("⑦ to the requester — approved + new balance",
+         "Your AL is approved ✓ Tue 23/06 → Thu 25/06. You have 4.5 AL days left. 🤍\n"
+         "AL របស់អ្នកអនុម័តហើយ ✓ Tue 23/06 → Thu 25/06។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត។ 🤍  (KH pending review)",
+         None),
+        ("⑧ to the requester — not approved (seniors-only recap, nothing to the group)",
          "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
-        ("⑤ the SUPERVISORS group notice (locked format + the reason — owner remodel)",
-         "Meng on leave Tue 23/06 → Thu 25/06 (3 days).\n"
-         "Meng ឈប់សម្រាក Tue 23/06 → Thu 25/06 (3 ថ្ងៃ)។\n"
+        ("⑨ SUPERVISORS notice — FULL-DAY (locked format: leave + day-off + back-at-work)",
+         "Meng on leave: Tue 23/06 → Thu 25/06 (3 days).\n"
+         "Meng ឈប់សម្រាក៖ Tue 23/06 → Thu 25/06 (3 ថ្ងៃ)។\n"
          "Reason: family trip\nមូលហេតុ៖ family trip\n"
          "Normal day off: Friday 26/06.\nថ្ងៃឈប់ធម្មតា៖ Friday 26/06។\n"
          "Back at work: Saturday 27/06, 9pm.\nត្រឡប់មកធ្វើការ៖ Saturday 27/06, 9pm។", None),
-        ("⑥ cancelling an AL — refund confirmation",
+        ("⑩ SUPERVISORS notice — HOURS-AL (return time that same day)",
+         "Meng on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.\n"
+         "Back at work: 12am each of those nights (rest of shift as normal).  (KH pending review)", None),
+        ("⑪ cancelling an AL — refund confirmation",
          "Your AL for Tue 23/06 is cancelled ✓ — 1 day(s) returned.\n"
          "AL របស់អ្នកសម្រាប់ Tue 23/06 ត្រូវបានលុបចោលហើយ ✓ — 1 ថ្ងៃបានត្រឡប់ចូលវិញ។", None),
     ]
 
 
 def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
-    """Dry-run 4: SPECIAL LEAVE + GIVE OT build messages."""
-    take_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:drs:take")],
-        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:drs:take")],
-        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:drs:take")],
-    ])
+    """Dry-run 4: SICK — own-sick anti-fake ladder, papers, part-duty, family-sick. Full."""
+    cant_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💪 I can come · ខ្ញុំអាចមក", callback_data="att:drs:noop")],
+        [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:drs:noop")]])
+    nudge_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Again tomorrow · ស្អែកទៀត", callback_data="att:drs:noop")],
+        [InlineKeyboardButton("👍 Better · ធូរស្បើយហើយ", callback_data="att:drs:noop")]])
     return [
-        ("① family-sick day — seniors informed (no approval gate)",
-         "FYI: Kimying takes sick leave for her child today.\n"
-         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនរបស់គាត់ថ្ងៃនេះ។", None),
-        ("② family-death leave — the group notice (reason NEVER appears)",
-         "Davy on leave Tue 09/06 → Thu 11/06 (family).\n"
-         "Davy ឈប់សម្រាក Tue 09/06 → Thu 11/06 (គ្រួសារ)។", None),
-        ("③ doctor papers arrived + you approved",
+        ("① Sick → Me: the anti-fake opener (try to come, see how you feel)",
+         "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
+         "What time can you come?\n"
+         "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល។ អ្នកអាចមកម៉ោងប៉ុន្មាន?", None),
+        ("② Sick → Me: 'I really can't come today' → rest + papers ask",
+         "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
+         "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n"
+         "(paperless = the missed time becomes pay-back, same price as informed-late)", None),
+        ("③ papers photo arrives → instant ack (goes to OWNER + Tyty ONLY)",
+         "Got your papers ✓ sending to the owner.\n"
+         "បានទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។", None),
+        ("④ [→ OWNER + Tyty card] Opus reads the paper → owner taps the decision",
+         "🩺 Davy — sick papers. Opus: Calmette Hospital · likely flu · 2 days · not contagious.\n"
+         "[✓ Accept (cover 2d)] [1d] [2d] [3d] [💺 Offer part-duty] [Skip → nightly nudges]\n"
+         "(the photo is forwarded right under this card; never shown to any group)", None),
+        ("⑤ owner accepts → real sick day, debt+points wiped, AL UNTOUCHED",
          "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
-         "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍", None),
-        ("④ the 3 days passed with no papers",
+         "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍", None),
+        ("⑥ owner offers PART-DUTY → staff invited back for light work (+15 ⭐, no pressure)",
+         "Feeling a little better? If you're up to it, there's light work today (+15 points ⭐) — "
+         "only if you truly feel able 🤍\n"
+         "ធូរស្បើយបន្តិចហើយឬនៅ? បើអ្នកមានកម្លាំង អាចមកធ្វើការងារស្រាលៗថ្ងៃនេះបាន (+15 points ⭐) — "
+         "តែបើអ្នកពិតជាអាចធ្វើបានប៉ុណ្ណោះ 🤍", cant_kb),
+        ("⑦ came on light duty → the senior memo + the staff welcome",
+         "[→ every senior on shift] Davy is coming on LIGHT DUTY today — easy/seated work only.\n"
+         "Davy នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។\n\n"
+         "[→ Davy] Thank you for coming 🤍 light duty only — a senior will point you to easy work.\n"
+         "អরគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារងាយៗឱ្យអ្នក។", None),
+        ("⑧ chose to rest instead",
+         "Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។", None),
+        ("⑨ 3 days passed, NO papers → the missed time becomes pay-back",
          "No papers came — the missed time goes to your pay-back balance.\n"
          "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។", None),
-        ("⑤ Give OT — senior submitted, waiting on you",
-         "Sent to the owner for approval ✓\nបានផ្ញើទៅម្ចាស់ហាងសម្រាប់អនុម័តហើយ ✓", None),
-        ("⑥ you approved — staff banks the hours + buyback slots",
-         "+1h OT approved — your bank: 4.5h. Choose when to take it back:\n"
-         "+1h OT ត្រូវបានអនុម័តហើយ — OT bank របស់អ្នក៖ 4.5h។ សូមជ្រើសម៉ោងដើម្បីសម្រាកសងវិញ៖",
-         take_kb),
-        ("⑦ senior hits the 14h cap",
+        ("⑩ FAMILY-sick day → seniors informed (no approval gate; burns 1 of 7 yearly days)",
+         "FYI: Kimying takes sick leave for her child today.\n"
+         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនរបស់គាត់ថ្ងៃនេះ។", None),
+        ("⑪ FAMILY-sick night nudge (12h before next shift) — one-tap re-book",
+         "Is your child better? If you need tomorrow off too, tell me now.\n"
+         "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។", nudge_kb),
+        ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
+         "Davy: 3rd paperless sick in 30 days (all Mondays). Pattern flag for your review.\n"
+         "(owner-only — English; staff never see this)", None),
+    ]
+
+
+def _buyback_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:drs:take")],
+        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:drs:take")],
+        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:drs:take")]])
+
+
+def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 5: MARRIAGE · FAMILY DEATH (2 tiers) · WIFE BIRTH. All AL-funded, never salary."""
+    upgrade_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Upgrade to 3 days · បន្ថែមដល់ 3 ថ្ងៃ", callback_data="att:drs:noop")]])
+    return [
+        ("① OWN marriage (3 days) → routes through senior approval (planned 30+ days ahead)",
+         "💍 Your marriage: 3 days, Mon 14/07 → Wed 16/07. From AL (can go below zero, never salary).\n"
+         "💍 រៀបការរបស់អ្នក៖ 3 ថ្ងៃ, Mon 14/07 → Wed 16/07។", None),
+        ("② marriage approved → warm confirmation",
+         "Your marriage leave is approved ✓ Mon 14/07 → Wed 16/07. Congratulations! 🤍\n"
+         "ច្បាប់រៀបការរបស់ប្អូនអនុម័តហើយ ✓ Mon 14/07 → Wed 16/07។ អបអរសាទរ! 🤍  (KH pending review)", None),
+        ("③ CHILD's marriage (1 day)",
+         "👰 Child's marriage: 1 day on Sat 19/07.\n👰 រៀបការកូន៖ 1 ថ្ងៃ នៅ Sat 19/07។", None),
+        ("④ FAMILY DEATH — law tier (child/parent/spouse): instant, NO approval, 3–7 days",
+         "We're very sorry for your loss 🤍 3 days of leave, Tue 09/06 → Thu 11/06. No approval needed.\n"
+         "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍 សម្រាក 3 ថ្ងៃ, Tue 09/06 → Thu 11/06។ "
+         "មិនចាំបាច់រង់ចាំការអនុម័តទេ។", None),
+        ("⑤ death SUPERVISORS notice — relation MAY be named (masking dropped, owner)",
+         "Davy on leave Tue 09/06 → Thu 11/06 (death of parent).\n"
+         "Davy ឈប់សម្រាក Tue 09/06 → Thu 11/06 (មរណភាព ឪពុក/ម្តាយ)។", None),
+        ("⑥ death COMPASSION tier (sibling/grandparent): 1 day instant, zero questions",
+         "We're very sorry for your loss 🤍 1 day of leave today. No approval needed.\n"
+         "យើងសូមចូលរួមរំលែកទុក្ខ 🤍 សម្រាក 1 ថ្ងៃថ្ងៃនេះ។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។  (KH pending review)",
+         None),
+        ("⑦ [→ OWNER] compassion case → one-tap upgrade if it warrants",
+         "Davy reported a sibling's death — gave 1 day (compassion). Upgrade?", upgrade_kb),
+        ("⑧ owner upgraded → staff told",
+         "Your leave is extended to 3 days 🤍\n"
+         "ច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ 3 ថ្ងៃហើយ 🤍", None),
+        ("⑨ a death-context PHOTO arrives → condolence only, NO AI, owner+Tyty only",
+         "You don't need to send anything — we're so sorry for your loss 🤍\n"
+         "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍", None),
+        ("⑩ WIFE giving birth (2 days) + the Supervisors notice",
+         "👶 Congratulations! 2 days of leave, Tue 09/06 → Wed 10/06.\n"
+         "អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, Tue 09/06 → Wed 10/06។\n\n"
+         "[→ SUPERVISORS] Davy on leave Tue 09/06 → Wed 10/06 (wife giving birth).\n"
+         "Davy ឈប់សម្រាក Tue 09/06 → Wed 10/06 (ប្រពន្ធសម្រាលកូន)។", None),
+    ]
+
+
+def build_catalogue6(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 6: GIVE OT (senior-granted) — Now/Later, owner approval, banking, buyback, caps."""
+    consent_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Yes · បាន", callback_data="att:drs:noop")],
+        [InlineKeyboardButton("❌ Can't · មិនបាន", callback_data="att:drs:noop")]])
+    return [
+        ("① senior taps Give OT → ⚡ Now or 📅 Later (then start → end, like AL)",
+         "Give OT — now or later?\nអនុញ្ញាត OT — ឥឡូវ ឬពេលក្រោយ?", None),
+        ("② ⚡ Now: start is fixed at the receiver's shift-END; pick the end (max 6h)",
+         "Give 2h OT to Renaud — when: now: 4pm–6pm. Then type the reason for the owners.\n"
+         "(NOW staff list = present by SCHEDULE, not location)", None),
+        ("③ 📅 Later: any staff → day → start → end (max 14h; whole day if it's their day off)",
+         "Give 4h OT to Renaud — when: Wed 10/06 5pm–9pm. (only times OUTSIDE their shift)\n"
+         "(day-off OT can run long — up to the 14h bank cap)", None),
+        ("④ [→ OWNER approval card] — who gives, who gets, when, why, current bank",
+         "Samphass gives 2h OT to Renaud — when: now 4pm–6pm, why: big rush · bank now: 0h/14h\n"
+         "[✅ Approve] [❌ No]", None),
+        ("⑤ NOW-OT consent — staff asked to accept (15 min → senior nudged to remind in person)",
+         "Senior gave you 2h OT now (4pm–6pm) — ok?\n"
+         "បងបានឱ្យអ្នកធ្វើ OT 2h ឥឡូវនេះ (4pm–6pm) — បានទេ?  (KH pending review)", consent_kb),
+        ("⑥ NOW-OT proof — share location for the window; senior confirm is the fallback",
+         "Share your live location for your OT so it counts.\n"
+         "ចែករំលែកទីតាំងបន្តផ្ទាល់សម្រាប់ OT របស់អ្នក ដើម្បីឱ្យវាត្រូវបានរាប់។  (KH pending review)\n" + _CI_HOWTO,
+         None),
+        ("⑦ FUTURE-OT — staff invited (voluntary; accepting becomes a commitment)",
+         "The shop is asking you for OT on Wed 10/06, 5pm–9pm — can you?\n"
+         "ហាងស្នើឱ្យអ្នកធ្វើ OT នៅ Wed 10/06, 5pm–9pm — អ្នកអាចធ្វើបានទេ?", consent_kb),
+        ("⑧ owner approved → hours bank + buyback slots (safest/most-surplus times, reward tone)",
+         "+2h OT approved — your bank: 2h. Choose when to take it back:\n"
+         "+2h OT ត្រូវបានអនុម័តហើយ — OT bank របស់អ្នក៖ 2h។ សូមជ្រើសម៉ោងដើម្បីសម្រាកសងវិញ៖", _buyback_kb()),
+        ("⑨ buyback booked → earned rest confirmed",
+         "Booked your rest ✓ — Tue 10/06, 2pm–3pm 🌴\n"
+         "បានកក់ម៉ោងសម្រាករបស់អ្នករួច ✓ — Tue 10/06, 2pm–3pm 🌴", None),
+        ("⑩ 12h-before reminder for the booked buyback (rest — no check-in)",
+         "Reminder — your earned rest is tomorrow: Tue 10/06, 2pm–3pm 🌴\n"
+         "រំលឹក — ម៉ោងសម្រាករបស់អ្នកគឺថ្ងៃស្អែក៖ Tue 10/06, 2pm–3pm 🌴  (KH pending review)", None),
+        ("⑪ owner REJECTS before it starts → reason → BOTH senior + staff told",
+         "[→ senior + staff] The OT was not approved this time. Reason: too quiet tonight.\n"
+         "(reject AFTER it started → too late, staff is paid/banked — they stayed in good faith)", None),
+        ("⑫ accepted OT, then NO-SHOW → penalty (points + senior & owner told; NO money/AL)",
+         "[→ OWNER + senior] Davy accepted OT for Wed 10/06 5pm–9pm but didn't show. "
+         "Points hit + dossier flag.  (owner-only)", None),
+        ("⑬ Give-OT blocked — receiver's bank is full (14h cap)",
          "Davy's OT bank is full (14h) — they need to take some back first.\n"
          "OT bank របស់ Davy ពេញហើយ (14h) — ត្រូវសម្រាកសងខ្លះសិន។", None),
+    ]
+
+
+def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 7: DAY-OFF SWAP — partner asked FIRST, then 2 seniors, same-week rule."""
+    agree_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:drs:noop")],
+        [InlineKeyboardButton("✋ No · ទេ", callback_data="att:drs:noop")]])
+    return [
+        ("① staff requests a swap → the PARTNER is asked FIRST (their veto is cheapest)",
+         "Davy wants to swap day off: Davy takes Wed off, you take Fri — same week. Reason: clinic\n"
+         "Davy ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ Davy ឈប់ថ្ងៃពុធ, អ្នកឈប់ថ្ងៃសុក្រ — ក្នុងសប្តាហ៍ដដែល។ "
+         "មូលហេតុ៖ clinic", agree_kb),
+        ("② partner agrees → goes to the seniors",
+         "You agreed — sending to seniors.\n"
+         "អ្នកបានយល់ព្រមហើយ — កំពុងផ្ញើទៅបងៗ/អ្នកគ្រប់គ្រង។", None),
+        ("③ partner declines OR stays silent → swap doesn't happen, seniors never bothered",
+         "Your day-off swap wasn't accepted by your partner.\n"
+         "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។", None),
+        ("④ seniors' approval card (same-week rule) → 2 ✅ applies the dated swap",
+         "Day-off swap: Davy ↔ Mealea. Reason: clinic\n"
+         "ប្តូរថ្ងៃឈប់៖ Davy ↔ Mealea។ មូលហេតុ៖ clinic", None),
+        ("⑤ approved → SUPERVISORS notice",
+         "Day-off swap: Davy off Fri 12/06, Mealea off Wed 10/06.\n"
+         "ប្តូរថ្ងៃឈប់៖ Davy ឈប់ Fri 12/06, Mealea ឈប់ Wed 10/06។", None),
+        ("⑥ approved → to the requester",
+         "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓", None),
+        ("⑦ seniors rejected → to the requester",
+         "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។", None),
+    ]
+
+
+def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 8: CROSS-CUTTING — acks, group redirect, autonomous call-outs, welcome."""
+    return [
+        ("① 👍 ACK — a normal (non-problem) reply gets a thumbs-up so they know they were heard",
+         "Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។\n(a reply that IS a problem gets a real answer, never a 👍)",
+         None),
+        ("② GROUP REDIRECT — someone posts leave/late in a group → GM sends them private",
+         "Please message me directly about your time off 🤍\n"
+         "សូមផ្ញើសារមកខ្ញុំផ្ទាល់អំពីការឈប់សម្រាករបស់អ្នក 🤍  (KH pending review)", None),
+        ("③ CALL-OUT — private DM when a pattern shows (warm, by name, Sonnet-written)",
+         "Hi Davy — we noticed Mondays have been hard lately (3 of your last 4 lates). "
+         "Everything okay? Let's fix Mondays together. 🤍\n(AI-written bilingual at send time; CC to owners)",
+         None),
+        ("④ CALL-OUT — the GROUP version (never names anyone, Opus-written, said once)",
+         "Friendly reminder: we track lateness patterns and reasons. Some Mondays have been "
+         "popular lately 😉\n(AI-written bilingual; the GM says it once and goes quiet)", None),
+        ("⑤ WELCOME — the one-time greeting + the always-on 📋 Menu button",
+         "👋 Hi team! I'm the GM — your new helper. Message me anytime and I'll open your menu; "
+         "the 📋 Menu button stays at the bottom for you.\n(full bilingual greeting in gm_greeting_FINAL)",
+         None),
     ]
 
 
@@ -1349,14 +1543,22 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     staff = [r for r in staff_all("active")]
     chunk = staff[page * 8:(page + 1) * 8]
-    rows = [[InlineKeyboardButton("🧪 Dry-run 1: check-in possibilities + today's schedule",
+    rows = [[InlineKeyboardButton("🧪 Dry-run 1: Check-in (full lifecycle)",
                                   callback_data="att:dr:go")],
             [InlineKeyboardButton("🧪 Dry-run 2: Late & payback lifecycle",
                                   callback_data="att:dr:go2")],
-            [InlineKeyboardButton("🧪 Dry-run 3: AL approval flow",
+            [InlineKeyboardButton("🧪 Dry-run 3: Annual Leave (all variants)",
                                   callback_data="att:dr:go3")],
-            [InlineKeyboardButton("🧪 Dry-run 4: Special Leave + Give OT",
-                                  callback_data="att:dr:go4")]] if page == 0 else []
+            [InlineKeyboardButton("🧪 Dry-run 4: Sick (papers, part-duty, family)",
+                                  callback_data="att:dr:go4")],
+            [InlineKeyboardButton("🧪 Dry-run 5: Marriage · Death · Birth",
+                                  callback_data="att:dr:go5")],
+            [InlineKeyboardButton("🧪 Dry-run 6: Give OT (Now/Later → buyback)",
+                                  callback_data="att:dr:go6")],
+            [InlineKeyboardButton("🧪 Dry-run 7: Day-off swap",
+                                  callback_data="att:dr:go7")],
+            [InlineKeyboardButton("🧪 Dry-run 8: Acks · redirect · call-outs · welcome",
+                                  callback_data="att:dr:go8")]] if page == 0 else []
     rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
@@ -1453,7 +1655,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         return
     if action == "dr":
-        if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4"):
+        if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4", "go5", "go6", "go7", "go8"):
             sample = _persona(context) or next(
                 (r for r in staff_all("active") if to_min(r.get("work_start")) is not None), None)
             if sample is None:
@@ -1462,17 +1664,28 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if data[2] == "go":
                 events = build_catalogue(sample) + [
                     ("📅 schedule summary", schedule_summary(_today()), None)]
-                intro = "🧪 Dry-run 1 — check-in messages + today's who/when summary. %d steps:"
+                intro = "🧪 Dry-run 1 — CHECK-IN, every message + today's who/when. %d steps:"
             elif data[2] == "go2":
                 events = build_catalogue2(sample)
-                intro = "🧪 Dry-run 2 — LATE + PAYBACK lifecycle, fully bilingual. %d steps:"
+                intro = "🧪 Dry-run 2 — LATE + PAYBACK lifecycle. %d steps:"
             elif data[2] == "go3":
                 events = build_catalogue3(sample)
-                intro = ("🧪 Dry-run 3 — AL APPROVAL flow (you see both sides: requester + senior), "
-                         "fully bilingual. %d steps:")
-            else:
+                intro = "🧪 Dry-run 3 — ANNUAL LEAVE, every variant. %d steps:"
+            elif data[2] == "go4":
                 events = build_catalogue4(sample)
-                intro = "🧪 Dry-run 4 — SPECIAL LEAVE + GIVE OT messages, fully bilingual. %d steps:"
+                intro = "🧪 Dry-run 4 — SICK (anti-fake ladder, papers, part-duty, family). %d steps:"
+            elif data[2] == "go5":
+                events = build_catalogue5(sample)
+                intro = "🧪 Dry-run 5 — MARRIAGE · FAMILY DEATH · WIFE BIRTH. %d steps:"
+            elif data[2] == "go6":
+                events = build_catalogue6(sample)
+                intro = "🧪 Dry-run 6 — GIVE OT (Now/Later → owner → bank → buyback). %d steps:"
+            elif data[2] == "go7":
+                events = build_catalogue7(sample)
+                intro = "🧪 Dry-run 7 — DAY-OFF SWAP (partner first, then seniors). %d steps:"
+            else:
+                events = build_catalogue8(sample)
+                intro = "🧪 Dry-run 8 — ACKS · GROUP REDIRECT · CALL-OUTS · WELCOME. %d steps:"
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
             await context.bot.send_message(update.effective_chat.id, intro % len(events))
