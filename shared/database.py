@@ -2497,8 +2497,9 @@ def attendance_test_counts() -> dict:
     with _db() as conn:
         with conn.cursor() as cur:
             for t in _TEST_TABLES:
-                cur.execute("SELECT COUNT(*) FROM %s WHERE is_test = TRUE" % t)
-                n = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) AS n FROM %s WHERE is_test = TRUE" % t)
+                row = cur.fetchone()
+                n = (row["n"] if isinstance(row, dict) else row[0]) if row else 0
                 if n:
                     out[t] = n
     return out
