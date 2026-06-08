@@ -2451,7 +2451,57 @@ def init_attendance_db() -> None:
                     ts        TIMESTAMPTZ DEFAULT NOW()
                 );
                 CREATE INDEX IF NOT EXISTS idx_location_pings_staff ON location_pings (staff_id, ts);
+                -- session 29: TEST-MODE isolation. Every row written during attendance_test_mode is
+                -- tagged is_test=TRUE. Live queries filter it out; /testreset deletes exactly these.
+                -- Real aggregate columns (staff_registry.al_left, ot_bank.balance_min) are NEVER
+                -- mutated in test — the shown balance = real value adjusted by these tagged rows.
+                ALTER TABLE al_requests        ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE al_approvals       ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE lateness_records   ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE payback_debts      ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE payback_bookings   ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE no_show_records    ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE special_leaves     ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE sick_cases         ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE ot_grants          ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE ot_buyback         ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE dayoff_overrides   ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE dayoff_swaps       ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE points_events      ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                ALTER TABLE location_pings     ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
             """)
+
+
+_TEST_TABLES = ["al_requests", "al_approvals", "lateness_records", "payback_debts",
+                "payback_bookings", "no_show_records", "special_leaves", "sick_cases",
+                "ot_grants", "ot_buyback", "dayoff_overrides", "dayoff_swaps",
+                "points_events", "attendance_sessions", "location_pings"]
+
+
+def attendance_testreset() -> dict:
+    """Delete EXACTLY the rows written during test mode (is_test=TRUE) from every attendance
+    table. Real rows can never be caught by this. Returns {table: rows_deleted}."""
+    out = {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for t in _TEST_TABLES:
+                cur.execute("DELETE FROM %s WHERE is_test = TRUE" % t)
+                out[t] = cur.rowcount
+    return out
+
+
+def attendance_test_counts() -> dict:
+    """How many test rows currently exist per table (for the owner's confidence)."""
+    out = {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for t in _TEST_TABLES:
+                cur.execute("SELECT COUNT(*) FROM %s WHERE is_test = TRUE" % t)
+                n = cur.fetchone()[0]
+                if n:
+                    out[t] = n
+    return out
 
 
 def import_staff_schedule_csv(path: str, year: int = 2026) -> dict:
