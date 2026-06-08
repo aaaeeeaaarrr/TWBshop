@@ -956,27 +956,40 @@ def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int) -> tuple[str, Inl
                 % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
 
 
-def ot_stub(p: dict, minutes: int, sid: int, when_label: str = "now") -> tuple[str, InlineKeyboardMarkup]:
+def _ot_when_label(kind: str, dayidx: int, startmin: int, minutes: int) -> str:
+    """Human window label for the owner card. Now = now→now+dur; Later = day start→end."""
+    if kind == "later" and dayidx >= 0 and startmin >= 0:
+        d = date.today() + timedelta(days=dayidx)
+        return "%s %s–%s" % (day_label(d), fmt12(startmin), fmt12(startmin + minutes))
+    return "now (next %s)" % (("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60)))
+
+
+def ot_stub(p: dict, minutes: int, sid: int, kind: str = "now",
+            dayidx: int = -1, startmin: int = -1) -> tuple[str, InlineKeyboardMarkup]:
     """Staff (+time) picked → next is WHY (typed), then the owner card."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    when = _ot_when_label(kind, dayidx, startmin, minutes)
     txt = _hdr(p, "Give %s OT to %s — when: %s.\n\nNext: type the reason for the owners.\n"
                   "បន្ទាប់៖ វាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"
-               % (label, rec["canonical_name"] if rec else "?", when_label))
+               % (label, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
         [InlineKeyboardButton("▶️ (after reason) → owner card",
-                              callback_data="att:ot:card:%d:%d" % (minutes, sid))]])
+                              callback_data="att:ot:card:%s:%d:%d:%d:%d"
+                              % (kind, minutes, sid, dayidx, startmin))]])
 
 
-def ot_owner_card(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+def ot_owner_card(p: dict, kind: str, minutes: int, sid: int,
+                  dayidx: int = -1, startmin: int = -1) -> tuple[str, InlineKeyboardMarkup]:
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    when = _ot_when_label(kind, dayidx, startmin, minutes)
     txt = _hdr(p, "[TEST PREVIEW → OWNER approval card]\n"
-                  "“%s gives %s OT to %s — when: …, why: big rush · bank now: 0h/14h”\n"
+                  "“%s gives %s OT to %s — when: %s, why: big rush · bank now: 0h/14h”\n"
                   "[✅ Approve] [❌ No]\n\n"
                   "Tap to see what happens →"
-               % (p["canonical_name"], label, rec["canonical_name"] if rec else "?"))
+               % (p["canonical_name"], label, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
         [InlineKeyboardButton("✅ As if owner approves", callback_data="att:ot:appd:%d:%d" % (minutes, sid))],
@@ -1400,11 +1413,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5])))
         if len(data) > 2 and data[2] == "wt":
             # att:ot:wt:{minutes}:{sid}:{dayidx}:{startmin}
-            d = date.today() + timedelta(days=int(data[5]))
-            wl = "%s %02d:00" % (day_label(d), int(data[6]) // 60)
-            return await show(ot_stub(p, int(data[3]), int(data[4]), wl))
+            return await show(ot_stub(p, int(data[3]), int(data[4]), "later",
+                                      int(data[5]), int(data[6])))
         if len(data) > 2 and data[2] == "card":
-            return await show(ot_owner_card(p, int(data[3]), int(data[4])))
+            # att:ot:card:{kind}:{minutes}:{sid}:{dayidx}:{startmin}
+            return await show(ot_owner_card(p, data[3], int(data[4]), int(data[5]),
+                                            int(data[6]), int(data[7])))
         if len(data) > 2 and data[2] == "appd":
             return await show(ot_approved_preview(p, int(data[3]), int(data[4])))
         return await show(ot_screen(p))
