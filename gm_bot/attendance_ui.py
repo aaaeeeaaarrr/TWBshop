@@ -1597,7 +1597,12 @@ def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
         nav.append(InlineKeyboardButton("▶", callback_data="att:pickp:%d" % (page + 1)))
     if nav:
         rows.append(nav)
-    return "🧪 TEST MODE — pick who you want to act as:", InlineKeyboardMarkup(rows)
+    head = ("🧪 TEST — pick who you want to act as.\n\n"
+            "✅ REAL TEST: run /testmode on first — then every button is LIVE (real code), and every "
+            "message (staff/senior/group) is routed to YOU. /teststatus · /testreset · /testmode off.\n"
+            "⚡ The Dry-runs below are a READ-ONLY preview (they can lag the real flow) — use them for "
+            "a quick look, but TRUST /testmode for the real test.")
+    return head, InlineKeyboardMarkup(rows)
 
 
 # ---------------------------------------------------------------- handlers (OWNER ONLY)

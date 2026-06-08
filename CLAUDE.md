@@ -294,7 +294,22 @@ plan → docs/HISTORY.md.
   after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
 - Suite green: 369.
 
-**▶ RESUME HERE (session 29):** building the attendance TEST HARNESS so the owner tests the whole system ONCE, alone, real buttons, every message routed to the owner, nothing real touched. DONE: is_test isolation on all attendance tables + /testreset + /teststatus; _att_send routing layer; /testmode on|off (restart-synced); AL flow fully wired test-aware (the template). NEXT: wire the remaining flows through _att_send + is_test + actor-override + balance-overlay — late/payback → check-in → Give OT → swap → sick → marriage/death/birth → real staff entry — then ONE owner role-play test, then go-live (greeting + 📋 Menu button + flip attendance_live). Design: docs/ATTENDANCE_TEST_MODE.md. attendance_live=OFF, attendance_test_mode=OFF.
+**▶ RESUME HERE (session 29): TEST HARNESS COMPLETE — ready for the owner's single role-play test.**
+All 8 flows are wired test-aware AND drivable from /test in test mode: AL · late/payback · check-in ·
+Give-OT · day-off swap · sick (declare + papers) · marriage · death/birth. In /testmode on, every
+flow runs the REAL submit_* code; every message (staff/senior/group) routes to the OWNER labeled
+[→ role]; the owner taps the other roles' buttons (actor-override); every write is is_test-tagged;
+real balances/data are NEVER touched. Commands: /testmode on|off · /teststatus · /testreset.
+Mechanism: shell terminals set att_test_pending {flow, persona, picks} + prompt the reason → bot
+_att_test_dispatch fires the real submit_* (no-reason flows use 'type go'). Safety: PreToolUse
+HIGH-RISK guard (.claude/hooks/highrisk_guard.py, per-action ask, fail-closed) + scripts/verify_live.py
+(ground-truth deploy check) installed; live hook-wiring needs a fresh-session check by the owner.
+Dry-runs/walkthroughs DEMOTED to read-only previews (persona picker says trust /testmode).
+NEXT: (1) owner runs the single role-play test (walk every topic, tweak wording/Khmer). (2) Then
+go-live: /testreset → /testmode off → send the greeting (Documents/gm_greeting_FINAL.txt) + attach the
+persistent 📋 Menu button → flip attendance_live='true' (live-location requirement waits until owner
+explains it + all staff pressed Start). Design: docs/ATTENDANCE_TEST_MODE.md.
+attendance_live=OFF, attendance_test_mode=OFF.
 
 **⏰ DATED CHECKPOINT (set 2026-06-08): stand up a staging/local Postgres so the prod DATABASE_URL
 is NOT present during normal development.** Today dev and prod share the managed DO Postgres — every
