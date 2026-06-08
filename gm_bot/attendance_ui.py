@@ -915,22 +915,54 @@ def ot_durations(p: dict, kind: str = "now") -> tuple[str, InlineKeyboardMarkup]
         InlineKeyboardMarkup(rows)
 
 
-def ot_staff_pick(p: dict, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
-    rows = [_back_row("att:ot:give")]
-    rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:ot:s:%d:%d" % (minutes, r["id"]))]
+def ot_staff_pick(p: dict, kind: str, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [_back_row("att:ot:%s" % kind)]
+    rows += [[InlineKeyboardButton(r["canonical_name"],
+                                   callback_data="att:ot:s:%s:%d:%d" % (kind, minutes, r["id"]))]
              for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"][:35]
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    return _hdr(p, "Give %s OT — to whom?\nអនុញ្ញាត OT %s — ឱ្យអ្នកណា?" % (label, label)), \
+    note = ("(⚡ Now: staff present right now)" if kind == "now"
+            else "(📅 Later: any staff — next you pick the day + start time)")
+    return _hdr(p, "Give %s OT — to whom? %s\nអនុញ្ញាត OT %s — ឱ្យអ្នកណា?" % (label, note, label)), \
         InlineKeyboardMarkup(rows)
 
 
-def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
-    """Staff picked → next is WHY (typed), then the owner card. Demonstrated step-by-step."""
+def ot_when_day(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Later-OT step: which DAY."""
+    rows = [_back_row("att:ot:later")]
+    btns = []
+    for i in range(7):
+        d = date.today() + timedelta(days=i)
+        btns.append(InlineKeyboardButton(day_label(d),
+                                         callback_data="att:ot:wd:%d:%d:%d" % (minutes, sid, i)))
+    rows += grid(btns, 2)
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    txt = _hdr(p, "Give %s OT to %s.\n\nNext: type the reason for the owners.\n"
+    return _hdr(p, "Give %s OT to %s — which DAY?\nអនុញ្ញាត OT %s ឱ្យ %s — ថ្ងៃណា?"
+                % (label, rec["canonical_name"] if rec else "?", label,
+                   rec["canonical_name"] if rec else "?")), InlineKeyboardMarkup(rows)
+
+
+def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Later-OT step: which START TIME on the chosen day."""
+    rows = [_back_row("att:ot:s:later:%d:%d" % (minutes, sid))]
+    btns = []
+    for h in range(6, 24):  # 06:00 → 23:00 in 1h slots
+        btns.append(InlineKeyboardButton("%02d:00" % h,
+                    callback_data="att:ot:wt:%d:%d:%d:%d" % (minutes, sid, dayidx, h * 60)))
+    rows += grid(btns, 4)
+    d = date.today() + timedelta(days=dayidx)
+    return _hdr(p, "%s — what START TIME?\n%s — ម៉ោងចាប់ផ្តើមណា?"
+                % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
+
+
+def ot_stub(p: dict, minutes: int, sid: int, when_label: str = "now") -> tuple[str, InlineKeyboardMarkup]:
+    """Staff (+time) picked → next is WHY (typed), then the owner card."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    txt = _hdr(p, "Give %s OT to %s — when: %s.\n\nNext: type the reason for the owners.\n"
                   "បន្ទាប់៖ វាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"
-               % (label, rec["canonical_name"] if rec else "?"))
+               % (label, rec["canonical_name"] if rec else "?", when_label))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
         [InlineKeyboardButton("▶️ (after reason) → owner card",
@@ -1356,9 +1388,21 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(ot_durations(p, data[2]))
         if len(data) > 2 and data[2] == "d":
             # att:ot:d:{kind}:{minutes}
-            return await show(ot_staff_pick(p, int(data[4])))
+            return await show(ot_staff_pick(p, data[3], int(data[4])))
         if len(data) > 2 and data[2] == "s":
-            return await show(ot_stub(p, int(data[3]), int(data[4])))
+            # att:ot:s:{kind}:{minutes}:{sid}
+            kind = data[3]
+            if kind == "later":
+                return await show(ot_when_day(p, int(data[4]), int(data[5])))
+            return await show(ot_stub(p, int(data[4]), int(data[5]), "now"))
+        if len(data) > 2 and data[2] == "wd":
+            # att:ot:wd:{minutes}:{sid}:{dayidx}
+            return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5])))
+        if len(data) > 2 and data[2] == "wt":
+            # att:ot:wt:{minutes}:{sid}:{dayidx}:{startmin}
+            d = date.today() + timedelta(days=int(data[5]))
+            wl = "%s %02d:00" % (day_label(d), int(data[6]) // 60)
+            return await show(ot_stub(p, int(data[3]), int(data[4]), wl))
         if len(data) > 2 and data[2] == "card":
             return await show(ot_owner_card(p, int(data[3]), int(data[4])))
         if len(data) > 2 and data[2] == "appd":
