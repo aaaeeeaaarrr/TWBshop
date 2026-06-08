@@ -64,6 +64,12 @@ def fmt12(minutes: int) -> str:
     return ("%d:%02d%s" % (h12, mm, suffix)) if mm else ("%d%s" % (h12, suffix))
 
 
+def fmt12s(hhmm) -> str:
+    """'21:00' -> '9pm' (am/pm everywhere — owner: never show 24h to staff)."""
+    m = to_min(hhmm)
+    return fmt12(m) if m is not None else "?"
+
+
 def day_label(d: date) -> str:
     """'Mo 29/06' — date-grid button label."""
     return "%s %02d/%02d" % (_DOW[d.weekday()], d.day, d.month)
@@ -1083,39 +1089,56 @@ def ot_when_day(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMar
                    rec["canonical_name"] if rec else "?")), InlineKeyboardMarkup(rows)
 
 
-def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int) -> tuple[str, InlineKeyboardMarkup]:
+_OT_TIMES_PER_PAGE = 12
+
+
+def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int, page: int = 0) \
+        -> tuple[str, InlineKeyboardMarkup]:
     """Later-OT step: which START TIME on the chosen day.
     SPEC (owner §2.5): never offer times INSIDE the receiver's scheduled shift — OT is
     extra hours, not their roster. Only start-times whose [start, start+duration] window
-    falls in a GAP outside their shift (whole day if it's their day off)."""
+    falls in a GAP outside their shift (whole day if it's their day off).
+    Full 24h in 30-min steps, am/pm labels, paged."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     d = date.today() + timedelta(days=dayidx)
     ws = to_min((rec or {}).get("work_start"))
     we = to_min((rec or {}).get("work_end"))
     off = _DOW_NAME.get(((rec or {}).get("day_off") or "")[:3].title())
     is_off = off is not None and d.weekday() == off
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
     rows = [_back_row("att:ot:s:later:%d:%d" % (minutes, sid))]
-    btns = []
-    for h in range(6, 24):  # 06:00 → 23:00 in 1h starts
-        start = h * 60
+    # every 30 min across the WHOLE day, drop windows that touch the receiver's shift
+    valids = []
+    for start in range(0, 1440, 30):
         end = start + minutes
         end_norm = end - 1440 if end > 1440 else end  # wrap past midnight
-        # hide windows that touch the receiver's shift (unless it's their day off)
         if not is_off and ws is not None and we is not None and overlaps(start, end_norm, ws, we):
             continue
-        btns.append(InlineKeyboardButton("%s" % fmt12(start),
-                    callback_data="att:ot:wt:%d:%d:%d:%d" % (minutes, sid, dayidx, start)))
-    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
-    if not btns:
+        valids.append(start)
+    if not valids:
         return _hdr(p, "%s — no free window outside %s's shift that day for this length.\n"
                        "%s — គ្មានពេលទំនេរក្រៅម៉ោងវេនរបស់ %s សម្រាប់រយៈពេលនេះទេ។\n\nPick another day."
                     % (day_label(d), nm, day_label(d), nm)), InlineKeyboardMarkup(rows)
-    rows += grid(btns, 4)
+    pages = (len(valids) + _OT_TIMES_PER_PAGE - 1) // _OT_TIMES_PER_PAGE
+    page = max(0, min(page, pages - 1))
+    chunk = valids[page * _OT_TIMES_PER_PAGE:(page + 1) * _OT_TIMES_PER_PAGE]
+    rows += grid([InlineKeyboardButton(fmt12(s),
+                  callback_data="att:ot:wt:%d:%d:%d:%d" % (minutes, sid, dayidx, s)) for s in chunk], 3)
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀ Earlier · មុន",
+                   callback_data="att:ot:wtp:%d:%d:%d:%d" % (minutes, sid, dayidx, page - 1)))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton("Later · បន្ទាប់ ▶",
+                   callback_data="att:ot:wtp:%d:%d:%d:%d" % (minutes, sid, dayidx, page + 1)))
+    if nav:
+        rows.append(nav)
     shift_note = ("(it's %s's day off — whole day open)" % nm if is_off
                   else "(only gaps outside %s's %s–%s shift)"
                   % (nm, fmt12(ws) if ws is not None else "?", fmt12(we) if we is not None else "?"))
-    return _hdr(p, "%s — what START TIME? %s\n%s — ម៉ោងចាប់ផ្តើមណា? (តែពេលក្រៅម៉ោងវេន)"
-                % (day_label(d), shift_note, day_label(d))), InlineKeyboardMarkup(rows)
+    pg = (" · page %d/%d" % (page + 1, pages)) if pages > 1 else ""
+    return _hdr(p, "%s — what START TIME?%s %s\n%s — ម៉ោងចាប់ផ្តើមណា? (តែពេលក្រៅម៉ោងវេន)"
+                % (day_label(d), pg, shift_note, day_label(d))), InlineKeyboardMarkup(rows)
 
 
 def _ot_when_label(kind: str, dayidx: int, startmin: int, minutes: int) -> str:
@@ -1178,7 +1201,7 @@ def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / "
                    "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
                    "Shift: %s–%s"
-                % (p.get("work_start") or "?", p.get("work_end") or "?")), \
+                % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")))), \
         InlineKeyboardMarkup([_back_row(),
                               [InlineKeyboardButton("▶️ Simulate the check-in messages",
                                                     callback_data="att:cis")]])
@@ -1197,7 +1220,7 @@ def ci_sim_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "▶️ Check-in simulator — each button sends the REAL message exactly as %s would "
                    "receive it (to you only). ④ makes your next shared live location be judged as "
                    "their check-in (geofence + early/late vs their %s start)."
-                % (p.get("call_name") or p["canonical_name"], p.get("work_start") or "?")), \
+                % (p.get("call_name") or p["canonical_name"], fmt12s(p.get("work_start")))), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1291,7 +1314,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "Payback debt · ជំពាក់ម៉ោងសងវិញ: %d min\n"
                    "OT bank · OT សន្សំ: %gh\n"
                    "Upcoming AL · AL ខាងមុខ: %s"
-                % (p.get("work_start") or "?", p.get("work_end") or "?",
+                % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")),
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
                    debt_min, bank_min / 60, up_txt)), \
         InlineKeyboardMarkup(rows)
@@ -1588,6 +1611,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if len(data) > 2 and data[2] == "wd":
             # att:ot:wd:{minutes}:{sid}:{dayidx}
             return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5])))
+        if len(data) > 2 and data[2] == "wtp":
+            # att:ot:wtp:{minutes}:{sid}:{dayidx}:{page}
+            return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5]), int(data[6])))
         if len(data) > 2 and data[2] == "wt":
             # att:ot:wt:{minutes}:{sid}:{dayidx}:{startmin}
             return await show(ot_stub(p, int(data[3]), int(data[4]), "later",
