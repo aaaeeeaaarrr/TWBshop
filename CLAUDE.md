@@ -533,8 +533,29 @@ AL accrual +1.5/mo arrears starts from the seeded al_left. Negative points later
 ## Current Status
 > Update this section at the end of every Claude Code session.
 
-**Last updated:** 2026-06-07 (session 28 cont. — shell fully bilingual, dry-run v2 catalogue, GM clarification
-fixes live, data-reliability package live, Level-1 reconciliation live, lateness=time-only model locked)
+**Last updated:** 2026-06-08 (session 29 — /test shell hardening: deployment-drift audit, OT WHEN-step
++ card window, every ladder walks to the END, full Khmer review export)
+
+**Session 29 (Jun 8):**
+- **DEPLOYMENT-DRIFT AUDIT (owner feared lost work):** verified ALL last-night work safe — 20 commits
+  pushed, server HEAD==origin, 19 attendance tables live in prod, attendance_live=OFF, all 5 services
+  running current code. Root cause of "Give OT shows no time": fixes were pushed to GitHub but the
+  twbshop-gm service was never restarted. LESSON: after any gm_bot/ push, `ssh twbshop pull + systemctl
+  restart twbshop-gm` — code on GitHub ≠ code running. coverage_requirements is NOT a table (hardcoded
+  in coverage.window_target).
+- **OT /test flow fixed:** added the missing WHEN step — 📅 Later now picks day + start-time before the
+  owner card; ⚡ Now skips it (it's now). Owner card + stub show the real chosen window.
+- **EVERY LADDER WALKS TO THE END (no more "Next build" dead-ends):** new generic walkthrough engine in
+  attendance_ui (att:walk:{name}:{idx}) + step sequences for late→payback, AL, day-off swap, sick(me/
+  family), marriage, family-death, wife-birth. Each stub has "▶️ See the rest of this flow" stepping
+  through every following message (senior cards, group notices, final staff confirm) — preview only,
+  gated. Personal OT view points to My schedule; dead Emergency "Later" stub removed.
+- **FULL KHMER REVIEW EXPORT for ChatGPT:** C:\Users\Papa\Documents\khmer_full_review.txt — Section A =
+  195 EXISTING bilingual messages (the "21" was only last-night's new strings; ~174 were already done in
+  prior sessions), Section B = 61 genuine staff-facing English-only gaps (mostly the just-extended
+  walkthrough lines, marked "(KH pending)"). Owner translating via ChatGPT. NEXT: regenerate the export
+  after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
+- Suite green: 369.
 
 **Session 28 (Jun 7) additions on top of the block below:**
 - **GM clarification fixes LIVE (the deaf-GM bugs from REPORT):** replies to nudges resolve (nudge_msg_ids);
