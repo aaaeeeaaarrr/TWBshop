@@ -3266,7 +3266,7 @@ async def _check_report_receipt(msg, context) -> None:
 
         if result.get("is_handwritten") and partial:
             question = (f"Can you tell me what this says? I can see \"{partial}\" but hard to read.\n"
-                        f"អាចប្រាប់ខ្ញុំបានទេថារូបនេះសរសេរអ្វី? ខ្ញុំអាចមើលឃើញ \"{partial}\" ប៉ុន្តែពិបាកអាន។")
+                        f"អាចប្រាប់ខ្ញុំបានទេថានេះសរសេរថាម៉េច? ខ្ញុំមើលឃើញ \"{partial}\" តែអក្សរផ្សេងៗពិបាកអាន។")
             sent = await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=question,
