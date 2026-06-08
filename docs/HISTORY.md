@@ -1,7 +1,9 @@
 # TWBshop — Historical Archive
 
-> ⚠ Historical reference ONLY. NOT current truth unless reopened and verified.
-> Contains internal IDs / staff names / server facts — do NOT paste externally.
+> **PRIVATE OPERATIONAL HISTORY — DO NOT SHARE, PASTE, EXPORT, OR UPLOAD OUTSIDE OWNER-CONTROLLED
+> PRIVATE REPOS.** Contains historical chat IDs, staff references, server/deploy context, and
+> operational notes.
+> **Historical reference only. Not current truth unless reopened and verified.**
 > Moved out of the auto-loaded CLAUDE.md on 2026-06-08 to keep context lean.
 
 ---
