@@ -3105,9 +3105,9 @@ def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) 
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO lateness_records
-                (staff_id, for_shift, expected_min, reason, informed_before, reported_at)
-                VALUES (%s,%s,%s,%s,TRUE,NOW()) RETURNING id""",
-                (staff_id, for_shift, expected_min, reason))
+                (staff_id, for_shift, expected_min, reason, informed_before, reported_at, is_test)
+                VALUES (%s,%s,%s,%s,TRUE,NOW(),%s) RETURNING id""",
+                (staff_id, for_shift, expected_min, reason, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3131,9 +3131,9 @@ def payback_add_debt(staff_id: int, minutes: int, reason: str, created_date: str
                 cur.execute("UPDATE payback_debts SET minutes_owed=minutes_owed+%s WHERE id=%s",
                             (minutes, existing["id"]))
                 return existing["id"]
-            cur.execute("""INSERT INTO payback_debts (staff_id, minutes_owed, reason, created_date)
-                           VALUES (%s,%s,%s,%s) RETURNING id""",
-                        (staff_id, minutes, reason, created_date))
+            cur.execute("""INSERT INTO payback_debts (staff_id, minutes_owed, reason, created_date, is_test)
+                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, minutes, reason, created_date, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3156,9 +3156,9 @@ def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, en
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO payback_bookings
-                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked)
-                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked))
+                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3184,7 +3184,8 @@ def payback_bookings_due_reminder(within_hours: int = 12) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute("""SELECT b.*, s.telegram_ids, s.call_name, s.canonical_name
                            FROM payback_bookings b JOIN staff_registry s ON s.id=b.staff_id
-                           WHERE b.status='booked' AND b.reminded_12h=FALSE""")
+                           WHERE b.status='booked' AND b.reminded_12h=FALSE AND b.is_test=%s""",
+                        (_ATT_TEST,))
             return [dict(r) for r in cur.fetchall()]
 
 
@@ -3199,7 +3200,8 @@ def payback_all_open() -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""SELECT *, (minutes_owed - minutes_paid) AS balance
-                           FROM payback_debts WHERE status='open' ORDER BY staff_id""")
+                           FROM payback_debts WHERE status='open' AND is_test=%s ORDER BY staff_id""",
+                        (_ATT_TEST,))
             return [dict(r) for r in cur.fetchall()]
 
 

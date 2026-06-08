@@ -1262,10 +1262,8 @@ async def _offer_payback(context, staff: dict, balance: int, uid: int) -> None:
     text = ("You owe %d min. Pick when to work it off — these are the times we need you most:\n"
             "អ្នកនៅត្រូវសង %d min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
             % (balance, balance))
-    try:
-        await context.bot.send_message(uid, text, reply_markup=kb)
-    except Exception as e:
-        logger.error("offer payback failed: %s", e)
+    await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
+                    text, kb=kb)
 
 
 async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -1841,19 +1839,18 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
                d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         # plain Supervisors notice
-        try:
-            await context.bot.send_message(
-                config.SUPERVISORS_CHAT_ID,
-                "%s pays back %s %s-%s." % (staff.get("call_name") or staff["canonical_name"],
-                                           d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
-        except Exception:
-            pass
+        await _att_send(context, None, "Supervisors group", "",
+            "%s pays back %s %s-%s." % (staff.get("call_name") or staff["canonical_name"],
+                                       d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)),
+            group=True)
 
 
 async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily (gated): advance the ignore-ladder for unbooked debts — day-3 warn, day-4 auto-book.
-    (The calm daily check-in line is delivered by the check-in flow; this job handles warn/autobook.)"""
-    if not _attendance_live():
+    (The calm daily check-in line is delivered by the check-in flow; this job handles warn/autobook.)
+    Runs in live OR test mode; payback_all_open() returns the matching dataset (real vs is_test),
+    and _att_send routes to the owner in test."""
+    if not _att_active():
         return
     from gm_bot import payback as pb
     today = datetime.now(finance.PP_TZ).date()
@@ -1876,12 +1873,13 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 if d.isoformat() not in leave and d.weekday() != off:
                     days += 1
         stage = pb.ignore_stage(days)
+        nm = staff.get("call_name") or staff["canonical_name"]
         try:
             if stage == "warn":
-                await context.bot.send_message(
-                    uid, "Pick before tomorrow, or I'll pick for you.\n"
-                         "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។",
-                    reply_markup=_payback_slot_keyboard(staff, debt["balance"]))
+                await _att_send(context, uid, "Staff", nm,
+                    "Pick before tomorrow, or I'll pick for you.\n"
+                    "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។",
+                    kb=_payback_slot_keyboard(staff, debt["balance"]))
             elif stage == "autobook":
                 from gm_bot import payback as _pb
                 from gm_bot.attendance import to_min
@@ -1892,9 +1890,9 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     _lbl, s_min, e_min = _pb.slot_windows(ws, we, debt["balance"])[0]
                     payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
                                  debt["balance"], auto_booked=True)
-                    await context.bot.send_message(
-                        uid, "I booked you %s %s-%s (you didn't choose).\n"
-                             "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"
+                    await _att_send(context, uid, "Staff", nm,
+                        "I booked you %s %s-%s (you didn't choose).\n"
+                        "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"
                         % (d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
                            d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         except Exception as e:
@@ -2137,7 +2135,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Gated, hourly: 12h-before reminder for booked payback slots (reward-neutral, encouraging)."""
-    if not _attendance_live():
+    if not _att_active():
         return
     from datetime import datetime as _dt
     now = datetime.now(finance.PP_TZ)
@@ -2155,18 +2153,14 @@ async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         hrs = (slot_dt - now).total_seconds() / 3600
         if not (0 < hrs <= 12):
             continue
-        try:
-            await context.bot.send_message(
-                ids[0],
-                "Reminder — your payback time is %s %s.\n"
-                "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺ %s %s។\n"
-                "Come 5 minutes early and you earn +10 points ⭐\n"
-                "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
-                % (b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"]),
-                   b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"])))
-            payback_mark_reminded(b["id"])
-        except Exception as e:
-            logger.error("12h reminder failed: %s", e)
+        await _att_send(context, ids[0], "Staff", b.get("call_name") or b.get("canonical_name") or "",
+            "Reminder — your payback time is %s %s.\n"
+            "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺ %s %s។\n"
+            "Come 5 minutes early and you earn +10 points ⭐\n"
+            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
+            % (b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"]),
+               b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"])))
+        payback_mark_reminded(b["id"])
 
 
 async def _al_accrual_job(context: ContextTypes.DEFAULT_TYPE) -> None:
