@@ -238,19 +238,17 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     """Dry-run 2: the LATE + PAYBACK lifecycle — every distinct message, once.
     Bilingual finals (batch-33, session 28)."""
     return [
-        ("① late declared (they picked 9:30pm) — confirmation + group heads-up",
+        ("① late declared — pick time → REASON typed at declare-time → confirm + group heads-up WITH reason",
          "Noted — see you ~9:30pm 🤍\nកត់ចំណាំហើយ — ជួបគ្នា ~9:30pm 🤍\n\n"
-         "[TEST PREVIEW → SUPERVISORS group]\n"
-         "“Davy will be ~30 min late for the 9pm shift today.\n"
-         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។”\n"
-         "← the reason follows as a REPLY to this once given on arrival (see step ③)",
+         "[TEST PREVIEW → SUPERVISORS group, reason INCLUDED at declare-time]\n"
+         "“Davy will be ~30 min late for the 9pm shift today. Reason: moto broke.\n"
+         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។ មូលហេតុ៖ moto broke”",
          None),
         ("② arrival watch — declared time passed, no location yet (repeats 4× every 15 min)",
          "Are you there yet?\nមកដល់ហើយឬនៅ?\n" + _CI_HOWTO, None),
-        ("③ they arrive — verdict + reason ask, then the reason goes to Supervisors",
-         "(verdict + 'Why were you late?' = Dry-run 1 steps ④–⑥, already approved)\n\n"
-         "[TEST PREVIEW → SUPERVISORS group, as a REPLY to the heads-up]\n"
-         "“Davy arrived 9:32pm — reason: moto broke” (KH — next batch)", None),
+        ("③ they arrive (location) — verdict only; reason already given at declare (silent arrivers asked now)",
+         "(check-in verdict = Dry-run 1 steps ④–⑥, already approved. A SILENT arriver who never declared "
+         "is asked 'Why were you late?' here instead.)", None),
         ("④ payback slot picker (right after the reason; no AL option — late = time)",
          "You owe 90 min. Pick when to work it off — these are the times we need you most:\n"
          "អ្នកនៅត្រូវសង 90 min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖",
@@ -617,6 +615,8 @@ def death_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("My child · កូនខ្ញុំ", callback_data="att:sp:deathw:child")],
         [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ", callback_data="att:sp:deathw:parent")],
         [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ", callback_data="att:sp:deathw:spouse")],
+        [InlineKeyboardButton("My sibling · បងប្អូនខ្ញុំ", callback_data="att:sp:deathw:sibling")],
+        [InlineKeyboardButton("My grandparent · ជីដូនជីតាខ្ញុំ", callback_data="att:sp:deathw:grandparent")],
     ]
     return _hdr(p, "🕊 We're very sorry. Who passed away?\n"
                    "🕊 យើងសូមចូលរួមរំលែកទុក្ខ។ តើអ្នកណាទទួលមរណភាព?"), InlineKeyboardMarkup(rows)
@@ -628,7 +628,8 @@ def death_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def death_days(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboardMarkup]:
-    # owner, session 28: choose 3–7 once at booking (no re-applying mid-funeral); more later = re-enter
+    # law tier (child/parent/spouse): choose 3–7 once. compassion tier (sibling/grandparent):
+    # 1 day granted instantly, owner may upgrade — no picker (handled in callback → death_stub 1).
     btns = [InlineKeyboardButton("%d ថ្ងៃ / days" % n, callback_data="att:sp:deathn:%s:%s:%d" % (who, iso, n))
             for n in range(3, 8)]
     rows = [_back_row("att:sp:death")] + grid(btns, 3)
@@ -643,11 +644,13 @@ def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeybo
                    "%d days of leave, %s → %s. No approval needed.\n"
                    "សម្រាក %d ថ្ងៃ, %s → %s។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។\n\n"
                    "[TEST PREVIEW → SUPERVISORS group]\n"
-                   "“%s on leave %s → %s (family).”  ← reason NEVER in groups\n\n"
+                   "“%s on leave %s → %s (death of %s).”\n%s\n"
                    "(From AL — balance can go below zero, never from salary. Need more later? Just open "
-                   "Special Leave again.)\n🚧 Next build: instant booking + notices + negative-AL ledger."
+                   "Special Leave again.)"
                 % (days, day_label(d), dn, days, day_label(d), dn,
-                   p.get("call_name") or p["canonical_name"], day_label(d), dn)), \
+                   p.get("call_name") or p["canonical_name"], day_label(d), dn, who,
+                   ("🩺 Compassion tier — 1 day given; owner can upgrade to 3."
+                    if days == 1 else "✓ booked."))), \
         InlineKeyboardMarkup([_back_row("att:sp:death"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -723,14 +726,15 @@ def late_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
     ws = to_min(p.get("work_start"))
     txt = _hdr(p,
-               "Noted — arriving ~%s (%d min late).\n\n"
-               "[TEST PREVIEW → SUPERVISORS group]\n"
-               "“%s will be ~%d min late for the %s shift today.”\n\n"
-               "🚧 Next build: arrival watch (4×15min nudges), reason quick-buttons ON ARRIVAL, "
-               "settle debt (payback slots / take from AL)."
+               "Noted — arriving ~%s (%d min late).\n"
+               "Why? (you type the reason)\nហេតុអ្វី? (សូមវាយប្រាប់ហេតុផល)\n\n"
+               "[TEST PREVIEW → SUPERVISORS group, with the reason]\n"
+               "“%s will be ~%d min late for the %s shift today. Reason: …”\n\n"
+               "Then on arrival (location): if >5 min late → PAYBACK slots (time only — never AL).\n"
+               "🚧 Next build: arrival watch (4×15min), real reason capture, payback offer."
                % (fmt12(ws + offset), offset, p.get("call_name") or p["canonical_name"],
                   offset, fmt12(ws)))
-    return txt, InlineKeyboardMarkup([_back_row("att:late"), _back_row()[0:0] or
+    return txt, InlineKeyboardMarkup([_back_row("att:late"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -888,15 +892,27 @@ def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         InlineKeyboardMarkup([_back_row("att:am")])
 
 
-def ot_durations(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+def ot_nowlater(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Give OT step 1: Now (present staff) or Later (scheduled)."""
+    rows = [
+        _back_row("att:aw"),
+        [InlineKeyboardButton("⚡ Now · ឥឡូវនេះ", callback_data="att:ot:now")],
+        [InlineKeyboardButton("📅 Later · ពេលក្រោយ", callback_data="att:ot:later")],
+    ]
+    return _hdr(p, "Give OT — now or later?\nអនុញ្ញាត OT — ឥឡូវ ឬពេលក្រោយ?"), InlineKeyboardMarkup(rows)
+
+
+def ot_durations(p: dict, kind: str = "now") -> tuple[str, InlineKeyboardMarkup]:
     btns = []
     m = 30
     while m <= 360:
         label = ("%dmin" % m) if m < 60 else ("%gh" % (m / 60))
-        btns.append(InlineKeyboardButton(label, callback_data="att:ot:d:%d" % m))
+        btns.append(InlineKeyboardButton(label, callback_data="att:ot:d:%s:%d" % (kind, m)))
         m += 30
-    rows = [_back_row("att:aw")] + grid(btns, 4)
-    return _hdr(p, "Give OT — how much?\nអនុញ្ញាត OT — ប៉ុន្មានម៉ោង?"), InlineKeyboardMarkup(rows)
+    rows = [_back_row("att:ot:give")] + grid(btns, 4)
+    head = ("⚡ Now — staff present now." if kind == "now" else "📅 Later — scheduled.")
+    return _hdr(p, "%s\nGive OT — how much?\nអនុញ្ញាត OT — ប៉ុន្មានម៉ោង?" % head), \
+        InlineKeyboardMarkup(rows)
 
 
 def ot_staff_pick(p: dict, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -1233,6 +1249,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "deathw":
             return await show(death_dates(p, data[3]))
         if sub == "deathd":
+            # compassion tier (sibling/grandparent) = 1 day instant + owner-upgrade; law tier picks 3–7
+            from gm_bot.special import death_tier
+            if death_tier(data[3]) == "compassion":
+                return await show(death_stub(p, data[3], data[4], 1))
             return await show(death_days(p, data[3], data[4]))
         if sub == "deathn":
             return await show(death_stub(p, data[3], data[4], int(data[5])))
@@ -1302,9 +1322,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(dayoff_screen(p))
     if action == "ot":
         if len(data) > 2 and data[2] == "give":
-            return await show(ot_durations(p))
+            return await show(ot_nowlater(p))
+        if len(data) > 2 and data[2] in ("now", "later"):
+            return await show(ot_durations(p, data[2]))
         if len(data) > 2 and data[2] == "d":
-            return await show(ot_staff_pick(p, int(data[3])))
+            # att:ot:d:{kind}:{minutes}
+            return await show(ot_staff_pick(p, int(data[4])))
         if len(data) > 2 and data[2] == "s":
             return await show(ot_stub(p, int(data[3]), int(data[4])))
         return await show(ot_screen(p))
