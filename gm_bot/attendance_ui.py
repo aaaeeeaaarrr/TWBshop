@@ -1923,6 +1923,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(ot_end(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
         if sub == "en":
             # att:ot:en:{kind}:{sid}:{dayidx}:{start}:{end}  → reason stub
+            if att_test_on():
+                kind, sid, dayidx, start, end = (data[3], int(data[4]), int(data[5]),
+                                                 int(data[6]), int(data[7]))
+                wd = (date.today() + timedelta(days=dayidx)).isoformat() if kind == "later" else None
+                context.user_data["att_test_pending"] = {
+                    "flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
+                    "minutes": end - start, "when_date": wd, "start_min": start}
+                return await show((_hdr(p, "Give OT — %d min.\n\n📝 Type the reason for the owners — "
+                    "your NEXT message is the reason, and the REAL grant fires: the owner approval "
+                    "card comes to you; approve it to bank + see the buyback picker." % (end - start)),
+                    InlineKeyboardMarkup([_back_row("att:ot:give")])))
             return await show(ot_stub(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
         if sub == "card":
             # att:ot:card:{kind}:{sid}:{dayidx}:{start}:{end}

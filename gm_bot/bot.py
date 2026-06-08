@@ -3135,6 +3135,17 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "🧪 Late declared (test) — Supervisors heads-up + the payback slot picker were routed to "
             "you. Tap a slot to book it (you'll get the booked-confirm + Supervisors notice). "
             "/testreset to wipe.")
+    elif flow == "ot":
+        receiver = next((s for s in staff_all("active") if s["id"] == pend.get("staff_id")), None)
+        if not receiver:
+            await update.message.reply_text("🧪 OT receiver not found.")
+            return
+        await submit_ot_grant(context, persona, receiver, pend["kind"], pend["minutes"],
+                              pend.get("when_date"), pend.get("start_min"), reason)
+        await update.message.reply_text(
+            "🧪 OT grant submitted (test) — the owner approval card was routed to you. Approve it; "
+            "for NOW-OT you'll then get the buyback picker, for LATER you'll get the staff consent "
+            "ask. /testreset to wipe.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
