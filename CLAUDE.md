@@ -296,6 +296,12 @@ plan → docs/HISTORY.md.
 
 **▶ RESUME HERE (session 29):** building the attendance TEST HARNESS so the owner tests the whole system ONCE, alone, real buttons, every message routed to the owner, nothing real touched. DONE: is_test isolation on all attendance tables + /testreset + /teststatus; _att_send routing layer; /testmode on|off (restart-synced); AL flow fully wired test-aware (the template). NEXT: wire the remaining flows through _att_send + is_test + actor-override + balance-overlay — late/payback → check-in → Give OT → swap → sick → marriage/death/birth → real staff entry — then ONE owner role-play test, then go-live (greeting + 📋 Menu button + flip attendance_live). Design: docs/ATTENDANCE_TEST_MODE.md. attendance_live=OFF, attendance_test_mode=OFF.
 
+**⏰ DATED CHECKPOINT (set 2026-06-08): stand up a staging/local Postgres so the prod DATABASE_URL
+is NOT present during normal development.** Today dev and prod share the managed DO Postgres — every
+migration/query in dev hits live payroll/staff data. The HIGH-RISK hook (.claude/hooks/highrisk_guard.py)
+is a BACKSTOP, not the fix; the real lock is a missing prod credential in dev. Target: before the next
+migration/payroll/payment task, and no later than **2026-06-30**. Don't let it become "never."
+
 **Phase:** Retail complete · B2B Phases 1+2 · GM Manager live · Ops listener live · Hiring intake+quiz+assessment built. Attendance system in build (gated OFF).
 
 **Known issues:** None

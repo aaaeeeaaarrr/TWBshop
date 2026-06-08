@@ -33,5 +33,18 @@
       "PowerShell(New-Item *)",
       "PowerShell(Remove-Item *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/highrisk_guard.py\""
+          }
+        ]
+      }
+    ]
   }
 }
