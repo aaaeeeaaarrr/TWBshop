@@ -1048,57 +1048,11 @@ def ot_nowlater(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "Give OT — now or later?\nអនុញ្ញាត OT — ឥឡូវ ឬពេលក្រោយ?"), InlineKeyboardMarkup(rows)
 
 
-def ot_durations(p: dict, kind: str = "now") -> tuple[str, InlineKeyboardMarkup]:
-    btns = []
-    m = 30
-    while m <= 360:
-        label = ("%dmin" % m) if m < 60 else ("%gh" % (m / 60))
-        btns.append(InlineKeyboardButton(label, callback_data="att:ot:d:%s:%d" % (kind, m)))
-        m += 30
-    rows = [_back_row("att:ot:give")] + grid(btns, 4)
-    head = ("⚡ Now — staff present now." if kind == "now" else "📅 Later — scheduled.")
-    return _hdr(p, "%s\nGive OT — how much?\nអនុញ្ញាត OT — ប៉ុន្មានម៉ោង?" % head), \
-        InlineKeyboardMarkup(rows)
-
-
-def ot_staff_pick(p: dict, kind: str, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
-    rows = [_back_row("att:ot:%s" % kind)]
-    rows += [[InlineKeyboardButton(r["canonical_name"],
-                                   callback_data="att:ot:s:%s:%d:%d" % (kind, minutes, r["id"]))]
-             for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"][:35]
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    note = ("(⚡ Now: staff present right now)" if kind == "now"
-            else "(📅 Later: any staff — next you pick the day + start time)")
-    return _hdr(p, "Give %s OT — to whom? %s\nអនុញ្ញាត OT %s — ឱ្យអ្នកណា?" % (label, note, label)), \
-        InlineKeyboardMarkup(rows)
-
-
-def ot_when_day(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
-    """Later-OT step: which DAY."""
-    rows = [_back_row("att:ot:later")]
-    btns = []
-    for i in range(7):
-        d = date.today() + timedelta(days=i)
-        btns.append(InlineKeyboardButton(day_label(d),
-                                         callback_data="att:ot:wd:%d:%d:%d" % (minutes, sid, i)))
-    rows += grid(btns, 2)
-    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    return _hdr(p, "Give %s OT to %s — which DAY?\nអនុញ្ញាត OT %s ឱ្យ %s — ថ្ងៃណា?"
-                % (label, rec["canonical_name"] if rec else "?", label,
-                   rec["canonical_name"] if rec else "?")), InlineKeyboardMarkup(rows)
-
-
 _OT_TIMES_PER_PAGE = 12
 
 
-def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int, page: int = 0) \
-        -> tuple[str, InlineKeyboardMarkup]:
-    """Later-OT step: which START TIME on the chosen day.
-    SPEC (owner §2.5): never offer times INSIDE the receiver's scheduled shift — OT is
-    extra hours, not their roster. Only start-times whose [start, start+duration] window
-    falls in a GAP outside their shift (whole day if it's their day off).
-    Full 24h in 30-min steps, am/pm labels, paged."""
+def _ot_receiver(sid: int, dayidx: int):
+    """(record, date, shift_start, shift_end, is_dayoff, call_name) for the OT receiver."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     d = date.today() + timedelta(days=dayidx)
     ws = to_min((rec or {}).get("work_start"))
@@ -1106,89 +1060,158 @@ def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int, page: int = 0) \
     off = _DOW_NAME.get(((rec or {}).get("day_off") or "")[:3].title())
     is_off = off is not None and d.weekday() == off
     nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
-    rows = [_back_row("att:ot:s:later:%d:%d" % (minutes, sid))]
-    # every 30 min across the WHOLE day, drop windows that touch the receiver's shift
-    valids = []
-    for start in range(0, 1440, 30):
-        end = start + minutes
-        end_norm = end - 1440 if end > 1440 else end  # wrap past midnight
-        if not is_off and ws is not None and we is not None and overlaps(start, end_norm, ws, we):
-            continue
-        valids.append(start)
+    return rec, d, ws, we, is_off, nm
+
+
+def ot_staff_pick(p: dict, kind: str) -> tuple[str, InlineKeyboardMarkup]:
+    """Pick who gets the OT. (Duration is no longer chosen first — same start→end picker
+    as AL; Now's start is fixed to shift-end, Later's start is chosen.)"""
+    rows = [_back_row("att:ot:%s" % kind)]
+    rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:ot:s:%s:%d" % (kind, r["id"]))]
+             for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"][:35]
+    note = ("(⚡ Now: staff present right now — OT starts at their shift end)" if kind == "now"
+            else "(📅 Later: any staff — next pick the day, then start & end time)")
+    return _hdr(p, "Give OT — to whom? %s\nអនុញ្ញាត OT — ឱ្យអ្នកណា?" % note), InlineKeyboardMarkup(rows)
+
+
+def ot_when_day(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Later-OT step: which DAY (then start, then end)."""
+    rows = [_back_row("att:ot:later")]
+    btns = [InlineKeyboardButton(day_label(date.today() + timedelta(days=i)),
+                                 callback_data="att:ot:wd:%d:%d" % (sid, i)) for i in range(7)]
+    rows += grid(btns, 2)
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    return _hdr(p, "Give OT to %s — which DAY?\nអនុញ្ញាត OT ឱ្យ %s — ថ្ងៃណា?" % (nm, nm)), \
+        InlineKeyboardMarkup(rows)
+
+
+def ot_start(p: dict, kind: str, sid: int, dayidx: int, page: int = 0) \
+        -> tuple[str, InlineKeyboardMarkup]:
+    """Pick the START time (same standard as AL). NOW = one fixed button at the receiver's
+    shift-end (the 'stay after' anchor — owner: trains Now-vs-Later). LATER = every 30-min
+    slot OUTSIDE their shift (spec §2.5), full 24h, paged. Then they pick the END time."""
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, dayidx)
+    if kind == "now":
+        s0 = we if we is not None else _now_min()
+        rows = [_back_row("att:ot:now"),
+                [InlineKeyboardButton(fmt12(s0), callback_data="att:ot:st:now:%d:%d:%d" % (sid, dayidx, s0))]]
+        return _hdr(p, "⚡ Now — OT for %s starts at shift end. Pick the start:\n"
+                       "⚡ ឥឡូវនេះ — OT របស់ %s ចាប់ផ្តើមពេលចប់វេន។ ជ្រើសម៉ោងចាប់ផ្តើម៖" % (nm, nm)), \
+            InlineKeyboardMarkup(rows)
+    # later: start slots outside the shift
+    rows = [_back_row("att:ot:s:later:%d" % sid)]
+    valids = [s for s in range(0, 1440, 30)
+              if is_off or ws is None or we is None or not overlaps(s, s + 30, ws, we)]
     if not valids:
-        return _hdr(p, "%s — no free window outside %s's shift that day for this length.\n"
-                       "%s — គ្មានពេលទំនេរក្រៅម៉ោងវេនរបស់ %s សម្រាប់រយៈពេលនេះទេ។\n\nPick another day."
+        return _hdr(p, "%s — no free time outside %s's shift that day.\n"
+                       "%s — គ្មានពេលទំនេរក្រៅម៉ោងវេនរបស់ %s ទេ។\n\nPick another day."
                     % (day_label(d), nm, day_label(d), nm)), InlineKeyboardMarkup(rows)
     pages = (len(valids) + _OT_TIMES_PER_PAGE - 1) // _OT_TIMES_PER_PAGE
     page = max(0, min(page, pages - 1))
     chunk = valids[page * _OT_TIMES_PER_PAGE:(page + 1) * _OT_TIMES_PER_PAGE]
     rows += grid([InlineKeyboardButton(fmt12(s),
-                  callback_data="att:ot:wt:%d:%d:%d:%d" % (minutes, sid, dayidx, s)) for s in chunk], 3)
+                  callback_data="att:ot:st:later:%d:%d:%d" % (sid, dayidx, s)) for s in chunk], 3)
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀ Earlier · មុន",
-                   callback_data="att:ot:wtp:%d:%d:%d:%d" % (minutes, sid, dayidx, page - 1)))
+        nav.append(InlineKeyboardButton("◀ Earlier · មុន", callback_data="att:ot:stp:%d:%d:%d" % (sid, dayidx, page - 1)))
     if page < pages - 1:
-        nav.append(InlineKeyboardButton("Later · បន្ទាប់ ▶",
-                   callback_data="att:ot:wtp:%d:%d:%d:%d" % (minutes, sid, dayidx, page + 1)))
+        nav.append(InlineKeyboardButton("Later · បន្ទាប់ ▶", callback_data="att:ot:stp:%d:%d:%d" % (sid, dayidx, page + 1)))
     if nav:
         rows.append(nav)
-    shift_note = ("(it's %s's day off — whole day open)" % nm if is_off
-                  else "(only gaps outside %s's %s–%s shift)"
-                  % (nm, fmt12(ws) if ws is not None else "?", fmt12(we) if we is not None else "?"))
+    note = ("(it's %s's day off — whole day open)" % nm if is_off
+            else "(only times outside %s's %s–%s shift)"
+            % (nm, fmt12(ws) if ws is not None else "?", fmt12(we) if we is not None else "?"))
     pg = (" · page %d/%d" % (page + 1, pages)) if pages > 1 else ""
-    return _hdr(p, "%s — what START TIME?%s %s\n%s — ម៉ោងចាប់ផ្តើមណា? (តែពេលក្រៅម៉ោងវេន)"
-                % (day_label(d), pg, shift_note, day_label(d))), InlineKeyboardMarkup(rows)
+    return _hdr(p, "%s — START time?%s %s\n%s — ម៉ោងចាប់ផ្តើម?" % (day_label(d), pg, note, day_label(d))), \
+        InlineKeyboardMarkup(rows)
 
 
-def _ot_when_label(kind: str, dayidx: int, startmin: int, minutes: int) -> str:
-    """Human window label for the owner card — ALWAYS clock-to-clock (owner: 'now (next 3.5h)'
-    confuses a senior who pressed late). Now = actual current time → +duration; Later = picked
-    start → +duration."""
-    if kind == "later" and dayidx >= 0 and startmin >= 0:
+def ot_end(p: dict, kind: str, sid: int, dayidx: int, start: int, page: int = 0) \
+        -> tuple[str, InlineKeyboardMarkup]:
+    """Pick the END time → duration = end − start. End ≤ start+6h (per-grant cap), must not
+    run into the receiver's shift (spec §2.5)."""
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, dayidx)
+    back = ("att:ot:st:now:%d:%d:%d" % (sid, dayidx, start) if kind == "now"
+            else "att:ot:stp:%d:%d:0" % (sid, dayidx))
+    rows = [_back_row(back)]
+    # Now caps at 6h (stay-after); Later caps at the 14h bank cap (owner: day-off OT can be long).
+    cap = 360 if kind == "now" else 840
+    ends = []
+    for e in range(start + 30, start + cap + 1, 30):
+        e_norm = e - 1440 if e > 1440 else e
+        if not is_off and ws is not None and we is not None and overlaps(start, e_norm, ws, we):
+            continue
+        ends.append(e)
+    if not ends:
+        return _hdr(p, "No valid end time from %s for this person — pick a different start."
+                    % fmt12(start)), InlineKeyboardMarkup(rows)
+    pages = (len(ends) + _OT_TIMES_PER_PAGE - 1) // _OT_TIMES_PER_PAGE
+    page = max(0, min(page, pages - 1))
+    chunk = ends[page * _OT_TIMES_PER_PAGE:(page + 1) * _OT_TIMES_PER_PAGE]
+    rows += grid([InlineKeyboardButton("%s (%s)" % (fmt12(e), _dur_txt(e - start)),
+                  callback_data="att:ot:en:%s:%d:%d:%d:%d" % (kind, sid, dayidx, start, e)) for e in chunk], 2)
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀", callback_data="att:ot:enp:%s:%d:%d:%d:%d" % (kind, sid, dayidx, start, page - 1)))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton("▶", callback_data="att:ot:enp:%s:%d:%d:%d:%d" % (kind, sid, dayidx, start, page + 1)))
+    if nav:
+        rows.append(nav)
+    capt = "6h" if kind == "now" else "14h"
+    return _hdr(p, "Start %s — END time? (max %s)\nចាប់ផ្តើម %s — ម៉ោងបញ្ចប់? (អតិបរមា %s)"
+                % (fmt12(start), capt, fmt12(start), capt)), InlineKeyboardMarkup(rows)
+
+
+def _dur_txt(minutes: int) -> str:
+    return ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+
+
+def _ot_window_label(kind: str, dayidx: int, start: int, end: int) -> str:
+    """Clock-to-clock window for cards (owner: always show real start–end)."""
+    if kind == "later" and dayidx >= 0:
         d = date.today() + timedelta(days=dayidx)
-        return "%s %s–%s" % (day_label(d), fmt12(startmin), fmt12(startmin + minutes))
-    now = _now_min()
-    return "now: %s–%s" % (fmt12(now), fmt12(now + minutes))
+        return "%s %s–%s" % (day_label(d), fmt12(start), fmt12(end))
+    return "now: %s–%s" % (fmt12(start), fmt12(end))
 
 
-def ot_stub(p: dict, minutes: int, sid: int, kind: str = "now",
-            dayidx: int = -1, startmin: int = -1) -> tuple[str, InlineKeyboardMarkup]:
-    """Staff (+time) picked → next is WHY (typed), then the owner card."""
+def ot_stub(p: dict, kind: str, sid: int, dayidx: int, start: int, end: int) \
+        -> tuple[str, InlineKeyboardMarkup]:
+    """Start+end picked → next is WHY (typed), then the owner card."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    when = _ot_when_label(kind, dayidx, startmin, minutes)
+    dur = _dur_txt(end - start)
+    when = _ot_window_label(kind, dayidx, start, end)
     txt = _hdr(p, "Give %s OT to %s — when: %s.\nអនុញ្ញាត OT %s ឱ្យ %s — ពេល៖ %s។\n\n"
                   "Next: type the reason for the owners.\n"
                   "បន្ទាប់៖ វាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"
-               % (label, rec["canonical_name"] if rec else "?", when,
-                  label, rec["canonical_name"] if rec else "?", when))
+               % (dur, rec["canonical_name"] if rec else "?", when,
+                  dur, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
         [InlineKeyboardButton("▶️ (after reason) → owner card",
-                              callback_data="att:ot:card:%s:%d:%d:%d:%d"
-                              % (kind, minutes, sid, dayidx, startmin))]])
+                              callback_data="att:ot:card:%s:%d:%d:%d:%d" % (kind, sid, dayidx, start, end))]])
 
 
-def ot_owner_card(p: dict, kind: str, minutes: int, sid: int,
-                  dayidx: int = -1, startmin: int = -1) -> tuple[str, InlineKeyboardMarkup]:
+def ot_owner_card(p: dict, kind: str, sid: int, dayidx: int, start: int, end: int) \
+        -> tuple[str, InlineKeyboardMarkup]:
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    when = _ot_when_label(kind, dayidx, startmin, minutes)
+    dur = _dur_txt(end - start)
+    when = _ot_window_label(kind, dayidx, start, end)
     txt = _hdr(p, "[TEST PREVIEW → OWNER approval card]\n"
                   "“%s gives %s OT to %s — when: %s, why: big rush · bank now: 0h/14h”\n"
                   "[✅ Approve] [❌ No]\n\n"
                   "Tap to see what happens →"
-               % (p["canonical_name"], label, rec["canonical_name"] if rec else "?", when))
+               % (p["canonical_name"], dur, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
-        [InlineKeyboardButton("✅ As if owner approves", callback_data="att:ot:appd:%d:%d" % (minutes, sid))],
+        [InlineKeyboardButton("✅ As if owner approves",
+                              callback_data="att:ot:appd:%d:%d" % (sid, end - start))],
         [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
-def ot_approved_preview(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+def ot_approved_preview(p: dict, sid: int, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    label = _dur_txt(minutes)
     rows = [_back_row("att:aw"), [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]]
     txt = _hdr(p, "[→ to %s, after approval]\n"
                   "+%s OT approved — your bank: %gh. Choose when to take it back:\n"
@@ -1598,34 +1621,38 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(walk_card(p, data[2], int(data[3])))
         return await show(main_menu(p))
     if action == "ot":
-        if len(data) > 2 and data[2] == "give":
+        sub = data[2] if len(data) > 2 else ""
+        if sub == "give":
             return await show(ot_nowlater(p))
-        if len(data) > 2 and data[2] in ("now", "later"):
-            return await show(ot_durations(p, data[2]))
-        if len(data) > 2 and data[2] == "d":
-            # att:ot:d:{kind}:{minutes}
-            return await show(ot_staff_pick(p, data[3], int(data[4])))
-        if len(data) > 2 and data[2] == "s":
-            # att:ot:s:{kind}:{minutes}:{sid}
+        if sub in ("now", "later"):
+            return await show(ot_staff_pick(p, sub))
+        if sub == "s":
+            # att:ot:s:{kind}:{sid}
             kind = data[3]
             if kind == "later":
-                return await show(ot_when_day(p, int(data[4]), int(data[5])))
-            return await show(ot_stub(p, int(data[4]), int(data[5]), "now"))
-        if len(data) > 2 and data[2] == "wd":
-            # att:ot:wd:{minutes}:{sid}:{dayidx}
-            return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5])))
-        if len(data) > 2 and data[2] == "wtp":
-            # att:ot:wtp:{minutes}:{sid}:{dayidx}:{page}
-            return await show(ot_when_time(p, int(data[3]), int(data[4]), int(data[5]), int(data[6])))
-        if len(data) > 2 and data[2] == "wt":
-            # att:ot:wt:{minutes}:{sid}:{dayidx}:{startmin}
-            return await show(ot_stub(p, int(data[3]), int(data[4]), "later",
-                                      int(data[5]), int(data[6])))
-        if len(data) > 2 and data[2] == "card":
-            # att:ot:card:{kind}:{minutes}:{sid}:{dayidx}:{startmin}
+                return await show(ot_when_day(p, int(data[4])))
+            return await show(ot_start(p, "now", int(data[4]), 0))
+        if sub == "wd":
+            # att:ot:wd:{sid}:{dayidx}  → later start picker
+            return await show(ot_start(p, "later", int(data[3]), int(data[4])))
+        if sub == "stp":
+            # att:ot:stp:{sid}:{dayidx}:{page}  (later start pager)
+            return await show(ot_start(p, "later", int(data[3]), int(data[4]), int(data[5])))
+        if sub == "st":
+            # att:ot:st:{kind}:{sid}:{dayidx}:{start}  → end picker
+            return await show(ot_end(p, data[3], int(data[4]), int(data[5]), int(data[6])))
+        if sub == "enp":
+            # att:ot:enp:{kind}:{sid}:{dayidx}:{start}:{page}
+            return await show(ot_end(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
+        if sub == "en":
+            # att:ot:en:{kind}:{sid}:{dayidx}:{start}:{end}  → reason stub
+            return await show(ot_stub(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
+        if sub == "card":
+            # att:ot:card:{kind}:{sid}:{dayidx}:{start}:{end}
             return await show(ot_owner_card(p, data[3], int(data[4]), int(data[5]),
                                             int(data[6]), int(data[7])))
-        if len(data) > 2 and data[2] == "appd":
+        if sub == "appd":
+            # att:ot:appd:{sid}:{minutes}
             return await show(ot_approved_preview(p, int(data[3]), int(data[4])))
         return await show(ot_screen(p))
     if action == "ci":
