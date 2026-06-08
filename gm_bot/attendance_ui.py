@@ -1883,8 +1883,22 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(emergency_screen(p))
     if action == "do":
         if len(data) > 2 and data[2] == "d":
+            context.user_data["att_do_day"] = data[3]   # remember the chosen new day-off date
             return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
+            if att_test_on():
+                req_off = context.user_data.get("att_do_day") or _today().isoformat()
+                ro = date.fromisoformat(req_off)
+                off_wd = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
+                partner_off = (ro + timedelta(days=(off_wd - ro.weekday())) if off_wd is not None
+                               else ro + timedelta(days=1)).isoformat()
+                context.user_data["att_test_pending"] = {
+                    "flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
+                    "req_off_date": req_off, "partner_off_date": partner_off}
+                return await show((_hdr(p, "Day-off swap — partner picked.\n\n📝 Type the reason — "
+                    "your NEXT message is the reason, and the REAL swap fires: the partner agree-card "
+                    "comes to you first, then the senior approval cards."),
+                    InlineKeyboardMarkup([_back_row("att:do")])))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
                                          "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "

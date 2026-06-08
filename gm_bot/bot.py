@@ -3146,6 +3146,16 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "🧪 OT grant submitted (test) — the owner approval card was routed to you. Approve it; "
             "for NOW-OT you'll then get the buyback picker, for LATER you'll get the staff consent "
             "ask. /testreset to wipe.")
+    elif flow == "swap":
+        partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
+        if not partner:
+            await update.message.reply_text("🧪 swap partner not found.")
+            return
+        await submit_swap(context, persona, partner, pend["req_off_date"],
+                          pend["partner_off_date"], reason)
+        await update.message.reply_text(
+            "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, "
+            "then approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
