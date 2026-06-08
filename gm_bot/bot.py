@@ -1983,10 +1983,11 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     """att:sp:cov:{case}:{days} | att:sp:duty:{case} — owner decides on sick papers."""
     query = update.callback_query
     await query.answer()
-    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
-        return
     parts = query.data.split(":")
     sub, case_id = parts[2], int(parts[3])
+    # cov/duty are the OWNER's decision; come/rest are the STAFF's (owner stands in during test).
+    if sub in ("cov", "duty") and update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
     case = sick_get(case_id)
     if not case:
         return
@@ -1997,19 +1998,21 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         sick_set(case_id, status="papered" if days else "provisional", covered_days=days or None)
         await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd." % days if days
                                                             else "\n\n→ nightly nudges (no fixed days)."))
-        if uid and days:
-            await context.bot.send_message(uid,
+        if days:
+            await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"]
+                            if staff else "",
                 "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
                 "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
     elif sub == "duty":
         await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
-        if uid:
-            await context.bot.send_message(uid,
+        if uid or _att_test_mode():
+            await _att_send(context, uid, "Staff",
+                staff.get("call_name") or staff["canonical_name"] if staff else "",
                 "Feeling a little better? If you're up to it, there's light work today (+15 points ⭐) — "
                 "only if you truly feel able 🤍\n"
                 "ធូរស្បើយបន្តិចហើយឬនៅ? បើអ្នកមានកម្លាំង អាចមកធ្វើការងារស្រាលៗថ្ងៃនេះបាន (+15 points ⭐) — "
                 "តែបើអ្នកពិតជាអាចធ្វើបានប៉ុណ្ណោះ 🤍",
-                reply_markup=InlineKeyboardMarkup([
+                kb=InlineKeyboardMarkup([
                     [InlineKeyboardButton("💪 I can come · ខ្ញុំអាចមក", callback_data="att:sp:come:%d" % case_id)],
                     [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:sp:rest:%d" % case_id)]]))
     elif sub == "come":
@@ -2022,14 +2025,12 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             "Thank you for coming in 🤍 light duty only — a senior will point you to seated/easy work.\n"
             "អរគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារអង្គុយ ឬការងារងាយៗឱ្យអ្នក។")
         # tell on-shift seniors
+        _ldn = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
         for sen in _seniors(exclude_staff_id=case["staff_id"]):
-            try:
-                _ldn = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
-                await context.bot.send_message(sen["telegram_ids"][0],
-                    "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
-                    "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។" % (_ldn, _ldn))
-            except Exception:
-                pass
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                sen.get("call_name") or sen["canonical_name"],
+                "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
+                "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។" % (_ldn, _ldn))
     elif sub == "rest":
         await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។")
 
@@ -2116,7 +2117,7 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily (gated): provisional own-sick cases past the 3-day papers grace with no papers →
     the missed shift becomes payback debt (the paperless rule)."""
-    if not _attendance_live():
+    if not _att_active():
         return
     from gm_bot import sick as sk
     from gm_bot.attendance import to_min
@@ -2134,13 +2135,10 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         payback_add_debt(staff["id"], shift_min, "paperless sick (no papers in 3 days)",
                          c["the_date"].isoformat())
         sick_set(c["id"], status="no_papers")
-        if staff.get("telegram_ids"):
-            try:
-                await context.bot.send_message(staff["telegram_ids"][0],
-                    "No papers came — the missed time goes to your pay-back balance.\n"
-                    "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
-            except Exception:
-                pass
+        await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff",
+            staff.get("call_name") or staff["canonical_name"],
+            "No papers came — the missed time goes to your pay-back balance.\n"
+            "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:

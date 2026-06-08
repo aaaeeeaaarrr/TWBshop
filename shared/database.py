@@ -2776,8 +2776,9 @@ def no_show_record(staff_id: int, shift_date: str) -> bool:
     """Record a no-show (idempotent). Returns True if newly recorded."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO no_show_records (staff_id, shift_date) VALUES (%s,%s)
-                ON CONFLICT (staff_id, shift_date) DO NOTHING RETURNING id""", (staff_id, shift_date))
+            cur.execute("""INSERT INTO no_show_records (staff_id, shift_date, is_test) VALUES (%s,%s,%s)
+                ON CONFLICT (staff_id, shift_date) DO NOTHING RETURNING id""",
+                        (staff_id, shift_date, _ATT_TEST))
             return cur.fetchone() is not None
 
 
@@ -2814,8 +2815,9 @@ def special_leave_get(leave_id: int) -> dict | None:
 def sick_create(staff_id: int, who: str, the_date: str, status: str = "open") -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO sick_cases (staff_id, who, the_date, status)
-                           VALUES (%s,%s,%s,%s) RETURNING id""", (staff_id, who, the_date, status))
+            cur.execute("""INSERT INTO sick_cases (staff_id, who, the_date, status, is_test)
+                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, who, the_date, status, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -2843,7 +2845,8 @@ def sick_provisional_open() -> list[dict]:
     """Provisional own-sick cases (no papers yet) — the daily job checks the grace deadline."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM sick_cases WHERE status='provisional' AND who='me'")
+            cur.execute("SELECT * FROM sick_cases WHERE status='provisional' AND who='me' AND is_test=%s",
+                        (_ATT_TEST,))
             return [dict(r) for r in cur.fetchall()]
 
 
@@ -2996,8 +2999,8 @@ def points_record(staff_id: int, cause: str, quantity: int = 1, ref: str | None 
     """Store a raw points event (value derived later from points_rules)."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref) "
-                        "VALUES (%s,%s,%s,%s)", (staff_id, cause, quantity, ref))
+            cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref, is_test) "
+                        "VALUES (%s,%s,%s,%s,%s)", (staff_id, cause, quantity, ref, _ATT_TEST))
 
 
 def points_rules_map() -> dict:
