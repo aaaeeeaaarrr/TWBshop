@@ -2603,6 +2603,24 @@ def _leave_questions(said_al: bool, leave_type: str, dates) -> list[str]:
     return qs
 
 
+def _leave_clarify_msg(said_al: bool, leave_type: str, dates, name: str) -> str:
+    """Full bilingual clarify question (one natural sentence per case — never glued
+    fragments). Mirrors _leave_questions' two checks. KH approved batch-2 (ChatGPT)."""
+    al_q = (not said_al) and leave_type in ("off", "unspecified")
+    day_q = not dates
+    if al_q and day_q:
+        return ("Quick check on your time off, %s — is this annual leave (AL), or another "
+                "kind of leave? And which day(s)? Thanks 🤍\n"
+                "សុំឆែកបន្តិច %s — នេះជាច្បាប់ឈប់ប្រចាំឆ្នាំ (AL) ឬច្បាប់ប្រភេទផ្សេង? "
+                "ហើយឈប់ថ្ងៃណាខ្លះ? អរគុណ 🤍" % (name, name))
+    if al_q:
+        return ("Quick check, %s — is this annual leave (AL), or another kind of leave? Thanks 🤍\n"
+                "សុំឆែកបន្តិច %s — នេះជាច្បាប់ឈប់ប្រចាំឆ្នាំ (AL) ឬច្បាប់ប្រភេទផ្សេង? អរគុណ 🤍"
+                % (name, name))
+    return ("Quick check, %s — which day(s) is your time off? Thanks 🤍\n"
+            "សុំឆែកបន្តិច %s — ប្អូនឈប់ថ្ងៃណាខ្លះ? អរគុណ 🤍" % (name, name))
+
+
 async def _handle_leave(context, msg, text: str, sender: str) -> None:
     """Supervisors/Management: detect a time-off/leave announcement, record it (to
     accumulate for AL once balances are seeded), and OPEN A CLARIFICATION when info is
@@ -2637,7 +2655,8 @@ async def _handle_leave(context, msg, text: str, sender: str) -> None:
 
     # Ask in-group, tagging the person, and open a clarification so the ladder follows up.
     person_mention = _staff_mention(person)
-    body = "Quick check on %s's time off — %s? Thanks." % (person_mention, " and ".join(questions))
+    body = _leave_clarify_msg(res.get("said_al", False),
+                              res.get("leave_type", "unspecified"), res.get("dates"), person_mention)
     try:
         sent = await context.bot.send_message(
             chat_id=chat_id, text=body, reply_to_message_id=msg.message_id,

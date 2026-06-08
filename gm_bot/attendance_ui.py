@@ -703,10 +703,12 @@ def _walk_steps(p: dict, name: str) -> list[str]:
             "“Are you there yet? Open Live Location.”\n"
             "“អ្នកមកដល់ហើយឬនៅ? សូមបើកទីតាំងបន្តផ្ទាល់។”" % nm,
             "[→ %s, when location enters the zone — TRUTH = location, not what was said]\n"
-            "“Arrived 9:18pm — 13 min late. That becomes 13 min pay-back time.”  (KH pending)" % nm,
-            "[→ %s] payback slot picker (no AL option — late = time). Best-for-the-shop "
-            "before/after-shift times, next 7 days:\n"
-            "[Fri 06/06 7:30–7:43pm] [Sat 07/06 5:47–6:00am] [Pay part only…]  (KH pending)" % nm,
+            "“Arrived 9:18pm — 13 min late. That becomes 13 min pay-back time.”\n"
+            "“មកដល់ 9:18pm — យឺត 13 នាទី។ នេះនឹងត្រូវរាប់ជា 13 នាទី ម៉ោងសងវិញ។”" % nm,
+            "[→ %s] payback slot picker (no AL option — late = time):\n"
+            "“Pick when to pay back your 13 minutes — the best times for the shop, next 7 days:”\n"
+            "“ជ្រើសពេលមកសង 13 នាទីរបស់ប្អូន — ពេលដែលល្អសម្រាប់ហាង ក្នុង 7 ថ្ងៃខាងមុខ:”\n"
+            "[Fri 06/06 7:30–7:43pm] [Sat 07/06 5:47–6:00am] [Pay part only…]" % nm,
             "[→ %s] booked ✓ — runs like a mini-shift (T−10, check-in, +10 if early):\n"
             "“Booked ✓ — Fri 06/06 7:30–7:43pm. Come 5 minutes early and you earn +10 points ⭐”\n"
             "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐”" % nm,
@@ -715,6 +717,8 @@ def _walk_steps(p: dict, name: str) -> list[str]:
         ]
     if name in ("al", "marriage"):
         what = "marriage leave (3 days)" if name == "marriage" else "AL"
+        kh_ok = ("ច្បាប់រៀបការរបស់ប្អូនអនុម័តហើយ ✓ Tue 23/06។ អបអរសាទរ! 🤍" if name == "marriage"
+                 else "AL របស់ប្អូនអនុម័តហើយ ✓ Tue 23/06។ ប្អូននៅសល់ AL 6.5 ថ្ងៃទៀត។ 🤍")
         return [
             "[→ %s] “Reason? (you type it)” → reason captured verbatim, attached to the request." % nm,
             "[→ EVERY senior, privately] approval card:\n"
@@ -727,9 +731,9 @@ def _walk_steps(p: dict, name: str) -> list[str]:
             "[→ SUPERVISORS group, reason INCLUDED]\n"
             "“%s on leave Tue 23/06 (family trip). Normal day off: Fri. Back at work: Wed 24/06, %s.”"
             % (nm, ws),
-            "[→ %s] “Your %s is approved ✓ Tue 23/06. AL balance: 6.5 days 🤍”  (KH pending)\n\n"
+            "[→ %s] “Your %s is approved ✓ Tue 23/06. AL balance: 6.5 days 🤍”\n“%s”\n\n"
             "✓ Approval ladder complete (AL deducted; marriage may go below zero, never salary)."
-            % (nm, what),
+            % (nm, what, kh_ok),
         ]
     if name == "swap":
         return [
