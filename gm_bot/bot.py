@@ -3115,6 +3115,26 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "🧪 AL request submitted (test) — the senior approval cards were routed to you. "
             "Tap ✅ on two of them to reach quorum, then watch the requester + Supervisors messages. "
             "/testreset to wipe this when done.")
+    elif flow == "late":
+        from gm_bot.attendance import to_min
+        mins = int(pend.get("mins") or 0)
+        today = datetime.now(finance.PP_TZ).date().isoformat()
+        ws = to_min(persona.get("work_start"))
+        nm = persona.get("call_name") or persona["canonical_name"]
+        late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
+        await _att_send(context, None, "Supervisors group", "",
+            "%s will be ~%d min late for today's shift. Reason: %s\n"
+            "%s នឹងមកយឺតប្រហែល %d នាទីសម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
+            % (nm, mins, reason, nm, mins, reason), group=True)
+        # arrival → debt + payback picker (simulated here so you can test booking)
+        payback_add_debt(persona["id"], mins, "late arrival (test)", today)
+        d = payback_open_debt(persona["id"])
+        if d:
+            await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
+        await update.message.reply_text(
+            "🧪 Late declared (test) — Supervisors heads-up + the payback slot picker were routed to "
+            "you. Tap a slot to book it (you'll get the booked-confirm + Supervisors notice). "
+            "/testreset to wipe.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

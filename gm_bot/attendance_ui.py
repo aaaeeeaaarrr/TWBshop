@@ -1806,6 +1806,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(rules_screen(p))
     if action == "late":
         if len(data) > 2 and data[2] == "o":
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "late", "persona_id": p["id"], "mins": int(data[3])}
+                return await show((_hdr(p, "Late ~%d min.\n\n📝 Type your reason — your NEXT message "
+                    "is the reason, and the REAL flow fires: Supervisors heads-up + the payback "
+                    "slot picker come to you." % int(data[3])),
+                    InlineKeyboardMarkup([_back_row("att:late")])))
             return await show(late_picked(p, int(data[3])))
         return await show(late_screen(p))
     if action == "al":
