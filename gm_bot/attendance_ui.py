@@ -366,7 +366,8 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① Sick → Me: the anti-fake opener (try to come, see how you feel)",
          "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
          "What time can you come?\n"
-         "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល។ អ្នកអាចមកម៉ោងប៉ុន្មាន?", None),
+         "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល។ អ្នកអាចមកម៉ោងប៉ុន្មាន?",
+         _ill(["9:30pm", "10pm", "10:30pm"], ["🛌 I really can't come today · ថ្ងៃនេះមកមិនបាន"])),
         ("② Sick → Me: 'I really can't come today' → rest + papers ask",
          "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
          "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n"
@@ -376,8 +377,9 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "បានទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។", None),
         ("④ [→ OWNER + Tyty card] Opus reads the paper → owner taps the decision",
          "🩺 Davy — sick papers. Opus: Calmette Hospital · likely flu · 2 days · not contagious.\n"
-         "[✓ Accept (cover 2d)] [1d] [2d] [3d] [💺 Offer part-duty] [Skip → nightly nudges]\n"
-         "(the photo is forwarded right under this card; never shown to any group)", None),
+         "(the photo is forwarded right under this card; never shown to any group)",
+         _ill(["✓ Accept (cover 2d)"], ["1d", "2d", "3d"], ["💺 Offer part-duty"],
+              ["Skip → nightly nudges"])),
         ("⑤ owner accepts → real sick day, debt+points wiped, AL UNTOUCHED",
          "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
          "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍", None),
@@ -470,8 +472,8 @@ def build_catalogue6(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Give 4h OT to Renaud — when: Wed 10/06 5pm–9pm. (only times OUTSIDE their shift)\n"
          "(day-off OT can run long — up to the 14h bank cap)", None),
         ("④ [→ OWNER approval card] — who gives, who gets, when, why, current bank",
-         "Samphass gives 2h OT to Renaud — when: now 4pm–6pm, why: big rush · bank now: 0h/14h\n"
-         "[✅ Approve] [❌ No]", None),
+         "Samphass gives 2h OT to Renaud — when: now 4pm–6pm, why: big rush · bank now: 0h/14h",
+         _ill(["✅ Approve", "❌ No"])),
         ("⑤ NOW-OT consent — staff asked to accept (15 min → senior nudged to remind in person)",
          "Senior gave you 2h OT now (4pm–6pm) — ok?\n"
          "បងបានឱ្យអ្នកធ្វើ OT 2h ឥឡូវនេះ (4pm–6pm) — បានទេ?  (KH pending review)", consent_kb),
@@ -521,7 +523,8 @@ def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។", None),
         ("④ seniors' approval card (same-week rule) → 2 ✅ applies the dated swap",
          "Day-off swap: Davy ↔ Mealea. Reason: clinic\n"
-         "ប្តូរថ្ងៃឈប់៖ Davy ↔ Mealea។ មូលហេតុ៖ clinic", None),
+         "ប្តូរថ្ងៃឈប់៖ Davy ↔ Mealea។ មូលហេតុ៖ clinic",
+         _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
         ("⑤ approved → SUPERVISORS notice",
          "Day-off swap: Davy off Fri 12/06, Mealea off Wed 10/06.\n"
          "ប្តូរថ្ងៃឈប់៖ Davy ឈប់ Fri 12/06, Mealea ឈប់ Wed 10/06។", None),
@@ -887,104 +890,119 @@ _WALK_BACK = {"late": "att:late", "al": "att:al", "swap": "att:do", "sickme": "a
               "birth": "att:sp"}
 
 
+def _ill(*rows) -> InlineKeyboardMarkup:
+    """Illustrative buttons for a preview pick-step — visual only (att:walk:noop)."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(lbl, callback_data="att:walk:noop")
+                                 for lbl in row] for row in rows])
+
+
 def _walk_btn(name: str) -> list[InlineKeyboardButton]:
     return [InlineKeyboardButton("▶️ See the rest of this flow", callback_data="att:walk:%s:0" % name)]
 
 
-def _walk_steps(p: dict, name: str) -> list[str]:
+def _walk_steps(p: dict, name: str) -> list[tuple[str, InlineKeyboardMarkup | None]]:
+    """Each step = (message text, illustrative keyboard or None). Pick-steps carry REAL
+    buttons (visual only) so the preview looks exactly like what staff/seniors will tap."""
     nm = p.get("call_name") or p["canonical_name"]
     ws = fmt12(to_min(p.get("work_start"))) if to_min(p.get("work_start")) is not None else "your start"
     if name == "late":
         return [
-            "[→ SUPERVISORS group, at declare-time WITH reason]\n"
-            "“%s will be ~15 min late for tonight's shift. Reason: moto broke.”" % nm,
-            "[→ %s, arrival watch — fires at the declared time, repeats 4× every 15 min "
-            "until location confirms]\n"
-            "“Are you there yet? Open Live Location.”\n"
-            "“អ្នកមកដល់ហើយឬនៅ? សូមបើកទីតាំងបន្តផ្ទាល់។”" % nm,
-            "[→ %s, when location enters the zone — TRUTH = location, not what was said]\n"
-            "“Arrived 9:18pm — 13 min late. That becomes 13 min pay-back time.”\n"
-            "“មកដល់ 9:18pm — យឺត 13 នាទី។ នេះនឹងត្រូវរាប់ជា 13 នាទី ម៉ោងសងវិញ។”" % nm,
-            "[→ %s] payback slot picker (no AL option — late = time):\n"
-            "“Pick when to pay back your 13 minutes — the best times for the shop, next 7 days:”\n"
-            "“ជ្រើសពេលមកសង 13 នាទីរបស់ប្អូន — ពេលដែលល្អសម្រាប់ហាង ក្នុង 7 ថ្ងៃខាងមុខ:”\n"
-            "[Fri 06/06 7:30–7:43pm] [Sat 07/06 5:47–6:00am] [Pay part only…]" % nm,
-            "[→ %s] booked ✓ — runs like a mini-shift (T−10, check-in, +10 if early):\n"
-            "“Booked ✓ — Fri 06/06 7:30–7:43pm. Come 5 minutes early and you earn +10 points ⭐”\n"
-            "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐”" % nm,
-            "[→ SUPERVISORS group]\n“%s pays back Fri 06/06, 7:30–7:43pm.”\n\n"
-            "✓ Lateness ladder complete." % nm,
+            ("[→ SUPERVISORS group, at declare-time WITH reason]\n"
+             "“%s will be ~15 min late for tonight's shift. Reason: moto broke.”" % nm, None),
+            ("[→ %s, arrival watch — fires at the declared time, repeats 4× every 15 min "
+             "until location confirms]\n"
+             "“Are you there yet? Open Live Location.”\n"
+             "“អ្នកមកដល់ហើយឬនៅ? សូមបើកទីតាំងបន្តផ្ទាល់។”" % nm, None),
+            ("[→ %s, when location enters the zone — TRUTH = location, not what was said]\n"
+             "“Arrived 9:18pm — 13 min late. That becomes 13 min pay-back time.”\n"
+             "“មកដល់ 9:18pm — យឺត 13 នាទី។ នេះនឹងត្រូវរាប់ជា 13 នាទី ម៉ោងសងវិញ។”" % nm, None),
+            ("[→ %s] payback slot picker (no AL option — late = time):\n"
+             "“Pick when to pay back your 13 minutes — the best times for the shop, next 7 days:”\n"
+             "“ជ្រើសពេលមកសង 13 នាទីរបស់ប្អូន — ពេលដែលល្អសម្រាប់ហាង ក្នុង 7 ថ្ងៃខាងមុខ:”" % nm,
+             _ill(["Fri 06/06 7:30–7:43pm"], ["Sat 07/06 5:47–6:00am"], ["Pay 1 hour only · សងតែ 1h"])),
+            ("[→ %s] booked ✓ — runs like a mini-shift (T−10, check-in, +10 if early):\n"
+             "“Booked ✓ — Fri 06/06 7:30–7:43pm. Come 5 minutes early and you earn +10 points ⭐”\n"
+             "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐”" % nm, None),
+            ("[→ SUPERVISORS group]\n“%s pays back Fri 06/06, 7:30–7:43pm.”\n\n"
+             "✓ Lateness ladder complete." % nm, None),
         ]
     if name in ("al", "marriage"):
         what = "marriage leave (3 days)" if name == "marriage" else "AL"
         kh_ok = ("ច្បាប់រៀបការរបស់ប្អូនអនុម័តហើយ ✓ Tue 23/06។ អបអរសាទរ! 🤍" if name == "marriage"
                  else "AL របស់ប្អូនអនុម័តហើយ ✓ Tue 23/06។ ប្អូននៅសល់ AL 6.5 ថ្ងៃទៀត។ 🤍")
         return [
-            "[→ %s] “Reason? (you type it)” → reason captured verbatim, attached to the request." % nm,
-            "[→ EVERY senior, privately] approval card:\n"
-            "“%s requests %s — Tue 23/06 (full day). Reason: family trip.\n"
-            "Working that day: Dara, Sok, Mealea (day-off: Pisey; on AL: Vann).\n"
-            "[✅ Approve] [❌ Not approve]”" % (nm, what),
-            "[→ requester] “Senior 1 approved ✓ (1/2)…” (silent until the 2nd vote).",
-            "[→ all seniors] the cards collapse → fresh DM tagging who approved. "
-            "2 ✅ = approved (2 ❌ = seniors-only recap, requester told no).",
-            "[→ SUPERVISORS group, reason INCLUDED]\n"
-            "“%s on leave Tue 23/06 (family trip). Normal day off: Fri. Back at work: Wed 24/06, %s.”"
-            % (nm, ws),
-            "[→ %s] “Your %s is approved ✓ Tue 23/06. AL balance: 6.5 days 🤍”\n“%s”\n\n"
-            "✓ Approval ladder complete (AL deducted; marriage may go below zero, never salary)."
-            % (nm, what, kh_ok),
+            ("[→ %s] “Reason? (you type it)” → reason captured verbatim, attached to the request." % nm,
+             None),
+            ("[→ EVERY senior, privately] approval card:\n"
+             "“%s requests %s — Tue 23/06 (full day). Reason: family trip.\n"
+             "Working that day: Dara, Sok, Mealea (day-off: Pisey; on AL: Vann).”" % (nm, what),
+             _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
+            ("[→ requester] “Senior 1 approved ✓ (1/2)…” (silent until the 2nd vote).", None),
+            ("[→ all seniors] the cards collapse → fresh DM tagging who approved. "
+             "2 ✅ = approved (2 ❌ = seniors-only recap, requester told no).", None),
+            ("[→ SUPERVISORS group, reason INCLUDED]\n"
+             "“%s on leave Tue 23/06 (family trip). Normal day off: Fri. Back at work: Wed 24/06, %s.”"
+             % (nm, ws), None),
+            ("[→ %s] “Your %s is approved ✓ Tue 23/06. AL balance: 6.5 days 🤍”\n“%s”\n\n"
+             "✓ Approval ladder complete (AL deducted; marriage may go below zero, never salary)."
+             % (nm, what, kh_ok), None),
         ]
     if name == "swap":
         return [
-            "[→ %s] “Reason? (you type it)” → captured." % nm,
-            "[→ the PARTNER, privately — their veto is asked FIRST (cheapest)]\n"
-            "“%s wants to swap day off: you take Wed off, %s takes Fri — same week. Reason: clinic.\n"
-            "[✅ I agree · ខ្ញុំយល់ព្រម] [✋ No · ទេ]”" % (nm, nm),
-            "[→ %s] “You agreed — sending to seniors.”  (partner silence/❌ = swap doesn't happen, "
-            "%s told, seniors never bothered.)" % (nm, nm),
-            "[→ EVERY senior] approval card (same week rule) → 2 ✅ applies dated overrides.",
-            "[→ SUPERVISORS group]\n“Day-off swap: %s off Fri, partner off Wed.”" % nm,
-            "[→ %s] “Your day-off swap is approved ✓”\n"
-            "“ការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓”\n\n✓ Swap ladder complete." % nm,
+            ("[→ %s] “Reason? (you type it)” → captured." % nm, None),
+            ("[→ the PARTNER, privately — their veto is asked FIRST (cheapest)]\n"
+             "“%s wants to swap day off: you take Wed off, %s takes Fri — same week. Reason: clinic.”"
+             % (nm, nm), _ill(["✅ I agree · ខ្ញុំយល់ព្រម", "✋ No · ទេ"])),
+            ("[→ %s] “You agreed — sending to seniors.”  (partner silence/❌ = swap doesn't happen, "
+             "%s told, seniors never bothered.)" % (nm, nm), None),
+            ("[→ EVERY senior] approval card (same week rule) → 2 ✅ applies dated overrides.",
+             _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
+            ("[→ SUPERVISORS group]\n“Day-off swap: %s off Fri, partner off Wed.”" % nm, None),
+            ("[→ %s] “Your day-off swap is approved ✓”\n"
+             "“ការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓”\n\n✓ Swap ladder complete." % nm, None),
         ]
     if name == "sickme":
         return [
-            "[→ %s] “If you see a doctor, send me a photo of the papers.” → (staff sends a photo)" % nm,
-            "[→ OWNER + Tyty ONLY — never a group, never other seniors]\n"
-            "“🩺 %s — sick papers. Opus: Calmette Hospital · likely flu · 2d · not contagious.\n"
-            "[✓ Accept (cover 2d)] [1d] [2d] [3d] [💺 Offer part-duty] [Skip → nightly nudges]”\n"
-            "(the photo is forwarded right under this card)" % nm,
-            "[→ owner taps ✓ Accept 2d] → debt + points wiped, real sick day, AL UNTOUCHED.",
-            "[→ %s] “Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍”\n"
-            "“រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍”" % nm,
-            "[→ %s, if part-duty offered] “Feeling a little better? There's light work today (+15 ⭐) "
-            "— only if you truly feel able 🤍 [💪 I can come] [🛌 Rest today]”\n\n"
-            "✓ Sick-papers ladder complete. (No papers in 3 days → the missed time becomes pay-back.)"
-            % nm,
+            ("[→ %s] “If you see a doctor, send me a photo of the papers.” → (staff sends a photo)" % nm,
+             None),
+            ("[→ OWNER + Tyty ONLY — never a group, never other seniors]\n"
+             "“🩺 %s — sick papers. Opus: Calmette Hospital · likely flu · 2d · not contagious.”\n"
+             "(the photo is forwarded right under this card)" % nm,
+             _ill(["✓ Accept (cover 2d)"], ["1d", "2d", "3d"], ["💺 Offer part-duty"],
+                  ["Skip → nightly nudges"])),
+            ("[→ owner taps ✓ Accept 2d] → debt + points wiped, real sick day, AL UNTOUCHED.", None),
+            ("[→ %s] “Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍”\n"
+             "“រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍”"
+             % nm, None),
+            ("[→ %s, if part-duty offered] “Feeling a little better? There's light work today (+15 ⭐) "
+             "— only if you truly feel able 🤍”\n\n"
+             "✓ Sick-papers ladder complete. (No papers in 3 days → the missed time becomes pay-back.)"
+             % nm, _ill(["💪 I can come · ខ្ញុំអាចមក", "🛌 Rest today · សម្រាកថ្ងៃនេះ"])),
         ]
     if name == "sickfam":
         return [
-            "[→ SUPERVISORS group] “%s's family member is sick — off today (no approval needed).”" % nm,
-            "[→ %s, 12h before the next shift] one-tap re-book nudge:\n"
-            "“Is your child better? If you need tomorrow off too, tell me now.\n"
-            "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។”\n"
-            "[Again tomorrow · ស្អែកទៀត] [👍 Better · ធូរស្បើយហើយ]\n\n"
-            "✓ Family-sick ladder complete (each day burns 1 of the 7 yearly special-leave days)." % nm,
+            ("[→ SUPERVISORS group] “%s's family member is sick — off today (no approval needed).”" % nm,
+             None),
+            ("[→ %s, 12h before the next shift] one-tap re-book nudge:\n"
+             "“Is your child better? If you need tomorrow off too, tell me now.\n"
+             "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។”\n\n"
+             "✓ Family-sick ladder complete (each day burns 1 of the 7 yearly special-leave days)." % nm,
+             _ill(["Again tomorrow · ស្អែកទៀត", "👍 Better · ធូរស្បើយហើយ"])),
         ]
     if name == "death":
         return [
-            "[→ SUPERVISORS group] (already shown on the previous screen — the relation may be named).",
-            "[→ OWNER, compassion tier only] “%s reported a sibling's death — gave 1 day (compassion). "
-            "[Upgrade to 3 days]”" % nm,
-            "[→ %s, if owner upgrades] “Your leave is extended to 3 days 🤍”\n\n"
-            "✓ Death-leave ladder complete (no approval ever; AL may go below zero, never salary)." % nm,
+            ("[→ SUPERVISORS group] “%s on leave (death of parent).” (relation may be named)" % nm, None),
+            ("[→ OWNER, compassion tier only] “%s reported a sibling's death — gave 1 day (compassion).”"
+             % nm, _ill(["Upgrade to 3 days · បន្ថែមដល់ 3 ថ្ងៃ"])),
+            ("[→ %s, if owner upgrades] “Your leave is extended to 3 days 🤍”\n\n"
+             "✓ Death-leave ladder complete (no approval ever; AL may go below zero, never salary)." % nm,
+             None),
         ]
     if name == "birth":
         return [
-            "[→ SUPERVISORS group] “%s on leave 2 days (wife giving birth).”" % nm,
-            "[→ %s] “Congratulations! 👶 2 days of leave booked.”\n"
-            "“អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ បានកក់រួច។”\n\n✓ Wife-birth ladder complete." % nm,
+            ("[→ SUPERVISORS group] “%s on leave 2 days (wife giving birth).”" % nm, None),
+            ("[→ %s] “Congratulations! 👶 2 days of leave booked.”\n"
+             "“អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ បានកក់រួច។”\n\n✓ Wife-birth ladder complete." % nm, None),
         ]
     return []
 
@@ -995,14 +1013,16 @@ def walk_card(p: dict, name: str, idx: int) -> tuple[str, InlineKeyboardMarkup]:
         return main_menu(p)
     idx = max(0, min(idx, len(steps) - 1))
     n = len(steps)
+    text, step_kb = steps[idx]
     back = ("att:walk:%s:%d" % (name, idx - 1)) if idx > 0 else _WALK_BACK.get(name, "att:menu")
-    rows = [_back_row(back)]
+    rows = [list(r) for r in step_kb.inline_keyboard] if step_kb else []
+    rows.append(_back_row(back))
     if idx < n - 1:
         rows.append([InlineKeyboardButton("▶️ Next step (%d/%d)" % (idx + 2, n),
                                           callback_data="att:walk:%s:%d" % (name, idx + 1))])
     else:
         rows.append([InlineKeyboardButton("🏠 Main menu — flow complete ✓", callback_data="att:menu")])
-    return _hdr(p, "Step %d of %d — the flow continues:\n\n%s" % (idx + 1, n, steps[idx])), \
+    return _hdr(p, "Step %d of %d — the flow continues:\n\n%s" % (idx + 1, n, text)), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1830,6 +1850,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(dayoff_screen(p))
     if action == "walk":
         # att:walk:{name}:{idx} — owner steps through the rest of a ladder to the end
+        if len(data) > 2 and data[2] == "noop":
+            return  # illustrative preview button — already answered, do nothing
         if len(data) > 3:
             return await show(walk_card(p, data[2], int(data[3])))
         return await show(main_menu(p))
