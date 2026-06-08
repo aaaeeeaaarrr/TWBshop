@@ -2,6 +2,68 @@
 
 ---
 
+## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
+REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-08-A
+
+> This is a FULL copy (not a pointer) so the project carries its own enforcement even if the global
+> `~/.claude/CLAUDE.md` fails to load, is stale on another machine, bootstrap wasn't run, the secrets
+> repo is unavailable, or a future session only sees this repo. Reliability > elegance for operating
+> constraints. Same text lives in the global file.
+
+Not values — constraints. The bar is EVIDENCE, never promises ("100% precision" as a slogan is
+banned). Keep the chat style fast and friendly; never let that soften proof on real work. The user
+may demand the evidence block at ANY time; its absence = NOT done. Words are not trusted — only evidence.
+
+### MODES — pick by what the task touches. If it isn't clearly CHAT or TRIVIAL, default UP to SHIPPABLE.
+- **CHAT / THINKING** — explaining, planning, questions, reviews. Fast, no ceremony.
+- **TRIVIAL EDIT** — comments, wording, formatting, docs; CANNOT change runtime behavior. Light
+  proof: files changed + a quick check.
+- **SHIPPABLE CODE** — any behavior / UI / API / DB / Telegram-bot / report / deploy change. FULL
+  real-path evidence required before saying done.
+- **HIGH-RISK** — money, payments, payroll, staff/customer records, audit logs, deletions, DB
+  migrations, permissions, irreversible writes, production deploy, external integrations. No
+  shortcuts, no "probably," no done without real-path proof.
+
+### HARD RULES
+1. **Real system only — NO BEHAVIOR FORK.** Test the SHIPPED path. Isolate data/users/routing/env/
+   test-records; NEVER fork logic, permissions, validation, or UI/API/DB/message paths. A preview/
+   mock/stub/shortcut is not proof unless the real path also passed.
+2. **No fake success.** Never say done/fixed/working/ready without running the real path and showing
+   evidence to the depth the mode requires.
+3. **PUSHED ≠ LIVE.** Server/service code: same turn → commit+push → deploy (pull) → restart →
+   VERIFY (deployed ref == origin, service up, running artifact actually contains the change).
+4. **Never blame state you can verify.** When something "isn't showing," verify the deployed/running
+   state YOURSELF first — no "maybe a restart/pull/sync."
+5. **Files are truth; chat is disposable.** Persist decisions/specs/results to repo files as you go;
+   a restart or compaction must lose nothing; prove safety from git, don't reassure vaguely.
+6. **User-path first + every actor's view.** Exercise the path the real actor uses (button, Telegram,
+   screen, report, approval); surface every recipient's output so all are visible. Backend-only proof
+   is NOT enough for a user-facing feature.
+7. **No dead buttons.** Every action does the real thing, or faithfully advances to its real
+   consequence via the real code path.
+8. **Exact, reversible isolation + teardown.** Test writes tagged, reversible, cleaned EXACTLY; never
+   pollute real data; never wipe-and-forget.
+9. **Test once → ship the same code.** Go-live only flips routing/config, never behavior. If code
+   changes after the test, re-run the real-path test.
+10. **Cover the whole surface + every branch** (success/fail/cancel/invalid/permission/duplicate/edge)
+    — ONE harness PER WORKFLOW, not one monster harness.
+11. **Fixes become permanent guards** — a fixed bug gets a regression test/constraint/validation.
+12. **Shortcuts: default to the correct real-path implementation.** In HIGH-RISK, none. Elsewhere,
+    state the tradeoff + real-path alternative FIRST. Never make the user repeat themselves.
+13. **Don't ask unless needed — but report assumptions + evidence AFTER acting.** Ask only when truly
+    ambiguous or HIGH-RISK; otherwise proceed real-path and state what you assumed and proved.
+14. **Verify inputs against context** (translations, data, suggestions); flag mismatches BEFORE applying.
+15. **Report faithfully.** For SHIPPABLE / HIGH-RISK, end with: files changed · commands run · real
+    path verified · evidence (logs/DB/output) · cleanup · regression guard · remaining risk · next step.
+
+### TWBshop HIGH-RISK paths (no shortcuts, real-path proof mandatory)
+- Payments / KHQR / Bakong · payroll & salary (staff_registry, slips, pays) · staff records &
+  ex-staff offboarding / bans / permissions · DB migrations & deletions · deploys to the twbshop-*
+  services (retail / b2b / gm / listener / hire) · attendance go-live (`attendance_live`).
+- Attendance test harness design: `docs/ATTENDANCE_TEST_MODE.md`.
+
+---
+
 ## Connectivity Reference (run only when something seems broken)
 
 | # | What | Check command | Good result |
