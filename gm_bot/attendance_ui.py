@@ -1626,6 +1626,16 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
             if p and ws is not None:
                 from gm_bot.checkin import verdict
                 state, mins = verdict(_now_min(), ws, dist <= WORK_ZONE_RADIUS_M)
+                in_zone = dist <= WORK_ZONE_RADIUS_M
+                # RECORD it for real (test-tagged) only in test mode — same att_check_in code as
+                # production. Never writes real data unless /testmode on (is_test stamped from the flag).
+                from shared.database import att_test_on, att_record_ping, att_check_in
+                if att_test_on() and state != "not_here":
+                    today = _today().isoformat()
+                    nowiso = datetime.now().isoformat()
+                    att_record_ping(p["id"], loc.latitude, loc.longitude, in_zone, nowiso)
+                    att_check_in(p["id"], today, nowiso, in_zone,
+                                 mins if state == "late" else 0, mins if state == "early" else 0)
                 if state == "not_here":
                     await msg.reply_text(_V_FAR + "\n[test: %dm from TWB]" % round(dist))
                 elif state == "early":

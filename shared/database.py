@@ -3209,8 +3209,9 @@ def att_record_ping(staff_id: int, lat: float, lng: float, in_zone: bool, ts: st
     """Silent location feed (secret collection). Every shared location update lands here."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO location_pings (staff_id, lat, lng, in_zone, ts) "
-                        "VALUES (%s,%s,%s,%s,COALESCE(%s, NOW()))", (staff_id, lat, lng, in_zone, ts))
+            cur.execute("INSERT INTO location_pings (staff_id, lat, lng, in_zone, ts, is_test) "
+                        "VALUES (%s,%s,%s,%s,COALESCE(%s, NOW()),%s)",
+                        (staff_id, lat, lng, in_zone, ts, _ATT_TEST))
 
 
 def att_get_session(staff_id: int, shift_date: str) -> dict | None:
@@ -3230,11 +3231,11 @@ def att_check_in(staff_id: int, shift_date: str, at_iso: str, in_zone: bool,
         with conn.cursor() as cur:
             # ensure a session row exists + refresh last-seen
             cur.execute("""
-                INSERT INTO attendance_sessions (staff_id, shift_date, last_loc_at, in_zone, status)
-                VALUES (%s,%s,%s,%s,'open')
+                INSERT INTO attendance_sessions (staff_id, shift_date, last_loc_at, in_zone, status, is_test)
+                VALUES (%s,%s,%s,%s,'open',%s)
                 ON CONFLICT (staff_id, shift_date)
                 DO UPDATE SET last_loc_at=EXCLUDED.last_loc_at, in_zone=EXCLUDED.in_zone
-            """, (staff_id, shift_date, at_iso, in_zone))
+            """, (staff_id, shift_date, at_iso, in_zone, _ATT_TEST))
             # set check-in atomically ONLY if not already set
             cur.execute("""
                 UPDATE attendance_sessions

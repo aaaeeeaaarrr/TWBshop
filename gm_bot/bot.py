@@ -1201,14 +1201,11 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
-        try:
-            await context.bot.send_message(uid, text)
-            # arm check-out capture: next in-zone share while this is set = checked out
-            if label.startswith("check-out"):
-                from shared.database import flow_save
-                flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=90)
-        except Exception as e:
-            logger.error("checkin send to %s failed: %s", name, e)
+        await _att_send(context, uid, "Staff", name, text)
+        # arm check-out capture: next in-zone share while this is set = checked out
+        if label.startswith("check-out"):
+            from shared.database import flow_save
+            flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=90)
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
