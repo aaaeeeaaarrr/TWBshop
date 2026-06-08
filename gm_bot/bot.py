@@ -3086,10 +3086,35 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
     if not update.message or not update.effective_user:
         return
     if update.effective_user.id == config.OWNER_TELEGRAM_ID:
+        if context.user_data.get("att_test_pending"):
+            await _att_test_dispatch(update, context)
+            return
         await _owner_private_departure(update, context)
     else:
         from gm_bot import rollcall
         await rollcall.handle_staff_private(update, context)
+
+
+async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Test-mode entry: the owner's typed reason completes a real submit_* with the persona as
+    actor. Only fires in test mode (the shell only sets att_test_pending when att_test_on)."""
+    pend = context.user_data.pop("att_test_pending", None)
+    if not pend:
+        return
+    reason = (update.message.text or "").strip() or "(no reason)"
+    persona = next((s for s in staff_all("active") if s["id"] == pend.get("persona_id")), None)
+    if not persona:
+        await update.message.reply_text("🧪 test persona not found — pick again via /test.")
+        return
+    flow = pend.get("flow")
+    if flow == "al":
+        await submit_al_request(context, persona, pend["kind"], pend["days"],
+                                pend.get("hours_start"), pend.get("hours_end"), reason,
+                                config.OWNER_TELEGRAM_ID)
+        await update.message.reply_text(
+            "🧪 AL request submitted (test) — the senior approval cards were routed to you. "
+            "Tap ✅ on two of them to reach quorum, then watch the requester + Supervisors messages. "
+            "/testreset to wipe this when done.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

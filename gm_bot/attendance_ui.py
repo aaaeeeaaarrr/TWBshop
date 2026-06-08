@@ -22,7 +22,7 @@ from telegram.ext import ContextTypes
 
 import config
 from gm_bot.attendance import to_min, overlaps
-from shared.database import staff_all
+from shared.database import staff_all, att_test_on
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -1831,6 +1831,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
+                if att_test_on():
+                    context.user_data["att_test_pending"] = {
+                        "flow": "al", "persona_id": p["id"], "kind": "days",
+                        "days": sorted(picked), "hours_start": None, "hours_end": None}
+                    return await show((_hdr(p, detail + "\n\n📝 Type the reason — your NEXT message is "
+                        "the reason, and the REAL AL request fires (senior cards come to you)."),
+                        InlineKeyboardMarkup([_back_row("att:al")])))
                 return await show(al_stub(p, detail))
             if sub == "time":
                 return await show(al_time_grid(p, "from", picked=picked))
@@ -1849,6 +1856,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
+                if att_test_on():
+                    context.user_data["att_test_pending"] = {
+                        "flow": "al", "persona_id": p["id"], "kind": "hours",
+                        "days": sorted(picked),
+                        "hours_start": "%02d:%02d" % (f // 60, f % 60),
+                        "hours_end": "%02d:%02d" % (t // 60, t % 60)}
+                    return await show((_hdr(p, detail + "\n\n📝 Type the reason — your NEXT message is "
+                        "the reason, and the REAL AL request fires (senior cards come to you)."),
+                        InlineKeyboardMarkup([_back_row("att:al")])))
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
