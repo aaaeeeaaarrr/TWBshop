@@ -287,8 +287,8 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑭ no-show day (never arrived at all) — the hardest message, tone matters",
          "You missed your whole shift yesterday. One day's pay is deducted, and this month's bonus "
          "is not earned. If something serious happened, please tell me.\n"
-         "អ្នកខកខានវេនទាំងមូលម្សិលមិញ។ ប្រាក់ឈ្នួល 1 ថ្ងៃនឹងត្រូវដក ហើយ Bonus ខែនេះមិនបានទទួលទេ។ "
-         "បើមានរឿងធ្ងន់ធ្ងរកើតឡើង សូមប្រាប់ខ្ញុំ។", None),
+         "អ្នកខកខានវេនទាំងមូលម្សិលមិញ។ ប្រាក់ឈ្នួល 1 ថ្ងៃនឹងត្រូវដក ហើយលក្ខខណ្ឌ Bonus ខែនេះមិនបានសម្រេចទេ។ "
+         "បើមានរឿងធ្ងន់ធ្ងរមែន សូមប្រាប់ខ្ញុំ។", None),
     ]
 
 
@@ -333,7 +333,7 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     return [
         ("① family-sick day — seniors informed (no approval gate)",
          "FYI: Kimying takes sick leave for her child today.\n"
-         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូន ថ្ងៃនេះ។", None),
+         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនរបស់គាត់ថ្ងៃនេះ។", None),
         ("② family-death leave — the group notice (reason NEVER appears)",
          "Davy on leave Tue 09/06 → Thu 11/06 (family).\n"
          "Davy ឈប់សម្រាក Tue 09/06 → Thu 11/06 (គ្រួសារ)។", None),
@@ -585,20 +585,26 @@ def marriage_dates(p: dict, child: bool) -> tuple[str, InlineKeyboardMarkup]:
     if child:
         rows = _date_grid_rows("att:sp:marcd", _today() + timedelta(days=31), 28, "att:sp:mar")
         return _hdr(p, "👰 Your child's marriage — which day? (1 day; "
-                       "must be planned 30+ days ahead)"), InlineKeyboardMarkup(rows)
+                       "must be planned 30+ days ahead)\n"
+                       "👰 រៀបការកូនរបស់អ្នក — ថ្ងៃណា? (1 ថ្ងៃ; ត្រូវស្នើមុន 30+ ថ្ងៃ)"), \
+            InlineKeyboardMarkup(rows)
     # own marriage: dates start at day 31 (owner rule — plan 30+ days ahead)
     rows = _date_grid_rows("att:sp:mard", _today() + timedelta(days=31), 28, "att:sp:mar")
     return _hdr(p, "💍 Your marriage — first day of leave? (3 days; "
-                   "must be planned 30+ days ahead)"), InlineKeyboardMarkup(rows)
+                   "must be planned 30+ days ahead)\n"
+                   "💍 រៀបការរបស់អ្នក — ថ្ងៃចាប់ផ្តើមសម្រាក? (3 ថ្ងៃ; ត្រូវស្នើមុន 30+ ថ្ងៃ)"), \
+        InlineKeyboardMarkup(rows)
 
 
 def marriage_stub(p: dict, iso: str, child: bool) -> tuple[str, InlineKeyboardMarkup]:
     d = date.fromisoformat(iso)
     if child:
-        detail = "👰 Child's marriage: 1 day on %s." % day_label(d)
+        detail = ("👰 Child's marriage: 1 day on %s.\n👰 រៀបការកូន៖ 1 ថ្ងៃ នៅ %s។"
+                  % (day_label(d), day_label(d)))
     else:
         d3 = day_label(d + timedelta(days=2))
-        detail = "💍 Your marriage: 3 days, %s → %s." % (day_label(d), d3)
+        detail = ("💍 Your marriage: 3 days, %s → %s.\n💍 រៀបការរបស់អ្នក៖ 3 ថ្ងៃ, %s → %s។"
+                  % (day_label(d), d3, day_label(d), d3))
     return _hdr(p, detail + "\nFrom AL — balance can go below zero, never from salary. "
                             "Senior approval like a normal AL."), \
         InlineKeyboardMarkup([_back_row("att:sp:mar"), _walk_btn("marriage"),
@@ -611,8 +617,8 @@ def death_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("My child · កូនខ្ញុំ", callback_data="att:sp:deathw:child")],
         [InlineKeyboardButton("My parent · ឪពុក/ម្តាយខ្ញុំ", callback_data="att:sp:deathw:parent")],
         [InlineKeyboardButton("My spouse · ប្តី/ប្រពន្ធខ្ញុំ", callback_data="att:sp:deathw:spouse")],
-        [InlineKeyboardButton("My sibling · បងប្អូនខ្ញុំ", callback_data="att:sp:deathw:sibling")],
-        [InlineKeyboardButton("My grandparent · ជីដូនជីតាខ្ញុំ", callback_data="att:sp:deathw:grandparent")],
+        [InlineKeyboardButton("My sibling · បងប្អូនបង្កើតខ្ញុំ", callback_data="att:sp:deathw:sibling")],
+        [InlineKeyboardButton("My grandparent · ជីតា/ជីដូនខ្ញុំ", callback_data="att:sp:deathw:grandparent")],
     ]
     return _hdr(p, "🕊 We're very sorry. Who passed away?\n"
                    "🕊 យើងសូមចូលរួមរំលែកទុក្ខ។ តើអ្នកណាទទួលមរណភាព?"), InlineKeyboardMarkup(rows)
@@ -645,8 +651,9 @@ def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeybo
                    "Special Leave again.)"
                 % (days, day_label(d), dn, days, day_label(d), dn,
                    p.get("call_name") or p["canonical_name"], day_label(d), dn, who,
-                   ("🩺 Compassion tier — 1 day given; owner can upgrade to 3."
-                    if days == 1 else "✓ booked."))), \
+                   ("🤍 If you need more time, just open Special Leave again — we're here for you.\n"
+                    "🤍 បើអ្នកត្រូវការពេលថែមទៀត គ្រាន់តែបើក Special Leave ម្តងទៀត — យើងនៅជាមួយអ្នក។"
+                    if days == 1 else "✓ booked · បានកក់រួច"))), \
         InlineKeyboardMarkup([_back_row("att:sp:death"), _walk_btn("death"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -820,13 +827,13 @@ def rules_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                 "• Late minutes become pay-back time — you work them back when the shop needs you.\n"
                 "• នាទីយឺតនឹងក្លាយជាម៉ោងសងវិញ — អ្នកធ្វើសងពេលហាងត្រូវការអ្នក។\n\n"
                 "• No-show = 1 day's pay and no bonus this time.\n"
-                "• No-show = ប្រាក់ឈ្នួល 1 ថ្ងៃ និងមិនមាន Bonus លើកនេះ។\n\n"
+                "• No-show = ដកប្រាក់ឈ្នួល 1 ថ្ងៃ ហើយលក្ខខណ្ឌ Bonus លើកនេះមិនបានសម្រេច។\n\n"
                 "• AL: free when asked 7+ days ahead. Within 7 days is possible — it costs points.\n"
                 "• AL៖ ស្នើមុន 7+ ថ្ងៃ = មិនដក Points។ ក្នុង 7 ថ្ងៃ អាចស្នើបាន — តែដក Points។\n\n"
                 "• Special Leave (sick, marriage, family death, birth): see the menu — money is never "
                 "taken for these.\n"
                 "• ច្បាប់ពិសេស (ឈឺ, រៀបការ, មរណភាពគ្រួសារ, ប្រពន្ធសម្រាលកូន)៖ សូមមើលក្នុង menu — "
-                "មិនដកលុយសម្រាប់រឿងទាំងនេះទេ។\n\n"
+                "មិនដកប្រាក់ខែសម្រាប់រឿងទាំងនេះទេ។\n\n"
                 "• Day-off swap: within 7 days, your partner agrees first.\n"
                 "• ប្តូរថ្ងៃឈប់៖ ក្នុងរយៈពេល 7 ថ្ងៃ ហើយអ្នកប្តូរជាមួយត្រូវយល់ព្រមមុន។\n\n"
                 "• OT: given by seniors, saved as hours — take them back when it's calm.\n"
@@ -851,12 +858,13 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
     ws = to_min(p.get("work_start"))
     txt = _hdr(p,
                "Noted — arriving ~%s (%d min late).\n"
+               "កត់ចំណាំហើយ — មកដល់ប្រហែល ~%s (យឺត %d min)។\n"
                "Why? (you type the reason)\nហេតុអ្វី? (សូមវាយប្រាប់ហេតុផល)\n\n"
                "[TEST PREVIEW → SUPERVISORS group, with the reason]\n"
                "“%s will be ~%d min late for the %s shift today. Reason: …”\n\n"
                "Then on arrival (location): if >5 min late → PAYBACK slots (time only — never AL)."
-               % (fmt12(ws + offset), offset, p.get("call_name") or p["canonical_name"],
-                  offset, fmt12(ws)))
+               % (fmt12(ws + offset), offset, fmt12(ws + offset), offset,
+                  p.get("call_name") or p["canonical_name"], offset, fmt12(ws)))
     return txt, InlineKeyboardMarkup([_back_row("att:late"), _walk_btn("late"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -1098,9 +1106,11 @@ def ot_stub(p: dict, minutes: int, sid: int, kind: str = "now",
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
     when = _ot_when_label(kind, dayidx, startmin, minutes)
-    txt = _hdr(p, "Give %s OT to %s — when: %s.\n\nNext: type the reason for the owners.\n"
+    txt = _hdr(p, "Give %s OT to %s — when: %s.\nអនុញ្ញាត OT %s ឱ្យ %s — ពេល៖ %s។\n\n"
+                  "Next: type the reason for the owners.\n"
                   "បន្ទាប់៖ វាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"
-               % (label, rec["canonical_name"] if rec else "?", when))
+               % (label, rec["canonical_name"] if rec else "?", when,
+                  label, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
         [InlineKeyboardButton("▶️ (after reason) → owner card",
@@ -1486,11 +1496,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return await show(al_fullday_or_time(p, picked))
             if sub == "full":
                 near = _near_days(picked)
-                detail = "Full-day AL for %d day(s) selected." % len(picked)
+                detail = ("Full-day AL for %d day(s) selected.\nបានជ្រើស AL ពេញមួយថ្ងៃ សម្រាប់ %d ថ្ងៃ។"
+                          % (len(picked), len(picked)))
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
+                    pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
-                               % (len(near), round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))))
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
+                               % (len(near), pts, len(near), pts))
                 return await show(al_stub(p, detail))
             if sub == "time":
                 return await show(al_time_grid(p, "from", picked=picked))
@@ -1500,12 +1513,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if sub == "t":
                 f = context.user_data.get("att_al_from")
                 t = int(data[3])
-                detail = "Hours AL: %s → %s (fractional deduction)." % (fmt12(f), fmt12(t))
+                detail = ("Hours AL: %s → %s (fractional deduction).\nAL តាមម៉ោង៖ %s → %s (ដកជាចំណែកថ្ងៃ)។"
+                          % (fmt12(f), fmt12(t), fmt12(f), fmt12(t)))
                 near = _near_days(picked)
                 if near:
                     window = t - f
+                    pts = round(SHORT_NOTICE_PT_PER_MIN * window * len(near))
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
-                               % (len(near), round(SHORT_NOTICE_PT_PER_MIN * window * len(near))))
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
+                               % (len(near), pts, len(near), pts))
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
@@ -1520,7 +1536,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
-                                         "then 2 seniors — same week rule.)", walk="swap"))
+                                         "then 2 seniors — same week rule.)\n"
+                                         "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
+                                         "បន្ទាប់មកបង 2 នាក់ — ត្រូវនៅសប្តាហ៍ដដែល។)", walk="swap"))
         return await show(dayoff_screen(p))
     if action == "walk":
         # att:walk:{name}:{idx} — owner steps through the rest of a ladder to the end
@@ -1585,7 +1603,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             from shared.database import al_get_request, al_set_status, al_deduct
             # cutoff: can't cancel once the AL date has started (today or past)
             if iso <= _today().isoformat():
-                await query.answer("Too late to cancel — that day has started", show_alert=True)
+                await query.answer("Too late to cancel — that day has started · "
+                                   "យឺតពេលលុបចោលហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ", show_alert=True)
                 return await show(my_screen(p))
             req = al_get_request(rid)
             if req:

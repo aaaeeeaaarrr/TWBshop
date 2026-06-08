@@ -1467,7 +1467,8 @@ async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     ot_grant_set(g["id"], staff_ok=True)
     await query.edit_message_text(query.message.text +
-        "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)")
+        "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)\n"
+        "✅ អរគុណ — បានកក់ឱ្យអ្នកហើយ។ (វាដំណើរការដូចវេនធ្វើការ៖ ចុះវត្តមានពេលអ្នកមកដល់។)")
     # the worked-then-banked happens at completion (check-in handler / senior confirm — wave note)
 
 
@@ -1553,7 +1554,8 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
     decision = query.data.split(":")[3]
     if decision == "no":
         swap_set_partner(int(sw["id"]), False)
-        await query.edit_message_text(query.message.text + "\n\n✋ You declined — thanks for telling us.")
+        await query.edit_message_text(query.message.text + "\n\n✋ You declined — thanks for telling us.\n"
+                                      "✋ អ្នកបានបដិសេធហើយ — អរគុណដែលប្រាប់យើង។")
         req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
         if req and (req.get("telegram_ids") or []):
             await context.bot.send_message(req["telegram_ids"][0],
@@ -1561,14 +1563,16 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
                 "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។")
         return
     swap_set_partner(int(sw["id"]), True)
-    await query.edit_message_text(query.message.text + "\n\n✅ You agreed — sending to seniors.")
+    await query.edit_message_text(query.message.text + "\n\n✅ You agreed — sending to seniors.\n"
+                                  "✅ អ្នកបានយល់ព្រមហើយ — កំពុងផ្ញើទៅបងៗ/អ្នកគ្រប់គ្រង។")
     # now seniors
     req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
     from datetime import date as _date
-    body = ("Day-off swap: %s ↔ %s. Reason: %s"
-            % (req.get("call_name") if req else "?",
-               (staff_get_by_uid(update.effective_user.id) or {}).get("call_name", "partner"),
-               sw.get("reason") or "—"))
+    _swap_a = req.get("call_name") if req else "?"
+    _swap_b = (staff_get_by_uid(update.effective_user.id) or {}).get("call_name", "partner")
+    _swap_r = sw.get("reason") or "—"
+    body = ("Day-off swap: %s ↔ %s. Reason: %s\nប្តូរថ្ងៃឈប់៖ %s ↔ %s។ មូលហេតុ៖ %s"
+            % (_swap_a, _swap_b, _swap_r, _swap_a, _swap_b, _swap_r))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:swps:%d:approve" % sw["id"])],
         [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:swps:%d:not_approve" % sw["id"])],
@@ -1702,7 +1706,7 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
         return
     if sen["id"] == req["staff_id"]:
-        await query.answer("Can't approve your own AL", show_alert=True)
+        await query.answer("Can't approve your own AL · មិនអាចអនុម័ត AL របស់ខ្លួនឯងបានទេ", show_alert=True)
         return
     from gm_bot import al as alm
     decisions = al_add_approval(int(req_s), sen["id"], update.effective_user.id, decision)
@@ -1748,15 +1752,18 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         try:
             day_off = requester.get("day_off") or "—"
             await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-                "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\nReason: %s\nNormal day off: %s"
-                % (name, days_txt, name, days_txt, req.get("reason") or "—", day_off))
+                "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\n"
+                "Reason: %s\nមូលហេតុ៖ %s\n"
+                "Normal day off: %s\nថ្ងៃឈប់ធម្មតា៖ %s"
+                % (name, days_txt, name, days_txt,
+                   req.get("reason") or "—", req.get("reason") or "—", day_off, day_off))
         except Exception:
             pass
     else:
         for sen in _seniors(exclude_staff_id=req["staff_id"]):
             try:
                 await context.bot.send_message(sen["telegram_ids"][0],
-                    "Not approved by %s.\nមិនអនុម័តដោយ %s។" % (vnames, vnames))
+                    "Not approved by %s.\nមិនបានអនុម័តដោយ %s។" % (vnames, vnames))
             except Exception:
                 pass
         if runc:
@@ -1947,7 +1954,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if uid and days:
             await context.bot.send_message(uid,
                 "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
-                "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍")
+                "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
     elif sub == "duty":
         await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
         if uid:
@@ -1971,9 +1978,10 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         # tell on-shift seniors
         for sen in _seniors(exclude_staff_id=case["staff_id"]):
             try:
+                _ldn = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
                 await context.bot.send_message(sen["telegram_ids"][0],
-                    "%s is coming on LIGHT DUTY today — please give easy/seated work only."
-                    % ((staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"))
+                    "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
+                    "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។" % (_ldn, _ldn))
             except Exception:
                 pass
     elif sub == "rest":
@@ -2260,7 +2268,8 @@ async def _maybe_correct_report(context, msg, full: dict) -> None:
     correction = finance.format_correction(full["raw"], computed)
     if not correction:
         return
-    body = f"📊 Report math check — {full['business_day']} ({full['report_kind']})\n\n{correction}"
+    body = (f"📊 Report math check · ពិនិត្យគណនារបាយការណ៍ — "
+            f"{full['business_day']} ({full['report_kind']})\n\n{correction}")
     to_staff = gm_get_state("report_corrections_to_staff") == "true"
     try:
         if to_staff:
@@ -2475,7 +2484,7 @@ async def _handle_lateness(context, msg, text: str, sender: str) -> None:
                     gm_resolve_lateness(case["id"], pb.get("payback_day"))
                     try:
                         await context.bot.send_message(
-                            chat_id=chat_id, text="Noted, thank you. ✓",
+                            chat_id=chat_id, text="Noted, thank you. ✓\nកត់ចំណាំហើយ អរគុណ។ ✓",
                             reply_to_message_id=msg.message_id,
                         )
                     except Exception:
@@ -2711,8 +2720,10 @@ async def _stock_order_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await context.bot.send_message(
                 chat_id=config.STOCK_CHECKS_CHAT_ID,
-                text="No stock sheet has been posted for %d days. Please do the stock "
-                     "check and send the sheet. Thank you." % days)
+                text=("No stock sheet has been posted for %d days. Please do the stock "
+                      "check and send the sheet. Thank you.\n"
+                      "មិនមាន stock sheet ត្រូវបានផ្ញើអស់ %d ថ្ងៃហើយ។ សូមធ្វើ stock check "
+                      "ហើយផ្ញើ sheet។ អরគុណ។" % (days, days)))
             logger.info("Stock: escalated missing sheet (%d days)", days)
         except Exception as e:
             logger.error("stock no-sheet escalation failed: %s", e)
@@ -3254,7 +3265,8 @@ async def _check_report_receipt(msg, context) -> None:
         partial = result.get("readable_partial", "")
 
         if result.get("is_handwritten") and partial:
-            question = f"Can you tell me what this says? I can see \"{partial}\" but hard to read."
+            question = (f"Can you tell me what this says? I can see \"{partial}\" but hard to read.\n"
+                        f"អាចប្រាប់ខ្ញុំបានទេថារូបនេះសរសេរអ្វី? ខ្ញុំអាចមើលឃើញ \"{partial}\" ប៉ុន្តែពិបាកអាន។")
             sent = await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=question,
@@ -3266,9 +3278,11 @@ async def _check_report_receipt(msg, context) -> None:
             issues = result["issues"]
             if issues:
                 issue_text = " and ".join(i.lower().rstrip(".") for i in issues[:2])
-                reply = f"Please send this photo again — {issue_text}."
+                reply = (f"Please send this photo again — {issue_text}.\n"
+                         f"សូមផ្ញើរូបនេះម្តងទៀត។")
             else:
-                reply = "Please send this photo again — not clear enough to record."
+                reply = ("Please send this photo again — not clear enough to record.\n"
+                         "សូមផ្ញើរូបនេះម្តងទៀត — មិនច្បាស់គ្រប់គ្រាន់សម្រាប់កត់ត្រាទេ។")
             sent = await context.bot.send_message(
                 chat_id=msg.chat_id,
                 text=reply,
