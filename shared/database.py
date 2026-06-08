@@ -2921,10 +2921,10 @@ def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
 def dayoff_set_override(staff_id: int, the_date: str, kind: str, reason: str = "") -> None:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason)
-                VALUES (%s,%s,%s,%s) ON CONFLICT (staff_id, the_date)
+            cur.execute("""INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason, is_test)
+                VALUES (%s,%s,%s,%s,%s) ON CONFLICT (staff_id, the_date)
                 DO UPDATE SET kind=EXCLUDED.kind, reason=EXCLUDED.reason""",
-                (staff_id, the_date, kind, reason))
+                (staff_id, the_date, kind, reason, _ATT_TEST))
 
 
 def dayoff_override_for(staff_id: int, the_date: str) -> str | None:
@@ -2941,9 +2941,9 @@ def swap_create(requester_id, partner_id, req_off_date, partner_off_date, reason
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO dayoff_swaps
-                (requester_id, partner_id, req_off_date, partner_off_date, reason)
-                VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                (requester_id, partner_id, req_off_date, partner_off_date, reason))
+                (requester_id, partner_id, req_off_date, partner_off_date, reason, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (requester_id, partner_id, req_off_date, partner_off_date, reason, _ATT_TEST))
             return cur.fetchone()["id"]
 
 

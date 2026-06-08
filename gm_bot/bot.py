@@ -1578,9 +1578,8 @@ async def submit_swap(context, requester: dict, partner: dict, req_off_date: str
         [InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:swp:%d:agree" % swap_id)],
         [InlineKeyboardButton("✋ No · ទេ", callback_data="att:swp:%d:no" % swap_id)],
     ])
-    pids = partner.get("telegram_ids") or []
-    if pids:
-        await context.bot.send_message(pids[0], body, reply_markup=kb)
+    await _att_send(context, (partner.get("telegram_ids") or [None])[0], "Partner",
+                    partner.get("call_name") or partner["canonical_name"], body, kb=kb)
     return swap_id
 
 
@@ -1592,18 +1591,20 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
     if not sw or sw["status"] != "pending":
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
         return
-    if update.effective_user.id != (staff_get_by_uid(update.effective_user.id) or {}).get("dummy", 1) \
-            and staff_get_by_uid(update.effective_user.id) \
-            and staff_get_by_uid(update.effective_user.id)["id"] != sw["partner_id"]:
-        return
+    if not _att_test_mode():
+        tapper = staff_get_by_uid(update.effective_user.id)
+        if not tapper or tapper["id"] != sw["partner_id"]:
+            return
+    partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
     decision = query.data.split(":")[3]
     if decision == "no":
         swap_set_partner(int(sw["id"]), False)
         await query.edit_message_text(query.message.text + "\n\n✋ You declined — thanks for telling us.\n"
                                       "✋ អ្នកបានបដិសេធហើយ — អរគុណដែលប្រាប់យើង។")
         req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
-        if req and (req.get("telegram_ids") or []):
-            await context.bot.send_message(req["telegram_ids"][0],
+        if req:
+            await _att_send(context, (req.get("telegram_ids") or [None])[0], "Requester",
+                req.get("call_name") or req["canonical_name"],
                 "Your day-off swap wasn't accepted by your partner.\n"
                 "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។")
         return
@@ -1612,9 +1613,8 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
                                   "✅ អ្នកបានយល់ព្រមហើយ — កំពុងផ្ញើទៅបងៗ/អ្នកគ្រប់គ្រង។")
     # now seniors
     req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
-    from datetime import date as _date
     _swap_a = req.get("call_name") if req else "?"
-    _swap_b = (staff_get_by_uid(update.effective_user.id) or {}).get("call_name", "partner")
+    _swap_b = (partner.get("call_name") or partner["canonical_name"]) if partner else "partner"
     _swap_r = sw.get("reason") or "—"
     body = ("Day-off swap: %s ↔ %s. Reason: %s\nប្តូរថ្ងៃឈប់៖ %s ↔ %s។ មូលហេតុ៖ %s"
             % (_swap_a, _swap_b, _swap_r, _swap_a, _swap_b, _swap_r))
@@ -1623,19 +1623,19 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:swps:%d:not_approve" % sw["id"])],
     ])
     for sen in _seniors(exclude_staff_id=sw["requester_id"]):
-        try:
-            await context.bot.send_message(sen["telegram_ids"][0], body, reply_markup=kb)
-        except Exception:
-            pass
+        await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                        sen.get("call_name") or sen["canonical_name"], body, kb=kb)
 
 
 async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:swps:{id}:{approve|not_approve} — seniors decide AFTER the partner agreed."""
+    """att:swps:{id}:{approve|not_approve} — seniors decide AFTER the partner agreed.
+    Test: owner taps as a senior (votes aren't deduped per-senior, so two taps reach quorum)."""
     query = update.callback_query
     await query.answer()
-    sen = staff_get_by_uid(update.effective_user.id)
-    if not sen or not sen.get("is_senior"):
-        return
+    if not _att_test_mode():
+        sen = staff_get_by_uid(update.effective_user.id)
+        if not sen or not sen.get("is_senior"):
+            return
     sw = swap_get(int(query.data.split(":")[2]))
     if not sw or sw["status"] != "partner_ok":
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
@@ -1664,26 +1664,23 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
         dayoff_set_override(req["id"], str(sw["partner_off_date"]), "work", "swap")
         dayoff_set_override(partner["id"], str(sw["partner_off_date"]), "off", "swap")
         dayoff_set_override(partner["id"], str(sw["req_off_date"]), "work", "swap")
-        for s in (req, partner):
-            if s.get("telegram_ids"):
-                await context.bot.send_message(s["telegram_ids"][0],
-                    "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓")
-        try:
-            from datetime import date as _date
-            rn2 = req.get("call_name") or req["canonical_name"]
-            pn2 = partner.get("call_name") or partner["canonical_name"]
-            rd2 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
-            pd2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
-            await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-                "Day-off swap: %s off %s, %s off %s.\nប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
-                % (rn2, rd2, pn2, pd2, rn2, rd2, pn2, pd2))
-        except Exception:
-            pass
+        for s, role in ((req, "Requester"), (partner, "Partner")):
+            await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
+                s.get("call_name") or s["canonical_name"],
+                "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓")
+        from datetime import date as _date
+        rn2 = req.get("call_name") or req["canonical_name"]
+        pn2 = partner.get("call_name") or partner["canonical_name"]
+        rd2 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+        pd2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
+        await _att_send(context, None, "Supervisors group", "",
+            "Day-off swap: %s off %s, %s off %s.\nប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
+            % (rn2, rd2, pn2, pd2, rn2, rd2, pn2, pd2), group=True)
     else:
-        for s in (req, partner):
-            if s.get("telegram_ids"):
-                await context.bot.send_message(s["telegram_ids"][0],
-                    "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។")
+        for s, role in ((req, "Requester"), (partner, "Partner")):
+            await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
+                s.get("call_name") or s["canonical_name"],
+                "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។")
 
 
 def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
