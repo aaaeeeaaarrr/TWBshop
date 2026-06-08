@@ -1759,12 +1759,24 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "meo":
             return await show(sick_me_time(p, int(data[3])))
         if sub == "mecant":
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()}
+                return await show((_hdr(p, "Sick — can't come today.\n\n📝 Type 'go' to run it (test): "
+                    "opens a provisional own-sick case. Then SEND ME A PHOTO to test the doctor-papers "
+                    "→ owner-card flow."), InlineKeyboardMarkup([_back_row("att:sp:me")])))
             return await show(sick_me_cant(p))
         if sub == "sickf":
             return await show(sick_family_dates(p, data[3]))
         if sub == "famd":
             return await show(sick_family_fulltime(p, data[3], data[4]))
         if sub == "famf":
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]}
+                return await show((_hdr(p, "Family sick (%s) — full day.\n\n📝 Type 'go' to run it "
+                    "(test): books the family-sick day + the Supervisors FYI comes to you." % data[3]),
+                    InlineKeyboardMarkup([_back_row("att:sp:sick")])))
             return await show(sick_family_stub(p, data[3], data[4]))
         if sub == "famt":
             return await show(sick_family_time_grid(p, data[3], data[4], "from"))

@@ -1913,12 +1913,17 @@ def _open_sick_case(staff_id: int) -> dict | None:
 async def _handle_sick_paper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Gated: a staff with an open own-sick case sends a photo → Opus reads it → owner card.
     Returns True if handled. Papers go ONLY to owner+Tyty; never analysed in a death context."""
-    if not _attendance_live():
+    if not _att_active():
         return False
     msg = update.message
     if not msg or not msg.photo or not update.effective_user:
         return False
-    staff = staff_get_by_uid(update.effective_user.id)
+    if _att_test_mode() and update.effective_user.id == config.OWNER_TELEGRAM_ID:
+        # test: the owner-as-persona sends the papers photo
+        sid = context.user_data.get("att_persona")
+        staff = next((s for s in staff_all("active") if s["id"] == sid), None) if sid else None
+    else:
+        staff = staff_get_by_uid(update.effective_user.id)
     if not staff or staff.get("status") != "active":
         return False
     case = _open_sick_case(staff["id"])
@@ -3176,6 +3181,23 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(
             "🧪 Wife-birth leave booked (test) — congratulations + Supervisors notice routed to you. "
             "/testreset to wipe.")
+    elif flow == "sick_me":
+        sick_create(persona["id"], "me", pend["date"], "provisional")
+        await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
+            persona.get("call_name") or persona["canonical_name"],
+            "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
+            "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
+        await update.message.reply_text(
+            "🧪 Provisional own-sick case opened (test). Now SEND A PHOTO to this chat to test the "
+            "doctor-papers → owner-card → accept/part-duty flow. /testreset to wipe.")
+    elif flow == "sick_fam":
+        sick_create(persona["id"], pend["who"], pend["date"], "open")
+        nm = persona.get("call_name") or persona["canonical_name"]
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s takes sick leave for their %s today.\n"
+            "FYI: %s សុំច្បាប់ឈឺសម្រាប់%sថ្ងៃនេះ។" % (nm, pend["who"], nm, pend["who"]), group=True)
+        await update.message.reply_text(
+            "🧪 Family-sick day booked (test) — the Supervisors FYI was routed to you. /testreset to wipe.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
