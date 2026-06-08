@@ -1142,11 +1142,14 @@ def ot_when_time(p: dict, minutes: int, sid: int, dayidx: int, page: int = 0) \
 
 
 def _ot_when_label(kind: str, dayidx: int, startmin: int, minutes: int) -> str:
-    """Human window label for the owner card. Now = now→now+dur; Later = day start→end."""
+    """Human window label for the owner card — ALWAYS clock-to-clock (owner: 'now (next 3.5h)'
+    confuses a senior who pressed late). Now = actual current time → +duration; Later = picked
+    start → +duration."""
     if kind == "later" and dayidx >= 0 and startmin >= 0:
         d = date.today() + timedelta(days=dayidx)
         return "%s %s–%s" % (day_label(d), fmt12(startmin), fmt12(startmin + minutes))
-    return "now (next %s)" % (("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60)))
+    now = _now_min()
+    return "now: %s–%s" % (fmt12(now), fmt12(now + minutes))
 
 
 def ot_stub(p: dict, minutes: int, sid: int, kind: str = "now",
