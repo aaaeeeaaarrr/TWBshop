@@ -38,6 +38,7 @@ from shared.database import (
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
     no_show_record, no_show_reverse, lateness_dates,
+    set_att_test, att_test_on, attendance_testreset, attendance_test_counts,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -1134,6 +1135,39 @@ def _attendance_live() -> bool:
     no scheduled prompts, no location processing. Flip via gm_set_state('attendance_live','true')
     only after role-play sign-off + staff briefed. Default OFF."""
     return gm_get_state("attendance_live") == "true"
+
+
+def _att_test_mode() -> bool:
+    """TEST MODE: owner role-plays the whole system alone. Every message routes to the owner;
+    every write is is_test-tagged; real balances untouched. Never messages a real staffer."""
+    return gm_get_state("attendance_test_mode") == "true"
+
+
+def _att_active() -> bool:
+    """A flow runs if it's live OR in test mode (test never reaches real staff)."""
+    return _attendance_live() or _att_test_mode()
+
+
+async def _att_send(context, to_uid, role: str, to_name: str, text: str,
+                    kb=None, group: bool = False) -> None:
+    """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
+    - test mode: deliver to the OWNER, labeled [→ role: name], buttons kept functional so the
+      owner taps as that role.
+    - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True)."""
+    if _att_test_mode():
+        prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
+        try:
+            await context.bot.send_message(config.OWNER_TELEGRAM_ID, prefix + text, reply_markup=kb)
+        except Exception as e:
+            logger.error("att_send(test) failed: %s", e)
+        return
+    target = config.SUPERVISORS_CHAT_ID if group else to_uid
+    if not target:
+        return
+    try:
+        await context.bot.send_message(target, text, reply_markup=kb)
+    except Exception as e:
+        logger.error("att_send to %s failed: %s", target, e)
 
 
 async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2921,6 +2955,54 @@ async def cmd_payroll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(text[i:i + 3500])
 
 
+async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testmode on|off — owner: enter/leave the role-play test harness. In test mode every
+    attendance message routes to YOU (labeled by recipient) with working buttons, every write is
+    is_test-tagged, and real balances are never touched. attendance_live stays untouched."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    arg = (context.args or [""])[0].lower()
+    if arg not in ("on", "off"):
+        cur = "ON" if _att_test_mode() else "off"
+        await update.message.reply_text("Test mode is currently %s.\nUse /testmode on  or  /testmode off"
+                                        % cur)
+        return
+    on = arg == "on"
+    gm_set_state("attendance_test_mode", "true" if on else "false")
+    set_att_test(on)
+    if on:
+        await update.message.reply_text(
+            "🧪 TEST MODE ON.\n"
+            "• Open /test and act as anyone — buttons are REAL.\n"
+            "• Every message (to staff, each senior, each group) comes HERE, labeled [→ who].\n"
+            "• Everything you do is tagged test data — real balances are NOT touched.\n"
+            "• /teststatus to see test rows · /testreset to wipe them · /testmode off when done.")
+    else:
+        await update.message.reply_text("✓ TEST MODE OFF. Messages now route to real recipients "
+                                        "(only matters once attendance_live is on).")
+
+
+async def cmd_testreset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testreset — delete EXACTLY the test-tagged attendance rows (real data can't be caught)."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    deleted = attendance_testreset()
+    total = sum(deleted.values())
+    detail = ", ".join("%s:%d" % (k, v) for k, v in deleted.items() if v) or "nothing to clear"
+    await update.message.reply_text("🧹 Test data wiped — %d rows.\n%s" % (total, detail))
+
+
+async def cmd_teststatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/teststatus — current mode + outstanding test rows per table."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    counts = attendance_test_counts()
+    mode = "🧪 ON" if _att_test_mode() else "off"
+    body = "\n".join("• %s: %d" % (k, v) for k, v in counts.items()) or "• (no test rows)"
+    await update.message.reply_text("Test mode: %s\nLive switch: %s\n\nTest rows:\n%s"
+                                    % (mode, "ON" if _attendance_live() else "off", body))
+
+
 async def cmd_vendor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/vendor — owner manages per-vendor receipt knowledge.
     /vendor                      -> list
@@ -3588,6 +3670,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("vendor",    cmd_vendor))
     app.add_handler(CommandHandler("rollcall",  cmd_rollcall))
     app.add_handler(CommandHandler("payroll",   cmd_payroll))
+    app.add_handler(CommandHandler("testmode",   cmd_testmode))
+    app.add_handler(CommandHandler("testreset",  cmd_testreset))
+    app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall

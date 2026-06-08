@@ -2478,6 +2478,20 @@ _TEST_TABLES = ["al_requests", "al_approvals", "lateness_records", "payback_debt
                 "ot_grants", "ot_buyback", "dayoff_overrides", "dayoff_swaps",
                 "points_events", "attendance_sessions", "location_pings"]
 
+# Process-global TEST flag. When True, attendance INSERT helpers stamp is_test=TRUE and
+# balance mutators become no-ops (the shown balance is computed with an overlay). Safe as a
+# global because test mode runs owner-only (attendance_live is OFF in test → no real traffic).
+_ATT_TEST = False
+
+
+def set_att_test(on: bool) -> None:
+    global _ATT_TEST
+    _ATT_TEST = bool(on)
+
+
+def att_test_on() -> bool:
+    return _ATT_TEST
+
 
 def attendance_testreset() -> dict:
     """Delete EXACTLY the rows written during test mode (is_test=TRUE) from every attendance

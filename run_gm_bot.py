@@ -38,8 +38,10 @@ init_gm_leave_db()
 init_stock_db()
 init_staff_registry_db()
 init_attendance_db()
-from shared.database import points_seed_catalogue
+from shared.database import points_seed_catalogue, set_att_test, gm_get_state
 points_seed_catalogue()
+# sync the process-global TEST flag with the persisted switch (survives restarts)
+set_att_test(gm_get_state("attendance_test_mode") == "true")
 
 app = build_app()
 logging.info("GM Manager bot starting...")
