@@ -582,7 +582,11 @@ async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     label, text, kb = events[i]
     context.user_data["att_dr_i"] = i + 1
-    rows = [list(r) for r in kb.inline_keyboard] if kb else []
+    # a choice button ADVANCES the dry-run (shows the consequence) — never a dead tap
+    rows = []
+    if kb:
+        for r in kb.inline_keyboard:
+            rows.append([InlineKeyboardButton(b.text, callback_data="att:dr:next") for b in r])
     if i + 1 < len(events):
         rows.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (i + 2, len(events)),
                                           callback_data="att:dr:next")])
@@ -1015,7 +1019,12 @@ def walk_card(p: dict, name: str, idx: int) -> tuple[str, InlineKeyboardMarkup]:
     n = len(steps)
     text, step_kb = steps[idx]
     back = ("att:walk:%s:%d" % (name, idx - 1)) if idx > 0 else _WALK_BACK.get(name, "att:menu")
-    rows = [list(r) for r in step_kb.inline_keyboard] if step_kb else []
+    # a choice button ADVANCES to its consequence (the next step) — never a dead tap
+    nxt = ("att:walk:%s:%d" % (name, idx + 1)) if idx < n - 1 else "att:menu"
+    rows = []
+    if step_kb:
+        for r in step_kb.inline_keyboard:
+            rows.append([InlineKeyboardButton(b.text, callback_data=nxt) for b in r])
     rows.append(_back_row(back))
     if idx < n - 1:
         rows.append([InlineKeyboardButton("▶️ Next step (%d/%d)" % (idx + 2, n),
