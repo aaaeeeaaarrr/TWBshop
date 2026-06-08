@@ -1715,26 +1715,37 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     body = ("%s requests AL: %s. Reason: %s\n%s ស្នើ AL: %s។ មូលហេតុ៖ %s\n\n"
             "Working those hours: %s\nអ្នកធ្វើការម៉ោងនោះ៖ %s"
             % (name, days_txt, reason, name, days_txt, reason, avail, avail))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:alapp:%d:approve" % req_id)],
-        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:alapp:%d:not_approve" % req_id)],
-    ])
     for sen in _seniors(exclude_staff_id=requester["id"]):
-        try:
-            await context.bot.send_message(sen["telegram_ids"][0], body, reply_markup=kb)
-        except Exception as e:
-            logger.error("AL card to senior %s failed: %s", sen["canonical_name"], e)
+        # senior id encoded so a test-mode tap (by the owner) is attributed to THIS senior
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Approve · អនុម័ត",
+                                  callback_data="att:alapp:%d:approve:%d" % (req_id, sen["id"]))],
+            [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត",
+                                  callback_data="att:alapp:%d:not_approve:%d" % (req_id, sen["id"]))],
+        ])
+        uid = (sen.get("telegram_ids") or [None])[0]
+        await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
+                        body, kb=kb)
     return req_id
 
 
 async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:alapp:{req}:{approve|not_approve} — a senior decides."""
+    """att:alapp:{req}:{approve|not_approve}:{senior_id} — a senior decides.
+    TEST mode: the owner taps; the encoded senior_id is the actor (so two distinct senior
+    cards = quorum). LIVE: the tapper must be that senior."""
     query = update.callback_query
     await query.answer()
-    sen = staff_get_by_uid(update.effective_user.id)
+    parts = query.data.split(":")
+    req_s, decision = parts[2], parts[3]
+    enc_sid = int(parts[4]) if len(parts) > 4 else None
+    if _att_test_mode() and enc_sid is not None:
+        sen = next((s for s in staff_all("active") if s["id"] == enc_sid), None)
+        actor_uid = (sen.get("telegram_ids") or [enc_sid])[0] if sen else enc_sid
+    else:
+        sen = staff_get_by_uid(update.effective_user.id)
+        actor_uid = update.effective_user.id
     if not sen or not sen.get("is_senior"):
         return
-    _, _, req_s, decision = query.data.split(":")
     req = al_get_request(int(req_s))
     if not req or req["status"] != "pending":
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
@@ -1743,7 +1754,7 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Can't approve your own AL · មិនអាចអនុម័ត AL របស់ខ្លួនឯងបានទេ", show_alert=True)
         return
     from gm_bot import al as alm
-    decisions = al_add_approval(int(req_s), sen["id"], update.effective_user.id, decision)
+    decisions = al_add_approval(int(req_s), sen["id"], actor_uid, decision)
     await query.edit_message_text(query.message.text + "\n\n✓ You voted: %s" % decision)
     if alm.quorum_reached(decisions):
         await _al_finalize(context, req, approved=True)
@@ -1775,34 +1786,27 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         amount = alm.al_day_count(days, req["kind"], frac)
         new_bal = al_deduct(req["staff_id"], amount)
         for sen in _seniors(exclude_staff_id=req["staff_id"]):
-            try:
-                await context.bot.send_message(sen["telegram_ids"][0],
-                    "Approved by %s.\nអនុម័តដោយ %s។" % (vnames, vnames))
-            except Exception:
-                pass
-        if runc:
-            await context.bot.send_message(runc[0],
-                "Your AL for %s is approved ✓\nAL របស់អ្នកសម្រាប់ %s ត្រូវបានអនុម័តហើយ ✓" % (days_txt, days_txt))
-        try:
-            day_off = requester.get("day_off") or "—"
-            await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-                "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\n"
-                "Reason: %s\nមូលហេតុ៖ %s\n"
-                "Normal day off: %s\nថ្ងៃឈប់ធម្មតា៖ %s"
-                % (name, days_txt, name, days_txt,
-                   req.get("reason") or "—", req.get("reason") or "—", day_off, day_off))
-        except Exception:
-            pass
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                            sen.get("call_name") or sen["canonical_name"],
+                            "Approved by %s.\nអនុម័តដោយ %s។" % (vnames, vnames))
+        await _att_send(context, runc[0] if runc else None, "Requester", name,
+            "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
+            "AL របស់អ្នកសម្រាប់ %s ត្រូវបានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត។ 🤍"
+            % (days_txt, new_bal, days_txt, new_bal))
+        day_off = requester.get("day_off") or "—"
+        await _att_send(context, None, "Supervisors group", "",
+            "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\n"
+            "Reason: %s\nមូលហេតុ៖ %s\n"
+            "Normal day off: %s\nថ្ងៃឈប់ធម្មតា៖ %s"
+            % (name, days_txt, name, days_txt,
+               req.get("reason") or "—", req.get("reason") or "—", day_off, day_off), group=True)
     else:
         for sen in _seniors(exclude_staff_id=req["staff_id"]):
-            try:
-                await context.bot.send_message(sen["telegram_ids"][0],
-                    "Not approved by %s.\nមិនបានអនុម័តដោយ %s។" % (vnames, vnames))
-            except Exception:
-                pass
-        if runc:
-            await context.bot.send_message(runc[0],
-                "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                            sen.get("call_name") or sen["canonical_name"],
+                            "Not approved by %s.\nមិនបានអនុម័តដោយ %s។" % (vnames, vnames))
+        await _att_send(context, runc[0] if runc else None, "Requester", name,
+            "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")
 
 
 async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

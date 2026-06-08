@@ -3017,9 +3017,10 @@ def al_create_request(staff_id: int, kind: str, days: list[str], hours_start: st
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO al_requests
-                (staff_id, requested_by_uid, kind, days, hours_start, hours_end, reason, status)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,'pending') RETURNING id""",
-                (staff_id, requested_by_uid, kind, _json.dumps(days), hours_start, hours_end, reason))
+                (staff_id, requested_by_uid, kind, days, hours_start, hours_end, reason, status, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%s) RETURNING id""",
+                (staff_id, requested_by_uid, kind, _json.dumps(days), hours_start, hours_end,
+                 reason, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3043,10 +3044,10 @@ def al_add_approval(req_id: int, senior_id: int, senior_uid: int, decision: str)
     """Record a senior decision (idempotent per senior). Returns all decisions so far."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO al_approvals (request_id, senior_id, senior_uid, decision)
-                VALUES (%s,%s,%s,%s)
+            cur.execute("""INSERT INTO al_approvals (request_id, senior_id, senior_uid, decision, is_test)
+                VALUES (%s,%s,%s,%s,%s)
                 ON CONFLICT (request_id, senior_uid) DO UPDATE SET decision=EXCLUDED.decision,
-                    decided_at=NOW()""", (req_id, senior_id, senior_uid, decision))
+                    decided_at=NOW()""", (req_id, senior_id, senior_uid, decision, _ATT_TEST))
             cur.execute("SELECT decision FROM al_approvals WHERE request_id=%s", (req_id,))
             return [r["decision"] for r in cur.fetchall()]
 
@@ -3083,8 +3084,16 @@ def al_pending_requests() -> list[dict]:
 
 
 def al_deduct(staff_id: int, amount: float) -> float:
+    """Deduct AL days. In TEST mode the real column is NEVER touched — we read the current
+    balance and return current−amount for display only (so the confirmation shows the decrement
+    without mutating real data; the test al_requests row carries the record)."""
     with _db() as conn:
         with conn.cursor() as cur:
+            if _ATT_TEST:
+                cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
+                            (staff_id,))
+                r = cur.fetchone()
+                return float(r["b"]) - float(amount) if r else 0.0
             cur.execute("UPDATE staff_registry SET al_left = COALESCE(al_left,0)-%s, updated_at=NOW() "
                         "WHERE id=%s RETURNING al_left", (amount, staff_id))
             r = cur.fetchone()
