@@ -493,10 +493,9 @@ def sick_me_time(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                "សូមឱ្យឆាប់ធូរស្បើយ — ជួបគ្នាប្រហែល %s 🤍\n\n"
                "[TEST PREVIEW → SUPERVISORS group]\n"
                "“%s is sick, coming ~%s today.”\n\n"
-               "(Missed time becomes pay-back, same as informed late. Doctor papers later wipe it.)\n"
-               "🚧 Next build: arrival watch, papers photo intake → owner tap, frequency dossier."
+               "(Missed time becomes pay-back, same as informed late. Doctor papers later wipe it.)"
                % (t, t, p.get("call_name") or p["canonical_name"], t))
-    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"),
+    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"), _walk_btn("sickme"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -505,9 +504,8 @@ def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
                "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n\n"
                "(Provisional: the missed shift becomes pay-back time unless papers arrive within 3 days.\n"
-               "Papers → real sick day: no pay-back, no points, AL untouched.)\n"
-               "🚧 Next build: papers intake → owner tap, provisional debt, frequency dossier.")
-    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"),
+               "Papers → real sick day: no pay-back, no points, AL untouched.)")
+    return txt, InlineKeyboardMarkup([_back_row("att:sp:me"), _walk_btn("sickme"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -565,11 +563,9 @@ def sick_family_stub(p: dict, who: str, iso: str, window: str = "full day") -> t
     d = day_label(date.fromisoformat(iso))
     return _hdr(p, "Sick leave for your %s — %s, %s ✓\n"
                    "ច្បាប់ឈឺសម្រាប់%s — %s, %s ✓\n"
-                   "Take care 🤍\nថែទាំឱ្យបានល្អ 🤍\n\n"
-                   "🚧 Next build: senior notify + Supervisors notice + the night-before "
-                   "one-tap re-book nudge (12h before next shift)."
+                   "Take care 🤍\nថែទាំឱ្យបានល្អ 🤍"
                 % (who, d, window, _WHO_KH.get(who, who), d, window)), \
-        InlineKeyboardMarkup([_back_row("att:sp:sick"),
+        InlineKeyboardMarkup([_back_row("att:sp:sick"), _walk_btn("sickfam"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -604,8 +600,8 @@ def marriage_stub(p: dict, iso: str, child: bool) -> tuple[str, InlineKeyboardMa
         d3 = day_label(d + timedelta(days=2))
         detail = "💍 Your marriage: 3 days, %s → %s." % (day_label(d), d3)
     return _hdr(p, detail + "\nFrom AL — balance can go below zero, never from salary. "
-                            "Senior approval like a normal AL.\n🚧 Next build: approval flow + notices."), \
-        InlineKeyboardMarkup([_back_row("att:sp:mar"),
+                            "Senior approval like a normal AL."), \
+        InlineKeyboardMarkup([_back_row("att:sp:mar"), _walk_btn("marriage"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -651,7 +647,7 @@ def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeybo
                    p.get("call_name") or p["canonical_name"], day_label(d), dn, who,
                    ("🩺 Compassion tier — 1 day given; owner can upgrade to 3."
                     if days == 1 else "✓ booked."))), \
-        InlineKeyboardMarkup([_back_row("att:sp:death"),
+        InlineKeyboardMarkup([_back_row("att:sp:death"), _walk_btn("death"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -665,10 +661,138 @@ def birth_stub(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
     d = date.fromisoformat(iso)
     d2 = day_label(d + timedelta(days=1))
     return _hdr(p, "👶 2 days of leave, %s → %s.\nFrom AL — balance can go below zero, never from "
-                   "salary.\n🚧 Next build: notify seniors + Supervisors plain notice."
+                   "salary."
                 % (day_label(d), d2)), \
         InlineKeyboardMarkup([_back_row("att:sp"),
+                              _walk_btn("birth"),
                               [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+# ───────────────────────── FLOW WALKTHROUGHS ─────────────────────────
+# Each stub above stops at the staff's last tap. These walkthroughs let the OWNER
+# (in /test) step through EVERY message that follows — senior cards, group notices,
+# final staff confirmation — so the whole ladder is visible end-to-end. Preview only:
+# cross-audience messages are tagged [→ X]; nothing is sent or written. New staff-facing
+# lines marked "(KH pending)" feed the next ChatGPT batch.
+
+_WALK_BACK = {"late": "att:late", "al": "att:al", "swap": "att:do", "sickme": "att:sp:me",
+              "sickfam": "att:sp:sick", "marriage": "att:sp:mar", "death": "att:sp:death",
+              "birth": "att:sp"}
+
+
+def _walk_btn(name: str) -> list[InlineKeyboardButton]:
+    return [InlineKeyboardButton("▶️ See the rest of this flow", callback_data="att:walk:%s:0" % name)]
+
+
+def _walk_steps(p: dict, name: str) -> list[str]:
+    nm = p.get("call_name") or p["canonical_name"]
+    ws = fmt12(to_min(p.get("work_start"))) if to_min(p.get("work_start")) is not None else "your start"
+    if name == "late":
+        return [
+            "[→ SUPERVISORS group, at declare-time WITH reason]\n"
+            "“%s will be ~15 min late for tonight's shift. Reason: moto broke.”" % nm,
+            "[→ %s, arrival watch — fires at the declared time, repeats 4× every 15 min "
+            "until location confirms]\n"
+            "“Are you there yet? Open Live Location.”\n"
+            "“អ្នកមកដល់ហើយឬនៅ? សូមបើកទីតាំងបន្តផ្ទាល់។”" % nm,
+            "[→ %s, when location enters the zone — TRUTH = location, not what was said]\n"
+            "“Arrived 9:18pm — 13 min late. That becomes 13 min pay-back time.”  (KH pending)" % nm,
+            "[→ %s] payback slot picker (no AL option — late = time). Best-for-the-shop "
+            "before/after-shift times, next 7 days:\n"
+            "[Fri 06/06 7:30–7:43pm] [Sat 07/06 5:47–6:00am] [Pay part only…]  (KH pending)" % nm,
+            "[→ %s] booked ✓ — runs like a mini-shift (T−10, check-in, +10 if early):\n"
+            "“Booked ✓ — Fri 06/06 7:30–7:43pm. Come 5 minutes early and you earn +10 points ⭐”\n"
+            "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐”" % nm,
+            "[→ SUPERVISORS group]\n“%s pays back Fri 06/06, 7:30–7:43pm.”\n\n"
+            "✓ Lateness ladder complete." % nm,
+        ]
+    if name in ("al", "marriage"):
+        what = "marriage leave (3 days)" if name == "marriage" else "AL"
+        return [
+            "[→ %s] “Reason? (you type it)” → reason captured verbatim, attached to the request." % nm,
+            "[→ EVERY senior, privately] approval card:\n"
+            "“%s requests %s — Tue 23/06 (full day). Reason: family trip.\n"
+            "Working that day: Dara, Sok, Mealea (day-off: Pisey; on AL: Vann).\n"
+            "[✅ Approve] [❌ Not approve]”" % (nm, what),
+            "[→ requester] “Senior 1 approved ✓ (1/2)…” (silent until the 2nd vote).",
+            "[→ all seniors] the cards collapse → fresh DM tagging who approved. "
+            "2 ✅ = approved (2 ❌ = seniors-only recap, requester told no).",
+            "[→ SUPERVISORS group, reason INCLUDED]\n"
+            "“%s on leave Tue 23/06 (family trip). Normal day off: Fri. Back at work: Wed 24/06, %s.”"
+            % (nm, ws),
+            "[→ %s] “Your %s is approved ✓ Tue 23/06. AL balance: 6.5 days 🤍”  (KH pending)\n\n"
+            "✓ Approval ladder complete (AL deducted; marriage may go below zero, never salary)."
+            % (nm, what),
+        ]
+    if name == "swap":
+        return [
+            "[→ %s] “Reason? (you type it)” → captured." % nm,
+            "[→ the PARTNER, privately — their veto is asked FIRST (cheapest)]\n"
+            "“%s wants to swap day off: you take Wed off, %s takes Fri — same week. Reason: clinic.\n"
+            "[✅ I agree · ខ្ញុំយល់ព្រម] [✋ No · ទេ]”" % (nm, nm),
+            "[→ %s] “You agreed — sending to seniors.”  (partner silence/❌ = swap doesn't happen, "
+            "%s told, seniors never bothered.)" % (nm, nm),
+            "[→ EVERY senior] approval card (same week rule) → 2 ✅ applies dated overrides.",
+            "[→ SUPERVISORS group]\n“Day-off swap: %s off Fri, partner off Wed.”" % nm,
+            "[→ %s] “Your day-off swap is approved ✓”\n"
+            "“ការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓”\n\n✓ Swap ladder complete." % nm,
+        ]
+    if name == "sickme":
+        return [
+            "[→ %s] “If you see a doctor, send me a photo of the papers.” → (staff sends a photo)" % nm,
+            "[→ OWNER + Tyty ONLY — never a group, never other seniors]\n"
+            "“🩺 %s — sick papers. Opus: Calmette Hospital · likely flu · 2d · not contagious.\n"
+            "[✓ Accept (cover 2d)] [1d] [2d] [3d] [💺 Offer part-duty] [Skip → nightly nudges]”\n"
+            "(the photo is forwarded right under this card)" % nm,
+            "[→ owner taps ✓ Accept 2d] → debt + points wiped, real sick day, AL UNTOUCHED.",
+            "[→ %s] “Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍”\n"
+            "“រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជា 🤍”" % nm,
+            "[→ %s, if part-duty offered] “Feeling a little better? There's light work today (+15 ⭐) "
+            "— only if you truly feel able 🤍 [💪 I can come] [🛌 Rest today]”\n\n"
+            "✓ Sick-papers ladder complete. (No papers in 3 days → the missed time becomes pay-back.)"
+            % nm,
+        ]
+    if name == "sickfam":
+        return [
+            "[→ SUPERVISORS group] “%s's family member is sick — off today (no approval needed).”" % nm,
+            "[→ %s, 12h before the next shift] one-tap re-book nudge:\n"
+            "“Is your child better? If you need tomorrow off too, tell me now.\n"
+            "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។”\n"
+            "[Again tomorrow · ស្អែកទៀត] [👍 Better · ធូរស្បើយហើយ]\n\n"
+            "✓ Family-sick ladder complete (each day burns 1 of the 7 yearly special-leave days)." % nm,
+        ]
+    if name == "death":
+        return [
+            "[→ SUPERVISORS group] (already shown on the previous screen — the relation may be named).",
+            "[→ OWNER, compassion tier only] “%s reported a sibling's death — gave 1 day (compassion). "
+            "[Upgrade to 3 days]”" % nm,
+            "[→ %s, if owner upgrades] “Your leave is extended to 3 days 🤍”\n\n"
+            "✓ Death-leave ladder complete (no approval ever; AL may go below zero, never salary)." % nm,
+        ]
+    if name == "birth":
+        return [
+            "[→ SUPERVISORS group] “%s on leave 2 days (wife giving birth).”" % nm,
+            "[→ %s] “Congratulations! 👶 2 days of leave booked.”\n"
+            "“អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ បានកក់រួច។”\n\n✓ Wife-birth ladder complete." % nm,
+        ]
+    return []
+
+
+def walk_card(p: dict, name: str, idx: int) -> tuple[str, InlineKeyboardMarkup]:
+    steps = _walk_steps(p, name)
+    if not steps:
+        return main_menu(p)
+    idx = max(0, min(idx, len(steps) - 1))
+    n = len(steps)
+    back = ("att:walk:%s:%d" % (name, idx - 1)) if idx > 0 else _WALK_BACK.get(name, "att:menu")
+    rows = [_back_row(back)]
+    if idx < n - 1:
+        rows.append([InlineKeyboardButton("▶️ Next step (%d/%d)" % (idx + 2, n),
+                                          callback_data="att:walk:%s:%d" % (name, idx + 1))])
+    else:
+        rows.append([InlineKeyboardButton("🏠 Main menu — flow complete ✓", callback_data="att:menu")])
+    return _hdr(p, "Step %d of %d — the flow continues:\n\n%s" % (idx + 1, n, steps[idx])), \
+        InlineKeyboardMarkup(rows)
 
 
 def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -730,11 +854,10 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                "Why? (you type the reason)\nហេតុអ្វី? (សូមវាយប្រាប់ហេតុផល)\n\n"
                "[TEST PREVIEW → SUPERVISORS group, with the reason]\n"
                "“%s will be ~%d min late for the %s shift today. Reason: …”\n\n"
-               "Then on arrival (location): if >5 min late → PAYBACK slots (time only — never AL).\n"
-               "🚧 Next build: arrival watch (4×15min), real reason capture, payback offer."
+               "Then on arrival (location): if >5 min late → PAYBACK slots (time only — never AL)."
                % (fmt12(ws + offset), offset, p.get("call_name") or p["canonical_name"],
                   offset, fmt12(ws)))
-    return txt, InlineKeyboardMarkup([_back_row("att:late"),
+    return txt, InlineKeyboardMarkup([_back_row("att:late"), _walk_btn("late"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
@@ -818,10 +941,12 @@ def al_time_grid(p: dict, stage: str, from_min: int | None = None,
     return _hdr(p, q), InlineKeyboardMarkup(rows)
 
 
-def al_stub(p: dict, detail: str) -> tuple[str, InlineKeyboardMarkup]:
-    return _hdr(p, detail + "\n\n🚧 Next build: reason step → senior approval cards "
-                            "(ALL seniors, availability picture) → Supervisors notice → deduction."), \
-        InlineKeyboardMarkup([_back_row(), [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+def al_stub(p: dict, detail: str, walk: str = "al") -> tuple[str, InlineKeyboardMarkup]:
+    rows = [_back_row()]
+    if walk:
+        rows.append(_walk_btn(walk))
+    rows.append([InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")])
+    return _hdr(p, detail), InlineKeyboardMarkup(rows)
 
 
 def emergency_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -839,8 +964,7 @@ def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                                   callback_data="att:em:d:%s" % (start + timedelta(days=i)).isoformat())
              for i in range(28)]
     rows = [_back_row("att:em")] + grid(btns, 4)
-    rows.append([InlineKeyboardButton("Later ▶ (29-60d) 🚧", callback_data="att:noop")])
-    return _hdr(p, "Which day? (today + next 60)"), InlineKeyboardMarkup(rows)
+    return _hdr(p, "Which day? (today + next 28)"), InlineKeyboardMarkup(rows)
 
 
 def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -884,12 +1008,16 @@ def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    # everyone's personal OT view — Give OT lives under About Work (seniors)
-    return _hdr(p, "Your OT bank: 0h 🚧\n\nOT is given by your seniors when the shop needs extra "
-                   "hours — when you have hours banked, I'll show you the times to take them back.\n"
+    # everyone's personal OT view — Give OT lives under About Work (seniors).
+    # Live bank + buyback slots are shown in 📋 My schedule (att:my).
+    return _hdr(p, "OT is given by your seniors when the shop needs extra hours — when you have hours "
+                   "banked, I'll show you the best times to take them back.\n"
                    "OT ត្រូវបានអនុញ្ញាតដោយបងៗ/អ្នកគ្រប់គ្រង ពេលហាងត្រូវការម៉ោងបន្ថែម។ "
-                   "ពេលអ្នកមានម៉ោង OT សន្សំទុក ខ្ញុំនឹងបង្ហាញពេលដែលអ្នកអាចសម្រាកសងម៉ោងវិញបាន។"), \
-        InlineKeyboardMarkup([_back_row("att:am")])
+                   "ពេលអ្នកមានម៉ោង OT សន្សំទុក ខ្ញុំនឹងបង្ហាញពេលដែលអ្នកអាចសម្រាកសងម៉ោងវិញបាន។\n\n"
+                   "👉 Your live OT bank is in 📋 My schedule.\n"
+                   "👉 OT bank បច្ចុប្បន្នរបស់អ្នកនៅក្នុង 📋 កាលវិភាគរបស់ខ្ញុំ។"), \
+        InlineKeyboardMarkup([_back_row("att:am"),
+                              [InlineKeyboardButton("📋 My schedule · កាលវិភាគ", callback_data="att:my")]])
 
 
 def ot_nowlater(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1385,15 +1513,20 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if len(data) > 2 and data[2] == "ok":
             return await show(emergency_dates(p))
         if len(data) > 2 and data[2] == "d":
-            return await show(al_stub(p, "Emergency AL for %s." % data[3]))
+            return await show(al_stub(p, "Emergency AL for %s." % data[3], walk=""))
         return await show(emergency_screen(p))
     if action == "do":
         if len(data) > 2 and data[2] == "d":
             return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
-                                         "then 2 seniors — same week rule.)"))
+                                         "then 2 seniors — same week rule.)", walk="swap"))
         return await show(dayoff_screen(p))
+    if action == "walk":
+        # att:walk:{name}:{idx} — owner steps through the rest of a ladder to the end
+        if len(data) > 3:
+            return await show(walk_card(p, data[2], int(data[3])))
+        return await show(main_menu(p))
     if action == "ot":
         if len(data) > 2 and data[2] == "give":
             return await show(ot_nowlater(p))
