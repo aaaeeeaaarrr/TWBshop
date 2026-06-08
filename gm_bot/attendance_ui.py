@@ -925,15 +925,44 @@ def ot_staff_pick(p: dict, minutes: int) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def ot_stub(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Staff picked → next is WHY (typed), then the owner card. Demonstrated step-by-step."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    txt = _hdr(p, "Give %s OT to %s.\n\n[TEST PREVIEW → OWNER approval card]\n"
-                  "“%s gives %s OT to %s — when: …, why: … · bank now: 0h/14h · [✅ Approve] [❌ No]”\n\n"
-                  "🚧 Next build: when+why steps, owner card, banking, buyback slots, daily reminder."
-               % (label, rec["canonical_name"] if rec else "?", p["canonical_name"], label,
-                  rec["canonical_name"] if rec else "?"))
-    return txt, InlineKeyboardMarkup([_back_row("att:aw"),
-                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+    txt = _hdr(p, "Give %s OT to %s.\n\nNext: type the reason for the owners.\n"
+                  "បន្ទាប់៖ វាយបញ្ចូលហេតុផលសម្រាប់ម្ចាស់ហាង។"
+               % (label, rec["canonical_name"] if rec else "?"))
+    return txt, InlineKeyboardMarkup([
+        _back_row("att:ot:give"),
+        [InlineKeyboardButton("▶️ (after reason) → owner card",
+                              callback_data="att:ot:card:%d:%d" % (minutes, sid))]])
+
+
+def ot_owner_card(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    txt = _hdr(p, "[TEST PREVIEW → OWNER approval card]\n"
+                  "“%s gives %s OT to %s — when: …, why: big rush · bank now: 0h/14h”\n"
+                  "[✅ Approve] [❌ No]\n\n"
+                  "Tap to see what happens →"
+               % (p["canonical_name"], label, rec["canonical_name"] if rec else "?"))
+    return txt, InlineKeyboardMarkup([
+        _back_row("att:ot:give"),
+        [InlineKeyboardButton("✅ As if owner approves", callback_data="att:ot:appd:%d:%d" % (minutes, sid))],
+        [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+
+
+def ot_approved_preview(p: dict, minutes: int, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
+    rows = [_back_row("att:aw"), [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]]
+    txt = _hdr(p, "[→ to %s, after approval]\n"
+                  "+%s OT approved — your bank: %gh. Choose when to take it back:\n"
+                  "+%s OT ត្រូវបានអនុម័ត — OT bank៖ %gh។ សូមជ្រើសម៉ោងសម្រាកសងវិញ៖\n"
+                  "(buyback slots at the SAFEST/most-surplus times appear here — reward tone)\n\n"
+                  "NOW-OT: location during the window + the granting senior confirm = banked.\n"
+                  "FUTURE-OT: staff taps ✅ Yes → it becomes a check-in work slot."
+               % (rec["canonical_name"] if rec else "?", label, minutes / 60, label, minutes / 60))
+    return txt, InlineKeyboardMarkup(rows)
 
 
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1330,6 +1359,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(ot_staff_pick(p, int(data[4])))
         if len(data) > 2 and data[2] == "s":
             return await show(ot_stub(p, int(data[3]), int(data[4])))
+        if len(data) > 2 and data[2] == "card":
+            return await show(ot_owner_card(p, int(data[3]), int(data[4])))
+        if len(data) > 2 and data[2] == "appd":
+            return await show(ot_approved_preview(p, int(data[3]), int(data[4])))
         return await show(ot_screen(p))
     if action == "ci":
         return await show(checkin_screen(p))
