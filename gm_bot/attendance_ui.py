@@ -1779,10 +1779,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(marriage_dates(p, child=False))
         if sub == "marchild":
             return await show(marriage_dates(p, child=True))
-        if sub == "mard":
-            return await show(marriage_stub(p, data[3], child=False))
-        if sub == "marcd":
-            return await show(marriage_stub(p, data[3], child=True))
+        if sub in ("mard", "marcd"):
+            child = sub == "marcd"
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child}
+                return await show((_hdr(p, "Marriage leave (%d day%s).\n\n📝 Type the reason — your "
+                    "NEXT message fires the REAL request; the senior approval cards come to you."
+                    % (1 if child else 3, "" if child else "s")),
+                    InlineKeyboardMarkup([_back_row("att:sp:mar")])))
+            return await show(marriage_stub(p, data[3], child=child))
         if sub == "death":
             return await show(death_menu(p))
         if sub == "deathw":
@@ -1791,13 +1797,31 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # compassion tier (sibling/grandparent) = 1 day instant + owner-upgrade; law tier picks 3–7
             from gm_bot.special import death_tier
             if death_tier(data[3]) == "compassion":
+                if att_test_on():
+                    context.user_data["att_test_pending"] = {
+                        "flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]}
+                    return await show((_hdr(p, "Family death (compassion, 1 day) — no reason needed.\n\n"
+                        "📝 Type 'go' to run it (test): condolence + Supervisors notice + the owner "
+                        "upgrade card come to you."), InlineKeyboardMarkup([_back_row("att:sp:death")])))
                 return await show(death_stub(p, data[3], data[4], 1))
             return await show(death_days(p, data[3], data[4]))
         if sub == "deathn":
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]}
+                return await show((_hdr(p, "Family death — no reason needed.\n\n📝 Type 'go' to run it "
+                    "(test): condolence + Supervisors notice come to you."),
+                    InlineKeyboardMarkup([_back_row("att:sp:death")])))
             return await show(death_stub(p, data[3], data[4], int(data[5])))
         if sub == "birth":
             return await show(birth_dates(p))
         if sub == "birthd":
+            if att_test_on():
+                context.user_data["att_test_pending"] = {
+                    "flow": "birth", "persona_id": p["id"], "start_date": data[3]}
+                return await show((_hdr(p, "Wife giving birth (2 days) — no reason needed.\n\n📝 Type "
+                    "'go' to run it (test): congratulations + Supervisors notice come to you."),
+                    InlineKeyboardMarkup([_back_row("att:sp")])))
             return await show(birth_stub(p, data[3]))
         return await show(special_menu(p))
     if action == "aw":

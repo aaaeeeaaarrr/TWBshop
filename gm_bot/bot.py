@@ -3156,6 +3156,26 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(
             "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, "
             "then approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
+    elif flow == "marriage":
+        from datetime import date as _date, timedelta as _td
+        d0 = _date.fromisoformat(pend["start_date"])
+        days = ([pend["start_date"]] if pend.get("child")
+                else [(d0 + _td(days=i)).isoformat() for i in range(3)])
+        await submit_al_request(context, persona, "days", days, None, None,
+                                "Marriage leave — " + reason, config.OWNER_TELEGRAM_ID)
+        await update.message.reply_text(
+            "🧪 Marriage leave submitted (test, via the AL approval engine) — senior cards routed to "
+            "you; approve as two seniors. /testreset to wipe.")
+    elif flow == "death":
+        await book_family_death(context, persona, pend["who"], pend["start_date"])
+        await update.message.reply_text(
+            "🧪 Family-death leave booked (test) — condolence + Supervisors notice routed to you; "
+            "for a sibling/grandparent the owner upgrade card too. /testreset to wipe.")
+    elif flow == "birth":
+        await book_wife_birth(context, persona, pend["start_date"])
+        await update.message.reply_text(
+            "🧪 Wife-birth leave booked (test) — congratulations + Supervisors notice routed to you. "
+            "/testreset to wipe.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
