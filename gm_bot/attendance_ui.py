@@ -1173,7 +1173,7 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
     btns = []
     for d in days:
         iso = d.isoformat()
-        mark = "✓ " if iso in picked else ""
+        mark = "✅ " if iso in picked else ""
         warn = "⚠ " if d <= near_cut else ""
         btns.append(InlineKeyboardButton(warn + mark + day_label(d), callback_data="att:al:d:%s" % iso))
     rows = [_back_row("att:am")] + grid(btns, 4)
@@ -1187,8 +1187,8 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
     if picked:
         rows.append([InlineKeyboardButton("✅ Done · រួចរាល់ (%d)" % len(picked),
                                           callback_data="att:al:done")])
-    return _hdr(p, "You have %s AL days left. Choose dates (tap to ✓, then Done).\n"
-                   "អ្នកនៅសល់ AL %s ថ្ងៃ។ ជ្រើសថ្ងៃ (ចុចដើម្បី ✓ បន្ទាប់មកចុច Done)។\n"
+    return _hdr(p, "You have %s AL days left.\n"
+                   "អ្នកនៅសល់ AL %s ថ្ងៃ។\n"
                    "⚠ days are short notice (within 7 days) — they cost points; "
                    "I'll show the exact cost before you confirm.\n"
                    "⚠ ថ្ងៃដែលមានសញ្ញា ⚠ គឺស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ត្រូវដក Points; "
@@ -1992,9 +1992,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if sub == "done":
                 return await show(al_fullday_or_time(p, picked))
             if sub == "full":
-                near = _near_days(picked)
-                detail = ("Full-day AL for %d day(s) selected.\nបានជ្រើស AL ពេញមួយថ្ងៃ សម្រាប់ %d ថ្ងៃ។"
-                          % (len(picked), len(picked)))
+                from gm_bot import al as alm
+                doff = p.get("day_off")
+                charged = alm.al_charged_days(picked, doff)     # day-off never costs AL
+                span = alm.al_span_label(picked, doff)          # from → to, bridging the day off
+                near = _near_days(set(charged))
+                detail = ("Full-day AL: %s — %d AL day(s).\nAL ពេញមួយថ្ងៃ៖ %s — %d ថ្ងៃ។"
+                          % (span, len(charged), span, len(charged)))
+                if len(charged) != len(picked):
+                    detail += ("\n(Your day off in this range is free.)"
+                               "\n(ថ្ងៃឈប់សម្រាករបស់អ្នកក្នុងចន្លោះនេះ មិនគិតថ្លៃទេ។)")
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                     pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))

@@ -287,6 +287,16 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — AL date-picker polish + day-off-aware count/span:**
+- Selected dates now show **✅** (green-tick emoji) not the `✓` unicode; al_screen header trimmed to
+  "You have X AL days left" (Eng+Kh) — dropped the "Choose dates (tap to ✓…)" line.
+- **Day-off is never charged AL + from→to span:** new `al.al_charged_days` / `al.al_span_label`;
+  `al_day_count` gained a `day_off` param (excludes the staff's weekly day-off). So picking 3 days where
+  one is the day off = **2 AL**, and the leave displays as "Tue 23/06 → Thu 25/06" — bridging the day
+  off (out first→last), whether or not they tapped it. A genuine WORKING-day gap does NOT bridge. Wired
+  into the full-day detail, `_al_summary` (senior card + final), and `_al_finalize` (deduction + notices).
+- Suite 394 green (+ al-day-off-excluded-and-span, updated summary test).
+
 **Session 30 (Jun 9) — AL card redesign + edit-in-place on decision:**
 - AL senior cards are now **English-only, BOLD space-separated dates** (`_al_summary`, HTML parse_mode);
   buttons English ("✅ Approve" / "❌ Not approve").

@@ -1800,8 +1800,8 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
                                reason, requested_by_uid)
     name = requester.get("call_name") or requester["canonical_name"]
-    # AL cards are English-only (owner request), with BOLD, spaced dates.
-    summary = _al_summary(name, days, reason)
+    # AL cards are English-only (owner request), with BOLD from→to dates (bridging the day off).
+    summary = _al_summary(name, days, reason, requester.get("day_off"))
     avail = _al_availability_lines(requester, days)
     avail_html = "\n".join(
         ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
@@ -1825,13 +1825,15 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     return req_id
 
 
-def _al_summary(name: str, days: list[str], reason: str) -> str:
-    """The AL request one-liner, English, with BOLD space-separated dates (HTML). Reused for the
-    senior card and the final edited-in-place result so the request text stays intact."""
+def _al_summary(name: str, days: list[str], reason: str, day_off: str | None = None) -> str:
+    """The AL request one-liner, English, with BOLD from→to dates (HTML) that BRIDGE the staff's
+    day-off (a day off between two AL days = continuous absence). Reused for the senior card and the
+    final edited-in-place result so the request text stays intact."""
     import html
-    from datetime import date as _date
-    dates = "   ".join("<b>%s</b>" % html.escape(_date.fromisoformat(d).strftime("%a %d/%m")) for d in days)
-    return "%s requests AL: %s\nReason: %s" % (html.escape(name), dates, html.escape(reason or "—"))
+    from gm_bot import al as alm
+    span = alm.al_span_label(days, day_off)
+    span_html = "   ".join("<b>%s</b>" % html.escape(seg.strip()) for seg in span.split(",") if seg.strip())
+    return "%s requests AL: %s\nReason: %s" % (html.escape(name), span_html, html.escape(reason or "—"))
 
 
 async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1876,16 +1878,17 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
     if not requester:
         return
     import html
+    from gm_bot import al as alm
     name = requester.get("call_name") or requester["canonical_name"]
     days = req["days"]
-    days_txt = ", ".join(__import__("datetime").date.fromisoformat(d).strftime("%a %d/%m") for d in days)
+    days_txt = alm.al_span_label(days, requester.get("day_off"))   # from→to, bridging the day off
     voters = [a for a in al_get_approvals(req["id"])
               if a["decision"] == ("approve" if approved else "not_approve")]
     vnames = " and ".join(v.get("call_name") or v["canonical_name"] for v in voters[:2])
     runc = requester.get("telegram_ids") or []
     # EDIT the senior cards in place — the request text stays intact, the decision is appended
     # (instead of spawning new undescriptive "Approved by X" messages).
-    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason")),
+    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason"), requester.get("day_off")),
                           ("✅ Approved by %s." if approved else "❌ Not approved by %s.")
                           % html.escape(vnames))
     edited = 0
@@ -1901,12 +1904,11 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
                             sen.get("call_name") or sen["canonical_name"], final, parse_mode="HTML")
     # the requester + Supervisors notices stay bilingual (the owner sees English via strip_khmer)
     if approved:
-        from gm_bot import al as alm
         from gm_bot.attendance import to_min
         sl = (to_min(requester.get("work_end")) - to_min(requester.get("work_start"))) % 1440 or 1440
         frac = alm.fractional_al(to_min(req["hours_start"]), to_min(req["hours_end"]), sl) \
             if req["kind"] == "hours" and req.get("hours_start") else 1.0
-        amount = alm.al_day_count(days, req["kind"], frac)
+        amount = alm.al_day_count(days, req["kind"], frac, day_off=requester.get("day_off"))
         new_bal = al_deduct(req["staff_id"], amount)
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"

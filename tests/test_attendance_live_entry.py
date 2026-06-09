@@ -260,13 +260,28 @@ def test_reason_terminals_format_bilingual(monkeypatch):
 
 
 def test_al_summary_bold_spaced_english():
-    """AL request line: English only, BOLD dates, spaced."""
+    """AL request line: English only, BOLD from→to dates."""
     from gm_bot import bot
     s = bot._al_summary("Pisey", ["2026-06-21", "2026-06-22"], "country side")
-    assert "<b>Sun 21/06</b>" in s and "<b>Mon 22/06</b>" in s   # bold dates
-    assert "<b>Sun 21/06</b>   <b>Mon 22/06</b>" in s            # spaced
+    assert "<b>Sun 21/06 → Mon 22/06</b>" in s   # consecutive days collapse to a from→to range
     assert "requests AL" in s and "country side" in s
-    assert "ស" not in s                                          # no Khmer
+    assert "ស" not in s                          # no Khmer
+
+
+def test_al_day_off_excluded_and_span_bridges():
+    """A day off inside the leave is never charged AL, and the span shows from→to across it."""
+    from gm_bot import al as alm
+    days = ["2026-06-23", "2026-06-24", "2026-06-25"]   # Tue, Wed(off), Thu
+    assert alm.al_day_count(days, "days", day_off="Wed") == 2.0          # Wed not charged
+    assert alm.al_charged_days(days, "Wed") == ["2026-06-23", "2026-06-25"]
+    assert alm.al_span_label(days, "Wed") == "Tue 23/06 → Thu 25/06"     # bridges the day off
+    # day off NOT clicked, but still bridged (out from first to last)
+    assert alm.al_span_label(["2026-06-23", "2026-06-25"], "Wed") == "Tue 23/06 → Thu 25/06"
+    # a real WORKING-day gap does NOT bridge (never imply days he works)
+    gap = alm.al_span_label(["2026-06-22", "2026-06-26"], "Wed")
+    assert "→" not in gap and "Mon 22/06" in gap and "Fri 26/06" in gap
+    # no day_off → everything counts
+    assert alm.al_day_count(days, "days") == 3.0
 
 
 def test_al_finalize_edits_cards_in_place(monkeypatch):
