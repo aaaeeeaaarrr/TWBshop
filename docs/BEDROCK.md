@@ -53,16 +53,34 @@ This single idea drives deltas 1, 2, and 4 below — see them as one principle, 
 
 ## Owner's one hands-on task (delta 2)
 The OS write-boundary cannot be built by Claude — no script Claude writes can establish the wall meant
-to constrain it (Claude runs as the user; a file the user owns, the user can re-permission). The owner
-sets the guard files + a trusted manifest to admin-owned / user-read-only, from an elevated shell.
-Exact `icacls` steps to be verified together on the actual machine — do NOT run unverified admin
-commands blind.
+to constrain it. The owner sets the GLOBAL enforcing guard files to admin-owned / user-read-only, from
+an elevated shell. Exact `icacls`/`Set-Acl` steps to be verified together on the machine — do NOT run
+unverified admin commands blind.
 
-## Implementation order (next session)
-1. **Owner** sets the OS boundary (delta 2).
-2. **Claude** applies deltas 1, 3, 5 to the real files.
-3. **Fresh-session wiring test — the only real proof.** In bypass mode: a catastrophic action with no
-   override must die on exit 2; verify the owner-run path works; grep for a DB write path that dodges
-   the guard. Three advisors agreeing is still zero proof the hook fires.
+**FEASIBILITY — VERIFIED (session 31, this machine `DESKTOP-CM74LHT`):** a real boundary IS achievable.
+- Claude runs as `Papa`, **non-elevated** (filtered token, no admin rights). `Papa` is in Administrators,
+  but UAC is ON (`EnableLUA=1`) and prompts on the secure desktop (`ConsentPromptBehaviorAdmin=5`) → a
+  non-elevated process **cannot silently elevate**; any elevation needs a human UAC consent. That is the
+  human gate that makes the wall real.
+- So: change OWNER of the global enforcing files to `Administrators`/`SYSTEM` and grant `Papa`
+  **ReadAndExecute only** (drop Write/Modify/FullControl, which also removes implicit ACL-change rights).
+  Then non-elevated Claude can run-but-not-modify them; updates require Papa to elevate (UAC).
+- **Lock the GLOBAL enforcing copies only** — `~/.claude/hooks/*.py` + `~/.claude/settings.json` — NOT the
+  repo source (`git pull` rewrites those; locking them would break pull). Cover bootstrap's reach too.
+- **Tradeoff to accept:** after locking, `bootstrap --sync` silently no-ops on the locked files (harmless
+  — its writes are already best-effort/swallowed), and updating a guard becomes a deliberate elevated
+  step. That friction is the point.
+
+## Implementation order (next session) — CORRECTED after the feasibility check
+The OS boundary moves to LAST: locking the guards first would make every delta edit need an elevated
+step. Finalize the code, prove it, THEN lock it.
+1. **Claude** applies deltas 1, 3, 5 to the real files. The final guard write also REMOVES the
+   `#HIGHRISK-OK` marker — a clean cutover: after it, guard edits hard-block with no override (soft
+   self-protection even before the OS lock).
+2. **Fresh-session wiring test — the only real proof.** In bypass mode: a catastrophic action must die
+   on exit 2 with NO override available; verify the owner-run-manually path; grep for a DB write path
+   that dodges the guard. Three advisors agreeing is still zero proof the hook fires.
+3. **Owner LOCKS** the global enforcing files (delta 2, elevated shell) — upgrades soft self-protection
+   to a hard OS boundary. Verify the resulting ACL together (real-path: read it back, don't assume).
 4. Back to attendance flows. **No universal tests gate** — project-opt-in, push/deploy-time only, and
    only where a real test suite exists.

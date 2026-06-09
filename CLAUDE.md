@@ -570,20 +570,22 @@ type it = self-approval; catastrophic actions will switch to block-and-owner-run
 
 **▶ RESUME HERE (session 31 → next session): BEDROCK deltas, then prove, then attendance.**
 Bedrock (Standards+Guards+Ratchet) is converged + documented → **`docs/BEDROCK.md`** (read it first).
-Architecture review is CLOSED — no more abstract review; the next move is PROOF. Order:
-  1. **OWNER, by hand:** set the OS write-boundary on the guard files + a trusted manifest (delta 2 —
-     admin-owned / user-read-only; Claude can't build the wall meant to constrain it). Verify exact
-     `icacls` steps together on the machine — don't run them blind.
-  2. **Claude:** apply deltas 1/3/5 to the real files — kill the self-typed `#HIGHRISK-OK` marker
-     (catastrophic set → block-and-owner-runs-manually) · gate secrets at commit/push/upload, not just
-     write · give the Ratchet a removal trigger.
-  3. **Fresh-session wiring test (only real proof):** bypass mode — a catastrophic action with NO
+Architecture review is CLOSED — no more abstract review; the next move is PROOF. Order (CORRECTED —
+OS boundary moves LAST so guard edits don't need elevation mid-build):
+  1. **Claude:** apply deltas 1/3/5 to the real files — the final guard write also REMOVES the
+     `#HIGHRISK-OK` marker (catastrophic set → block-and-owner-runs-manually) · gate secrets at
+     commit/push/upload not just write · give the Ratchet a removal trigger.
+  2. **Fresh-session wiring test (only real proof):** bypass mode — a catastrophic action with NO
      override must die on exit 2; verify the owner-run path; grep for a DB write path that dodges the
-     guard. (Also: the PowerShell-coverage matcher + global hooks activate only after a session RESTART.)
+     guard.
+  3. **OWNER locks** the GLOBAL enforcing files (`~/.claude/hooks/*.py` + `~/.claude/settings.json`),
+     elevated shell — owner→Administrators/SYSTEM, Papa→ReadAndExecute. FEASIBILITY VERIFIED session 31
+     (Claude non-elevated + UAC prompts → real boundary; see docs/BEDROCK.md). Read the ACL back to prove.
   4. Then attendance: (a) **Bank-on-completion for OT** (the only fix for "leave early, keep OT pay");
      (b) **Go-live prep** (owner role-play → /testreset → /testmode off → greeting + 📋 Menu → flip
      attendance_live). **No universal tests gate** (project-opt-in, push/deploy-time only).
-attendance_live=OFF, attendance_test_mode=OFF.
+NOTE: PowerShell-tool coverage + global hooks are now ACTIVE this session (verified — a PS call to a
+guard path hard-blocked). attendance_live=OFF, attendance_test_mode=OFF.
 
 **▶ RESUME HERE (session 29): TEST HARNESS COMPLETE — ready for the owner's single role-play test.**
 All 8 flows are wired test-aware AND drivable from /test in test mode: AL · late/payback · check-in ·
