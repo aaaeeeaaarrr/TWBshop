@@ -1201,6 +1201,8 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error("checkin scheduler compute failed: %s", e)
         return
+    from shared.database import ot_now_ends_today, flow_save
+    ot_ends = ot_now_ends_today(today)   # {staff_id: latest accepted Now-OT end} — extends the shift
     for minute, name, label, text in events:
         if not ci.is_due(minute, now_min):
             continue
@@ -1217,11 +1219,37 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
+        # if a Now-OT extends past shift-end, the plain shift-end checkout/nudges are REPLACED by the
+        # OT-end ones below (don't pester "did you leave early?" while they're working OT).
+        if staff["id"] in ot_ends and (label.startswith("check-out") or label.startswith("leave-early")):
+            continue
         await _att_send(context, uid, "Staff", name, text)
         # arm check-out capture: next in-zone share while this is set = checked out (60-min window)
         if label.startswith("check-out"):
-            from shared.database import flow_save
             flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
+
+    # Part 3 — end-of-OT checkout: fire the SAME checkout + nudges at the LATEST OT-end, overwriting
+    # the single checked_out_at (a 2nd OT just moves the end). Derive 'already out' from checked_out_at.
+    for staff_id, end_min in ot_ends.items():
+        staff = next((s for s in staff_all("active") if s["id"] == staff_id), None)
+        if not staff or not (staff.get("telegram_ids") or []):
+            continue
+        if end_min >= 1440:
+            continue   # overnight OT-end (crosses midnight) — not handled yet; safe to skip
+        sess = att_get_session(staff_id, today)
+        co = sess.get("checked_out_at") if sess else None
+        if co is not None and hasattr(co, "astimezone"):
+            co_pp = co.astimezone(finance.PP_TZ)
+            if co_pp.hour * 60 + co_pp.minute >= end_min:
+                continue   # they've already checked out at/after the OT end
+        uid = staff["telegram_ids"][0]
+        name = staff.get("call_name") or staff["canonical_name"]
+        for off in (0, 10, 20, 40):
+            if ci.is_due(end_min + off, now_min):
+                await _att_send(context, uid, "Staff", name,
+                                ui._CI_MSG_OUT if off == 0 else ui._CI_MSG_OUT2)
+                if off == 0:
+                    flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
@@ -1458,6 +1486,9 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
     gets a REJECT-ONLY notice — owner silence = approval, with a veto window open until the OT
     actually starts. NOW banks on the spot (reversed if the owner rejects in time + offers buyback);
     LATER asks the staff to accept. The owner never has to act for the OT to proceed."""
+    # Stamp Now-OT with today's date so the scheduler can fire its end-of-OT checkout (Part 3).
+    if kind == "now" and not when_date:
+        when_date = datetime.now(finance.PP_TZ).date().isoformat()
     gid = ot_grant_create(senior["id"], staff["id"], kind, minutes, when_date, start_min, reason)
     sn = staff.get("call_name") or staff["canonical_name"]
     snr = senior.get("call_name") or senior["canonical_name"]

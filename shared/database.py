@@ -2929,6 +2929,25 @@ def ot_grant_create(senior_id, staff_id, kind, minutes, when_date, start_min, re
             return cur.fetchone()["id"]
 
 
+def ot_now_ends_today(today_iso: str) -> dict:
+    """For each staffer with an ACCEPTED Now-OT dated `today`, the LATEST OT-end (minute-of-day) —
+    so the scheduler fires an end-of-OT checkout there, and suppresses the plain shift-end checkout
+    while the OT runs (Part 3). 'banked' = the staff accepted the Now-OT. Mode-scoped by is_test."""
+    out = {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT staff_id, start_min, minutes FROM ot_grants
+                           WHERE kind='now' AND status='banked' AND when_date=%s AND is_test=%s""",
+                        (today_iso, _ATT_TEST))
+            for r in cur.fetchall():
+                if r["start_min"] is None:
+                    continue
+                end = int(r["start_min"]) + int(r["minutes"])
+                if end > out.get(r["staff_id"], -1):
+                    out[r["staff_id"]] = end
+    return out
+
+
 def ot_grant_get(grant_id: int) -> dict | None:
     with _db() as conn:
         with conn.cursor() as cur:

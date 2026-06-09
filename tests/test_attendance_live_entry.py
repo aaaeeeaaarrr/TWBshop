@@ -427,6 +427,32 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert "Requester" in roles and "Partner" in roles and "Supervisors group" in roles
 
 
+def test_ot_now_ends_today_latest_per_staff(monkeypatch):
+    """A 2nd Now-OT extends, not duplicates — ot_now_ends_today returns the LATEST end per staff."""
+    from shared import database as db
+    rows = [
+        {"staff_id": 2, "start_min": 960, "minutes": 120},   # 16:00 +2h = 1080
+        {"staff_id": 2, "start_min": 960, "minutes": 240},   # 16:00 +4h = 1200 (later → wins)
+        {"staff_id": 5, "start_min": 1020, "minutes": 60},   # 1080
+        {"staff_id": 7, "start_min": None, "minutes": 60},   # ignored (no start)
+    ]
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return rows
+
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    assert db.ot_now_ends_today("2026-06-09") == {2: 1200, 5: 1080}
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

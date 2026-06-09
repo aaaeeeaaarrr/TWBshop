@@ -287,6 +287,17 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — Part 3: end-of-OT re-checkout (simpler path, owner-approved):**
+- A Now-OT extends the shift → the checkout fires at the **LATEST OT-end** (a 2nd OT just moves the
+  end), reusing the same message+nudges, and **overwrites the single `checked_out_at`** (no new
+  state — `att_check_out` already overwrites; "final departure = OT end"). Now-OT is now stamped
+  `when_date=today` so it's findable; `database.ot_now_ends_today()` returns the latest end per staff;
+  the scheduler suppresses the plain shift-end checkout while OT runs, then fires the OT-end one
+  (derives "already out" from `checked_out_at >= end`). Suite 402.
+- KNOWN edges (flagged, safe): **overnight OT-end (crosses midnight) is skipped** (not handled yet, no
+  misfire); overlapping-OT double-bank is a separate OT-pay concern. Live firing is scheduler-driven
+  (gated by attendance_live) → provable only at go-live; logic unit-tested (ot_now_ends_today).
+
 **Session 30 (Jun 9) — checkout window 60-min + nudges +10/+20/+40 (owner):**
 - Check-out capture window 90→**60 min**; nudge ("Did you leave early? share location") now fires at
   **+10/+20/+40** (was just +10) — `staff_day_events` raw list. Suppressed once checked out. test_day_events
