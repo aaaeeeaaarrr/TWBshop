@@ -3394,6 +3394,29 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
         await rollcall.handle_staff_private(update, context)
 
 
+async def _late_simarr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:simarr:{persona}:{mins} — TEST ONLY: simulate the late staffer arriving + sharing a
+    correct live location → fire the real arrival payback (debt + slot picker), mirroring live."""
+    query = update.callback_query
+    await query.answer()
+    if not _att_test_mode() or update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    parts = query.data.split(":")
+    persona = next((s for s in staff_all("active") if s["id"] == int(parts[2])), None)
+    if not persona:
+        return
+    mins = int(parts[3])
+    today = datetime.now(finance.PP_TZ).date().isoformat()
+    payback_add_debt(persona["id"], mins, "late arrival (test)", today)
+    d = payback_open_debt(persona["id"])
+    try:
+        await query.edit_message_text((query.message.text or "") + "\n\n📍 Arrived (simulated).")
+    except Exception:
+        pass
+    if d:
+        await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
+
+
 async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:go — tap-to-confirm for the no-reason flows (replaces typing 'go'). Owner test uses the
     user_data pending; a live staffer uses flow_state. Fires the real submit_* via _att_dispatch."""
@@ -3470,13 +3493,17 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "%s នឹងមកយឺតប្រហែល %d នាទីសម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
             % (nm, mins, reason, nm, mins, reason), group=True)
         if not live:
-            # TEST collapses declare+arrival so the owner can test booking without a real GPS share.
-            # LIVE: heads-up ONLY — the payback debt + slot picker appear on ARRIVAL when the staffer
-            # shares live location (truth = GPS-measured minutes), via _handle_staff_location.
-            payback_add_debt(persona["id"], mins, "late arrival (test)", today)
-            d = payback_open_debt(persona["id"])
-            if d:
-                await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
+            # TEST: mirror the LIVE split — declare = heads-up only; the payback picker appears on
+            # ARRIVAL. Offer a button to SIMULATE arrival + a correct live-location share (not an
+            # auto-collapse), so the owner tests the real two-step flow.
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                "📍 Simulate arrival — shared correct live location",
+                callback_data="att:simarr:%d:%d" % (persona["id"], mins))]])
+            await update.message.reply_text(
+                "🧪 Late declared (test) — Supervisors heads-up sent. In LIVE the payback picker "
+                "appears when they ARRIVE & share live location. Tap to simulate that:", reply_markup=kb)
+            return
+        # LIVE: heads-up only — payback appears on real arrival via _handle_staff_location.
         await confirm(
             "✅ Thanks for letting us know — travel safely. Share your live location when you arrive "
             "and I'll work out the time.\n"
@@ -4177,6 +4204,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
     app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go$"))
+    app.add_handler(CallbackQueryHandler(_late_simarr_callback, pattern=r"^att:simarr:"))
     # private photo from staff → reason capture / sick papers (gated); harmless otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))

@@ -138,7 +138,9 @@ def test_dispatch_late_live_declares_only(monkeypatch):
     assert upd.message.replies and "live location" in upd.message.replies[0].lower()
 
 
-def test_dispatch_late_test_collapses_payback(monkeypatch):
+def test_dispatch_late_test_defers_to_simulate_arrival(monkeypatch):
+    """TEST late: declare = heads-up only + a 'simulate arrival' button. NO auto-payback (it now
+    mirrors live — the picker comes from the simulate-arrival tap)."""
     from gm_bot import bot
     calls = {"payback": 0, "offer": 0}
 
@@ -153,7 +155,6 @@ def test_dispatch_late_test_collapses_payback(monkeypatch):
     monkeypatch.setattr(bot, "_att_send", _send)
     monkeypatch.setattr(bot, "payback_add_debt",
                         lambda *a, **k: calls.__setitem__("payback", calls["payback"] + 1))
-    monkeypatch.setattr(bot, "payback_open_debt", lambda *a, **k: {"balance": 30})
     monkeypatch.setattr(bot, "_offer_payback", _offer)
 
     upd = _Update(uid=bot.config.OWNER_TELEGRAM_ID, text="traffic")
@@ -161,8 +162,27 @@ def test_dispatch_late_test_collapses_payback(monkeypatch):
     asyncio.run(bot._att_dispatch(upd, ctx,
                 {"flow": "late", "persona_id": 11, "mins": 30}, live=False))
 
-    assert calls["payback"] == 1       # test collapses declare+arrival so the owner can book
-    assert calls["offer"] == 1
+    assert calls["payback"] == 0 and calls["offer"] == 0          # deferred — no auto-collapse
+    assert upd.message.replies and "simulate" in upd.message.replies[0].lower()
+
+
+def test_late_simarr_fires_payback(monkeypatch):
+    """Tapping 'simulate arrival' in test fires the real payback debt + slot picker."""
+    from gm_bot import bot
+    calls = {"payback": 0, "offer": 0}
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [dict(_PERSONA)])
+    monkeypatch.setattr(bot, "payback_add_debt",
+                        lambda *a, **k: calls.__setitem__("payback", calls["payback"] + 1))
+    monkeypatch.setattr(bot, "payback_open_debt", lambda *a, **k: {"balance": 30})
+
+    async def _offer(*a, **k):
+        calls["offer"] += 1
+
+    monkeypatch.setattr(bot, "_offer_payback", _offer)
+    upd = _CbUpdate(bot.config.OWNER_TELEGRAM_ID, "att:simarr:11:30")
+    asyncio.run(bot._late_simarr_callback(upd, _Ctx()))
+    assert calls["payback"] == 1 and calls["offer"] == 1
 
 
 def test_present_now_for_ot(monkeypatch):

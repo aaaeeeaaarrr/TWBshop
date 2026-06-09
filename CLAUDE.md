@@ -287,6 +287,12 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — late TEST: simulate-arrival button (mirrors live):**
+- TEST late no longer auto-collapses to the payback picker. It now sends the heads-up + a
+  "📍 Simulate arrival — shared correct live location" button (`att:simarr:{persona}:{mins}`,
+  `_late_simarr_callback`, test-only/owner-only) → tapping fires the real arrival payback (debt +
+  picker), exactly mirroring the live declare→arrival split. LIVE late unchanged. Suite 400 green.
+
 **Session 30 (Jun 9) — audit fixes A+B+D:**
 - D: deleted dead **Emergency AL** code (emergency_screen/dates + att:em branch) — unreachable since
   the owner removed it from the menu; confirmed SEPARATE from short-notice AL (kept).
