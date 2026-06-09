@@ -1511,6 +1511,7 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
     senior = next((s for s in staff_all("active") if s["id"] == g["senior_id"]), None)
+    was_confirmed = g["status"] in ("banked", "booked")   # staff had accepted → group was told it's ON
     if g["kind"] == "now" and g["status"] == "banked":
         ot_bank_add(g["staff_id"], -int(g["minutes"]))   # reverse the on-the-spot bank (no-op in test)
     ot_grant_set(gid, status="rejected")
@@ -1533,6 +1534,11 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if senior:
         await _att_send(context, (senior.get("telegram_ids") or [None])[0], "Senior",
                         senior.get("call_name") or senior["canonical_name"], cancel_txt)
+    if was_confirmed and staff:   # the group was told it was ON → tell them it's OFF
+        _cnm = staff.get("call_name") or staff["canonical_name"]
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s's extra OT was cancelled.\nFYI: OT បន្ថែមរបស់ %s ត្រូវបានលុបចោល។" % (_cnm, _cnm),
+            group=True)
 
 
 async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2200,6 +2206,9 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await _att_send(context, uid, "Staff", nm0,
                 "Saved ✓ — your sick day is confirmed. Get well 🤍\n"
                 "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
+            await _att_send(context, None, "Supervisors group", "",
+                "FYI: %s is on covered sick leave for %d day(s).\nFYI: %s សុំច្បាប់ឈឺមានឯកសារ %d ថ្ងៃ។"
+                % (nm0, days, nm0, days), group=True)
         else:
             # no cover — the pay-back created at declaration just stands (don't spell it out to them)
             sick_set(case_id, status="provisional")
@@ -2315,6 +2324,9 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     % (nm, yday.strftime("%a %d/%m")))
             except Exception:
                 pass
+            await _att_send(context, None, "Supervisors group", "",   # informational (decided next morning)
+                "🚫 No-show: %s did not come for %s's shift.\n🚫 អវត្តមាន៖ %s មិនបានមកធ្វើការវេន %s។"
+                % (nm, yday.strftime("%a %d/%m"), nm, yday.strftime("%a %d/%m")), group=True)
 
 
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:

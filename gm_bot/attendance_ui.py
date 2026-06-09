@@ -2183,6 +2183,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             remaining, sid = al_cancel_day(rid, iso)
             if remaining >= 0:
                 al_deduct(p["id"], -1)   # refund just the one cancelled day
+                from gm_bot.bot import _att_send
+                nmx = p.get("call_name") or p["canonical_name"]
+                dlbl = date.fromisoformat(iso).strftime("%a %d/%m")
+                await _att_send(context, None, "Supervisors group", "",
+                    "FYI: %s cancelled AL on %s — back to work that day.\n"
+                    "FYI: %s បានលុបចោល AL ថ្ងៃ %s — នឹងមកធ្វើការវិញ។" % (nmx, dlbl, nmx, dlbl), group=True)
             return await show(my_screen(p))
         return await show(my_screen(p))
     # att:noop and anything unknown: stay put

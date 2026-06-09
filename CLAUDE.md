@@ -287,6 +287,14 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — coverage-gap Supervisors FYIs (round 2):**
+- Added 4 more group FYIs: **sick papers accepted** ("X on covered sick leave for N days"), **OT
+  cancelled by owner** (only if it was confirmed/banked/booked), **no-show** (informational — decided
+  the NEXT-MORNING 08:00 sweep over yesterday, so it's after-the-fact, not "please cover"), **AL day
+  cancelled** ("X cancelled AL on D — back to work"). Now the group hears every coverage-relevant event.
+  Still silent (intentionally): AL/swap REJECTED (no schedule change), sick no-papers-final (internal).
+- Suite 399 green.
+
 **Session 30 (Jun 9) — Supervisors-group FYIs + sick return-check buttons:**
 - Added Supervisors FYIs: **own sick declared** ("X out sick today") and **OT confirmed** ("X on extra
   OT — window"). The light-duty "come" note now goes to the **Supervisors group** (was per-senior DMs;
