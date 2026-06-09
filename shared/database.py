@@ -2473,9 +2473,12 @@ def init_attendance_db() -> None:
             """)
 
 
-_TEST_TABLES = ["al_requests", "al_approvals", "lateness_records", "payback_debts",
-                "payback_bookings", "no_show_records", "special_leaves", "sick_cases",
-                "ot_grants", "ot_buyback", "dayoff_overrides", "dayoff_swaps",
+# Order matters for testreset: delete FK-CHILD tables BEFORE their parents
+# (al_approvals→al_requests, payback_bookings→payback_debts, ot_buyback→ot_grants) or the
+# DELETE hits a ForeignKeyViolation. Child-first is harmless even where there's no FK.
+_TEST_TABLES = ["al_approvals", "al_requests", "payback_bookings", "payback_debts",
+                "ot_buyback", "ot_grants", "lateness_records", "no_show_records",
+                "special_leaves", "sick_cases", "dayoff_overrides", "dayoff_swaps",
                 "points_events", "attendance_sessions", "location_pings"]
 
 # Process-global TEST flag. When True, attendance INSERT helpers stamp is_test=TRUE and
