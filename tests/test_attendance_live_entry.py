@@ -165,6 +165,36 @@ def test_dispatch_late_test_collapses_payback(monkeypatch):
     assert calls["offer"] == 1
 
 
+def test_copy_test_rows_builds_is_test_insert():
+    """/testseed core: copy real rows → is_test=TRUE duplicates, id excluded, columns passed
+    through, is_test forced TRUE. DB-free (fake cursor) so the suite never writes to prod."""
+    from shared.database import _copy_test_rows
+
+    class FakeCur:
+        def __init__(self):
+            self.sql = []
+
+        def execute(self, q, params=None):
+            self.sql.append(q)
+
+        def fetchall(self):
+            # emulate information_schema already excluding 'id' (WHERE column_name <> 'id')
+            return [{"column_name": "staff_id"}, {"column_name": "days"},
+                    {"column_name": "is_test"}]
+
+        @property
+        def rowcount(self):
+            return 2
+
+    cur = FakeCur()
+    n = _copy_test_rows(cur, "al_requests", "AND status='approved'")
+    assert n == 2
+    insert = cur.sql[-1]
+    assert insert == ("INSERT INTO al_requests (staff_id, days, is_test) "
+                      "SELECT staff_id, days, TRUE FROM al_requests "
+                      "WHERE is_test=FALSE AND status='approved'")
+
+
 class _Query:
     def __init__(self, data):
         self.data = data

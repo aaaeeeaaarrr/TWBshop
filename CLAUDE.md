@@ -287,6 +287,20 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — /testseed + restart test-mode sync + /testmode diagnostic:**
+- **/testseed [name]** (owner/Tyty): mirrors real approved ALs + open payback debts into is_test copies
+  so TEST mode shows realistic data after a /testreset wipe (idempotent — clears prior test copies
+  first; real rows never touched). `database.attendance_testseed()` + generic `_copy_test_rows` (schema-
+  proof via information_schema). Ends the "re-seed Visal by hand each reset" loop.
+- **Restart bug fixed:** `build_app` now restores `set_att_test(gm_get_state('attendance_test_mode'))`
+  on boot — a restart no longer silently flips att_test_on() to False while the DB says test_mode=true
+  (which made TEST mode show REAL rows instead of the is_test sandbox — likely source of earlier
+  "ALs still gone in test" confusion).
+- **/testmode no-confirmation:** logs showed ZERO sendMessage in 45 min (bot idle) → the command isn't
+  being answered. Added a temp `logger.info("CMD /testmode received…")` (uid+chat+args) to tell apart
+  "not delivered to this bot" vs "handler silent-return". REMOVE after diagnosis.
+- Suite 381 green (+ test_copy_test_rows, DB-free).
+
 **Session 30 (Jun 9) — precision standard + data fixes:**
 - **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no
   teeth lost) in BOTH global ~/.claude/CLAUDE.md and project CLAUDE.md. New first-class **Rule 2 PROOF,

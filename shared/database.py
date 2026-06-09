@@ -2519,6 +2519,37 @@ def attendance_test_counts() -> dict:
     return out
 
 
+def _copy_test_rows(cur, table: str, where_extra: str) -> int:
+    """Copy real (is_test=FALSE) rows of `table` into is_test=TRUE duplicates with fresh ids.
+    Generic over the schema via information_schema so it never drifts when columns change.
+    `where_extra` is appended to 'WHERE is_test=FALSE' and MUST be literal (no user input)."""
+    cur.execute("SELECT column_name FROM information_schema.columns "
+                "WHERE table_name=%s AND column_name <> 'id' ORDER BY ordinal_position", (table,))
+    cols = [r["column_name"] for r in cur.fetchall()]
+    if not cols:
+        return 0
+    sel = ", ".join(("TRUE" if c == "is_test" else c) for c in cols)
+    cur.execute("INSERT INTO %s (%s) SELECT %s FROM %s WHERE is_test=FALSE %s"
+                % (table, ", ".join(cols), sel, table, where_extra))
+    return cur.rowcount
+
+
+def attendance_testseed(staff_id: int | None = None) -> dict:
+    """Mirror real approved ALs + open payback debts into is_test copies so TEST mode shows
+    realistic data (the owner's role-play sandbox). Idempotent: first clears existing test copies
+    in these two tables (clean mirror, no duplicates on repeat). Real rows are NEVER modified.
+    Optional staff_id limits the mirror to one person. Returns {table: rows_added}."""
+    sfilt = (" AND staff_id = %d" % int(staff_id)) if staff_id else ""
+    out = {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            for t in ("al_requests", "payback_debts"):
+                cur.execute("DELETE FROM %s WHERE is_test=TRUE%s" % (t, sfilt))
+            out["al_requests"] = _copy_test_rows(cur, "al_requests", "AND status='approved'" + sfilt)
+            out["payback_debts"] = _copy_test_rows(cur, "payback_debts", "AND status='open'" + sfilt)
+    return out
+
+
 def import_staff_schedule_csv(path: str, year: int = 2026) -> dict:
     """Rebuild staff_registry from the owner's CSV (the source of truth).
 

@@ -38,7 +38,7 @@ from shared.database import (
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
     no_show_record, no_show_reverse, lateness_dates,
-    set_att_test, att_test_on, attendance_testreset, attendance_test_counts,
+    set_att_test, att_test_on, attendance_testreset, attendance_test_counts, attendance_testseed,
     init_receipt_clarifications_db, receipt_save_clarification,
     receipt_get_pending, receipt_save_answer, receipt_get_answered_examples,
     init_gm_finance_db, save_daily_report, get_daily_reports_for_day, gm_get_state, gm_set_state,
@@ -2972,6 +2972,8 @@ async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """/testmode on|off — owner: enter/leave the role-play test harness. In test mode every
     attendance message routes to YOU (labeled by recipient) with working buttons, every write is
     is_test-tagged, and real balances are never touched. attendance_live stays untouched."""
+    logger.info("CMD /testmode received: uid=%s chat=%s args=%s",
+                update.effective_user.id, getattr(update.effective_chat, "type", "?"), context.args)
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
         return
     arg = (context.args or [""])[0].lower()
@@ -3014,6 +3016,31 @@ async def cmd_teststatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     body = "\n".join("• %s: %d" % (k, v) for k, v in counts.items()) or "• (no test rows)"
     await update.message.reply_text("Test mode: %s\nLive switch: %s\n\nTest rows:\n%s"
                                     % (mode, "ON" if _attendance_live() else "off", body))
+
+
+async def cmd_testseed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testseed [name] — copy real approved ALs + open paybacks into is_test copies so TEST mode
+    shows realistic data. Idempotent (clears prior test copies first). Then /testmode on to see it,
+    /testreset to wipe. No name = everyone; a name = just that staffer."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    arg = " ".join(context.args or []).strip()
+    sid, who = None, "everyone"
+    if arg:
+        act = [m for m in staff_find_by_name(arg) if m.get("status") == "active"]
+        if len(act) == 1:
+            sid, who = act[0]["id"], act[0].get("call_name") or act[0]["canonical_name"]
+        else:
+            await update.message.reply_text(
+                "Couldn't match exactly one active staffer to '%s' (%d matches). "
+                "Use /testseed with no name to seed everyone." % (arg, len(act)))
+            return
+    res = attendance_testseed(sid)
+    total = sum(res.values())
+    detail = ", ".join("%s:%d" % (k, v) for k, v in res.items() if v) or "nothing to copy"
+    await update.message.reply_text(
+        "🌱 Seeded test data from live for %s — %d rows (%s).\n"
+        "Turn /testmode on to see it · /testreset to wipe." % (who, total, detail))
 
 
 async def cmd_vendor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3786,6 +3813,14 @@ def build_app() -> Application:
 
     app = Application.builder().token(config.GM_BOT_TOKEN).build()
 
+    # Restore the test-mode process flag from the DB so a restart can't silently flip
+    # att_test_on() to False while attendance_test_mode='true' (which would make TEST mode show
+    # real rows instead of the is_test sandbox). The DB is the source of truth across restarts.
+    try:
+        set_att_test(gm_get_state("attendance_test_mode") == "true")
+    except Exception as e:
+        logger.error("test-mode flag restore failed: %s", e)
+
     # ConversationHandler wraps the teach + proposal-refine flows
     teach_conv = ConversationHandler(
         entry_points=[
@@ -3838,6 +3873,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testmode",   cmd_testmode))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
+    app.add_handler(CommandHandler("testseed",   cmd_testseed))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall
