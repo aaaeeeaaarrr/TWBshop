@@ -4,6 +4,10 @@
 classes; it does not produce good work (judgment does). Denylists are incomplete — this is
 defense-in-depth, not a force field. Slower-but-solid for high-risk; no ceremony for routine.
 
+**Cadence (session 31):** lean/fast by DEFAULT — full rigor only on "bedrock this", auto on the
+genuinely dangerous set, or when flagged `WE SHOULD BEDROCK THIS`. The Guards stay always-on regardless;
+cadence governs rigor, not the hard-stops. (Canonical rule lives in `~/.claude/CLAUDE.md` → How to Behave.)
+
 Converged design (owner + 3 adversarial advisor passes, session 31, 2026-06-10). **The architecture
 review is CLOSED** — further changes come from a real incident or a failed drill, not another abstract
 review. When review shifts from finding protection gaps to polishing wording, stop and go test/build.
