@@ -168,6 +168,20 @@ named **Bedrock** (Standards+Guards+Ratchet) and converged via 3 advisor passes 
 Architecture review CLOSED; 5 deltas queued. ⚠ The `#HIGHRISK-OK` marker is DEPRECATED — Claude can
 type it = self-approval; catastrophic actions will switch to block-and-owner-runs-manually next session)
 
+**⏳ IN PROGRESS (session 31) — OT / shift-redefine rebuild → full settled design in `docs/OT_DESIGN.md`.**
+Owner redesigned OT into a UNIFIED **"redefine-a-shift"** model: a senior retimes / moves / extends a
+working day's shift, the staff approves, and OT is EMERGENT = hours worked beyond the normal shift
+length. Normal late/leave-early/no-show rules apply (no special OT −10 card). PB and OT are ONE currency
+(an extension/earned-OT clears payback first, then banks; points stay separate; agreed OT shields the PB
+ladder before deadline). Cancellation = re-edit or absence. Day-off payback (within regular shift hours,
+natural cap) to be wired too. **DONE + tested (pure logic + DB):** spec + decision log; `gm_bot/ot.py`
+length-based OT + `split_ot_pb`/`apply_ot_to_pb` + `end_option_tags` ladder; `payback.dayoff_*` window
+primitive; `shift_changes` table (additive) + lifecycle CRUD (`shift_change_create/get/set_status/active/
+set_banked`), is_test round-trip verified. **NEXT:** handler wiring (propose→approve→notify; attendance
+uses the redefined shift; bank-at-checkout + PB-netting + the shield); the picker UI in attendance_ui
+(staff→day→change-day/change-time ladders, today-edges, +PB/+OT tags); day-off payback into
+`_payback_slot_keyboard`; `/test` harness. attendance_live=OFF, attendance_test_mode=OFF.
+
 **▶ RESUME HERE (session 31 → next session): BEDROCK deltas, then prove, then attendance.**
 Bedrock (Standards+Guards+Ratchet) is converged + documented → **`docs/BEDROCK.md`** (read it first).
 Architecture review is CLOSED — no more abstract review; the next move is PROOF. Order (CORRECTED —
