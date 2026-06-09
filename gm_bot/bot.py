@@ -1554,7 +1554,13 @@ async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         ot_grant_set(g["id"], status="declined", staff_ok=False)
         await query.edit_message_text(query.message.text + "\n\n❌ Declined (no problem).")
         return
-    # accepted — NOW banks HERE (only after consent) + offers buyback; LATER becomes a booked slot
+    # accepted — tell the Supervisors group someone's on extra OT (coverage)
+    _onm = staff.get("call_name") or staff["canonical_name"]
+    _owin = _ot_window(g["kind"], g.get("when_date"), g.get("start_min"), int(g["minutes"]))
+    await _att_send(context, None, "Supervisors group", "",
+        "FYI: %s is on extra OT — %s.\nFYI: %s ធ្វើ OT បន្ថែម — %s។" % (_onm, _owin, _onm, _owin),
+        group=True)
+    # NOW banks HERE (only after consent) + offers buyback; LATER becomes a booked slot
     if g["kind"] == "now":
         new_bal = ot_bank_add(g["staff_id"], int(g["minutes"]))
         ot_grant_set(g["id"], status="banked", staff_ok=True)
@@ -2117,6 +2123,53 @@ def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
     return False
 
 
+def _sick_return_kb(case_id: int) -> InlineKeyboardMarkup:
+    """Return-check buttons on the nightly nudge — the staff tells us if/when they're back."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Coming in tomorrow · ស្អែកមកធ្វើការ", callback_data="att:sret:yes:%d" % case_id)],
+        [InlineKeyboardButton("🛌 Still resting · សម្រាកបន្ត", callback_data="att:sret:no:%d" % case_id)],
+        [InlineKeyboardButton("⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…", callback_data="att:sret:today:%d" % case_id)],
+    ])
+
+
+def _sret_time_kb(case_id: int) -> InlineKeyboardMarkup:
+    btns = [InlineKeyboardButton(_fmt_min(h * 60), callback_data="att:sret:t:%d:%d" % (case_id, h * 60))
+            for h in range(7, 21)]
+    return InlineKeyboardMarkup([btns[i:i + 4] for i in range(0, len(btns), 4)])
+
+
+async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:sret:{yes|no|today|t}:{case}[:{min}] — the sick staff's return answer → Supervisors FYI."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    action, case_id = parts[2], int(parts[3])
+    case = sick_get(case_id)
+    if not case:
+        return
+    staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
+    nm = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
+    if action == "yes":
+        await query.edit_message_text("Great — see you tomorrow 🤍\nឃើញគ្នាស្អែក 🤍")
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s is well enough to return TOMORROW.\nFYI: %s នឹងវិលត្រឡប់មកធ្វើការវិញនៅថ្ងៃស្អែក។"
+            % (nm, nm), group=True)
+    elif action == "no":
+        await query.edit_message_text("Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។")
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s is still resting — NOT back tomorrow.\nFYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។"
+            % (nm, nm), group=True)
+    elif action == "today":
+        await query.edit_message_text("What time today?\nម៉ោងប៉ុន្មានថ្ងៃនេះ?", reply_markup=_sret_time_kb(case_id))
+    elif action == "t":
+        m = int(parts[4])
+        await query.edit_message_text("See you at %s today 🤍\nឃើញគ្នាម៉ោង %s ថ្ងៃនេះ 🤍"
+                                      % (_fmt_min(m), _fmt_min(m)))
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s is coming in TODAY at %s.\nFYI: %s នឹងមកធ្វើការថ្ងៃនេះ ម៉ោង %s។"
+            % (nm, _fmt_min(m), nm, _fmt_min(m)), group=True)
+
+
 async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:sp:cov:{case}:{days} | att:sp:duty:{case} — owner decides on sick papers."""
     query = update.callback_query
@@ -2152,7 +2205,8 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             sick_set(case_id, status="provisional")
             await query.edit_message_text(query.message.text + "\n\n✓ Noted.")
             if _att_test_mode():   # show the next step (the nightly return-check) so the test continues
-                await _att_send(context, uid, "Staff", nm0, _SICK_RETURN_CHECK)
+                await _att_send(context, uid, "Staff", nm0, _SICK_RETURN_CHECK,
+                                kb=_sick_return_kb(case_id))
     elif sub == "duty":
         await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
         if uid or _att_test_mode():
@@ -2174,13 +2228,12 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(
             "Thank you for coming in 🤍 light duty only — a senior will point you to seated/easy work.\n"
             "អរគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារអង្គុយ ឬការងារងាយៗឱ្យអ្នក។")
-        # tell on-shift seniors
+        # tell the Supervisors group (the seniors are already in there — no need to DM each)
         _ldn = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
-        for sen in _seniors(exclude_staff_id=case["staff_id"]):
-            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                sen.get("call_name") or sen["canonical_name"],
-                "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
-                "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។" % (_ldn, _ldn))
+        await _att_send(context, None, "Supervisors group", "",
+            "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
+            "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។"
+            % (_ldn, _ldn), group=True)
     elif sub == "rest":
         await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។")
 
@@ -2282,7 +2335,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if sk.papers_deadline_passed(c["the_date"], today):
             sick_set(c["id"], status="no_papers")   # window closed; the pay-back made at declaration stands
             continue
-        await _att_send(context, uid, "Staff", nm, _SICK_RETURN_CHECK)
+        await _att_send(context, uid, "Staff", nm, _SICK_RETURN_CHECK, kb=_sick_return_kb(c["id"]))
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3482,6 +3535,9 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             persona.get("call_name") or persona["canonical_name"],
             "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
             "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
+        _snm = persona.get("call_name") or persona["canonical_name"]
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។" % (_snm, _snm), group=True)
         await confirm(
             "🤍 Rest well — I've noted your sick leave. If you see a doctor, send a photo of the papers.\n"
             "🤍 សម្រាកឱ្យបានល្អ — ខ្ញុំបានកត់ត្រាច្បាប់ឈឺ។ បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារមក។",
@@ -4104,6 +4160,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
+    app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
     app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go$"))
     # private photo from staff → reason capture / sick papers (gated); harmless otherwise

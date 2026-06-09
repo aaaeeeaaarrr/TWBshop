@@ -287,6 +287,16 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — Supervisors-group FYIs + sick return-check buttons:**
+- Added Supervisors FYIs: **own sick declared** ("X out sick today") and **OT confirmed** ("X on extra
+  OT — window"). The light-duty "come" note now goes to the **Supervisors group** (was per-senior DMs;
+  they're already in the group).
+- **Sick nightly return-check now has buttons** (`att:sret:`): ✅ coming tomorrow / 🛌 still resting /
+  ⏰ coming in today at… (hour picker) → each posts a Supervisors FYI (returns tomorrow / not back /
+  coming today at HH). `_sick_return_callback` + `_sick_return_kb` + `_sret_time_kb`. Wired into the
+  nightly job + the test 'skip' preview.
+- Suite 399 green.
+
 **Session 30 (Jun 9) — senior self-AL/swap needs only 1 approval:**
 - `al.approvals_needed(is_senior)` → 1 for a senior's own AL/swap, 2 for regular staff. `quorum_reached`
   /`quorum_rejected` take a `needed` arg. Wired into `_al_approval_callback` + `_swap_senior_callback`
