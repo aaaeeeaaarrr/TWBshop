@@ -287,6 +287,11 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — checkout window 60-min + nudges +10/+20/+40 (owner):**
+- Check-out capture window 90→**60 min**; nudge ("Did you leave early? share location") now fires at
+  **+10/+20/+40** (was just +10) — `staff_day_events` raw list. Suppressed once checked out. test_day_events
+  updated. Suite 401. (Part 3 — OT-end re-checkout — next.)
+
 **Session 30 (Jun 9) — late arrival = ONE combined message + 3-outcome test sim:**
 - Live late arrival is now ONE message: `_offer_payback(late_min=…)` combines the check-in verdict
   ("X min late, counts as pay-back") WITH the picker, so reason+action can't be read separately.

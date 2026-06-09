@@ -141,6 +141,8 @@ def staff_day_events(p: dict) -> list[tuple[int, int, str]]:
         (ws + 5, "T+5 free-minutes message (only if still not checked in)"),
         (ws + ln, "check-out request"),
         (ws + ln + 10, "leave-early ask (only if no check-out)"),
+        (ws + ln + 20, "leave-early ask (only if no check-out)"),
+        (ws + ln + 40, "leave-early ask (only if no check-out)"),
     ]
     return [(m // 1440, m % 1440, label) for m, label in raw]
 

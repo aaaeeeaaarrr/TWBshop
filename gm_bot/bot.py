@@ -1218,10 +1218,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
         await _att_send(context, uid, "Staff", name, text)
-        # arm check-out capture: next in-zone share while this is set = checked out
+        # arm check-out capture: next in-zone share while this is set = checked out (60-min window)
         if label.startswith("check-out"):
             from shared.database import flow_save
-            flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=90)
+            flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
