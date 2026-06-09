@@ -287,6 +287,14 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — sick-papers nightly nudges (label was a lie) + test continues:**
+- The "Skip → nightly nudges" button promised nudges but `_sick_papers_deadline_job` only converted
+  to pay-back AFTER 3 days — ZERO nudges before. Now the daily job sends a gentle nightly reminder
+  (`_SICK_NUDGE`) each run while within the 3-day grace, then converts on the deadline (`_SICK_NOPAPERS`).
+- The test 'skip' terminal now PREVIEWS the nudge (+ in test, the day-3 payback outcome) so the flow
+  continues instead of dead-ending. Shared text constants reused by both the live job and the preview.
+- Suite 398 green.
+
 **Session 30 (Jun 9) — tap-to-confirm + bilingual Back:**
 - No-reason flows (own-sick, family-sick, family-death ×2, wife-birth) now show a **"✅ I confirm ·
   ខ្ញុំបញ្ជាក់"** button (`att:go`) instead of asking to type 'go'. New `_confirm_prompt` + bot

@@ -2097,6 +2097,13 @@ def _tyty_uid() -> int | None:
     return ids[0] if ids else None
 
 
+_SICK_NUDGE = ("Gentle reminder 🤍 please send a photo of your doctor's papers — without them within "
+               "3 days, the missed time becomes pay-back.\n"
+               "សូមរំលឹកដោយសុភាព 🤍 សូមផ្ញើរូបថតឯកសារពេទ្យ — បើគ្មានក្នុង 3 ថ្ងៃ ម៉ោងខកខាននឹងក្លាយជាម៉ោងសងវិញ។")
+_SICK_NOPAPERS = ("No papers came — the missed time goes to your pay-back balance.\n"
+                  "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
+
+
 async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:sp:cov:{case}:{days} | att:sp:duty:{case} — owner decides on sick papers."""
     query = update.callback_query
@@ -2116,11 +2123,17 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         sick_set(case_id, status="papered" if days else "provisional", covered_days=days or None)
         await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd." % days if days
                                                             else "\n\n→ nightly nudges (no fixed days)."))
+        nm0 = (staff.get("call_name") or staff["canonical_name"]) if staff else ""
         if days:
-            await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"]
-                            if staff else "",
+            await _att_send(context, uid, "Staff", nm0,
                 "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
                 "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
+        else:
+            # the staff gets a gentle nightly reminder (the real job sends it each night until the
+            # 3-day deadline); show it here so the flow continues. In test, also show the day-3 outcome.
+            await _att_send(context, uid, "Staff", nm0, _SICK_NUDGE)
+            if _att_test_mode():
+                await _att_send(context, uid, "Staff", nm0, "(Day 3, still no papers →) " + _SICK_NOPAPERS)
     elif sub == "duty":
         await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
         if uid or _att_test_mode():
@@ -2243,20 +2256,21 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     for c in sick_provisional_open():
         if c.get("papers_seen"):
             continue
-        if not sk.papers_deadline_passed(c["the_date"], today):
-            continue
         staff = next((s for s in staff_all("active") if s["id"] == c["staff_id"]), None)
         if not staff:
+            continue
+        uid = (staff.get("telegram_ids") or [None])[0]
+        nm = staff.get("call_name") or staff["canonical_name"]
+        if not sk.papers_deadline_passed(c["the_date"], today):
+            # still within grace → gentle NIGHTLY nudge to bring the papers (one per daily run)
+            await _att_send(context, uid, "Staff", nm, _SICK_NUDGE)
             continue
         ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
         shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
         payback_add_debt(staff["id"], shift_min, "paperless sick (no papers in 3 days)",
                          c["the_date"].isoformat())
         sick_set(c["id"], status="no_papers")
-        await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff",
-            staff.get("call_name") or staff["canonical_name"],
-            "No papers came — the missed time goes to your pay-back balance.\n"
-            "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
+        await _att_send(context, uid, "Staff", nm, _SICK_NOPAPERS)
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
