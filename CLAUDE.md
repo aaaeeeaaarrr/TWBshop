@@ -287,6 +287,14 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — tap-to-confirm + bilingual Back:**
+- No-reason flows (own-sick, family-sick, family-death ×2, wife-birth) now show a **"✅ I confirm ·
+  ខ្ញុំបញ្ជាក់"** button (`att:go`) instead of asking to type 'go'. New `_confirm_prompt` + bot
+  `_att_go_callback` (owner→user_data pending, live→flow_state) fires the real submit_* via
+  `_att_dispatch(reason="(confirmed)")`. `_att_dispatch` made callback-safe (no `message.text`).
+- **Back button bilingual:** `_back_row` → "← Back · ត្រឡប់ក្រោយ" (applies everywhere).
+- Suite 396 green (+ att:go-confirms, back-row-bilingual).
+
 **Session 30 (Jun 9) — AL date-picker polish + day-off-aware count/span:**
 - Selected dates now show **✅** (green-tick emoji) not the `✓` unicode; al_screen header trimmed to
   "You have X AL days left" (Eng+Kh) — dropped the "Choose dates (tap to ✓…)" line.

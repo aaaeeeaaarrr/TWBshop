@@ -3258,15 +3258,41 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
         await rollcall.handle_staff_private(update, context)
 
 
+async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:go — tap-to-confirm for the no-reason flows (replaces typing 'go'). Owner test uses the
+    user_data pending; a live staffer uses flow_state. Fires the real submit_* via _att_dispatch."""
+    query = update.callback_query
+    await query.answer()
+    uid = update.effective_user.id
+    pend, live = None, False
+    if uid == config.OWNER_TELEGRAM_ID:
+        pend = context.user_data.pop("att_test_pending", None)
+    elif _attendance_live():
+        from shared.database import flow_load, flow_clear
+        fs = flow_load(uid)
+        if fs and fs.get("flow") == "att_pending":
+            pend = fs.get("data") or {}
+            flow_clear(uid)
+            live = True
+    if not pend:
+        return
+    try:
+        await query.edit_message_text((query.message.text or "") + "\n\n✅ Confirmed.")
+    except Exception:
+        pass
+    await _att_dispatch(update, context, pend, live=live, reason="(confirmed)")
+
+
 async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
-                        pend: dict | None, *, live: bool) -> None:
+                        pend: dict | None, *, live: bool, reason: str | None = None) -> None:
     """Complete a reason/'go' terminal by firing the REAL submit_* — for a live staffer acting as
     THEMSELVES (live=True; routes to the real seniors/Supervisors/owner) or the owner role-playing
     a persona (live=False; every message routes to the owner, rows is_test-tagged). ONE code path
     for both: the only differences are the actor, the requester uid, the late collapse, and copy."""
     if not pend:
         return
-    reason = (update.message.text or "").strip() or "(no reason)"
+    if reason is None:   # typed-reason flows read the message; tap-to-confirm flows pass it in
+        reason = (((update.message.text or "").strip()) if update.message else "") or "(no reason)"
     if live:
         persona = staff_get_by_uid(update.effective_user.id)
         if not persona or persona.get("status") != "active":
@@ -3280,7 +3306,11 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         req_uid = config.OWNER_TELEGRAM_ID
 
     async def confirm(live_text: str, test_text: str) -> None:
-        await update.message.reply_text(live_text if live else test_text)
+        txt = live_text if live else test_text
+        if update.message is not None:
+            await update.message.reply_text(txt)
+        else:   # came from a tap (att:go) — no message to reply to
+            await context.bot.send_message(update.effective_chat.id, txt)
 
     flow = pend.get("flow")
     if flow == "al":
@@ -3997,6 +4027,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
+    app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go$"))
     # private photo from staff → reason capture / sick papers (gated); harmless otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))

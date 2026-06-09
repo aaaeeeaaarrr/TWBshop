@@ -480,6 +480,30 @@ def test_ot_future_now_accept_banks(monkeypatch):
     assert seen["bank"] == 1 and seen["buyback"] == 1 and seen["status"] == "banked"
 
 
+def test_back_row_bilingual():
+    """The Back button shows Khmer too."""
+    row = ui._back_row("att:menu")
+    assert "Back" in row[0].text and "ត្រឡប់ក្រោយ" in row[0].text
+
+
+def test_att_go_confirms_no_reason_flow(monkeypatch):
+    """Tap '✅ I confirm' (att:go) fires the real submit_* — no typing 'go'."""
+    from gm_bot import bot
+    fired = {}
+
+    async def _dispatch(update, context, pend, *, live, reason=None):
+        fired.update(pend=pend, live=live, reason=reason)
+
+    monkeypatch.setattr(bot, "_att_dispatch", _dispatch)
+    upd = _CbUpdate(bot.config.OWNER_TELEGRAM_ID, "att:go")
+    ctx = _Ctx()
+    ctx.user_data["att_test_pending"] = {"flow": "sick_me", "persona_id": 11}
+    asyncio.run(bot._att_go_callback(upd, ctx))
+    assert fired.get("pend", {}).get("flow") == "sick_me"
+    assert fired["live"] is False and fired["reason"] == "(confirmed)"
+    assert "att_test_pending" not in ctx.user_data   # consumed
+
+
 def test_dispatch_live_rejects_unknown_uid(monkeypatch):
     from gm_bot import bot
     monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: None)

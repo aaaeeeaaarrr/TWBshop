@@ -660,6 +660,18 @@ def _arm_prompt(p: dict, context, base: str, back: str):
     return _hdr(p, line), InlineKeyboardMarkup([_back_row(back)])
 
 
+def _confirm_prompt(p: dict, context, base: str, back: str):
+    """For NO-reason flows: show a tappable '✅ I confirm' button instead of asking them to type
+    'go'. Tapping fires att:go → the real submit_* (same pending as the reason flows)."""
+    line = base
+    if att_test_on():
+        line += "\n🧪 (test — routes to you; /testreset to wipe.)"
+    return _hdr(p, line), InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ I confirm · ខ្ញុំបញ្ជាក់", callback_data="att:go")],
+        _back_row(back),
+    ])
+
+
 def _hdr(p: dict, line: str = "") -> str:
     if p.get("_live"):
         head = "👤 %s" % (p.get("call_name") or p["canonical_name"])
@@ -669,7 +681,7 @@ def _hdr(p: dict, line: str = "") -> str:
 
 
 def _back_row(target: str = "att:menu") -> list[InlineKeyboardButton]:
-    return [InlineKeyboardButton("←Back", callback_data=target)]
+    return [InlineKeyboardButton("← Back · ត្រឡប់ក្រោយ", callback_data=target)]
 
 
 # ---------------------------------------------------------------- screens
@@ -1873,11 +1885,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()})
-                return await show(_arm_prompt(p, context,
+                return await show(_confirm_prompt(p, context,
                     "Sick — can't come today. · ឈឺ មកធ្វើការថ្ងៃនេះមិនបាន។\n\n"
-                    "📝 Type 'go' to confirm — opens a sick case; if you see a doctor, send a photo of "
-                    "the papers after.\n"
-                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — បើកសំណុំរឿងឈឺ; បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារក្រោយមក។",
+                    "Opens a sick case; if you see a doctor, send a photo of the papers after.\n"
+                    "បើកសំណុំរឿងឈឺ; បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារក្រោយមក។",
                     "att:sp:me"))
             return await show(sick_me_cant(p))
         if sub == "sickf":
@@ -1888,10 +1899,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]})
-                return await show(_arm_prompt(p, context,
+                return await show(_confirm_prompt(p, context,
                     "Family sick (%s) — full day. · គ្រួសារឈឺ (%s) ពេញមួយថ្ងៃ។\n\n"
-                    "📝 Type 'go' to confirm — books the day and notifies the Supervisors.\n"
-                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — កត់ត្រាថ្ងៃ ហើយជូនដំណឹងដល់បងៗ។"
+                    "Books the day and notifies the Supervisors.\n"
+                    "កត់ត្រាថ្ងៃ ហើយជូនដំណឹងដល់បងៗ។"
                     % (data[3], data[3]), "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4]))
         if sub == "famt":
@@ -1929,11 +1940,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if _armed(context):
                     _arm_pending(context, update.effective_user.id,
                         {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
-                    return await show(_arm_prompt(p, context,
+                    return await show(_confirm_prompt(p, context,
                         "Family death (1 day) — no reason needed. · មរណភាពគ្រួសារ (1 ថ្ងៃ) "
                         "មិនបាច់មូលហេតុ។\n\n"
-                        "📝 Type 'go' to confirm — sends condolences and notifies the Supervisors.\n"
-                        "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
+                        "Sends condolences and notifies the Supervisors.\n"
+                        "ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
                         "att:sp:death"))
                 return await show(death_stub(p, data[3], data[4], 1))
             return await show(death_days(p, data[3], data[4]))
@@ -1941,10 +1952,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
-                return await show(_arm_prompt(p, context,
+                return await show(_confirm_prompt(p, context,
                     "Family death — no reason needed. · មរណភាពគ្រួសារ មិនបាច់មូលហេតុ។\n\n"
-                    "📝 Type 'go' to confirm — sends condolences and notifies the Supervisors.\n"
-                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
+                    "Sends condolences and notifies the Supervisors.\n"
+                    "ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
                     "att:sp:death"))
             return await show(death_stub(p, data[3], data[4], int(data[5])))
         if sub == "birth":
@@ -1953,11 +1964,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "birth", "persona_id": p["id"], "start_date": data[3]})
-                return await show(_arm_prompt(p, context,
+                return await show(_confirm_prompt(p, context,
                     "Wife giving birth (2 days) — no reason needed. · ប្រពន្ធសម្រាលកូន (2 ថ្ងៃ) "
                     "មិនបាច់មូលហេតុ។\n\n"
-                    "📝 Type 'go' to confirm — sends congratulations and notifies the Supervisors.\n"
-                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យអបអរសាទរ ហើយជូនដំណឹងដល់បងៗ។", "att:sp"))
+                    "Sends congratulations and notifies the Supervisors.\n"
+                    "ផ្ញើពាក្យអបអរសាទរ ហើយជូនដំណឹងដល់បងៗ។", "att:sp"))
             return await show(birth_stub(p, data[3]))
         return await show(special_menu(p))
     if action == "aw":
