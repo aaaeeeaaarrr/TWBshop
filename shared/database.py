@@ -3078,6 +3078,26 @@ def al_set_status(req_id: int, status: str) -> None:
                         (status, req_id))
 
 
+def al_cancel_day(req_id: int, iso: str) -> tuple[int, int | None]:
+    """Cancel ONE day from a multi-day AL request: drop `iso` from its days, keep the rest. Only
+    mark the whole request 'cancelled' when it was the LAST day. Returns (remaining_days, staff_id).
+    (Caller refunds the single day via al_deduct.)"""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT days, staff_id FROM al_requests WHERE id=%s", (req_id,))
+            row = cur.fetchone()
+            if not row:
+                return (-1, None)
+            days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
+            if days:
+                cur.execute("UPDATE al_requests SET days=%s WHERE id=%s", (_json.dumps(days), req_id))
+            else:
+                cur.execute("UPDATE al_requests SET status='cancelled', decided_at=NOW() WHERE id=%s",
+                            (req_id,))
+            return (len(days), row["staff_id"])
+
+
 def al_pending_requests() -> list[dict]:
     import json as _json
     with _db() as conn:
