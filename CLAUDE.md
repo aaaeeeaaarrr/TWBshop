@@ -296,9 +296,10 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   on boot — a restart no longer silently flips att_test_on() to False while the DB says test_mode=true
   (which made TEST mode show REAL rows instead of the is_test sandbox — likely source of earlier
   "ALs still gone in test" confusion).
-- **/testmode no-confirmation:** logs showed ZERO sendMessage in 45 min (bot idle) → the command isn't
-  being answered. Added a temp `logger.info("CMD /testmode received…")` (uid+chat+args) to tell apart
-  "not delivered to this bot" vs "handler silent-return". REMOVE after diagnosis.
+- **/testmode no-confirmation: RESOLVED.** Temp debug log proved command reaches the handler (uid=owner,
+  chat=private, args=['on']) and replies (sendMessage 200) after a clean restart. Earlier silence was a
+  transient (process not processing updates during the overload/restart churn) — not reproduced, not a
+  code bug. Debug line removed.
 - Suite 381 green (+ test_copy_test_rows, DB-free).
 
 **Session 30 (Jun 9) — precision standard + data fixes:**

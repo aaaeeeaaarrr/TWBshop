@@ -2972,8 +2972,6 @@ async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """/testmode on|off — owner: enter/leave the role-play test harness. In test mode every
     attendance message routes to YOU (labeled by recipient) with working buttons, every write is
     is_test-tagged, and real balances are never touched. attendance_live stays untouched."""
-    logger.info("CMD /testmode received: uid=%s chat=%s args=%s",
-                update.effective_user.id, getattr(update.effective_chat, "type", "?"), context.args)
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
         return
     arg = (context.args or [""])[0].lower()
