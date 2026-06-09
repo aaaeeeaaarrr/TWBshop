@@ -64,6 +64,14 @@ def apply_ot_to_pb(ot_earned_min: int, pb_balance_min: int) -> tuple[int, int, i
     return pb_cleared, ot_banked, max(0, pb_balance_min) - pb_cleared
 
 
+def settle_shift(worked_min: int, normal_len_min: int, pb_balance_min: int) -> tuple[int, int, int]:
+    """At checkout: OT = worked beyond normal length; it clears payback FIRST, the rest banks.
+    Returns (ot_banked, pb_cleared, new_pb_balance). The whole money path in one call."""
+    earned = ot_earned(worked_min, normal_len_min)
+    pb_cleared, ot_banked = split_ot_pb(earned, pb_balance_min)
+    return ot_banked, pb_cleared, max(0, pb_balance_min) - pb_cleared
+
+
 def _ext_tag(pb_cleared: int, ot: int) -> str:
     """Button tag: while the extension only clears debt -> '+NPB'; once it earns OT -> '+MOT'."""
     if ot > 0:

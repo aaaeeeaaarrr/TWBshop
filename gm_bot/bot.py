@@ -1518,6 +1518,70 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
     return gid
 
 
+async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
+                              start_min: int, end_min: int, normal_len: int, reason: str) -> int:
+    """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
+    Creates a PROPOSED row and sends the staff an approval card. OT is emergent = worked beyond
+    normal_len; normal attendance rules apply to [start,end]. Any extension first clears outstanding
+    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring)."""
+    from shared.database import shift_change_create, payback_open_debt
+    from gm_bot import ot as ot_mod
+    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len, reason)
+    sn = staff.get("call_name") or staff["canonical_name"]
+    extra = max(0, end_min - (start_min + normal_len))
+    pb = 0
+    if extra:
+        d = payback_open_debt(staff["id"])
+        pb = max(0, (d["minutes_owed"] - d["minutes_paid"])) if d else 0
+    pb_cleared, ot_min = ot_mod.split_ot_pb(extra, pb)
+    tag = ot_mod._ext_tag(pb_cleared, ot_min)
+    win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
+    tagtxt = (" (%s)" % tag) if tag else ""
+    body = ("🕒 Shift change — %s: %s%s\nWhy: %s\n"
+            "You're paid for the time you work; come early → +10 points; normal late/no-show rules apply.\n\n"
+            "🕒 ប្តូរវេន — %s៖ %s%s\nមូលហេតុ៖ %s\n"
+            "អ្នកទទួលបានប្រាក់តាមពេលដែលអ្នកធ្វើ; មកមុន → +10 ពិន្ទុ; ច្បាប់យឺត/អវត្តមានធម្មតាអនុវត្ត។"
+            % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
+        [InlineKeyboardButton("❌ Can't · មិនអាច", callback_data="att:sc:no:%d" % cid)],
+    ])
+    suid = (staff.get("telegram_ids") or [None])[0]
+    msg = await _att_send(context, suid, "Staff", sn, body, kb=kb)
+    if msg is not None:
+        context.bot_data.setdefault("sc_staff_card", {})[cid] = (msg.chat_id, msg.message_id)
+    return cid
+
+
+async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:sc:yes|no:{id} — staff approves/declines a senior's shift redefine. Approve → the shift is
+    active for that day (attendance uses it); decline → nothing changes."""
+    from shared.database import shift_change_get, shift_change_set_status
+    query = update.callback_query
+    await query.answer()
+    cid = int(query.data.split(":")[3])
+    g = shift_change_get(cid)
+    if not g or g["status"] != "proposed":
+        return
+    if not _att_test_mode():
+        staff = staff_get_by_uid(update.effective_user.id)
+        if not staff or staff["id"] != g["staff_id"]:
+            return
+    if query.data.split(":")[2] == "no":
+        shift_change_set_status(cid, "declined")
+        await query.edit_message_text(query.message.text + "\n\n❌ Declined · បានបដិសេធ")
+        return
+    shift_change_set_status(cid, "approved")
+    await query.edit_message_text(query.message.text + "\n\n✅ Approved · បានយល់ព្រម")
+    staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+    if staff:
+        nm = staff.get("call_name") or staff["canonical_name"]
+        win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
+            % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+
+
 def _ot_started(g: dict) -> bool:
     """Has the granted OT already started? The owner's veto window closes at OT start."""
     sm = g.get("start_min")
@@ -4259,6 +4323,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
     app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
+    app.add_handler(CallbackQueryHandler(_shift_change_callback, pattern=r"^att:sc:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))

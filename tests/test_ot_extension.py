@@ -23,6 +23,17 @@ def test_split_clears_pb_first():
     assert ot.split_ot_pb(180, 120) == (120, 60)         # clears 2h debt, 1h OT
     assert ot.split_ot_pb(120, 0) == (0, 120)            # no debt -> all OT
 
+def test_settle_shift_full_money_path():
+    # worked 11h, normal 9h, no debt -> banks 2h OT
+    assert ot.settle_shift(660, 540, 0) == (120, 0, 0)
+    # worked 11h, normal 9h, owes 1h -> 2h OT clears 1h debt, banks 1h, debt 0
+    assert ot.settle_shift(660, 540, 60) == (60, 60, 0)
+    # worked a normal day (however shifted), owes 2h -> no OT, debt untouched
+    assert ot.settle_shift(540, 540, 120) == (0, 0, 120)
+    # short day (late/left early), owes 100 -> no OT, debt stands
+    assert ot.settle_shift(480, 540, 100) == (0, 0, 100)
+
+
 def test_apply_ot_to_pb_nets():
     # 3h OT earned + 2h PB owed -> clears 2h, banks 1h, debt now 0  (your "shows as 1 OT")
     assert ot.apply_ot_to_pb(180, 120) == (120, 60, 0)
