@@ -3123,12 +3123,13 @@ def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) 
 
 
 def payback_open_debt(staff_id: int) -> dict | None:
-    """The staff's single open payback debt (balance = owed-paid), or None."""
+    """The staff's single open payback debt (balance = owed-paid), or None. Mode-scoped: in test
+    mode it sees only is_test debts, in live only real ones (so the two never merge/mix)."""
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""SELECT *, (minutes_owed - minutes_paid) AS balance
-                           FROM payback_debts WHERE staff_id=%s AND status='open'
-                           ORDER BY id LIMIT 1""", (staff_id,))
+                           FROM payback_debts WHERE staff_id=%s AND status='open' AND is_test=%s
+                           ORDER BY id LIMIT 1""", (staff_id, _ATT_TEST))
             row = cur.fetchone()
             return dict(row) if row else None
 
