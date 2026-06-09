@@ -1316,17 +1316,18 @@ async def _offer_payback(context, staff: dict, balance: int, uid: int,
     """Send the payback slot picker. On a FRESH late arrival (late_min given) the check-in verdict is
     COMBINED into this one message — so the reason ('X late, counts as pay-back') and the picker can't
     be read separately. Other contexts (re-offers/ladder) get the plain 'You owe X' header."""
+    from gm_bot.attendance_ui import _hm
     kb = _payback_slot_keyboard(staff, balance)
     if late_min is not None:
-        text = ("Checked in ✓ — %d min late (counts as pay-back). Pick when to work it off — the "
+        text = ("Checked in ✓ — %s late (counts as pay-back). Pick when to work it off — the "
                 "times we need you most:\n"
-                "ចុះវត្តមានរួច ✓ — យឺត %d នាទី (រាប់ជាម៉ោងសងវិញ)។ "
+                "ចុះវត្តមានរួច ✓ — យឺត %s (រាប់ជាម៉ោងសងវិញ)។ "
                 "សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
-                % (late_min, late_min))
+                % (_hm(late_min), _hm(late_min)))
     else:
-        text = ("You owe %d min. Pick when to work it off — these are the times we need you most:\n"
-                "អ្នកនៅត្រូវសង %d min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
-                % (balance, balance))
+        text = ("You owe %s. Pick when to work it off — these are the times we need you most:\n"
+                "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                % (_hm(balance), _hm(balance)))
     await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
                     text, kb=kb)
 
@@ -2119,10 +2120,11 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.edit_message_text("Your payback is already cleared ✓ / សងរួចរាល់ហើយ ✓")
         return
     if sub == "part":
+        from gm_bot.attendance_ui import _hm
         part = min(int(data[3]), debt["balance"])
         kb = _payback_slot_keyboard({**staff}, part)
         await query.edit_message_text(
-            "Pick a time for %d min:\nសូមជ្រើសពេលសម្រាប់ %d min៖" % (part, part), reply_markup=kb)
+            "Pick a time for %s:\nសូមជ្រើសពេលសម្រាប់ %s៖" % (_hm(part), _hm(part)), reply_markup=kb)
         return
     if sub == "book":
         slot_date, s_min, e_min, mins = data[3], int(data[4]), int(data[5]), int(data[6])
@@ -3657,10 +3659,11 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         ws = to_min(persona.get("work_start"))
         nm = persona.get("call_name") or persona["canonical_name"]
         late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
+        from gm_bot.attendance_ui import _hm
         await _att_send(context, None, "Supervisors group", "",
-            "%s will be ~%d min late for today's shift. Reason: %s\n"
-            "%s នឹងមកយឺតប្រហែល %d នាទីសម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
-            % (nm, mins, reason, nm, mins, reason), group=True)
+            "%s will be ~%s late for today's shift. Reason: %s\n"
+            "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
+            % (nm, _hm(mins), reason, nm, _hm(mins), reason), group=True)
         if not live:
             # TEST: mirror the LIVE split — declare = heads-up only; the outcome appears on ARRIVAL.
             # They CLICKED late, but might actually arrive early / on-time / late — so offer all three
