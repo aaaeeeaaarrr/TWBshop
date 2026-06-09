@@ -174,13 +174,18 @@ working day's shift, the staff approves, and OT is EMERGENT = hours worked beyon
 length. Normal late/leave-early/no-show rules apply (no special OT −10 card). PB and OT are ONE currency
 (an extension/earned-OT clears payback first, then banks; points stay separate; agreed OT shields the PB
 ladder before deadline). Cancellation = re-edit or absence. Day-off payback (within regular shift hours,
-natural cap) to be wired too. **DONE + tested (pure logic + DB):** spec + decision log; `gm_bot/ot.py`
-length-based OT + `split_ot_pb`/`apply_ot_to_pb` + `end_option_tags` ladder; `payback.dayoff_*` window
-primitive; `shift_changes` table (additive) + lifecycle CRUD (`shift_change_create/get/set_status/active/
-set_banked`), is_test round-trip verified. **NEXT:** handler wiring (propose→approve→notify; attendance
-uses the redefined shift; bank-at-checkout + PB-netting + the shield); the picker UI in attendance_ui
-(staff→day→change-day/change-time ladders, today-edges, +PB/+OT tags); day-off payback into
-`_payback_slot_keyboard`; `/test` harness. attendance_live=OFF, attendance_test_mode=OFF.
+natural cap). **DONE + tested:** spec + decision log; `gm_bot/ot.py` length-based OT +
+`split_ot_pb`/`apply_ot_to_pb`/`settle_shift` + `end_option_tags` ladder; `payback.dayoff_*` primitive;
+`shift_changes` table (additive) + lifecycle CRUD; **propose** (`submit_shift_change` + approval card) +
+**approve/decline** (`_shift_change_callback`, registered `att:sc:`); **bank-at-checkout**
+(`_settle_redefined_shift` in `_handle_staff_location` — settle + PB-net + 14h cap, is_test end-to-end
+proven); **day-off payback slot WIRED** into `_payback_slot_keyboard`. **NEXT (the picker-UI phase — `/test`
+still shows the OLD Now/Later OT flow until this lands):** rebuild the Give-OT picker in `attendance_ui`
+(old chain = `ot_nowlater`/`ot_staff_pick`/`ot_when_day`/`ot_start`/`ot_end` → new: staff→work-day→
+[Change day | Change time]→start ladder (`ot.start_options`)→end ladder (`ot.end_option_tags`, +PB/+OT
+tags)→confirm→`submit_shift_change`; today-edges; change-day→nearest 2 day-offs) + its callback routing;
+then **attendance USES the redefined times** (scheduler/verdict read `shift_change_active`); the **shield**;
+`/test` harness. attendance_live=OFF, attendance_test_mode=OFF.
 
 **▶ RESUME HERE (session 31 → next session): BEDROCK deltas, then prove, then attendance.**
 Bedrock (Standards+Guards+Ratchet) is converged + documented → **`docs/BEDROCK.md`** (read it first).
