@@ -257,11 +257,34 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-09 (session 30 — precision-standard v2026-06-09-A: compressed 15→6 rules +
-new Rule 2 PROOF-NOT-ECHO (WRITTEN ≠ SAVED); fixed Visal AL 10th→11th (day off) real+test; root-caused
-the "won't restore" bug = ad-hoc ssh scripts skipped commit, repo write path via _db() is sound)
+**Last updated:** 2026-06-09 (session 30 — LIVE staff entry wired for the attendance flows (gated,
+inert until attendance_live); precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused
+the "won't restore" bug = ad-hoc ssh scripts skipped commit)
 
-**Session 30 (Jun 9):**
+**Session 30 (Jun 9) — LIVE STAFF ENTRY for attendance (gated OFF):**
+- **What:** a real ACTIVE TWB staffer can now open their OWN attendance menu (Check-in / Late / About
+  Work / About Me → AL, Special Leave, day-off swap, OT, My schedule) and fire the REAL submit_* as
+  themselves. Same menus/callbacks/submit_* as the owner /test shell — NO behavior fork (Rule 1).
+- **Entry:** non-owner /start or private text → if `attendance_live` AND active TWB staff →
+  `attendance_ui.open_live_menu` (persona LOCKED to self; "🎭 Switch persona" hidden; pick/persona
+  callbacks refused). Else → roll-call (unchanged). Check-in & late→payback-on-arrival stay on the
+  already-live location path (`_handle_staff_location`).
+- **Reason capture:** flow_state (DB, restart-safe) per the doc — `flow_save(uid,"att_pending",…)`;
+  the staffer's next text completes the flow. Owner test path still uses user_data (unchanged).
+- **Unified dispatcher:** `_att_test_dispatch` → `_att_dispatch(update, ctx, pend, *, live)`. live=True
+  acts as self, requester_uid=self, routes to real recipients; live=False = owner test (routed to
+  owner, is_test). **LIVE late = declare-only** (heads-up); the payback debt+picker appear on arrival
+  via live location. TEST collapses declare+arrival (so the owner can test booking) — per the doc note.
+- **Gating/safety:** everything behind `_attendance_live()` (still OFF) — module messages no one but
+  the owner until go-live. Module docstring safety-contract updated to the live+test contract.
+- **Verified:** suite 379 green (+10 new in tests/test_attendance_live_entry.py — persona self-lock,
+  menu hides switch, armed gating, flow_state routing, LIVE late declare-only vs TEST collapse,
+  unknown-uid rejected). py_compile OK. Real-staff DELIVERY provable only at go-live (single account +
+  gate OFF) — the documented plan (owner role-play test in test mode covers the message shapes).
+- New live reason-PROMPT strings are English (KH pending) — flag for the next ChatGPT Khmer pass; the
+  staff-facing OUTPUTS (senior cards / Supervisors notices / confirms) are already bilingual.
+
+**Session 30 (Jun 9) — precision standard + data fixes:**
 - **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no
   teeth lost) in BOTH global ~/.claude/CLAUDE.md and project CLAUDE.md. New first-class **Rule 2 PROOF,
   NOT ECHO** — operation echo ≠ persisted state: PUSHED ≠ LIVE and WRITTEN ≠ SAVED (commit/close then

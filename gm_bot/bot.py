@@ -216,8 +216,17 @@ async def _auto_skip_proposals_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
-        # staff roll-call: pressing Start binds + greets them (silence for strangers)
+        # staff roll-call: pressing Start binds + greets them (silence for strangers).
+        # When attendance is LIVE, an active TWB staffer instead opens their own attendance menu.
         if update.effective_chat and update.effective_chat.type == "private":
+            uid = update.effective_user.id
+            rec = staff_get_by_uid(uid) if _attendance_live() else None
+            if rec and rec.get("status") == "active" and rec.get("org") == "TWB":
+                if len(rec.get("telegram_ids", [])) > 1:
+                    from shared.database import staff_bind_uid
+                    staff_bind_uid(rec["id"], uid)
+                await attendance_ui.open_live_menu(update, context, rec)
+                return
             from gm_bot import rollcall
             await rollcall.handle_staff_private(update, context)
         return
@@ -3086,40 +3095,70 @@ async def exstaff_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """All loose private text. Owner -> departure detection; anyone else -> roll-call.
+    """All loose private text. Owner -> test dispatch / departure detection. A live staffer ->
+    complete a pending attendance flow, else open their own attendance menu, else roll-call.
     (One router because PTB lets only the first matching handler in a group fire.)"""
     if not update.message or not update.effective_user:
         return
-    if update.effective_user.id == config.OWNER_TELEGRAM_ID:
+    uid = update.effective_user.id
+    if uid == config.OWNER_TELEGRAM_ID:
         if context.user_data.get("att_test_pending"):
-            await _att_test_dispatch(update, context)
+            await _att_dispatch(update, context,
+                                context.user_data.pop("att_test_pending", None), live=False)
             return
         await _owner_private_departure(update, context)
     else:
+        # live attendance entry (gated): a typed reason completes a real flow; otherwise the
+        # active staffer opens their own menu. Falls through to roll-call when not live.
+        if _attendance_live():
+            from shared.database import flow_load, flow_clear
+            fs = flow_load(uid)
+            if fs and fs.get("flow") == "att_pending":
+                pend = fs.get("data") or {}
+                flow_clear(uid)
+                await _att_dispatch(update, context, pend, live=True)
+                return
+            rec = staff_get_by_uid(uid)
+            if rec and rec.get("status") == "active" and rec.get("org") == "TWB":
+                await attendance_ui.open_live_menu(update, context, rec)
+                return
         from gm_bot import rollcall
         await rollcall.handle_staff_private(update, context)
 
 
-async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Test-mode entry: the owner's typed reason completes a real submit_* with the persona as
-    actor. Only fires in test mode (the shell only sets att_test_pending when att_test_on)."""
-    pend = context.user_data.pop("att_test_pending", None)
+async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                        pend: dict | None, *, live: bool) -> None:
+    """Complete a reason/'go' terminal by firing the REAL submit_* — for a live staffer acting as
+    THEMSELVES (live=True; routes to the real seniors/Supervisors/owner) or the owner role-playing
+    a persona (live=False; every message routes to the owner, rows is_test-tagged). ONE code path
+    for both: the only differences are the actor, the requester uid, the late collapse, and copy."""
     if not pend:
         return
     reason = (update.message.text or "").strip() or "(no reason)"
-    persona = next((s for s in staff_all("active") if s["id"] == pend.get("persona_id")), None)
-    if not persona:
-        await update.message.reply_text("🧪 test persona not found — pick again via /test.")
-        return
+    if live:
+        persona = staff_get_by_uid(update.effective_user.id)
+        if not persona or persona.get("status") != "active":
+            return
+        req_uid = update.effective_user.id
+    else:
+        persona = next((s for s in staff_all("active") if s["id"] == pend.get("persona_id")), None)
+        if not persona:
+            await update.message.reply_text("🧪 test persona not found — pick again via /test.")
+            return
+        req_uid = config.OWNER_TELEGRAM_ID
+
+    async def confirm(live_text: str, test_text: str) -> None:
+        await update.message.reply_text(live_text if live else test_text)
+
     flow = pend.get("flow")
     if flow == "al":
         await submit_al_request(context, persona, pend["kind"], pend["days"],
-                                pend.get("hours_start"), pend.get("hours_end"), reason,
-                                config.OWNER_TELEGRAM_ID)
-        await update.message.reply_text(
-            "🧪 AL request submitted (test) — the senior approval cards were routed to you. "
-            "Tap ✅ on two of them to reach quorum, then watch the requester + Supervisors messages. "
-            "/testreset to wipe this when done.")
+                                pend.get("hours_start"), pend.get("hours_end"), reason, req_uid)
+        await confirm(
+            "✅ AL request sent — your seniors will review it. I'll message you when it's decided.\n"
+            "✅ បានផ្ញើសំណើ AL — បងៗនឹងពិនិត្យ ហើយខ្ញុំនឹងប្រាប់ពេលមានការសម្រេច។",
+            "🧪 AL request submitted (test) — the senior approval cards were routed to you. Tap ✅ on "
+            "two to reach quorum, then watch the requester + Supervisors messages. /testreset to wipe.")
     elif flow == "late":
         from gm_bot.attendance import to_min
         mins = int(pend.get("mins") or 0)
@@ -3131,54 +3170,69 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "%s will be ~%d min late for today's shift. Reason: %s\n"
             "%s នឹងមកយឺតប្រហែល %d នាទីសម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
             % (nm, mins, reason, nm, mins, reason), group=True)
-        # arrival → debt + payback picker (simulated here so you can test booking)
-        payback_add_debt(persona["id"], mins, "late arrival (test)", today)
-        d = payback_open_debt(persona["id"])
-        if d:
-            await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
-        await update.message.reply_text(
+        if not live:
+            # TEST collapses declare+arrival so the owner can test booking without a real GPS share.
+            # LIVE: heads-up ONLY — the payback debt + slot picker appear on ARRIVAL when the staffer
+            # shares live location (truth = GPS-measured minutes), via _handle_staff_location.
+            payback_add_debt(persona["id"], mins, "late arrival (test)", today)
+            d = payback_open_debt(persona["id"])
+            if d:
+                await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
+        await confirm(
+            "✅ Thanks for letting us know — travel safely. Share your live location when you arrive "
+            "and I'll work out the time.\n"
+            "✅ អរគុណដែលប្រាប់ — សូមធ្វើដំណើរដោយសុវត្ថិភាព។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ ខ្ញុំនឹងគណនាម៉ោងឱ្យ។",
             "🧪 Late declared (test) — Supervisors heads-up + the payback slot picker were routed to "
-            "you. Tap a slot to book it (you'll get the booked-confirm + Supervisors notice). "
-            "/testreset to wipe.")
+            "you. Tap a slot to book it. /testreset to wipe.")
     elif flow == "ot":
         receiver = next((s for s in staff_all("active") if s["id"] == pend.get("staff_id")), None)
         if not receiver:
-            await update.message.reply_text("🧪 OT receiver not found.")
+            await update.message.reply_text("OT receiver not found." if live
+                                            else "🧪 OT receiver not found.")
             return
         await submit_ot_grant(context, persona, receiver, pend["kind"], pend["minutes"],
                               pend.get("when_date"), pend.get("start_min"), reason)
-        await update.message.reply_text(
+        await confirm(
+            "✅ OT grant sent to the owners for approval.\n✅ បានផ្ញើសំណើ OT ទៅម្ចាស់ហាងសម្រាប់អនុម័ត។",
             "🧪 OT grant submitted (test) — the owner approval card was routed to you. Approve it; "
-            "for NOW-OT you'll then get the buyback picker, for LATER you'll get the staff consent "
-            "ask. /testreset to wipe.")
+            "NOW-OT → buyback picker, LATER → the staff consent ask. /testreset to wipe.")
     elif flow == "swap":
         partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
         if not partner:
-            await update.message.reply_text("🧪 swap partner not found.")
+            await update.message.reply_text("swap partner not found." if live
+                                            else "🧪 swap partner not found.")
             return
         await submit_swap(context, persona, partner, pend["req_off_date"],
                           pend["partner_off_date"], reason)
-        await update.message.reply_text(
-            "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, "
-            "then approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
+        await confirm(
+            "✅ Day-off swap sent — your partner agrees first, then two seniors approve.\n"
+            "✅ បានផ្ញើសំណើប្តូរថ្ងៃឈប់ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបង 2 នាក់អនុម័ត។",
+            "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, then "
+            "approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
     elif flow == "marriage":
         from datetime import date as _date, timedelta as _td
         d0 = _date.fromisoformat(pend["start_date"])
         days = ([pend["start_date"]] if pend.get("child")
                 else [(d0 + _td(days=i)).isoformat() for i in range(3)])
         await submit_al_request(context, persona, "days", days, None, None,
-                                "Marriage leave — " + reason, config.OWNER_TELEGRAM_ID)
-        await update.message.reply_text(
+                                "Marriage leave — " + reason, req_uid)
+        await confirm(
+            "✅ Marriage leave sent for senior approval. Congratulations 🎉\n"
+            "✅ បានផ្ញើសំណើច្បាប់រៀបការសម្រាប់អនុម័ត។ សូមអបអរសាទរ 🎉",
             "🧪 Marriage leave submitted (test, via the AL approval engine) — senior cards routed to "
             "you; approve as two seniors. /testreset to wipe.")
     elif flow == "death":
         await book_family_death(context, persona, pend["who"], pend["start_date"])
-        await update.message.reply_text(
-            "🧪 Family-death leave booked (test) — condolence + Supervisors notice routed to you; "
-            "for a sibling/grandparent the owner upgrade card too. /testreset to wipe.")
+        await confirm(
+            "🤍 Sorry for your loss — the leave is booked and the Supervisors are notified.\n"
+            "🤍 សូមរំលែកមរណទុក្ខ — ច្បាប់ត្រូវបានកត់ត្រា ហើយបានជូនដំណឹងដល់បងៗ។",
+            "🧪 Family-death leave booked (test) — condolence + Supervisors notice routed to you; for "
+            "a sibling/grandparent the owner upgrade card too. /testreset to wipe.")
     elif flow == "birth":
         await book_wife_birth(context, persona, pend["start_date"])
-        await update.message.reply_text(
+        await confirm(
+            "👶 Congratulations! The leave is booked and the Supervisors are notified.\n"
+            "👶 សូមអបអរសាទរ! ច្បាប់ត្រូវបានកត់ត្រា ហើយបានជូនដំណឹងដល់បងៗ។",
             "🧪 Wife-birth leave booked (test) — congratulations + Supervisors notice routed to you. "
             "/testreset to wipe.")
     elif flow == "sick_me":
@@ -3187,7 +3241,9 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
             persona.get("call_name") or persona["canonical_name"],
             "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
             "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
-        await update.message.reply_text(
+        await confirm(
+            "🤍 Rest well — I've noted your sick leave. If you see a doctor, send a photo of the papers.\n"
+            "🤍 សម្រាកឱ្យបានល្អ — ខ្ញុំបានកត់ត្រាច្បាប់ឈឺ។ បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារមក។",
             "🧪 Provisional own-sick case opened (test). Now SEND A PHOTO to this chat to test the "
             "doctor-papers → owner-card → accept/part-duty flow. /testreset to wipe.")
     elif flow == "sick_fam":
@@ -3196,7 +3252,9 @@ async def _att_test_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s takes sick leave for their %s today.\n"
             "FYI: %s សុំច្បាប់ឈឺសម្រាប់%sថ្ងៃនេះ។" % (nm, pend["who"], nm, pend["who"]), group=True)
-        await update.message.reply_text(
+        await confirm(
+            "🤍 Noted — take care of your %s. The Supervisors are informed.\n"
+            "🤍 បានកត់ត្រា — សូមថែទាំ%sរបស់អ្នក។ បានជូនដំណឹងដល់បងៗ។" % (pend["who"], pend["who"]),
             "🧪 Family-sick day booked (test) — the Supervisors FYI was routed to you. /testreset to wipe.")
 
 

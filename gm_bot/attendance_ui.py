@@ -1,16 +1,17 @@
-"""Attendance main-menu SHELL — TEST MODE, OWNER ONLY.
+"""Attendance main-menu — owner role-play SHELL + LIVE staff entry (one set of menus, no fork).
 
-⚠️ SAFETY CONTRACT (owner instruction, session 28): while this shell exists, NOTHING here
-may message anyone except the OWNER. Structurally enforced:
-  - the only entry point is the owner-only /test command in the owner's own DM;
-  - every screen is an edit of that same message in that same chat;
-  - there is NO send_message to any other chat id anywhere in this module;
-  - cross-audience messages (Supervisors posts, senior cards…) appear as [TEST PREVIEW]
-    text to the owner instead.
+TWO drivers, the SAME menus / callbacks / submit_* (Rule 1 — no behavior fork):
+  - OWNER role-play shell via /test: the owner picks a PERSONA and walks every ladder; every
+    message routes to the owner ([→ role] previews); rows are is_test-tagged. Active whenever
+    attendance_test_mode is on.
+  - LIVE staff entry: a real ACTIVE TWB staffer opens their OWN menu — persona LOCKED to
+    themselves, never another. GATED by attendance_live; submit_* route to the real recipients
+    via bot._att_send. Reason capture uses flow_state (DB, restart-safe).
 
-The owner picks a PERSONA (any active staff) and walks the ladders as that person.
-Real flows (DB writes, timers, group posts) are 🚧 next-build stubs.
-Pure helpers live at the top — unit-tested in tests/test_attendance_ui.py.
+⚠️ SAFETY: when attendance_live is OFF and test mode is OFF, this module messages NO ONE but the
+owner — the live branch is gated (callback rejects non-owners unless _attendance_live()), and the
+owner branch only ever edits the owner's own message. Pure helpers at the top are unit-tested in
+tests/test_attendance_ui.py; live entry in tests/test_attendance_live_entry.py.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from telegram.ext import ContextTypes
 
 import config
 from gm_bot.attendance import to_min, overlaps
-from shared.database import staff_all, att_test_on
+from shared.database import staff_all, att_test_on, staff_get_by_uid, flow_save
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -600,11 +601,47 @@ def _persona(context) -> dict | None:
     sid = context.user_data.get("att_persona")
     if sid is None:
         return None
-    return next((r for r in staff_all("active") if r["id"] == sid), None)
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    if rec is not None and context.user_data.get("att_live_self"):
+        rec = dict(rec)
+        rec["_live"] = True   # a real staffer driving their own menu (not the owner shell)
+    return rec
+
+
+def _is_live(context) -> bool:
+    """True when a real staffer is driving their OWN menu (live), not the owner role-play shell."""
+    return bool(context.user_data.get("att_live_self"))
+
+
+def _armed(context) -> bool:
+    """A terminal fires the REAL submit_* when the owner is in test mode OR a live staffer is
+    driving. Otherwise (test off, owner just browsing) terminals show a read-only preview stub."""
+    return att_test_on() or _is_live(context)
+
+
+def _arm_pending(context, uid: int, pend: dict) -> None:
+    """Stash the pending reason/'go' for the next typed message. Owner test → user_data (ephemeral);
+    live staffer → flow_state (DB, restart-safe), per docs/ATTENDANCE_TEST_MODE.md item 8."""
+    if att_test_on():
+        context.user_data["att_test_pending"] = pend
+    else:
+        flow_save(uid, "att_pending", "reason", pend, ttl_min=15)
+
+
+def _arm_prompt(p: dict, context, base: str, back: str):
+    """Unified prompt for an armed terminal. Neutral copy works for BOTH live (routes to the real
+    seniors/Supervisors) and test; test adds an owner coaching suffix. (KH pending for new lines.)"""
+    line = base
+    if att_test_on():
+        line += "\n🧪 (test — every reply/card routes to you; /testreset to wipe when done.)"
+    return _hdr(p, line), InlineKeyboardMarkup([_back_row(back)])
 
 
 def _hdr(p: dict, line: str = "") -> str:
-    head = "🧪 TEST — acting as %s (%s)" % (p["canonical_name"], p.get("call_name") or "-")
+    if p.get("_live"):
+        head = "👤 %s" % (p.get("call_name") or p["canonical_name"])
+    else:
+        head = "🧪 TEST — acting as %s (%s)" % (p["canonical_name"], p.get("call_name") or "-")
     return head + ("\n\n" + line if line else "")
 
 
@@ -624,9 +661,12 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("🕘 Late · មកយឺត", callback_data="att:late")],
         [InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")],
         [InlineKeyboardButton("👤 About Me · របស់ខ្ញុំ", callback_data="att:am")],
-        [InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")],
     ]
-    return _hdr(p, "Main menu — what they see when they type anything:"), InlineKeyboardMarkup(rows)
+    if not p.get("_live"):
+        rows.append([InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")])
+    line = ("What would you like to do? · តើអ្នកចង់ធ្វើអ្វី?" if p.get("_live")
+            else "Main menu — what they see when they type anything:")
+    return _hdr(p, line), InlineKeyboardMarkup(rows)
 
 
 def about_me_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1673,16 +1713,35 @@ async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if update.effective_chat.type != "private":
         return
+    context.user_data["att_live_self"] = False   # owner is role-playing, not a live staffer
     text, kb = persona_picker(0)
     await update.message.reply_text(text, reply_markup=kb)
 
 
+async def open_live_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, rec: dict) -> None:
+    """LIVE entry: a real active staffer opens their OWN attendance menu (gated upstream by
+    attendance_live). Persona is LOCKED to themselves; the owner role-play shell is unaffected."""
+    context.user_data["att_persona"] = rec["id"]
+    context.user_data["att_live_self"] = True
+    context.user_data["att_al_picked"] = set()
+    text, kb = main_menu(_persona(context))
+    await update.message.reply_text(text, reply_markup=kb)
+
+
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """All att:* buttons. Owner-only — everything edits the owner's own message."""
+    """All att:* buttons. The owner drives the role-play shell; a real staffer drives their OWN
+    menu — persona LOCKED to themselves, and only when attendance_live is on."""
     query = update.callback_query
-    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
-        await query.answer()
-        return
+    uid = update.effective_user.id
+    if uid != config.OWNER_TELEGRAM_ID:
+        from gm_bot.bot import _attendance_live
+        rec = staff_get_by_uid(uid) if _attendance_live() else None
+        if not rec or rec.get("status") != "active" or rec.get("org") != "TWB":
+            await query.answer()
+            return
+        # security: a live staffer can ONLY ever act as themselves
+        context.user_data["att_persona"] = rec["id"]
+        context.user_data["att_live_self"] = True
     await query.answer()
     data = query.data.split(":")
     action = data[1] if len(data) > 1 else ""
@@ -1690,6 +1749,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     async def show(pair):
         text, kb = pair
         await query.edit_message_text(text, reply_markup=kb)
+
+    if _is_live(context) and action in ("pick", "pickp", "persona"):
+        return await show(main_menu(_persona(context)))   # live: locked to self
 
     if action == "drs":
         # dry-run sample buttons demonstrate their consequence (owner: ladders must continue)
@@ -1772,24 +1834,24 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "meo":
             return await show(sick_me_time(p, int(data[3])))
         if sub == "mecant":
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()}
-                return await show((_hdr(p, "Sick — can't come today.\n\n📝 Type 'go' to run it (test): "
-                    "opens a provisional own-sick case. Then SEND ME A PHOTO to test the doctor-papers "
-                    "→ owner-card flow."), InlineKeyboardMarkup([_back_row("att:sp:me")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()})
+                return await show(_arm_prompt(p, context,
+                    "Sick — can't come today.\n\n📝 Type 'go' to confirm. Opens a sick case; if you "
+                    "see a doctor, send a photo of the papers afterwards.", "att:sp:me"))
             return await show(sick_me_cant(p))
         if sub == "sickf":
             return await show(sick_family_dates(p, data[3]))
         if sub == "famd":
             return await show(sick_family_fulltime(p, data[3], data[4]))
         if sub == "famf":
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]}
-                return await show((_hdr(p, "Family sick (%s) — full day.\n\n📝 Type 'go' to run it "
-                    "(test): books the family-sick day + the Supervisors FYI comes to you." % data[3]),
-                    InlineKeyboardMarkup([_back_row("att:sp:sick")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]})
+                return await show(_arm_prompt(p, context,
+                    "Family sick (%s) — full day.\n\n📝 Type 'go' to confirm. Books the day and "
+                    "notifies the Supervisors." % data[3], "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4]))
         if sub == "famt":
             return await show(sick_family_time_grid(p, data[3], data[4], "from"))
@@ -1806,13 +1868,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(marriage_dates(p, child=True))
         if sub in ("mard", "marcd"):
             child = sub == "marcd"
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child}
-                return await show((_hdr(p, "Marriage leave (%d day%s).\n\n📝 Type the reason — your "
-                    "NEXT message fires the REAL request; the senior approval cards come to you."
-                    % (1 if child else 3, "" if child else "s")),
-                    InlineKeyboardMarkup([_back_row("att:sp:mar")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child})
+                return await show(_arm_prompt(p, context,
+                    "Marriage leave (%d day%s).\n\n📝 Type the reason — your next message submits it "
+                    "for senior approval." % (1 if child else 3, "" if child else "s"), "att:sp:mar"))
             return await show(marriage_stub(p, data[3], child=child))
         if sub == "death":
             return await show(death_menu(p))
@@ -1822,31 +1883,31 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # compassion tier (sibling/grandparent) = 1 day instant + owner-upgrade; law tier picks 3–7
             from gm_bot.special import death_tier
             if death_tier(data[3]) == "compassion":
-                if att_test_on():
-                    context.user_data["att_test_pending"] = {
-                        "flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]}
-                    return await show((_hdr(p, "Family death (compassion, 1 day) — no reason needed.\n\n"
-                        "📝 Type 'go' to run it (test): condolence + Supervisors notice + the owner "
-                        "upgrade card come to you."), InlineKeyboardMarkup([_back_row("att:sp:death")])))
+                if _armed(context):
+                    _arm_pending(context, update.effective_user.id,
+                        {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
+                    return await show(_arm_prompt(p, context,
+                        "Family death (1 day) — no reason needed.\n\n📝 Type 'go' to confirm. Sends "
+                        "condolences and notifies the Supervisors.", "att:sp:death"))
                 return await show(death_stub(p, data[3], data[4], 1))
             return await show(death_days(p, data[3], data[4]))
         if sub == "deathn":
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]}
-                return await show((_hdr(p, "Family death — no reason needed.\n\n📝 Type 'go' to run it "
-                    "(test): condolence + Supervisors notice come to you."),
-                    InlineKeyboardMarkup([_back_row("att:sp:death")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
+                return await show(_arm_prompt(p, context,
+                    "Family death — no reason needed.\n\n📝 Type 'go' to confirm. Sends condolences "
+                    "and notifies the Supervisors.", "att:sp:death"))
             return await show(death_stub(p, data[3], data[4], int(data[5])))
         if sub == "birth":
             return await show(birth_dates(p))
         if sub == "birthd":
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "birth", "persona_id": p["id"], "start_date": data[3]}
-                return await show((_hdr(p, "Wife giving birth (2 days) — no reason needed.\n\n📝 Type "
-                    "'go' to run it (test): congratulations + Supervisors notice come to you."),
-                    InlineKeyboardMarkup([_back_row("att:sp")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "birth", "persona_id": p["id"], "start_date": data[3]})
+                return await show(_arm_prompt(p, context,
+                    "Wife giving birth (2 days) — no reason needed.\n\n📝 Type 'go' to confirm. Sends "
+                    "congratulations and notifies the Supervisors.", "att:sp"))
             return await show(birth_stub(p, data[3]))
         return await show(special_menu(p))
     if action == "aw":
@@ -1855,13 +1916,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(rules_screen(p))
     if action == "late":
         if len(data) > 2 and data[2] == "o":
-            if att_test_on():
-                context.user_data["att_test_pending"] = {
-                    "flow": "late", "persona_id": p["id"], "mins": int(data[3])}
-                return await show((_hdr(p, "Late ~%d min.\n\n📝 Type your reason — your NEXT message "
-                    "is the reason, and the REAL flow fires: Supervisors heads-up + the payback "
-                    "slot picker come to you." % int(data[3])),
-                    InlineKeyboardMarkup([_back_row("att:late")])))
+            if _armed(context):
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "late", "persona_id": p["id"], "mins": int(data[3])})
+                return await show(_arm_prompt(p, context,
+                    "Late ~%d min.\n\n📝 Type your reason — your next message sends the Supervisors a "
+                    "heads-up. Share your live location when you arrive and I'll work out the payback."
+                    % int(data[3]), "att:late"))
             return await show(late_picked(p, int(data[3])))
         return await show(late_screen(p))
     if action == "al":
@@ -1887,13 +1948,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
-                if att_test_on():
-                    context.user_data["att_test_pending"] = {
-                        "flow": "al", "persona_id": p["id"], "kind": "days",
-                        "days": sorted(picked), "hours_start": None, "hours_end": None}
-                    return await show((_hdr(p, detail + "\n\n📝 Type the reason — your NEXT message is "
-                        "the reason, and the REAL AL request fires (senior cards come to you)."),
-                        InlineKeyboardMarkup([_back_row("att:al")])))
+                if _armed(context):
+                    _arm_pending(context, update.effective_user.id,
+                        {"flow": "al", "persona_id": p["id"], "kind": "days",
+                         "days": sorted(picked), "hours_start": None, "hours_end": None})
+                    return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
+                        "next message submits the AL request for senior approval.", "att:al"))
                 return await show(al_stub(p, detail))
             if sub == "time":
                 return await show(al_time_grid(p, "from", picked=picked))
@@ -1912,15 +1972,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
-                if att_test_on():
-                    context.user_data["att_test_pending"] = {
-                        "flow": "al", "persona_id": p["id"], "kind": "hours",
-                        "days": sorted(picked),
-                        "hours_start": "%02d:%02d" % (f // 60, f % 60),
-                        "hours_end": "%02d:%02d" % (t // 60, t % 60)}
-                    return await show((_hdr(p, detail + "\n\n📝 Type the reason — your NEXT message is "
-                        "the reason, and the REAL AL request fires (senior cards come to you)."),
-                        InlineKeyboardMarkup([_back_row("att:al")])))
+                if _armed(context):
+                    _arm_pending(context, update.effective_user.id,
+                        {"flow": "al", "persona_id": p["id"], "kind": "hours",
+                         "days": sorted(picked),
+                         "hours_start": "%02d:%02d" % (f // 60, f % 60),
+                         "hours_end": "%02d:%02d" % (t // 60, t % 60)})
+                    return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
+                        "next message submits the AL request for senior approval.", "att:al"))
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
@@ -1935,19 +1994,18 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.user_data["att_do_day"] = data[3]   # remember the chosen new day-off date
             return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
-            if att_test_on():
+            if _armed(context):
                 req_off = context.user_data.get("att_do_day") or _today().isoformat()
                 ro = date.fromisoformat(req_off)
                 off_wd = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
                 partner_off = (ro + timedelta(days=(off_wd - ro.weekday())) if off_wd is not None
                                else ro + timedelta(days=1)).isoformat()
-                context.user_data["att_test_pending"] = {
-                    "flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
-                    "req_off_date": req_off, "partner_off_date": partner_off}
-                return await show((_hdr(p, "Day-off swap — partner picked.\n\n📝 Type the reason — "
-                    "your NEXT message is the reason, and the REAL swap fires: the partner agree-card "
-                    "comes to you first, then the senior approval cards."),
-                    InlineKeyboardMarkup([_back_row("att:do")])))
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
+                     "req_off_date": req_off, "partner_off_date": partner_off})
+                return await show(_arm_prompt(p, context,
+                    "Day-off swap — partner picked.\n\n📝 Type the reason — your next message submits "
+                    "it: your partner agrees first, then two seniors approve.", "att:do"))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
                                          "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
@@ -1986,17 +2044,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(ot_end(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
         if sub == "en":
             # att:ot:en:{kind}:{sid}:{dayidx}:{start}:{end}  → reason stub
-            if att_test_on():
+            if _armed(context):
                 kind, sid, dayidx, start, end = (data[3], int(data[4]), int(data[5]),
                                                  int(data[6]), int(data[7]))
                 wd = (date.today() + timedelta(days=dayidx)).isoformat() if kind == "later" else None
-                context.user_data["att_test_pending"] = {
-                    "flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
-                    "minutes": end - start, "when_date": wd, "start_min": start}
-                return await show((_hdr(p, "Give OT — %d min.\n\n📝 Type the reason for the owners — "
-                    "your NEXT message is the reason, and the REAL grant fires: the owner approval "
-                    "card comes to you; approve it to bank + see the buyback picker." % (end - start)),
-                    InlineKeyboardMarkup([_back_row("att:ot:give")])))
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
+                     "minutes": end - start, "when_date": wd, "start_min": start})
+                return await show(_arm_prompt(p, context,
+                    "Give OT — %d min.\n\n📝 Type the reason for the owners — your next message submits "
+                    "it for owner approval." % (end - start), "att:ot:give"))
             return await show(ot_stub(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
         if sub == "card":
             # att:ot:card:{kind}:{sid}:{dayidx}:{start}:{end}
