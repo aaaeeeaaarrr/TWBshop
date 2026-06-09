@@ -1,99 +1,59 @@
-"""Session 31: shift-extension OT credit/points math — the money-critical exploit guards.
-Pure logic, no DB. Times are minutes-of-day (7am=420, 4pm=960)."""
+"""Session 31 UNIFIED OT model — length-based OT, PB↔OT netting, the +PB/+OT end-ladder.
+Pure logic, no DB. Times are minutes-of-day (1pm=780, 9h shift = 540 min)."""
 from gm_bot import ot
 
-S0, S1 = 420, 960          # shift 7:00 -> 16:00
-PRE = (360, 420)           # before-shift OT 6:00 -> 7:00 (60 min)
-POST = (960, 1080)         # after-shift OT 16:00 -> 18:00 (120 min)
+NORMAL = 540   # a 9-hour shift
 
 
-def out(grants, ci, co):
-    return ot.ot_outcome(S0, S1, grants, ci, co)
+# ---- OT = worked length beyond normal (the whole model) ----
+def test_ot_earned_full_extension():
+    assert ot.ot_earned(11 * 60, NORMAL) == 120          # worked 11h vs 9h normal -> 2h OT
+
+def test_ot_earned_normal_day_however_shifted():
+    assert ot.ot_earned(NORMAL, NORMAL) == 0             # 9h worked = 0 OT (late/moved doesn't matter)
+
+def test_ot_earned_short_day():
+    assert ot.ot_earned(8 * 60, NORMAL) == 0             # left early / came late -> under normal -> 0
 
 
-# ---- committed / union ----
-def test_committed_pre_post_union():
-    assert ot.committed_ot(S0, S1, [PRE]) == 60
-    assert ot.committed_ot(S0, S1, [POST]) == 120
-    assert ot.committed_ot(S0, S1, [PRE, POST]) == 180
-    # overlapping after-shift grants collapse to ONE window (no double count)
-    assert ot.committed_ot(S0, S1, [(960, 1080), (960, 1020)]) == 120
+# ---- PB <-> OT one currency ----
+def test_split_clears_pb_first():
+    assert ot.split_ot_pb(60, 120) == (60, 0)            # 1h extension, 2h debt -> all PB
+    assert ot.split_ot_pb(120, 120) == (120, 0)          # exactly clears
+    assert ot.split_ot_pb(180, 120) == (120, 60)         # clears 2h debt, 1h OT
+    assert ot.split_ot_pb(120, 0) == (0, 120)            # no debt -> all OT
+
+def test_apply_ot_to_pb_nets():
+    # 3h OT earned + 2h PB owed -> clears 2h, banks 1h, debt now 0  (your "shows as 1 OT")
+    assert ot.apply_ot_to_pb(180, 120) == (120, 60, 0)
+    # 2h OT + 5h PB -> clears 2h, banks 0, 3h debt remains
+    assert ot.apply_ot_to_pb(120, 300) == (120, 0, 180)
+    # no debt -> all banks
+    assert ot.apply_ot_to_pb(90, 0) == (0, 90, 0)
 
 
-# ---- before-shift ----
-def test_before_full_ontime():
-    w, lbl, pts = out([PRE], 360, 960)          # arrive 6:00 exactly, work all day
-    assert (w, lbl, pts) == (60, "ok", 0)
+# ---- the end-ladder tags (matches the owner's example) ----
+def test_end_ladder_with_2h_pb():
+    # start 1pm (780), 9h normal -> normal end 10pm (1320); 2h PB owed; hourly
+    got = ot.end_option_tags(780, NORMAL, pb_balance_min=120, step_min=60)
+    assert got == [
+        (1320, ""),          # 10pm  (normal end)
+        (1380, "+1PB"),      # 11pm  clears 1h debt
+        (1440 % 1440, "+2PB"),  # 12am clears 2h debt  -> minute 0
+        (60, "+1OT"),        # 1am   debt cleared, 1h OT
+        (120, "+2OT"),       # 2am   2h OT
+    ]
 
-def test_before_early_bonus():
-    w, lbl, pts = out([PRE], 350, 960)          # arrive 5:50 (10m early), full
-    assert (w, lbl, pts) == (60, "early", 10)
-
-def test_before_cameo_last_5min_is_no_show():
-    w, lbl, pts = out([PRE], 415, 960)          # show only 6:55 -> shift; 5 min of OT
-    assert w == 5 and lbl == "no_show" and pts == -10   # paid 5, still -10
-
-def test_before_early_then_leave_loophole_killed():
-    # arrive "early" 5:50 but leave 6:05 -> only 5 min OT -> no_show, NO +10
-    w, lbl, pts = out([PRE], 350, 365)
-    assert lbl == "no_show" and pts == -10
-
-def test_before_no_show_but_on_time_for_shift():
-    # skip the 6am OT, arrive 7:00 for the shift: 0 OT, no_show penalty, shift itself on-time
-    w, lbl, pts = out([PRE], 420, 960)
-    assert w == 0 and lbl == "no_show" and pts == -10
+def test_end_ladder_no_pb_is_all_ot():
+    got = ot.end_option_tags(780, NORMAL, pb_balance_min=0, step_min=60)
+    assert [t for _e, t in got] == ["", "+1OT", "+2OT", "+3OT", "+4OT"]
 
 
-# ---- after-shift ----
-def test_after_full():
-    w, lbl, pts = out([POST], 420, 1080)        # work shift + full OT
-    assert (w, lbl, pts) == (120, "ok", 0)
+# ---- start options (today clipping) ----
+def test_start_options_future_day_full():
+    opts = ot.start_options()            # 30-min steps, whole day
+    assert opts[0] == 0 and opts[-1] == 1410 and len(opts) == 48
 
-def test_after_exactly_half_is_ok():
-    w, lbl, pts = out([POST], 420, 1020)        # leave 17:00 -> 60 of 120 = half
-    assert w == 60 and lbl == "ok" and pts == 0
-
-def test_after_under_half_is_no_show():
-    w, lbl, pts = out([POST], 420, 1000)        # leave 16:40 -> 40 of 120
-    assert w == 40 and lbl == "no_show" and pts == -10
-
-def test_after_never_early():
-    # arriving early for the shift gives no OT-early bonus (after-shift OT only)
-    w, lbl, pts = out([POST], 400, 1080)
-    assert lbl == "ok" and pts == 0
-
-
-# ---- overlap / both edges / overnight ----
-def test_overlap_no_double_bank():
-    w, lbl, pts = out([(960, 1080), (960, 1020)], 420, 1080)
-    assert w == 120                              # union 16:00-18:00, not 120+60
-
-def test_both_edges_same_day():
-    w, lbl, pts = out([PRE, POST], 350, 1080)    # arrive 5:50 (early), work both edges
-    assert w == 180 and lbl == "early"           # 60 pre + 120 post
-
-def test_both_edges_ontime_is_ok():
-    w, lbl, pts = out([PRE, POST], 360, 1080)    # arrive 6:00 exactly = on-time, not early
-    assert w == 180 and lbl == "ok"
-
-def test_overnight_after_shift_monotonic():
-    # OT 16:00 -> 01:00 next day == minute 1500; presence to 1500
-    w, lbl, pts = out([(960, 1500)], 420, 1500)
-    assert w == 540 and lbl == "ok"
-
-
-# ---- degenerate ----
-def test_no_grant():
-    assert out([], 420, 960) == (0, "none", 0)
-
-def test_zero_presence():
-    assert ot.worked_ot(S0, S1, [POST], 1080, 1080) == 0
-
-
-# ---- picker options ----
-def test_pre_shift_options_30min():
-    # 30-min steps, 4h before a 7am shift: 3:00 .. 6:30, earliest first
-    assert ot.pre_shift_start_options(420) == [180, 210, 240, 270, 300, 330, 360, 390]
-def test_post_shift_options_30min():
-    # 30-min steps, up to 4h after 4pm: 4:30 .. 8:00
-    assert ot.post_shift_end_options(960) == [990, 1020, 1050, 1080, 1110, 1140, 1170, 1200]
+def test_start_options_today_drops_past():
+    opts = ot.start_options(earliest_min=720)   # noon now -> only afternoon/evening
+    assert opts[0] == 720 and all(m >= 720 for m in opts)

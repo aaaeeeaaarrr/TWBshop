@@ -1,8 +1,12 @@
-"""Give-OT / time-bank pure logic (session 28). No DB/Telegram.
+"""OT pure logic. No DB/Telegram.
 
-Seniors GRANT OT → owner approves → hours bank (cap 14h, no money) → staff takes buyback rest at
-the shop's SAFEST (most-surplus) times. NOW-OT = present staff (consent + location/senior proof);
-FUTURE-OT = accept → scheduled work slot. Accepted = commitment.
+Time bank: granted OT banks (cap 14h, no money) → staff takes it back as REST via buyback at the
+shop's safest times. Bank-cap helpers below are session-28.
+
+Session 31 (see docs/OT_DESIGN.md) UNIFIED the entry: OT is no longer a separate Now/Later grant —
+a senior REDEFINES a working day's shift (retime/move/extend) and the staff approves; OT is emergent
+= hours worked beyond the normal shift length, and it nets against payback (one currency). The
+unified helpers are in the session-31 block below.
 """
 from __future__ import annotations
 
@@ -25,84 +29,66 @@ def duration_options(current_bank_min: int) -> list[int]:
 
 
 # ======================================================================================
-# Session 31: SHIFT-EXTENSION OT model (see docs/OT_DESIGN.md). Supersedes the Now/Later
-# entry split. OT extends a working day's shift edge — earlier start and/or later end.
-# Credit = in-zone time ∩ UNION of sanctioned OT windows (never summed across overlapping
-# grants), capped, banked at the day's checkout. Points: +10 early to the OT start, −10
-# "very late" (completed under HALF the committed OT — ghost OR 5-min cameo). Time worked
-# is ALWAYS credited; early can never combine with a no-show.
-# All times are minutes on a MONOTONIC axis (caller converts datetimes; overnight => may
-# exceed 1440, fine as long as ordered).
+# Session 31: UNIFIED "redefine-a-shift" model (see docs/OT_DESIGN.md). A senior retimes /
+# moves / extends a working day's shift; the staff approves; OT is EMERGENT = hours worked
+# BEYOND the person's normal shift length. No window logic, no OT-specific +10/−10 — normal
+# late / leave-early / no-show rules apply to the approved [start,end] (the early +10 is the
+# existing early-arrival bonus). PB and OT are ONE currency (time): an extension / earned OT
+# clears outstanding PAYBACK first, the rest is OT. All times are minutes (caller converts
+# datetimes; overnight => may exceed 1440, fine if kept ordered). Pure logic, no DB.
 # ======================================================================================
 
-NO_SHOW_RATIO = 0.5      # completed below this fraction of committed OT = "very late" / no-show
-EARLY_GRACE_MIN = 5      # must beat the OT start by MORE than this to earn the early bonus
-PTS_EARLY = 10
-PTS_NO_SHOW = -10
-MAX_PRE_SHIFT_HOURS = 4  # picker: OT may start at most this many hours before the shift
-OT_STEP_MIN = 30         # picker granularity for OT start/end options (flip to 15 if you want finer)
+OT_STEP_MIN = 30        # start-picker granularity (flip to 15 for finer)
+MAX_EXTRA_HOURS = 4     # most OT (hours beyond normal length) the end-ladder offers
 
 
-def union_windows(shift_start, shift_end, grants):
-    """grants: iterable of (ot_start, ot_end). Returns (pre_start, post_end) — the EXTENDED edges:
-    earliest pre-shift start (< shift_start) and latest post-shift end (> shift_end), or None on a
-    side with no grant. Overlapping/duplicate grants on a side collapse into one window (the union),
-    so credit is never double-counted."""
-    pre_starts = [s for (s, e) in grants if s < shift_start]
-    post_ends = [e for (s, e) in grants if e > shift_end]
-    return (min(pre_starts) if pre_starts else None,
-            max(post_ends) if post_ends else None)
+def ot_earned(worked_min: int, normal_len_min: int) -> int:
+    """OT = hours worked BEYOND a normal shift length. Late/short already reduce worked_min, so a
+    normal-length day (however shifted) earns 0 — that's the whole unified model."""
+    return max(0, worked_min - normal_len_min)
 
 
-def committed_ot(shift_start, shift_end, grants):
-    """Total sanctioned OT minutes for the day (pre head + post tail), counted ONCE via the union."""
-    pre_start, post_end = union_windows(shift_start, shift_end, grants)
-    pre = (shift_start - pre_start) if pre_start is not None else 0
-    post = (post_end - shift_end) if post_end is not None else 0
-    return pre + post
+def split_ot_pb(minutes: int, pb_balance_min: int) -> tuple[int, int]:
+    """Split `minutes` of OT (or a planned extension) against an outstanding PAYBACK balance: it
+    clears the debt FIRST, the remainder is OT. Returns (pb_cleared, ot). One currency (time)."""
+    pb = max(0, pb_balance_min)
+    pb_cleared = min(max(0, minutes), pb)
+    return pb_cleared, max(0, minutes) - pb_cleared
 
 
-def worked_ot(shift_start, shift_end, grants, checkin, checkout):
-    """OT minutes ACTUALLY worked = overlap of in-zone presence [checkin, checkout] with the union OT
-    windows: pre head [pre_start, shift_start] + post tail [shift_end, post_end]. Never counts regular
-    shift time; never double-counts overlapping grants; capped by the windows. 0 if checkout<=checkin."""
-    if checkout <= checkin:
-        return 0
-    pre_start, post_end = union_windows(shift_start, shift_end, grants)
-    worked = 0
-    if pre_start is not None:
-        worked += max(0, min(checkout, shift_start) - max(checkin, pre_start))
-    if post_end is not None:
-        worked += max(0, min(checkout, post_end) - max(checkin, shift_end))
-    return worked
+def apply_ot_to_pb(ot_earned_min: int, pb_balance_min: int) -> tuple[int, int, int]:
+    """After a shift is worked: OT earned pays down PB first, the rest banks. Returns
+    (pb_cleared, ot_banked, new_pb_balance). My Schedule shows the net. Points are NOT touched here
+    (reputation never nets — that stays on its own track)."""
+    pb_cleared, ot_banked = split_ot_pb(ot_earned_min, pb_balance_min)
+    return pb_cleared, ot_banked, max(0, pb_balance_min) - pb_cleared
 
 
-def ot_outcome(shift_start, shift_end, grants, checkin, checkout):
-    """Return (worked_min, label, points). `worked_min` is ALWAYS credited/paid.
-      - 'no_show'  −10 : worked < HALF the committed OT (ghost OR 5-min cameo). Wins over 'early'.
-      - 'early'    +10 : arrived MORE than the grace before the OT start, and NOT a no-show.
-                         (before-shift only — after-shift they were already at work.)
-      - 'ok'         0 : did at least half; on-time / late-but-worked.
-      - 'none'       0 : no OT grant for the day.
-    """
-    committed = committed_ot(shift_start, shift_end, grants)
-    worked = worked_ot(shift_start, shift_end, grants, checkin, checkout)
-    if committed <= 0:
-        return (worked, "none", 0)
-    if worked < NO_SHOW_RATIO * committed:
-        return (worked, "no_show", PTS_NO_SHOW)   # early bonus NEVER applies to a no-show
-    pre_start, _ = union_windows(shift_start, shift_end, grants)
-    if pre_start is not None and (pre_start - checkin) > EARLY_GRACE_MIN:
-        return (worked, "early", PTS_EARLY)
-    return (worked, "ok", 0)
+def _ext_tag(pb_cleared: int, ot: int) -> str:
+    """Button tag: while the extension only clears debt -> '+NPB'; once it earns OT -> '+MOT'."""
+    if ot > 0:
+        return "+%gOT" % (ot / 60)
+    if pb_cleared > 0:
+        return "+%gPB" % (pb_cleared / 60)
+    return ""
 
 
-def pre_shift_start_options(shift_start, max_hours=MAX_PRE_SHIFT_HOURS, step_min=OT_STEP_MIN):
-    """Picker: before-shift OT start options, earliest first (30-min steps, 4h cap). Each
-    auto-confirms to [option, shift_start]. Pay stays minute-accurate (timestamp-based) regardless."""
-    return [shift_start - m for m in range(max_hours * 60, 0, -step_min)]
+def end_option_tags(start_min: int, normal_len_min: int, pb_balance_min: int = 0,
+                    max_extra_hours: int = MAX_EXTRA_HOURS, step_min: int = 60) -> list[tuple[int, str]]:
+    """Change-time END buttons from a chosen start. First = the normal end (no tag); each step beyond
+    carries '+NPB' (clearing debt) then '+MOT'. step default hourly (wider, 2/row in the UI). Returns
+    [(end_min mod 1440, tag)]."""
+    normal_end = start_min + normal_len_min
+    out = [(normal_end % 1440, "")]
+    extra = step_min
+    while extra <= max_extra_hours * 60:
+        pb_cleared, ot = split_ot_pb(extra, pb_balance_min)
+        out.append(((normal_end + extra) % 1440, _ext_tag(pb_cleared, ot)))
+        extra += step_min
+    return out
 
 
-def post_shift_end_options(shift_end, max_hours=MAX_PRE_SHIFT_HOURS, step_min=OT_STEP_MIN):
-    """Picker: after-shift OT end options (start pinned at shift_end), nearest first (30-min steps)."""
-    return [shift_end + m for m in range(step_min, max_hours * 60 + 1, step_min)]
+def start_options(step_min: int = OT_STEP_MIN, earliest_min: int = 0) -> list[int]:
+    """Change-time START buttons (12am..11:30pm at `step_min`). For TODAY pass earliest_min = the
+    current minute-of-day to drop past times; future days pass 0."""
+    return [m for m in range(0, 1440, step_min) if m >= earliest_min]
