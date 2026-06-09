@@ -287,6 +287,13 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — death/birth confirm prompts: warm + direct (owner):**
+- Dropped "no reason needed" and the flat "Sends condolences/congratulations and notifies the
+  Supervisors" descriptions (those were MY wording, not ChatGPT). Death now leads "🤍 So sorry for
+  your loss" + leave (N days) + date; birth leads "👶 Congratulations!" + leave (2 days) + date.
+- (Sick prompts famf/mecant still carry mild "notifies the Supervisors / opens a sick case" meta —
+  not yet reworded; flagged.)
+
 **Session 30 (Jun 9) — marriage = no reason (confirm button):**
 - Marriage no longer asks for a typed reason (it's their own wedding). Now a `_confirm_prompt`:
   "Marriage leave (N days) · Date: from → to · If you need more days you can request AL" + ✅ I confirm

@@ -3505,8 +3505,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await submit_swap(context, persona, partner, pend["req_off_date"],
                           pend["partner_off_date"], reason)
         await confirm(
-            "✅ Day-off swap sent — your partner agrees first, then two seniors approve.\n"
-            "✅ បានផ្ញើសំណើប្តូរថ្ងៃឈប់ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបង 2 នាក់អនុម័ត។",
+            "✅ Day-off swap sent — your partner agrees first, then the seniors approve.\n"
+            "✅ បានផ្ញើសំណើប្តូរថ្ងៃឈប់ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។",
             "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, then "
             "approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
     elif flow == "marriage":
