@@ -2126,8 +2126,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 detail = ("Full-day AL: %s — %d AL day(s).\nAL ពេញមួយថ្ងៃ៖ %s — %d ថ្ងៃ។"
                           % (span, len(charged), span, len(charged)))
                 if len(charged) != len(picked):
-                    detail += ("\n(Your day off in this range is free.)"
-                               "\n(ថ្ងៃឈប់សម្រាករបស់អ្នកក្នុងចន្លោះនេះ មិនគិតថ្លៃទេ។)")
+                    detail += "\nDay off = Free"
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                     pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
