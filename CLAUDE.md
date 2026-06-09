@@ -3,58 +3,45 @@
 ---
 
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
-REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-08-A
+REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-09-A
 
 > This is a FULL copy (not a pointer) so the project carries its own enforcement even if the global
 > `~/.claude/CLAUDE.md` fails to load, is stale on another machine, bootstrap wasn't run, the secrets
 > repo is unavailable, or a future session only sees this repo. Reliability > elegance for operating
 > constraints. Same text lives in the global file.
 
-Not values — constraints. The bar is EVIDENCE, never promises ("100% precision" as a slogan is
-banned). Keep the chat style fast and friendly; never let that soften proof on real work. The user
-may demand the evidence block at ANY time; its absence = NOT done. Words are not trusted — only evidence.
+Constraints, not values. The bar is EVIDENCE, never promises. Chat stays fast and friendly; proof on
+real work never softens. The user may demand the evidence block at ANY time; its absence = NOT done.
 
-### MODES — pick by what the task touches. If it isn't clearly CHAT or TRIVIAL, default UP to SHIPPABLE.
-- **CHAT / THINKING** — explaining, planning, questions, reviews. Fast, no ceremony.
-- **TRIVIAL EDIT** — comments, wording, formatting, docs; CANNOT change runtime behavior. Light
-  proof: files changed + a quick check.
-- **SHIPPABLE CODE** — any behavior / UI / API / DB / Telegram-bot / report / deploy change. FULL
-  real-path evidence required before saying done.
-- **HIGH-RISK** — money, payments, payroll, staff/customer records, audit logs, deletions, DB
-  migrations, permissions, irreversible writes, production deploy, external integrations. No
-  shortcuts, no "probably," no done without real-path proof.
+### MODES — default UP if unsure.
+- **CHAT / THINKING** — explain / plan / review. No ceremony.
+- **TRIVIAL EDIT** — comments / docs / wording, no runtime change. Light proof: files + quick check.
+- **SHIPPABLE** — any behavior / UI / API / DB / bot / report / deploy change. Full real-path evidence
+  before "done."
+- **HIGH-RISK** — money / payroll / staff+customer records / audit / deletions / migrations /
+  permissions / prod deploy / integrations / secrets. No shortcuts, no "probably," nothing called done
+  without real-path proof.
 
-### HARD RULES
-1. **Real system only — NO BEHAVIOR FORK.** Test the SHIPPED path. Isolate data/users/routing/env/
-   test-records; NEVER fork logic, permissions, validation, or UI/API/DB/message paths. A preview/
-   mock/stub/shortcut is not proof unless the real path also passed.
-2. **No fake success.** Never say done/fixed/working/ready without running the real path and showing
-   evidence to the depth the mode requires.
-3. **PUSHED ≠ LIVE.** Server/service code: same turn → commit+push → deploy (pull) → restart →
-   VERIFY (deployed ref == origin, service up, running artifact actually contains the change).
-4. **Never blame state you can verify.** When something "isn't showing," verify the deployed/running
-   state YOURSELF first — no "maybe a restart/pull/sync."
-5. **Files are truth; chat is disposable.** Persist decisions/specs/results to repo files as you go;
-   a restart or compaction must lose nothing; prove safety from git, don't reassure vaguely.
-6. **User-path first + every actor's view.** Exercise the path the real actor uses (button, Telegram,
-   screen, report, approval); surface every recipient's output so all are visible. Backend-only proof
-   is NOT enough for a user-facing feature.
-7. **No dead buttons.** Every action does the real thing, or faithfully advances to its real
-   consequence via the real code path.
-8. **Exact, reversible isolation + teardown.** Test writes tagged, reversible, cleaned EXACTLY; never
-   pollute real data; never wipe-and-forget.
-9. **Test once → ship the same code.** Go-live only flips routing/config, never behavior. If code
-   changes after the test, re-run the real-path test.
-10. **Cover the whole surface + every branch** (success/fail/cancel/invalid/permission/duplicate/edge)
-    — ONE harness PER WORKFLOW, not one monster harness.
-11. **Fixes become permanent guards** — a fixed bug gets a regression test/constraint/validation.
-12. **Shortcuts: default to the correct real-path implementation.** In HIGH-RISK, none. Elsewhere,
-    state the tradeoff + real-path alternative FIRST. Never make the user repeat themselves.
-13. **Don't ask unless needed — but report assumptions + evidence AFTER acting.** Ask only when truly
-    ambiguous or HIGH-RISK; otherwise proceed real-path and state what you assumed and proved.
-14. **Verify inputs against context** (translations, data, suggestions); flag mismatches BEFORE applying.
-15. **Report faithfully.** For SHIPPABLE / HIGH-RISK, end with: files changed · commands run · real
-    path verified · evidence (logs/DB/output) · cleanup · regression guard · remaining risk · next step.
+### RULES
+1. **ONE REAL SYSTEM — no behavior fork.** Isolate data / routing only, never logic / permissions /
+   paths. Isolation reversible with teardown; never pollute real data. Test once → ship that same
+   code; go-live only flips routing/config; re-test if code changed.
+2. **PROOF, NOT ECHO.** Nothing is done / fixed / live / saved on the operation's own word. Verify
+   from an INDEPENDENT read after it settles: **PUSHED ≠ LIVE** (ref==origin, service up, running code
+   carries the change); **WRITTEN ≠ SAVED** (commit/close first, then re-read from a SEPARATE
+   connection/session/process). A 2xx, RETURNING row, return value, same-transaction read, local
+   buffer, or enqueue/send acknowledgement is NOT final proof. Check state yourself before blaming it.
+3. **FILES ARE TRUTH, CHAT IS DISPOSABLE.** Persist to the repo as you go; prove from git.
+4. **EVERY ACTOR, NO DEAD ENDS.** User-path first and each role's view (backend-only proof is
+   insufficient for user-facing work); every control does a real action or faithfully advances through
+   a real path.
+5. **COVER EVERY BRANCH** — success / fail / cancel / invalid / permission / duplicate / edge; one
+   harness per workflow. Fixes become permanent guards (regression test or constraint), never symptom
+   patches.
+6. **REPORT FAITHFULLY.** Don't ask unless needed, but state assumptions, verify inputs against
+   context (flag mismatches before applying), and name any shortcut as a tradeoff before taking it
+   (HIGH-RISK: none). SHIPPABLE / HIGH-RISK ends with: files · commands · path verified · evidence
+   (independent, post-settlement) · cleanup · regression guard · remaining risk · next step.
 
 ### TWBshop HIGH-RISK paths (no shortcuts, real-path proof mandatory)
 - Payments / KHQR / Bakong · payroll & salary (staff_registry, slips, pays) · staff records &
@@ -270,8 +257,23 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-08 (session 29 — /test shell hardening: deployment-drift audit, OT WHEN-step
-+ card window, every ladder walks to the END, full Khmer review export)
+**Last updated:** 2026-06-09 (session 30 — precision-standard v2026-06-09-A: compressed 15→6 rules +
+new Rule 2 PROOF-NOT-ECHO (WRITTEN ≠ SAVED); fixed Visal AL 10th→11th (day off) real+test; root-caused
+the "won't restore" bug = ad-hoc ssh scripts skipped commit, repo write path via _db() is sound)
+
+**Session 30 (Jun 9):**
+- **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no
+  teeth lost) in BOTH global ~/.claude/CLAUDE.md and project CLAUDE.md. New first-class **Rule 2 PROOF,
+  NOT ECHO** — operation echo ≠ persisted state: PUSHED ≠ LIVE and WRITTEN ≠ SAVED (commit/close then
+  re-read on a SEPARATE connection; RETURNING / return value / 2xx / enqueue-ack are not proof).
+- **Visal AL corrected real+test:** req 17 was 9/10/12 but the 10th is his day off (Wed) → now 9/11/12
+  approved (is_test=False); seeded matching test copy (req 20) + Por 240 test payback (debt 11).
+- **Root cause of the "/testreset won't restore Visal's ALs" saga:** NOT a bot bug and NOT test
+  isolation. My earlier inline `ssh … psycopg2.connect()` restore scripts never called commit
+  (autocommit defaults off) → implicit ROLLBACK on process exit; RETURNING showed the in-txn value so
+  it looked restored. The REPO write path (`shared/database.py::_db()` context manager) commits
+  correctly — every bot/helper write is sound. Fix: ad-hoc DB scripts use _db() or autocommit + a
+  fresh-connection readback (now Rule 2).
 
 **Session 29 (Jun 8):**
 - **DEPLOYMENT-DRIFT AUDIT (owner feared lost work):** verified ALL last-night work safe — 20 commits
