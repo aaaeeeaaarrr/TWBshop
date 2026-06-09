@@ -1467,9 +1467,11 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
         [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
         [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
     ])
-    await _att_send(context, suid, "Staff", sn,
+    msg = await _att_send(context, suid, "Staff", sn,
         "You're asked for OT (%s) — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT (%s) — អ្នកអាចធ្វើបានទេ?"
         % (whenphrase, whenphrase), kb=kb)
+    if msg is not None:
+        context.bot_data.setdefault("ot_staff_card", {})[gid] = (msg.chat_id, msg.message_id)
     return gid
 
 
@@ -1513,11 +1515,24 @@ async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ot_bank_add(g["staff_id"], -int(g["minutes"]))   # reverse the on-the-spot bank (no-op in test)
     ot_grant_set(gid, status="rejected")
     await query.edit_message_text(query.message.text + "\n\n❌ Rejected (before start).")
-    for s, role in ((staff, "Staff"), (senior, "Senior")):
-        if s:
-            await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
-                            s.get("call_name") or s["canonical_name"],
-                            "The OT was cancelled by the owner.\nOT ត្រូវបានលុបចោលដោយម្ចាស់ហាង។")
+    cancel_txt = "This OT was cancelled by the owner.\nOT នេះត្រូវបានលុបចោលដោយម្ចាស់ហាង។"
+    # edit the staff's pending Yes/Can't card in place (no stale card + a separate new message)
+    sc = context.bot_data.get("ot_staff_card", {}).pop(gid, None)
+    staff_edited = False
+    if sc:
+        from gm_bot.attendance import strip_khmer as _sk
+        try:
+            await context.bot.edit_message_text(_sk(cancel_txt) if _att_test_mode() else cancel_txt,
+                                                chat_id=sc[0], message_id=sc[1])
+            staff_edited = True
+        except Exception:
+            pass
+    if staff and not staff_edited:
+        await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff",
+                        staff.get("call_name") or staff["canonical_name"], cancel_txt)
+    if senior:
+        await _att_send(context, (senior.get("telegram_ids") or [None])[0], "Senior",
+                        senior.get("call_name") or senior["canonical_name"], cancel_txt)
 
 
 async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1668,9 +1683,12 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:swps:%d:approve" % sw["id"])],
         [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:swps:%d:not_approve" % sw["id"])],
     ])
+    cards = context.bot_data.setdefault("swap_cards", {}).setdefault(sw["id"], [])
     for sen in _seniors(exclude_staff_id=sw["requester_id"]):
-        await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                        sen.get("call_name") or sen["canonical_name"], body, kb=kb)
+        msg = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                              sen.get("call_name") or sen["canonical_name"], body, kb=kb)
+        if msg is not None:
+            cards.append((msg.chat_id, msg.message_id))
 
 
 async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1703,6 +1721,20 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
     partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
     if not req or not partner:
         return
+    # edit the senior cards in place (the swap request stays intact + the verdict) — like AL
+    from datetime import date as _date0
+    _rn0 = req.get("call_name") or req["canonical_name"]
+    _pn0 = partner.get("call_name") or partner["canonical_name"]
+    _rd0 = _date0.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+    _pd0 = _date0.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
+    _final = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s\n\n%s"
+              % (_rn0, _pn0, _rn0, _rd0, _pn0, _pd0, sw.get("reason") or "—",
+                 "✅ Approved" if approved else "❌ Not approved"))
+    for _cid, _mid in context.bot_data.get("swap_cards", {}).pop(sw["id"], []):
+        try:
+            await context.bot.edit_message_text(_final, chat_id=_cid, message_id=_mid)
+        except Exception:
+            pass
     if approved:
         # dated overrides: requester off on req_off_date, partner off on partner_off_date; each works
         # the other's normal day-off date that week (the override 'work' is implied by absence of 'off').
@@ -1731,7 +1763,8 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
 
 def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
     return [s for s in staff_all("active")
-            if s.get("is_senior") and s["id"] != exclude_staff_id and (s.get("telegram_ids") or [])]
+            if s.get("is_senior") and s.get("org") == "TWB" and s["id"] != exclude_staff_id
+            and (s.get("telegram_ids") or [])]   # TWB seniors only — attendance never mixes locations
 
 
 def _al_availability_lines(requester: dict, days: list[str]) -> str:
@@ -1743,7 +1776,9 @@ def _al_availability_lines(requester: dict, days: list[str]) -> str:
         return ""
     scheds = [{"name": s.get("call_name") or s["canonical_name"],
                "work_start": to_min(s.get("work_start")), "work_end": to_min(s.get("work_end")),
-               "day_off": s.get("day_off")} for s in staff_all("active") if s["id"] != requester["id"]]
+               "day_off": s.get("day_off")} for s in staff_all("active")
+              if s["id"] != requester["id"] and s.get("org") == "TWB"
+              and s.get("canonical_name") != "Tyty"]   # TWB only — never mix in Delis/Tyty
     # who's on AL each day (from approved requests)
     on_al_by_day = {}
     for r in al_pending_requests():  # pending don't count; use approved below

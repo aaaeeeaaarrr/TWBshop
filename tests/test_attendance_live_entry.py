@@ -301,6 +301,53 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
     assert "Requester" in roles and "Supervisors group" in roles
 
 
+def test_al_availability_excludes_delis(monkeypatch):
+    """Coverage 'working those days' is TWB-only — Delis staff must never leak in."""
+    from gm_bot import bot
+    req = {"id": 1, "work_start": "08:00", "work_end": "17:00", "org": "TWB", "day_off": "Sun",
+           "canonical_name": "Req", "call_name": "Req"}
+    twb = {"id": 2, "work_start": "08:00", "work_end": "17:00", "org": "TWB", "day_off": "Mon",
+           "canonical_name": "TwbMate", "call_name": "TwbMate"}
+    delis = {"id": 3, "work_start": "08:00", "work_end": "17:00", "org": "DELIS", "day_off": "Mon",
+             "canonical_name": "DelisMate", "call_name": "DelisMate"}
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [req, twb, delis])
+    monkeypatch.setattr(bot, "al_pending_requests", lambda: [])
+    out = bot._al_availability_lines(req, ["2026-06-23"])   # Tuesday — nobody's day off
+    assert "TwbMate" in out
+    assert "DelisMate" not in out
+
+
+def test_swap_apply_edits_senior_cards(monkeypatch):
+    """Day-off swap decision edits the senior cards in place (request intact + verdict)."""
+    from gm_bot import bot
+    edits, roles = [], []
+    sw = {"id": 9, "requester_id": 1, "partner_id": 2, "req_off_date": "2026-06-21",
+          "partner_off_date": "2026-06-24", "reason": "x", "status": "partner_ok"}
+    monkeypatch.setattr(bot, "swap_get", lambda i: sw)
+    monkeypatch.setattr(bot, "swap_set_status", lambda *a, **k: None)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 1, "canonical_name": "Req", "call_name": "Req", "telegram_ids": [11]},
+        {"id": 2, "canonical_name": "Par", "call_name": "Par", "telegram_ids": [22]}])
+    monkeypatch.setattr(bot, "dayoff_set_override", lambda *a, **k: None)
+
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+        roles.append(role)
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+
+    class _Bot:
+        async def edit_message_text(self, text, chat_id=None, message_id=None, parse_mode=None):
+            edits.append((chat_id, message_id, text))
+
+    ctx = _Ctx()
+    ctx.bot = _Bot()
+    ctx.bot_data = {"swap_cards": {9: [(111, 5), (111, 6)]}}
+    asyncio.run(bot._swap_apply(ctx, sw, approved=True))
+    assert len(edits) == 2
+    assert "✅ Approved" in edits[0][2] and "Day-off swap" in edits[0][2]
+    assert "Requester" in roles and "Partner" in roles and "Supervisors group" in roles
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

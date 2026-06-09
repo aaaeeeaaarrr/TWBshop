@@ -1660,7 +1660,8 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
-    staff = [r for r in staff_all("active")]
+    staff = [r for r in staff_all("active")
+             if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]   # TWB only
     chunk = staff[page * 8:(page + 1) * 8]
     rows = [[InlineKeyboardButton("🧪 Dry-run 1: Check-in (full lifecycle)",
                                   callback_data="att:dr:go")],
@@ -1815,7 +1816,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "dr":
         if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4", "go5", "go6", "go7", "go8"):
             sample = _persona(context) or next(
-                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None), None)
+                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None
+                 and r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"), None)
             if sample is None:
                 await query.answer("No staff with shifts found")
                 return

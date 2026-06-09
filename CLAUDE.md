@@ -301,6 +301,19 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   edit-all-cards style; minor: OT owner-reject leaves the staff's pending card stale.
 - Suite 391 green (+ _al_summary, _al_finalize-edits-in-place).
 
+**Session 30 (Jun 9) — location-mix fix + swap/OT edit-in-place:**
+- **LOCATION BUG (owner): DELIS staff leaked into TWB AL coverage.** `_al_availability_lines` built its
+  roster from ALL active staff. Fixed → TWB only (excl Tyty). Audited every `staff_all` aggregation:
+  also filtered `_seniors` (TWB only — defensive; no Delis senior today), the `/test` persona picker,
+  and the dry-run sample. (The greeting/started report intentionally labels "(Delis)" — left as-is.)
+  Org values are `TWB` / `DELIS`; the 4 seniors are all TWB; Tyty is TWB & not senior.
+- **Swap senior cards now edit-in-place** (like AL): `_swap_partner_callback` stores card refs in
+  `bot_data["swap_cards"]`; `_swap_apply` edits them all to "Day-off swap … ✅/❌ verdict" (no more
+  stale non-voter cards).
+- **OT owner-reject** now edits the staff's pending Yes/Can't card to "cancelled" (stored in
+  `bot_data["ot_staff_card"]`) instead of leaving it stale + a new message; senior still memo'd.
+- Suite 393 green (+ al-availability-excludes-Delis, swap-apply-edits-cards).
+
 **Session 30 (Jun 9) — OT approval model = silence-is-approval (owner):**
 - **OT no longer waits for owner approval.** Senior gives OT (Now or Later) → the STAFF is engaged
   IMMEDIATELY (Now = bank on the spot + buyback picker; Later = Yes/Can't ask) and the owner gets a
