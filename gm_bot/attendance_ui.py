@@ -1451,7 +1451,7 @@ _OT_TIMES_PER_PAGE = 12
 def _ot_receiver(sid: int, dayidx: int):
     """(record, date, shift_start, shift_end, is_dayoff, call_name) for the OT receiver."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    d = date.today() + timedelta(days=dayidx)
+    d = _today() + timedelta(days=dayidx)
     ws = to_min((rec or {}).get("work_start"))
     we = to_min((rec or {}).get("work_end"))
     off = _DOW_NAME.get(((rec or {}).get("day_off") or "")[:3].title())
@@ -1485,7 +1485,7 @@ def ot_staff_pick(p: dict, kind: str) -> tuple[str, InlineKeyboardMarkup]:
 def ot_when_day(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
     """Later-OT step: which DAY (then start, then end)."""
     rows = [_back_row("att:ot:later")]
-    btns = [InlineKeyboardButton(day_label(date.today() + timedelta(days=i)),
+    btns = [InlineKeyboardButton(day_label(_today() + timedelta(days=i)),
                                  callback_data="att:ot:wd:%d:%d" % (sid, i)) for i in range(7)]
     rows += grid(btns, 2)
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
@@ -1578,7 +1578,7 @@ def _dur_txt(minutes: int) -> str:
 def _ot_window_label(kind: str, dayidx: int, start: int, end: int) -> str:
     """Clock-to-clock window for cards (owner: always show real start–end)."""
     if kind == "later" and dayidx >= 0:
-        d = date.today() + timedelta(days=dayidx)
+        d = _today() + timedelta(days=dayidx)
         return "%s %s–%s" % (day_label(d), fmt12(start), fmt12(end))
     return "now: %s–%s" % (fmt12(start), fmt12(end))
 
@@ -2221,7 +2221,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 kind, sid, dayidx, start, end = (data[3], int(data[4]), int(data[5]),
                                                  int(data[6]), int(data[7]))
-                wd = (date.today() + timedelta(days=dayidx)).isoformat() if kind == "later" else None
+                wd = (_today() + timedelta(days=dayidx)).isoformat() if kind == "later" else None
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
                      "minutes": end - start, "when_date": wd, "start_min": start})
