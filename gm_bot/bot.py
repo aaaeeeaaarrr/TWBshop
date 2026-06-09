@@ -3455,8 +3455,9 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await confirm(
             "✅ AL request sent — your seniors will review it. I'll message you when it's decided.\n"
             "✅ បានផ្ញើសំណើ AL — បងៗនឹងពិនិត្យ ហើយខ្ញុំនឹងប្រាប់ពេលមានការសម្រេច។",
-            "🧪 AL request submitted (test) — the senior approval cards were routed to you. Tap ✅ on "
-            "two to reach quorum, then watch the requester + Supervisors messages. /testreset to wipe.")
+            "🧪 AL request submitted (test) — the senior approval cards were routed to you. Tap ✅ to "
+            "reach quorum (2 seniors; 1 if the requester is a senior), then watch the requester + "
+            "Supervisors messages. /testreset to wipe.")
     elif flow == "late":
         from gm_bot.attendance import to_min
         mins = int(pend.get("mins") or 0)
@@ -3508,7 +3509,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ Day-off swap sent — your partner agrees first, then the seniors approve.\n"
             "✅ បានផ្ញើសំណើប្តូរថ្ងៃឈប់ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។",
             "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, then "
-            "approve as two seniors, then watch the Supervisors notice. /testreset to wipe.")
+            "approve as the seniors (2; or 1 if the requester is a senior), then watch the Supervisors "
+            "notice. /testreset to wipe.")
     elif flow == "marriage":
         from datetime import date as _date, timedelta as _td
         d0 = _date.fromisoformat(pend["start_date"])
@@ -3520,7 +3522,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ Marriage leave sent for senior approval. Congratulations 🎉\n"
             "✅ បានផ្ញើសំណើច្បាប់រៀបការសម្រាប់អនុម័ត។ សូមអបអរសាទរ 🎉",
             "🧪 Marriage leave submitted (test, via the AL approval engine) — senior cards routed to "
-            "you; approve as two seniors. /testreset to wipe.")
+            "you; approve as the seniors (2; or 1 if the requester is a senior). /testreset to wipe.")
     elif flow == "death":
         await book_family_death(context, persona, pend["who"], pend["start_date"])
         await confirm(

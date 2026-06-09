@@ -396,7 +396,7 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("② Sick → Me: 'I really can't come today' → rest + papers ask",
          "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
          "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n"
-         "(paperless = the missed time becomes pay-back, same price as informed-late)", None),
+         "(paperless = pay-back from now; doctor's papers within 2 days cancel it)", None),
         ("③ papers photo arrives → instant ack (goes to OWNER + Tyty ONLY)",
          "Got your papers ✓ sending to the owner.\n"
          "បានទទួលឯកសាររបស់អ្នក ✓ កំពុងផ្ញើទៅម្ចាស់ហាង។", None),
@@ -413,16 +413,17 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "only if you truly feel able 🤍\n"
          "ធូរស្បើយបន្តិចហើយឬនៅ? បើអ្នកមានកម្លាំង អាចមកធ្វើការងារស្រាលៗថ្ងៃនេះបាន (+15 points ⭐) — "
          "តែបើអ្នកពិតជាអាចធ្វើបានប៉ុណ្ណោះ 🤍", cant_kb),
-        ("⑦ came on light duty → the senior memo + the staff welcome",
-         "[→ every senior on shift] Davy is coming on LIGHT DUTY today — easy/seated work only.\n"
+        ("⑦ came on light duty → the Supervisors-group memo + the staff welcome",
+         "[→ Supervisors group] Davy is coming on LIGHT DUTY today — easy/seated work only.\n"
          "Davy នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។\n\n"
          "[→ Davy] Thank you for coming 🤍 light duty only — a senior will point you to easy work.\n"
          "អরគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារងាយៗឱ្យអ្នក។", None),
         ("⑧ chose to rest instead",
          "Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។", None),
-        ("⑨ 3 days passed, NO papers → the missed time becomes pay-back",
-         "No papers came — the missed time goes to your pay-back balance.\n"
-         "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។", None),
+        ("⑨ each night while out → return check (never papers/pay-back); the answer goes to Supervisors",
+         "Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
+         "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។",
+         _ill(["✅ Coming in tomorrow"], ["🛌 Still resting"], ["⏰ Coming in today at…"])),
         ("⑩ FAMILY-sick day → seniors informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for her child today.\n"
          "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនរបស់គាត់ថ្ងៃនេះ។", None),
@@ -496,9 +497,10 @@ def build_catalogue6(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("③ 📅 Later: any staff → day → start → end (max 14h; whole day if it's their day off)",
          "Give 4h OT to Renaud — when: Wed 10/06 5pm–9pm. (only times OUTSIDE their shift)\n"
          "(day-off OT can run long — up to the 14h bank cap)", None),
-        ("④ [→ OWNER approval card] — who gives, who gets, when, why, current bank",
-         "Samphass gives 2h OT to Renaud — when: now 4pm–6pm, why: big rush · bank now: 0h/14h",
-         _ill(["✅ Approve", "❌ No"])),
+        ("④ [→ OWNER reject-only notice] — silence = approval; the staff is asked in PARALLEL (no gate)",
+         "Samphass gives 2h OT to Renaud — when: now 4pm–6pm, why: big rush · bank now: 0h/14h\n"
+         "(you only act to VETO — allowed until the OT starts)",
+         _ill(["❌ Reject"])),
         ("⑤ NOW-OT consent — staff asked to accept (15 min → senior nudged to remind in person)",
          "Senior gave you 2h OT now (4pm–6pm) — ok?\n"
          "បងបានឱ្យអ្នកធ្វើ OT 2h ឥឡូវនេះ (4pm–6pm) — បានទេ?  (KH pending review)", consent_kb),
@@ -509,7 +511,7 @@ def build_catalogue6(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑦ FUTURE-OT — staff invited (voluntary; accepting becomes a commitment)",
          "The shop is asking you for OT on Wed 10/06, 5pm–9pm — can you?\n"
          "ហាងស្នើឱ្យអ្នកធ្វើ OT នៅ Wed 10/06, 5pm–9pm — អ្នកអាចធ្វើបានទេ?", consent_kb),
-        ("⑧ owner approved → hours bank + buyback slots (safest/most-surplus times, reward tone)",
+        ("⑧ staff accepts → hours bank + buyback slots (safest/most-surplus times, reward tone)",
          "+2h OT approved — your bank: 2h. Choose when to take it back:\n"
          "+2h OT ត្រូវបានអនុម័តហើយ — OT bank របស់អ្នក៖ 2h។ សូមជ្រើសម៉ោងដើម្បីសម្រាកសងវិញ៖", _buyback_kb()),
         ("⑨ buyback booked → earned rest confirmed",
@@ -518,9 +520,9 @@ def build_catalogue6(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑩ 12h-before reminder for the booked buyback (rest — no check-in)",
          "Reminder — your earned rest is tomorrow: Tue 10/06, 2pm–3pm 🌴\n"
          "រំលឹក — ម៉ោងសម្រាករបស់អ្នកគឺថ្ងៃស្អែក៖ Tue 10/06, 2pm–3pm 🌴  (KH pending review)", None),
-        ("⑪ owner REJECTS before it starts → reason → BOTH senior + staff told",
-         "[→ senior + staff] The OT was not approved this time. Reason: too quiet tonight.\n"
-         "(reject AFTER it started → too late, staff is paid/banked — they stayed in good faith)", None),
+        ("⑪ owner REJECTS before it starts → staff + senior told, Supervisors notice, bank reversed",
+         "[→ staff + senior] This OT was cancelled by the owner.\n"
+         "(reject AFTER it started → too late: staff is paid/banked — they stayed in good faith)", None),
         ("⑫ accepted OT, then NO-SHOW → penalty (points + senior & owner told; NO money/AL)",
          "[→ OWNER + senior] Davy accepted OT for Wed 10/06 5pm–9pm but didn't show. "
          "Points hit + dossier flag.  (owner-only)", None),
@@ -1056,7 +1058,8 @@ def _walk_steps(p: dict, name: str) -> list[tuple[str, InlineKeyboardMarkup | No
              % nm, None),
             ("[→ %s, if part-duty offered] “Feeling a little better? There's light work today (+15 ⭐) "
              "— only if you truly feel able 🤍”\n\n"
-             "✓ Sick-papers ladder complete. (No papers in 3 days → the missed time becomes pay-back.)"
+             "✓ Sick-papers ladder complete. (Paperless = pay-back from declaration; accepted papers "
+             "within 2 days cancel it. Nightly return-check asks if they're back, not about papers.)"
              % nm, _ill(["💪 I can come · ខ្ញុំអាចមក", "🛌 Rest today · សម្រាកថ្ងៃនេះ"])),
         ]
     if name == "sickfam":
@@ -1266,22 +1269,9 @@ def al_stub(p: dict, detail: str, walk: str = "al") -> tuple[str, InlineKeyboard
     return _hdr(p, detail), InlineKeyboardMarkup(rows)
 
 
-def emergency_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    rows = [_back_row(),
-            [InlineKeyboardButton("I fully understand · យល់ច្បាស់ហើយ", callback_data="att:em:ok")],
-            [InlineKeyboardButton("❌ No Emergency AL · មិនប្រើ", callback_data="att:menu")]]
-    return _hdr(p, "⚠️ You can only use Emergency AL once every 30 days. Do you understand?\n"
-                   "អ្នកអាចប្រើឈប់សម្រាកបន្ទាន់បានតែ ១ដងក្នុង ៣០ថ្ងៃ។ តើអ្នកយល់ច្បាស់ទេ?"), InlineKeyboardMarkup(rows)
-
-
-def emergency_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    btns = [InlineKeyboardButton("Today", callback_data="att:em:d:today")]
-    start = date.today() + timedelta(days=1)
-    btns += [InlineKeyboardButton(day_label(start + timedelta(days=i)),
-                                  callback_data="att:em:d:%s" % (start + timedelta(days=i)).isoformat())
-             for i in range(28)]
-    rows = [_back_row("att:em")] + grid(btns, 4)
-    return _hdr(p, "Which day? (today + next 28)"), InlineKeyboardMarkup(rows)
+# Emergency AL was REMOVED by the owner (session 28) — weird emergencies go via points (TBD).
+# The old emergency_screen/emergency_dates + att:em branch were unreachable dead code, deleted
+# session 30. (Short-notice AL — _near_days / SHORT_NOTICE_PT_PER_MIN — is a SEPARATE thing, kept.)
 
 
 def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1505,14 +1495,14 @@ def ot_owner_card(p: dict, kind: str, sid: int, dayidx: int, start: int, end: in
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     dur = _dur_txt(end - start)
     when = _ot_window_label(kind, dayidx, start, end)
-    txt = _hdr(p, "[TEST PREVIEW → OWNER approval card]\n"
+    txt = _hdr(p, "[TEST PREVIEW → OWNER reject-only notice — silence = approval]\n"
                   "“%s gives %s OT to %s — when: %s, why: big rush · bank now: 0h/14h”\n"
-                  "[✅ Approve] [❌ No]\n\n"
+                  "[❌ Reject]   (staff is asked in parallel; you only veto, until it starts)\n\n"
                   "Tap to see what happens →"
                % (p["canonical_name"], dur, rec["canonical_name"] if rec else "?", when))
     return txt, InlineKeyboardMarkup([
         _back_row("att:ot:give"),
-        [InlineKeyboardButton("✅ As if owner approves",
+        [InlineKeyboardButton("▶️ As if approved (you stay silent)",
                               callback_data="att:ot:appd:%d:%d" % (sid, end - start))],
         [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
@@ -2062,12 +2052,6 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
-    if action == "em":
-        if len(data) > 2 and data[2] == "ok":
-            return await show(emergency_dates(p))
-        if len(data) > 2 and data[2] == "d":
-            return await show(al_stub(p, "Emergency AL for %s." % data[3], walk=""))
-        return await show(emergency_screen(p))
     if action == "do":
         if len(data) > 2 and data[2] == "d":
             context.user_data["att_do_day"] = data[3]   # remember the chosen new day-off date
