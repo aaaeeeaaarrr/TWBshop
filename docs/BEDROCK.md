@@ -51,6 +51,18 @@ This single idea drives deltas 1, 2, and 4 below — see them as one principle, 
    in N months, or a rule that has never once been the thing that caught a problem, is a compress/delete
    candidate at the next review. Keep Bedrock lean by design, not by occasional cleanup panic.
 
+## Reporting constraint — the owner reads ONLY results (his own words, session 31)
+The owner gives instructions and reads the OUTCOME only — not the assistant's prose. So a guard block
+buried in explanation is invisible to him; a blocked-but-needed task would just look like "it didn't
+work." Therefore:
+- When a guard stops an action needed to finish his instruction, LEAD the reply with an unmissable
+  `🛑 NEEDS YOU — paste this: ! <exact command, ready to run>`. One paste, pre-written. Never bury it.
+- TUNE the guard patterns so HARMLESS actions never trip (today's blunt false-positives blocked even
+  read-only commands). The only block he should ever see is a rare, genuinely-catastrophic one.
+- Protection against the assistant's autonomous mistakes still works without him reading anything (the
+  hard-stop fires regardless) — only the NOTIFICATION must move into the results channel. This is a
+  hard requirement for delta 1 ("block-and-owner-runs") to actually function for this owner.
+
 ## Owner's one hands-on task (delta 2)
 The OS write-boundary cannot be built by Claude — no script Claude writes can establish the wall meant
 to constrain it. The owner sets the GLOBAL enforcing guard files to admin-owned / user-read-only, from
