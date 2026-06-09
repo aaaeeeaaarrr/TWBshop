@@ -1838,8 +1838,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()})
                 return await show(_arm_prompt(p, context,
-                    "Sick — can't come today.\n\n📝 Type 'go' to confirm. Opens a sick case; if you "
-                    "see a doctor, send a photo of the papers afterwards.", "att:sp:me"))
+                    "Sick — can't come today. · ឈឺ មកធ្វើការថ្ងៃនេះមិនបាន។\n\n"
+                    "📝 Type 'go' to confirm — opens a sick case; if you see a doctor, send a photo of "
+                    "the papers after.\n"
+                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — បើកសំណុំរឿងឈឺ; បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារក្រោយមក។",
+                    "att:sp:me"))
             return await show(sick_me_cant(p))
         if sub == "sickf":
             return await show(sick_family_dates(p, data[3]))
@@ -1850,8 +1853,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]})
                 return await show(_arm_prompt(p, context,
-                    "Family sick (%s) — full day.\n\n📝 Type 'go' to confirm. Books the day and "
-                    "notifies the Supervisors." % data[3], "att:sp:sick"))
+                    "Family sick (%s) — full day. · គ្រួសារឈឺ (%s) ពេញមួយថ្ងៃ។\n\n"
+                    "📝 Type 'go' to confirm — books the day and notifies the Supervisors.\n"
+                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — កត់ត្រាថ្ងៃ ហើយជូនដំណឹងដល់បងៗ។"
+                    % (data[3], data[3]), "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4]))
         if sub == "famt":
             return await show(sick_family_time_grid(p, data[3], data[4], "from"))
@@ -1872,8 +1877,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child})
                 return await show(_arm_prompt(p, context,
-                    "Marriage leave (%d day%s).\n\n📝 Type the reason — your next message submits it "
-                    "for senior approval." % (1 if child else 3, "" if child else "s"), "att:sp:mar"))
+                    "Marriage leave (%d day%s). · ច្បាប់រៀបការ (%d ថ្ងៃ)។\n\n"
+                    "📝 Type the reason — your next message submits it for senior approval.\n"
+                    "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើទៅបងៗដើម្បីអនុម័ត។"
+                    % (1 if child else 3, "" if child else "s", 1 if child else 3), "att:sp:mar"))
             return await show(marriage_stub(p, data[3], child=child))
         if sub == "death":
             return await show(death_menu(p))
@@ -1887,8 +1894,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     _arm_pending(context, update.effective_user.id,
                         {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
                     return await show(_arm_prompt(p, context,
-                        "Family death (1 day) — no reason needed.\n\n📝 Type 'go' to confirm. Sends "
-                        "condolences and notifies the Supervisors.", "att:sp:death"))
+                        "Family death (1 day) — no reason needed. · មរណភាពគ្រួសារ (1 ថ្ងៃ) "
+                        "មិនបាច់មូលហេតុ។\n\n"
+                        "📝 Type 'go' to confirm — sends condolences and notifies the Supervisors.\n"
+                        "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
+                        "att:sp:death"))
                 return await show(death_stub(p, data[3], data[4], 1))
             return await show(death_days(p, data[3], data[4]))
         if sub == "deathn":
@@ -1896,8 +1906,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
                 return await show(_arm_prompt(p, context,
-                    "Family death — no reason needed.\n\n📝 Type 'go' to confirm. Sends condolences "
-                    "and notifies the Supervisors.", "att:sp:death"))
+                    "Family death — no reason needed. · មរណភាពគ្រួសារ មិនបាច់មូលហេតុ។\n\n"
+                    "📝 Type 'go' to confirm — sends condolences and notifies the Supervisors.\n"
+                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យរំលែកទុក្ខ ហើយជូនដំណឹងដល់បងៗ។",
+                    "att:sp:death"))
             return await show(death_stub(p, data[3], data[4], int(data[5])))
         if sub == "birth":
             return await show(birth_dates(p))
@@ -1906,8 +1918,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "birth", "persona_id": p["id"], "start_date": data[3]})
                 return await show(_arm_prompt(p, context,
-                    "Wife giving birth (2 days) — no reason needed.\n\n📝 Type 'go' to confirm. Sends "
-                    "congratulations and notifies the Supervisors.", "att:sp"))
+                    "Wife giving birth (2 days) — no reason needed. · ប្រពន្ធសម្រាលកូន (2 ថ្ងៃ) "
+                    "មិនបាច់មូលហេតុ។\n\n"
+                    "📝 Type 'go' to confirm — sends congratulations and notifies the Supervisors.\n"
+                    "📝 វាយ 'go' ដើម្បីបញ្ជាក់ — ផ្ញើពាក្យអបអរសាទរ ហើយជូនដំណឹងដល់បងៗ។", "att:sp"))
             return await show(birth_stub(p, data[3]))
         return await show(special_menu(p))
     if action == "aw":
@@ -1920,9 +1934,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "late", "persona_id": p["id"], "mins": int(data[3])})
                 return await show(_arm_prompt(p, context,
-                    "Late ~%d min.\n\n📝 Type your reason — your next message sends the Supervisors a "
-                    "heads-up. Share your live location when you arrive and I'll work out the payback."
-                    % int(data[3]), "att:late"))
+                    "Late ~%d min. · មកយឺត ~%d នាទី។\n\n"
+                    "📝 Type your reason — it sends the Supervisors a heads-up. Share your live "
+                    "location when you arrive and I'll work out the payback.\n"
+                    "📝 សរសេរមូលហេតុ — វាជូនដំណឹងដល់បងៗ។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ "
+                    "ខ្ញុំនឹងគណនាម៉ោងសងវិញ។"
+                    % (int(data[3]), int(data[3])), "att:late"))
             return await show(late_picked(p, int(data[3])))
         return await show(late_screen(p))
     if action == "al":
@@ -1953,7 +1970,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         {"flow": "al", "persona_id": p["id"], "kind": "days",
                          "days": sorted(picked), "hours_start": None, "hours_end": None})
                     return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
-                        "next message submits the AL request for senior approval.", "att:al"))
+                        "next message submits the AL request for senior approval.\n"
+                        "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
                 return await show(al_stub(p, detail))
             if sub == "time":
                 return await show(al_time_grid(p, "from", picked=picked))
@@ -1979,7 +1997,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                          "hours_start": "%02d:%02d" % (f // 60, f % 60),
                          "hours_end": "%02d:%02d" % (t // 60, t % 60)})
                     return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
-                        "next message submits the AL request for senior approval.", "att:al"))
+                        "next message submits the AL request for senior approval.\n"
+                        "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
@@ -2004,8 +2023,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
                      "req_off_date": req_off, "partner_off_date": partner_off})
                 return await show(_arm_prompt(p, context,
-                    "Day-off swap — partner picked.\n\n📝 Type the reason — your next message submits "
-                    "it: your partner agrees first, then two seniors approve.", "att:do"))
+                    "Day-off swap — partner picked. · ប្តូរថ្ងៃឈប់ — បានជ្រើសដៃគូ។\n\n"
+                    "📝 Type the reason — your partner agrees first, then two seniors approve.\n"
+                    "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបង 2 នាក់អនុម័ត។", "att:do"))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
                                          "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
@@ -2052,8 +2072,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     {"flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
                      "minutes": end - start, "when_date": wd, "start_min": start})
                 return await show(_arm_prompt(p, context,
-                    "Give OT — %d min.\n\n📝 Type the reason for the owners — your next message submits "
-                    "it for owner approval." % (end - start), "att:ot:give"))
+                    "Give OT — %d min. · ឱ្យ OT — %d នាទី។\n\n"
+                    "📝 Type the reason for the owners — your next message submits it for owner approval.\n"
+                    "📝 សរសេរមូលហេតុសម្រាប់ម្ចាស់ហាង — សារបន្ទាប់នឹងបញ្ជូនសំណើដើម្បីអនុម័ត។"
+                    % (end - start, end - start), "att:ot:give"))
             return await show(ot_stub(p, data[3], int(data[4]), int(data[5]), int(data[6]), int(data[7])))
         if sub == "card":
             # att:ot:card:{kind}:{sid}:{dayidx}:{start}:{end}

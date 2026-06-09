@@ -165,6 +165,47 @@ def test_dispatch_late_test_collapses_payback(monkeypatch):
     assert calls["offer"] == 1
 
 
+class _Query:
+    def __init__(self, data):
+        self.data = data
+        self.edited = []
+
+    async def answer(self, *a, **k):
+        pass
+
+    async def edit_message_text(self, t, **k):
+        self.edited.append(t)
+
+
+class _CbUpdate:
+    def __init__(self, uid, data):
+        self.callback_query = _Query(data)
+        self.effective_user = types.SimpleNamespace(id=uid)
+        self.effective_chat = types.SimpleNamespace(id=uid, type="private")
+
+
+def test_reason_terminals_format_bilingual(monkeypatch):
+    """Drive the REAL callback for every %-formatted terminal — proves the bilingual prompts
+    format without a ValueError (the only runtime risk after adding Khmer with embedded numbers)."""
+    import config
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [dict(_PERSONA)])
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)         # armed (owner test mode)
+    monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    cases = [
+        ("att:ot:en:now:11:0:480:540", "នាទី"),       # OT 60 min (2× %d)
+        ("att:late:o:30", "នាទី"),                     # late ~30 min (2× %d)
+        ("att:sp:mard:2026-06-25", "ថ្ងៃ"),            # marriage 3 days (%d %s %d)
+        ("att:sp:famf:mother:2026-06-25", "គ្រួសារ"),  # family sick (2× %s)
+        ("att:al:full", "AL"),                          # AL full-day suffix
+    ]
+    for data, needle in cases:
+        upd = _CbUpdate(config.OWNER_TELEGRAM_ID, data)
+        ctx = _Ctx(); ctx.user_data["att_persona"] = 11
+        asyncio.run(ui.callback(upd, ctx))
+        out = upd.callback_query.edited[-1]
+        assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
+
+
 def test_dispatch_live_rejects_unknown_uid(monkeypatch):
     from gm_bot import bot
     monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: None)

@@ -281,8 +281,11 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   menu hides switch, armed gating, flow_state routing, LIVE late declare-only vs TEST collapse,
   unknown-uid rejected). py_compile OK. Real-staff DELIVERY provable only at go-live (single account +
   gate OFF) — the documented plan (owner role-play test in test mode covers the message shapes).
-- New live reason-PROMPT strings are English (KH pending) — flag for the next ChatGPT Khmer pass; the
-  staff-facing OUTPUTS (senior cards / Supervisors notices / confirms) are already bilingual.
+- Khmer WIRED into all 11 live reason/'go' prompts (bilingual EN·KH), mirroring the file's already-
+  approved terms (បងៗ / ច្បាប់រៀបការ / មរណភាពគ្រួសារ / ប្រពន្ធសម្រាលកូន / ប្តូរថ្ងៃឈប់ / ទីតាំងផ្ទាល់);
+  Latin kept for go/AL/OT/numbers. Real callback path proves the %-formatted ones (late/marriage/famf/
+  ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
+  owner-reviewed). The dispatcher confirmations were already bilingual.
 
 **Session 30 (Jun 9) — precision standard + data fixes:**
 - **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no
