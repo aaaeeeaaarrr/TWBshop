@@ -330,10 +330,10 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
 - **Take-back ≠ payback:** earned-OT buyback slots are now at the shift EDGES (come in late / leave
   early) via new `payback.takeback_windows`, not the before/after-shift payback windows. Labeled
   🌅 in late / 🌙 leave early.
-- **OWNER never gets Khmer:** `attendance.strip_khmer()` applied per-recipient — `_att_send` strips when
-  the recipient is the owner (test-routed previews + owner notices), and the `/test` shell strips text
-  + button labels for the owner (live staff keep full bilingual). One bilingual source, stripped only
-  for the owner at output.
+- **OWNER never gets Khmer — but ONLY in message BODIES, not the shell.** `attendance.strip_khmer()` is
+  applied in `_att_send` when the recipient is the owner (test-routed previews + owner notices →
+  English). The `/test` shell menus/screens STAY BILINGUAL so the owner previews exactly what staff see
+  (owner corrected the scope, session 30 — do NOT strip the shell/menu). Live staff always bilingual.
 - Suite 389 green (+ _ot_started, Later/Now ask-first, now-accept-banks, _ot_window, takeback_windows,
   strip_khmer).
 

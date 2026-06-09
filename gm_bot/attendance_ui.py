@@ -22,7 +22,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 import config
-from gm_bot.attendance import to_min, overlaps, strip_khmer
+from gm_bot.attendance import to_min, overlaps
 from shared.database import staff_all, att_test_on, staff_get_by_uid, flow_save, al_leave_days_set
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
@@ -670,16 +670,6 @@ def _hdr(p: dict, line: str = "") -> str:
 
 def _back_row(target: str = "att:menu") -> list[InlineKeyboardButton]:
     return [InlineKeyboardButton("←Back", callback_data=target)]
-
-
-def _strip_kb(kb):
-    """English-only copy of an inline keyboard (owner doesn't want Khmer on buttons either)."""
-    if kb is None:
-        return None
-    rows = [[InlineKeyboardButton(strip_khmer(b.text) or b.text,
-                                  callback_data=b.callback_data, url=b.url) for b in row]
-            for row in kb.inline_keyboard]
-    return InlineKeyboardMarkup(rows)
 
 
 # ---------------------------------------------------------------- screens
@@ -1791,8 +1781,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     async def show(pair):
         text, kb = pair
-        if uid == config.OWNER_TELEGRAM_ID and not _is_live(context):
-            text, kb = strip_khmer(text), _strip_kb(kb)   # owner shell → English only; live keeps KH
+        # The /test shell stays BILINGUAL — it previews exactly what staff see (owner, session 30).
+        # Khmer is stripped only from the message BODIES routed to the owner (in bot._att_send).
         await query.edit_message_text(text, reply_markup=kb)
 
     if _is_live(context) and action in ("pick", "pickp", "persona"):

@@ -233,8 +233,8 @@ class _CbUpdate:
 
 def test_reason_terminals_format_bilingual(monkeypatch):
     """Drive the REAL callback for every %-formatted terminal — proves the prompts format without a
-    ValueError (the runtime risk from Khmer with embedded numbers). Owner shell = English-only, so
-    we assert the English survives (the Khmer is correctly stripped for the owner)."""
+    ValueError (the runtime risk from Khmer with embedded numbers). The /test shell stays BILINGUAL
+    for the owner (only message BODIES are stripped), so the English AND Khmer both render."""
     import config
     monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [dict(_PERSONA)])
     monkeypatch.setattr(ui, "att_test_on", lambda: True)         # armed (owner test mode)
@@ -252,6 +252,11 @@ def test_reason_terminals_format_bilingual(monkeypatch):
         asyncio.run(ui.callback(upd, ctx))
         out = upd.callback_query.edited[-1]
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
+    # shell keeps Khmer (the OT prompt is bilingual) — only routed message bodies are English-only
+    upd = _CbUpdate(config.OWNER_TELEGRAM_ID, "att:ot:en:now:11:0:480:540")
+    ctx = _Ctx(); ctx.user_data["att_persona"] = 11
+    asyncio.run(ui.callback(upd, ctx))
+    assert "នាទី" in upd.callback_query.edited[-1]
 
 
 def test_al_summary_bold_spaced_english():
