@@ -74,3 +74,10 @@ recipient address and is_test flag differ.
 ## Status
 - ✅ session 29: is_test on all tables + testreset/test_counts (deployed, verified in prod).
 - ⏳ routing layer, actor override, owner commands, flow wiring (1–8), staff entry.
+
+## LIVE vs TEST — late/payback (owner, 2026-06-09)
+- TEST collapses declare+arrival: the late test fires Supervisors heads-up AND the payback picker
+  immediately (so the owner can test booking without sharing a real location). Keep this.
+- LIVE must NOT: Late declare -> Supervisors heads-up ONLY. The payback debt + slot picker appear
+  on ARRIVAL when the staff shares live location (truth = GPS-measured minutes), via
+  _handle_staff_location. When wiring the live staff-entry, do NOT call _offer_payback at declare.
