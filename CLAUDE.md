@@ -257,10 +257,10 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-10 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED + made UNIVERSAL:
-hard-blocks (exit 2) in EVERY mode unless `#HIGHRISK-OK` marker; now installed GLOBALLY for every
-project + synced to every machine via bootstrap; added a 2nd guard (secret-leak block); marker
-protocol documented in global laws)
+**Last updated:** 2026-06-10 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED + made UNIVERSAL +
+named **Bedrock** (Standards+Guards+Ratchet) and converged via 3 advisor passes → `docs/BEDROCK.md`.
+Architecture review CLOSED; 5 deltas queued. ⚠ The `#HIGHRISK-OK` marker is DEPRECATED — Claude can
+type it = self-approval; catastrophic actions will switch to block-and-owner-runs-manually next session)
 
 **Session 31 (Jun 9) — HIGH-RISK guard: proven live, then hardened (owner: "I always say yes"):**
 - **Proved the live hook wiring** (the session-30 resume task). The PreToolUse guard DOES fire
@@ -568,16 +568,21 @@ protocol documented in global laws)
   after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
 - Suite green: 369.
 
-**▶ RESUME HERE (session 31 → next session):**
-HIGH-RISK hook wiring is PROVEN + HARDENED (session-31 note above): it fires live, and now hard-blocks
-(exit 2) in every mode unless the marker `#HIGHRISK-OK` is appended to the command. ⚠ The PowerShell-
-coverage matcher change activates only after a fresh session RESTART (Bash already guarded live). After
-restart, optionally re-confirm: a `systemctl restart …` via the PowerShell tool should hard-block.
-OT-end checkout is MIDNIGHT-SAFE (`ot_now_end_times`); DB write-path clean. Pick one open attendance
-thread:
-  (a) **Bank-on-completion for OT** — the only fix for "leave early, keep OT pay" (flagged, not built);
-  (b) **Go-live prep** — owner role-play test → /testreset → /testmode off → greeting + 📋 Menu →
-      flip attendance_live (see the session-29 RESUME just below for the full go-live sequence).
+**▶ RESUME HERE (session 31 → next session): BEDROCK deltas, then prove, then attendance.**
+Bedrock (Standards+Guards+Ratchet) is converged + documented → **`docs/BEDROCK.md`** (read it first).
+Architecture review is CLOSED — no more abstract review; the next move is PROOF. Order:
+  1. **OWNER, by hand:** set the OS write-boundary on the guard files + a trusted manifest (delta 2 —
+     admin-owned / user-read-only; Claude can't build the wall meant to constrain it). Verify exact
+     `icacls` steps together on the machine — don't run them blind.
+  2. **Claude:** apply deltas 1/3/5 to the real files — kill the self-typed `#HIGHRISK-OK` marker
+     (catastrophic set → block-and-owner-runs-manually) · gate secrets at commit/push/upload, not just
+     write · give the Ratchet a removal trigger.
+  3. **Fresh-session wiring test (only real proof):** bypass mode — a catastrophic action with NO
+     override must die on exit 2; verify the owner-run path; grep for a DB write path that dodges the
+     guard. (Also: the PowerShell-coverage matcher + global hooks activate only after a session RESTART.)
+  4. Then attendance: (a) **Bank-on-completion for OT** (the only fix for "leave early, keep OT pay");
+     (b) **Go-live prep** (owner role-play → /testreset → /testmode off → greeting + 📋 Menu → flip
+     attendance_live). **No universal tests gate** (project-opt-in, push/deploy-time only).
 attendance_live=OFF, attendance_test_mode=OFF.
 
 **▶ RESUME HERE (session 29): TEST HARNESS COMPLETE — ready for the owner's single role-play test.**
