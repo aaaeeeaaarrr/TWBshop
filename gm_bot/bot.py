@@ -1158,7 +1158,7 @@ def _att_active() -> bool:
 
 
 async def _att_send(context, to_uid, role: str, to_name: str, text: str,
-                    kb=None, group: bool = False) -> None:
+                    kb=None, group: bool = False, parse_mode: str | None = None):
     """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
     - test mode: deliver to the OWNER, labeled [→ role: name], buttons kept functional so the
       owner taps as that role.
@@ -1168,20 +1168,21 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
         # everything routes to the OWNER in test → English-only (owner doesn't want Khmer)
         prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
         try:
-            await context.bot.send_message(config.OWNER_TELEGRAM_ID, strip_khmer(prefix + text),
-                                           reply_markup=kb)
+            return await context.bot.send_message(config.OWNER_TELEGRAM_ID, strip_khmer(prefix + text),
+                                                  reply_markup=kb, parse_mode=parse_mode)
         except Exception as e:
             logger.error("att_send(test) failed: %s", e)
-        return
+            return None
     target = config.SUPERVISORS_CHAT_ID if group else to_uid
     if not target:
-        return
+        return None
     # the owner reads English only; staff/groups get the full bilingual text
     body = strip_khmer(text) if target == config.OWNER_TELEGRAM_ID else text
     try:
-        await context.bot.send_message(target, body, reply_markup=kb)
+        return await context.bot.send_message(target, body, reply_markup=kb, parse_mode=parse_mode)
     except Exception as e:
         logger.error("att_send to %s failed: %s", target, e)
+        return None
 
 
 async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1760,26 +1761,42 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
                             hours_start: str | None, hours_end: str | None, reason: str,
                             requested_by_uid: int) -> int:
     """Create the AL request and DM every senior an approval card (gated by caller)."""
+    import html
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
                                reason, requested_by_uid)
     name = requester.get("call_name") or requester["canonical_name"]
-    days_txt = ", ".join(__import__("datetime").date.fromisoformat(d).strftime("%a %d/%m") for d in days)
+    # AL cards are English-only (owner request), with BOLD, spaced dates.
+    summary = _al_summary(name, days, reason)
     avail = _al_availability_lines(requester, days)
-    body = ("%s requests AL: %s. Reason: %s\n%s ស្នើ AL: %s។ មូលហេតុ៖ %s\n\n"
-            "Working those hours: %s\nអ្នកធ្វើការម៉ោងនោះ៖ %s"
-            % (name, days_txt, reason, name, days_txt, reason, avail, avail))
+    avail_html = "\n".join(
+        ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
+         if ":" in ln else html.escape(ln))
+        for ln in avail.split("\n"))
+    body = "%s\n\nWorking those days:\n%s" % (summary, avail_html)
+    cards = context.bot_data.setdefault("al_cards", {}).setdefault(req_id, [])
     for sen in _seniors(exclude_staff_id=requester["id"]):
         # senior id encoded so a test-mode tap (by the owner) is attributed to THIS senior
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Approve · អនុម័ត",
+            [InlineKeyboardButton("✅ Approve",
                                   callback_data="att:alapp:%d:approve:%d" % (req_id, sen["id"]))],
-            [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត",
+            [InlineKeyboardButton("❌ Not approve",
                                   callback_data="att:alapp:%d:not_approve:%d" % (req_id, sen["id"]))],
         ])
         uid = (sen.get("telegram_ids") or [None])[0]
-        await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
-                        body, kb=kb)
+        msg = await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
+                              body, kb=kb, parse_mode="HTML")
+        if msg is not None:
+            cards.append((msg.chat_id, msg.message_id))
     return req_id
+
+
+def _al_summary(name: str, days: list[str], reason: str) -> str:
+    """The AL request one-liner, English, with BOLD space-separated dates (HTML). Reused for the
+    senior card and the final edited-in-place result so the request text stays intact."""
+    import html
+    from datetime import date as _date
+    dates = "   ".join("<b>%s</b>" % html.escape(_date.fromisoformat(d).strftime("%a %d/%m")) for d in days)
+    return "%s requests AL: %s\nReason: %s" % (html.escape(name), dates, html.escape(reason or "—"))
 
 
 async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1823,6 +1840,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
     requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
     if not requester:
         return
+    import html
     name = requester.get("call_name") or requester["canonical_name"]
     days = req["days"]
     days_txt = ", ".join(__import__("datetime").date.fromisoformat(d).strftime("%a %d/%m") for d in days)
@@ -1830,6 +1848,23 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
               if a["decision"] == ("approve" if approved else "not_approve")]
     vnames = " and ".join(v.get("call_name") or v["canonical_name"] for v in voters[:2])
     runc = requester.get("telegram_ids") or []
+    # EDIT the senior cards in place — the request text stays intact, the decision is appended
+    # (instead of spawning new undescriptive "Approved by X" messages).
+    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason")),
+                          ("✅ Approved by %s." if approved else "❌ Not approved by %s.")
+                          % html.escape(vnames))
+    edited = 0
+    for cid, mid in context.bot_data.get("al_cards", {}).pop(req["id"], []):
+        try:
+            await context.bot.edit_message_text(final, chat_id=cid, message_id=mid, parse_mode="HTML")
+            edited += 1
+        except Exception:
+            pass
+    if not edited:   # card refs lost (e.g. a restart) → one recap so seniors still see the outcome
+        for sen in _seniors(exclude_staff_id=req["staff_id"]):
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                            sen.get("call_name") or sen["canonical_name"], final, parse_mode="HTML")
+    # the requester + Supervisors notices stay bilingual (the owner sees English via strip_khmer)
     if approved:
         from gm_bot import al as alm
         from gm_bot.attendance import to_min
@@ -1838,10 +1873,6 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             if req["kind"] == "hours" and req.get("hours_start") else 1.0
         amount = alm.al_day_count(days, req["kind"], frac)
         new_bal = al_deduct(req["staff_id"], amount)
-        for sen in _seniors(exclude_staff_id=req["staff_id"]):
-            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                            sen.get("call_name") or sen["canonical_name"],
-                            "Approved by %s.\nអនុម័តដោយ %s។" % (vnames, vnames))
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
             "AL របស់អ្នកសម្រាប់ %s ត្រូវបានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត។ 🤍"
@@ -1854,10 +1885,6 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             % (name, days_txt, name, days_txt,
                req.get("reason") or "—", req.get("reason") or "—", day_off, day_off), group=True)
     else:
-        for sen in _seniors(exclude_staff_id=req["staff_id"]):
-            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                            sen.get("call_name") or sen["canonical_name"],
-                            "Not approved by %s.\nមិនបានអនុម័តដោយ %s។" % (vnames, vnames))
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")
 

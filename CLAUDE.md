@@ -287,6 +287,20 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — AL card redesign + edit-in-place on decision:**
+- AL senior cards are now **English-only, BOLD space-separated dates** (`_al_summary`, HTML parse_mode);
+  buttons English ("✅ Approve" / "❌ Not approve").
+- **Decision edits the card in place** — `submit_al_request` stores each card's (chat_id, msg_id) in
+  `bot_data["al_cards"][req_id]`; `_al_finalize` edits every card to "{request}…✅/❌ <verdict> by X and Y"
+  and DROPS the old per-senior "Approved by X" new messages. Fallback recap if card refs lost (restart).
+  Requester + Supervisors notices kept (bilingual; owner sees English via strip).
+- `_att_send` now takes `parse_mode` and RETURNS the sent Message (so cards can be edited later).
+- AUDIT (decision → new msg vs edit card): AL fixed. Already edit-in-place: OT yes/can't, OT reject,
+  OT buyback, swap-partner, sick-papers, death-upgrade. STILL TO CONVERT (owner to decide): **swap
+  SENIOR cards** (only the voter's card updates; others go stale) — best next candidate for the same
+  edit-all-cards style; minor: OT owner-reject leaves the staff's pending card stale.
+- Suite 391 green (+ _al_summary, _al_finalize-edits-in-place).
+
 **Session 30 (Jun 9) — OT approval model = silence-is-approval (owner):**
 - **OT no longer waits for owner approval.** Senior gives OT (Now or Later) → the STAFF is engaged
   IMMEDIATELY (Now = bank on the spot + buyback picker; Later = Yes/Can't ask) and the owner gets a

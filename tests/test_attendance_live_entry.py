@@ -254,6 +254,53 @@ def test_reason_terminals_format_bilingual(monkeypatch):
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
 
 
+def test_al_summary_bold_spaced_english():
+    """AL request line: English only, BOLD dates, spaced."""
+    from gm_bot import bot
+    s = bot._al_summary("Pisey", ["2026-06-21", "2026-06-22"], "country side")
+    assert "<b>Sun 21/06</b>" in s and "<b>Mon 22/06</b>" in s   # bold dates
+    assert "<b>Sun 21/06</b>   <b>Mon 22/06</b>" in s            # spaced
+    assert "requests AL" in s and "country side" in s
+    assert "ស" not in s                                          # no Khmer
+
+
+def test_al_finalize_edits_cards_in_place(monkeypatch):
+    """On decision the senior cards are EDITED in place (request intact + verdict); no new
+    per-senior messages; requester + Supervisors notices still sent."""
+    from gm_bot import bot
+    edits, roles = [], []
+    g = {"id": 50, "staff_id": 2, "days": ["2026-06-21"], "reason": "r", "kind": "days",
+         "status": "pending", "hours_start": None, "hours_end": None}
+    monkeypatch.setattr(bot, "al_get_request", lambda i: g)
+    monkeypatch.setattr(bot, "al_set_status", lambda *a, **k: None)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 2, "canonical_name": "Pisey", "call_name": "Pisey", "telegram_ids": [222],
+         "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}])
+    monkeypatch.setattr(bot, "al_get_approvals", lambda i: [
+        {"decision": "approve", "canonical_name": "A", "call_name": "A"},
+        {"decision": "approve", "canonical_name": "B", "call_name": "B"}])
+    monkeypatch.setattr(bot, "al_deduct", lambda sid, amt: 5)
+    monkeypatch.setattr(bot, "_seniors", lambda exclude_staff_id=None: [])
+
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+        roles.append(role)
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+
+    class _Bot:
+        async def edit_message_text(self, text, chat_id=None, message_id=None, parse_mode=None):
+            edits.append((chat_id, message_id, text))
+
+    ctx = _Ctx()
+    ctx.bot = _Bot()
+    ctx.bot_data = {"al_cards": {50: [(111, 7), (111, 8)]}}
+    asyncio.run(bot._al_finalize(ctx, g, approved=True))
+    assert len(edits) == 2                                   # both cards edited in place
+    assert "Approved by A and B" in edits[0][2]
+    assert "Senior" not in roles                             # NO new per-senior message
+    assert "Requester" in roles and "Supervisors group" in roles
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""
