@@ -96,6 +96,77 @@ def _write_ssh_config():
             f.write(SSH_CONFIG_ENTRY)
 
 
+# Guard hooks installed GLOBALLY (filename in .claude/hooks/, matcher). Source of truth = this repo.
+# To add a future guardrail: drop its script in .claude/hooks/ and append one line here.
+GLOBAL_GUARDS = [
+    ("highrisk_guard.py", "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit"),
+    ("secret_guard.py",   "Bash|PowerShell|Edit|Write|MultiEdit"),
+]
+
+
+def _ensure_global_guards():
+    """Install the guard hooks GLOBALLY so every project on this machine inherits them.
+
+    Copies each repo guard script to ~/.claude/hooks/ and merges its PreToolUse hook into
+    ~/.claude/settings.json. Idempotent (refreshes in place, never duplicates) and non-destructive
+    (preserves every other setting/hook; backs up to settings.json.bak first). BEST-EFFORT: any
+    failure is swallowed so it can NEVER break a pull (this runs on every pull via --sync). Guards
+    activate on the NEXT session start (Claude loads hook config at startup). Same scripts also live
+    in TWBshop/.claude/ as self-contained copies.
+    """
+    try:
+        hooks_dir = os.path.join(CLAUDE_DIR, "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        installed = []  # (matcher, dest)
+        for name, matcher in GLOBAL_GUARDS:
+            src = os.path.join(PROJECT_DIR, ".claude", "hooks", name)
+            if not os.path.exists(src):
+                continue
+            dest = os.path.join(hooks_dir, name)
+            with open(src, "rb") as f:
+                data = f.read()
+            with open(dest, "wb") as f:
+                f.write(data)
+            installed.append((matcher, dest))
+        if not installed:
+            return
+
+        settings_path = os.path.join(CLAUDE_DIR, "settings.json")
+        settings = {}
+        if os.path.exists(settings_path):
+            try:
+                with open(settings_path, encoding="utf-8") as f:
+                    settings = json.load(f)
+            except (ValueError, OSError):
+                return  # unreadable/corrupt -> do NOT risk clobbering it
+            try:  # one-time backup before we touch it
+                with open(settings_path, encoding="utf-8") as f:
+                    raw = f.read()
+                with open(settings_path + ".bak", "w", encoding="utf-8") as f:
+                    f.write(raw)
+            except OSError:
+                pass
+
+        our_files = {n for n, _ in GLOBAL_GUARDS}
+        hooks = settings.setdefault("hooks", {})
+        pre = hooks.get("PreToolUse", [])
+        # Drop any prior entry for ANY of our guards (idempotent + path refresh); keep all others.
+        pre = [e for e in pre
+               if not any(any(fn in h.get("command", "") for fn in our_files)
+                          for h in e.get("hooks", []))]
+        for matcher, dest in installed:
+            pre.append({
+                "matcher": matcher,
+                "hooks": [{"type": "command", "command": 'python "%s"' % dest.replace(os.sep, "/")}],
+            })
+        hooks["PreToolUse"] = pre
+
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+    except Exception:
+        pass  # never break a pull
+
+
 def sync(silent=False):
     """Download latest secrets, SSH key, and global CLAUDE.md. Fast and always safe to run."""
     token = get_token()
@@ -112,6 +183,7 @@ def sync(silent=False):
         if not silent:
             print("done")
     _write_ssh_config()
+    _ensure_global_guards()
 
 
 def full_setup():

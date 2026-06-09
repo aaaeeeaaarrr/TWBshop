@@ -257,9 +257,10 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-09 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED: hook fires but its
-"ask" was a no-op under bypass-permissions mode; now hard-blocks (exit 2) in EVERY mode unless the
-deliberate per-action marker `#HIGHRISK-OK` is appended; added PowerShell-tool coverage)
+**Last updated:** 2026-06-10 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED + made UNIVERSAL:
+hard-blocks (exit 2) in EVERY mode unless `#HIGHRISK-OK` marker; now installed GLOBALLY for every
+project + synced to every machine via bootstrap; added a 2nd guard (secret-leak block); marker
+protocol documented in global laws)
 
 **Session 31 (Jun 9) — HIGH-RISK guard: proven live, then hardened (owner: "I always say yes"):**
 - **Proved the live hook wiring** (the session-30 resume task). The PreToolUse guard DOES fire
@@ -284,6 +285,28 @@ deliberate per-action marker `#HIGHRISK-OK` is appended; added PowerShell-tool c
   `.claude/settings.json`. All probe/diagnostic code removed; git clean except the two intended files.
 - **STILL the real lock (NOT this guard):** the staging/local Postgres so prod creds aren't in dev
   (dated backlog, due 2026-06-30). This guard is the accident/reflex backstop, not the wall.
+
+**Session 31 (Jun 10) — guards made UNIVERSAL (owner: "as guarded in every project as you are here"):**
+- **Why:** only TWBshop was guarded; POSbusiness/Personal/future projects + the global `~/.claude` had
+  NO hook. Owner wants every project, every machine, as protected.
+- **Global install + sync:** `bootstrap.py::_ensure_global_guards()` (list-driven via `GLOBAL_GUARDS`)
+  copies each repo guard → `~/.claude/hooks/` and merges a PreToolUse entry into `~/.claude/settings.json`
+  — idempotent (refreshes, never duplicates), non-destructive (preserves theme/model + other hooks,
+  `.bak` first), and BEST-EFFORT (any failure swallowed so it can never break a pull). Runs on every
+  pull via `--sync`, so every machine self-installs on its next TWBshop pull; every project on that
+  machine inherits it. Repo is the single source of truth.
+- **Guard 2 — secret-leak block** (`.claude/hooks/secret_guard.py`): scans the text being WRITTEN
+  (content/new_string/command, never removed text) for live key/token/private-key/DB-URL patterns and
+  hard-blocks them landing anywhere but secrets.py/.env. 12/12 acceptance (incl. secrets.py allowed,
+  secret-REMOVAL allowed, marker override, fail-closed). Same `#HIGHRISK-OK` override.
+- **Marker protocol documented in the global laws** (`~/.claude/CLAUDE.md` → "How to Behave"), pushed
+  via `bootstrap.py --push-global` so every session/machine knows: HIGH-RISK hard-blocks; STOP, say why,
+  append `#HIGHRISK-OK`. Framed as a mechanical backstop, NOT a replacement for the precision standard.
+- **Verified:** both guards registered globally (2 PreToolUse entries, theme/model preserved); both
+  enforce standalone; bootstrap py_compile OK; idempotent over 2 runs. ⚠ Global hooks ACTIVATE on next
+  session start (loaded at startup) — open sessions (incl. POSbusiness) need a restart to pick them up.
+  Residual: hook command uses bare `python` (fine on Windows-on-PATH; revisit if a Mac/Linux dev machine
+  is added). NEXT (owner, one at a time): guardrail 2 = "tests must pass before done" gate.
 
 **Session 30 (Jun 9) — OT-end checkout: midnight worry closed (kept GPS, rejected the button):**
 - Owner floated replacing the GPS OT-end checkout with a "senior (+ staff) confirm OT done" button to
