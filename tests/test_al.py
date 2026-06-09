@@ -37,6 +37,14 @@ def test_quorum():
     assert al.quorum_rejected(["not_approve", "not_approve"]) is True
 
 
+def test_approvals_needed_senior_vs_regular():
+    assert al.approvals_needed(is_senior=True) == 1    # senior: 1 other senior
+    assert al.approvals_needed(is_senior=False) == 2   # regular staff: 2 seniors
+    assert al.quorum_reached(["approve"], needed=1) is True
+    assert al.quorum_reached(["approve"], needed=2) is False
+    assert al.quorum_rejected(["not_approve"], needed=1) is True
+
+
 def test_senior_timers_scale_to_start():
     now = datetime(2026, 6, 8, 12, tzinfo=timezone.utc)
     # AL starts in 2 hours -> nudge 30min (25%), escalate 1h (50%)

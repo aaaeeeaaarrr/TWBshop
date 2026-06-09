@@ -287,6 +287,11 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — senior self-AL/swap needs only 1 approval:**
+- `al.approvals_needed(is_senior)` → 1 for a senior's own AL/swap, 2 for regular staff. `quorum_reached`
+  /`quorum_rejected` take a `needed` arg. Wired into `_al_approval_callback` + `_swap_senior_callback`
+  (needed derived from the REQUESTER's is_senior). Suite 399 green.
+
 **Session 30 (Jun 9) — paperless-sick model corrected (owner): pay-back from declaration:**
 - RULE (owner): paperless sick is **pay-back from the moment they declare** (any length); accepted
   doctor's papers within **2 days** (PAPERS_GRACE_DAYS 3→2) CANCEL it; after 2 days it's final.

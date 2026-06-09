@@ -1705,11 +1705,13 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
         return
     from gm_bot import al as alm
+    requester = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
+    needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
     votes = swap_add_senior_vote(int(sw["id"]), query.data.split(":")[3])
     await query.edit_message_text(query.message.text + "\n\n✓ voted: %s" % query.data.split(":")[3])
-    if alm.quorum_reached(votes):
+    if alm.quorum_reached(votes, needed):
         await _swap_apply(context, sw, approved=True)
-    elif alm.quorum_rejected(votes):
+    elif alm.quorum_rejected(votes, needed):
         await _swap_apply(context, sw, approved=False)
 
 
@@ -1863,11 +1865,13 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Can't approve your own AL · មិនអាចអនុម័ត AL របស់ខ្លួនឯងបានទេ", show_alert=True)
         return
     from gm_bot import al as alm
+    requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
+    needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
     decisions = al_add_approval(int(req_s), sen["id"], actor_uid, decision)
     await query.edit_message_text(query.message.text + "\n\n✓ You voted: %s" % decision)
-    if alm.quorum_reached(decisions):
+    if alm.quorum_reached(decisions, needed):
         await _al_finalize(context, req, approved=True)
-    elif alm.quorum_rejected(decisions):
+    elif alm.quorum_rejected(decisions, needed):
         await _al_finalize(context, req, approved=False)
 
 

@@ -86,12 +86,21 @@ def al_span_label(al_days: list[str], day_off: str | None = None,
     return ", ".join(fmt(a) if a == b else "%s → %s" % (fmt(a), fmt(b)) for a, b in segs)
 
 
-def quorum_reached(approvals: list[str]) -> bool:
-    return len([a for a in approvals if a == "approve"]) >= APPROVALS_NEEDED
+APPROVALS_NEEDED_SENIOR = 1   # a senior's OWN AL/swap needs just 1 other senior's approval
 
 
-def quorum_rejected(approvals: list[str]) -> bool:
-    return len([a for a in approvals if a == "not_approve"]) >= APPROVALS_NEEDED
+def approvals_needed(is_senior: bool) -> int:
+    """How many senior approvals a request needs: a senior's own AL/swap → 1 other senior;
+    regular staff → 2 seniors."""
+    return APPROVALS_NEEDED_SENIOR if is_senior else APPROVALS_NEEDED
+
+
+def quorum_reached(approvals: list[str], needed: int = APPROVALS_NEEDED) -> bool:
+    return len([a for a in approvals if a == "approve"]) >= needed
+
+
+def quorum_rejected(approvals: list[str], needed: int = APPROVALS_NEEDED) -> bool:
+    return len([a for a in approvals if a == "not_approve"]) >= needed
 
 
 def senior_timers(now, al_start):
