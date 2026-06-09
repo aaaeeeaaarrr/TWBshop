@@ -1347,8 +1347,10 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     from shared.database import flow_load, flow_clear, att_check_out
     fs = flow_load(user.id)
     if fs and fs.get("flow") == "checkout" and in_zone and not update.edited_message:
-        att_check_out(staff["id"], fs["data"].get("shift_date", shift_date), now_pp.isoformat())
+        sd = fs["data"].get("shift_date", shift_date)
+        att_check_out(staff["id"], sd, now_pp.isoformat())
         flow_clear(user.id)
+        _settle_redefined_shift(staff, sd, now_pp)   # banks OT (net of payback) iff this day was redefined
         await msg.reply_text("Checked out ✓ — thank you, rest well 🤍\n"
                              "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍")
         return True
@@ -1580,6 +1582,39 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
             % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+
+
+def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
+    """At checkout for a day that had an APPROVED shift-redefine: OT = worked beyond the normal shift
+    length; it clears outstanding payback FIRST, the rest banks (capped at the 14h bank). Marks the
+    change done. NO-OP for a normal (un-redefined) day, or one already settled. Best-effort — never
+    blocks the checkout. Points are NOT touched here (reputation stays on its own track)."""
+    try:
+        from shared.database import (shift_change_active, att_get_session, payback_open_debt,
+                                     payback_credit, ot_bank_add, ot_bank_balance,
+                                     shift_change_set_banked)
+        from gm_bot import ot as ot_mod
+        sc = shift_change_active(staff["id"], shift_date)
+        if not sc or sc.get("status") != "approved" or not sc.get("normal_len"):
+            return                       # not redefined, or already done
+        sess = att_get_session(staff["id"], shift_date) or {}
+        ci_dt = sess.get("checked_in_at")
+        if not ci_dt:
+            return
+        worked = round((now_pp - ci_dt).total_seconds() / 60)
+        debt = payback_open_debt(staff["id"])
+        pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
+        ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
+        if pb_cleared and debt:
+            payback_credit(debt["id"], pb_cleared)   # OT clears the debt first (uncapped)
+        banked = 0
+        if ot_banked:
+            banked = min(ot_banked, ot_mod.cap_room(ot_bank_balance(staff["id"])))  # respect 14h bank
+            if banked > 0:
+                ot_bank_add(staff["id"], banked)
+        shift_change_set_banked(sc["id"], banked)
+    except Exception as e:
+        logger.error("OT settle at checkout failed: %s", e)
 
 
 def _ot_started(g: dict) -> bool:
