@@ -774,3 +774,333 @@ run_hire_bot.py         ← entry point: python run_hire_bot.py (systemd: twbsho
 
 ---
 
+
+---
+
+## Sessions 29-31 (Jun 8-10, 2026) — moved from CLAUDE.md to keep live status lean
+
+**Session 31 (Jun 9) — HIGH-RISK guard: proven live, then hardened (owner: "I always say yes"):**
+- **Proved the live hook wiring** (the session-30 resume task). The PreToolUse guard DOES fire
+  (instrumented probe: invoked every call, CLAUDE_PROJECT_DIR correct — Claude runs it via Git Bash).
+  BUT this session runs in a permission-BYPASS mode (a non-allowlisted `rm -rf` ran with NO prompt), so
+  the guard's `permissionDecision:"ask"` was a NO-OP — `systemctl restart` etc. ran unguarded. Same
+  cause as session-30's "systemctl didn't prompt." Only `exit 2` actually blocks in bypass mode (proven
+  with a sentinel). My very first manual probe "failed" only because MY shell lacked CLAUDE_PROJECT_DIR
+  — not a wiring bug.
+- **Owner insight → design change:** owner ALWAYS approves prompts reflexively, so "ask" never protected
+  them. Protection moved OFF the human rubber-stamp ONTO a hard stop. Guard now HARD-BLOCKS (exit 2)
+  every HIGH-RISK match in ALL modes unless the per-action, auditable marker `#HIGHRISK-OK` is appended
+  to the command (accidents/reflexes/runaways never carry it; Claude adds it only after articulating the
+  risk). Dropped the mode-aware "ask" path entirely (simpler + strictly more protective for this owner).
+- **Red-team caught a real gap:** the matcher missed the **PowerShell tool** — how deploys run on
+  Windows (`PowerShell(ssh twbshop "...systemctl restart...")`) — so destructive PS ops sailed past.
+  Added PowerShell to BOTH the settings.json matcher AND classify(). ⚠ The matcher change activates only
+  NEXT session (loaded at startup); Bash is guarded live NOW (proven).
+- **Verified:** live block of `systemctl restart` (did NOT run) + live allow with marker; script harness
+  green across all modes (block / marker-allow / safe-allow / PowerShell block / fail-closed block /
+  edit-secrets.py block); py_compile OK; settings.json valid JSON. Files: `.claude/hooks/highrisk_guard.py`,
+  `.claude/settings.json`. All probe/diagnostic code removed; git clean except the two intended files.
+- **STILL the real lock (NOT this guard):** the staging/local Postgres so prod creds aren't in dev
+  (dated backlog, due 2026-06-30). This guard is the accident/reflex backstop, not the wall.
+
+**Session 31 (Jun 10) — guards made UNIVERSAL (owner: "as guarded in every project as you are here"):**
+- **Why:** only TWBshop was guarded; POSbusiness/Personal/future projects + the global `~/.claude` had
+  NO hook. Owner wants every project, every machine, as protected.
+- **Global install + sync:** `bootstrap.py::_ensure_global_guards()` (list-driven via `GLOBAL_GUARDS`)
+  copies each repo guard → `~/.claude/hooks/` and merges a PreToolUse entry into `~/.claude/settings.json`
+  — idempotent (refreshes, never duplicates), non-destructive (preserves theme/model + other hooks,
+  `.bak` first), and BEST-EFFORT (any failure swallowed so it can never break a pull). Runs on every
+  pull via `--sync`, so every machine self-installs on its next TWBshop pull; every project on that
+  machine inherits it. Repo is the single source of truth.
+- **Guard 2 — secret-leak block** (`.claude/hooks/secret_guard.py`): scans the text being WRITTEN
+  (content/new_string/command, never removed text) for live key/token/private-key/DB-URL patterns and
+  hard-blocks them landing anywhere but secrets.py/.env. 12/12 acceptance (incl. secrets.py allowed,
+  secret-REMOVAL allowed, marker override, fail-closed). Same `#HIGHRISK-OK` override.
+- **Marker protocol documented in the global laws** (`~/.claude/CLAUDE.md` → "How to Behave"), pushed
+  via `bootstrap.py --push-global` so every session/machine knows: HIGH-RISK hard-blocks; STOP, say why,
+  append `#HIGHRISK-OK`. Framed as a mechanical backstop, NOT a replacement for the precision standard.
+- **Verified:** both guards registered globally (2 PreToolUse entries, theme/model preserved); both
+  enforce standalone; bootstrap py_compile OK; idempotent over 2 runs. ⚠ Global hooks ACTIVATE on next
+  session start (loaded at startup) — open sessions (incl. POSbusiness) need a restart to pick them up.
+  Residual: hook command uses bare `python` (fine on Windows-on-PATH; revisit if a Mac/Linux dev machine
+  is added). NEXT (owner, one at a time): guardrail 2 = "tests must pass before done" gate.
+
+**Session 30 (Jun 9) — OT-end checkout: midnight worry closed (kept GPS, rejected the button):**
+- Owner floated replacing the GPS OT-end checkout with a "senior (+ staff) confirm OT done" button to
+  dodge the midnight edge. Thought it human-side: a staff SELF-confirm is EXPLOITABLE (OT banks at
+  ACCEPT → tap-done-and-leave-early keeps full pay); busy senior / hasty staff just don't tap → never
+  verified. GPS (must be physically in-zone at OT-end) is the STRONGER anti-fake → kept GPS.
+- Fixed the real wart instead: `ot_now_ends_today` → **`ot_now_end_times(today, tz)`** returns the
+  LATEST OT-end as a tz-aware DATETIME (queries today+yesterday grants → an overnight OT granted
+  yesterday that ends after midnight IS included). `_checkin_scheduler_job` fires at real
+  elapsed-minute offsets 0/10/20/40 from that datetime → correct ACROSS MIDNIGHT, no minute-of-day
+  wrap, no `end_min>=1440` skip. 'already out' is now a datetime compare. Suite 402 green.
+- FLAGGED, NOT solved by this (owner to decide): "leave early, keep OT pay" is a bank-on-ACCEPT
+  question, fixable only by banking OT on COMPLETION — checkout UI can't fix it. On the discuss list.
+- Advisor rule "SIMPLER-PATH / COST-HONESTY" written as a self-contained ~7-line block (a How-to-Behave
+  habit, NOT a 7th law); handed to owner to forward — NOT yet added to standing rules (preview-first).
+
+**Session 30 (Jun 9) — LIVE STAFF ENTRY for attendance (gated OFF):**
+- **What:** a real ACTIVE TWB staffer can now open their OWN attendance menu (Check-in / Late / About
+  Work / About Me → AL, Special Leave, day-off swap, OT, My schedule) and fire the REAL submit_* as
+  themselves. Same menus/callbacks/submit_* as the owner /test shell — NO behavior fork (Rule 1).
+- **Entry:** non-owner /start or private text → if `attendance_live` AND active TWB staff →
+  `attendance_ui.open_live_menu` (persona LOCKED to self; "🎭 Switch persona" hidden; pick/persona
+  callbacks refused). Else → roll-call (unchanged). Check-in & late→payback-on-arrival stay on the
+  already-live location path (`_handle_staff_location`).
+- **Reason capture:** flow_state (DB, restart-safe) per the doc — `flow_save(uid,"att_pending",…)`;
+  the staffer's next text completes the flow. Owner test path still uses user_data (unchanged).
+- **Unified dispatcher:** `_att_test_dispatch` → `_att_dispatch(update, ctx, pend, *, live)`. live=True
+  acts as self, requester_uid=self, routes to real recipients; live=False = owner test (routed to
+  owner, is_test). **LIVE late = declare-only** (heads-up); the payback debt+picker appear on arrival
+  via live location. TEST collapses declare+arrival (so the owner can test booking) — per the doc note.
+- **Gating/safety:** everything behind `_attendance_live()` (still OFF) — module messages no one but
+  the owner until go-live. Module docstring safety-contract updated to the live+test contract.
+- **Verified:** suite 379 green (+10 new in tests/test_attendance_live_entry.py — persona self-lock,
+  menu hides switch, armed gating, flow_state routing, LIVE late declare-only vs TEST collapse,
+  unknown-uid rejected). py_compile OK. Real-staff DELIVERY provable only at go-live (single account +
+  gate OFF) — the documented plan (owner role-play test in test mode covers the message shapes).
+- Khmer WIRED into all 11 live reason/'go' prompts (bilingual EN·KH), mirroring the file's already-
+  approved terms (បងៗ / ច្បាប់រៀបការ / មរណភាពគ្រួសារ / ប្រពន្ធសម្រាលកូន / ប្តូរថ្ងៃឈប់ / ទីតាំងផ្ទាល់);
+  Latin kept for go/AL/OT/numbers. Real callback path proves the %-formatted ones (late/marriage/famf/
+  ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
+  owner-reviewed). The dispatcher confirmations were already bilingual.
+
+**Session 30 (Jun 9) — Part 3: end-of-OT re-checkout (simpler path, owner-approved):**
+- A Now-OT extends the shift → the checkout fires at the **LATEST OT-end** (a 2nd OT just moves the
+  end), reusing the same message+nudges, and **overwrites the single `checked_out_at`** (no new
+  state — `att_check_out` already overwrites; "final departure = OT end"). Now-OT is now stamped
+  `when_date=today` so it's findable; `database.ot_now_ends_today()` returns the latest end per staff;
+  the scheduler suppresses the plain shift-end checkout while OT runs, then fires the OT-end one
+  (derives "already out" from `checked_out_at >= end`). Suite 402.
+- **UPDATE (later same session): the overnight edge is now FIXED** — `ot_now_end_times` is datetime-based
+  (see the midnight-safe note above), so cross-midnight OT-ends fire correctly. Remaining: overlapping-OT
+  double-bank is a separate OT-pay concern. Live firing is scheduler-driven (gated by attendance_live) →
+  provable only at go-live; logic unit-tested (`ot_now_end_times`).
+
+**Session 30 (Jun 9) — checkout window 60-min + nudges +10/+20/+40 (owner):**
+- Check-out capture window 90→**60 min**; nudge ("Did you leave early? share location") now fires at
+  **+10/+20/+40** (was just +10) — `staff_day_events` raw list. Suppressed once checked out. test_day_events
+  updated. Suite 401. (Part 3 — OT-end re-checkout — next.)
+
+**Session 30 (Jun 9) — late arrival = ONE combined message + 3-outcome test sim:**
+- Live late arrival is now ONE message: `_offer_payback(late_min=…)` combines the check-in verdict
+  ("X min late, counts as pay-back") WITH the picker, so reason+action can't be read separately.
+- TEST simulate-arrival now offers 3 buttons (they declared late but may arrive otherwise): **early >5**
+  (+points verdict), **on-time ±5** (free, verdict only), **late >5** (combined verdict+picker) — each
+  running the real verdict (5-min grace). `_late_simarr_callback` reworked.
+- ⚠ FIXED 2 LATENT NameErrors: `cmd_start` + `_private_text_router` used `attendance_ui` without a
+  local import (module imports it locally everywhere) — would've crashed at GO-LIVE when a live
+  staffer texts/Starts. Now import locally. Suite 401 green.
+
+**Session 30 (Jun 9) — late TEST: simulate-arrival button (mirrors live):**
+- TEST late no longer auto-collapses to the payback picker. It now sends the heads-up + a
+  "📍 Simulate arrival — shared correct live location" button (`att:simarr:{persona}:{mins}`,
+  `_late_simarr_callback`, test-only/owner-only) → tapping fires the real arrival payback (debt +
+  picker), exactly mirroring the live declare→arrival split. LIVE late unchanged. Suite 400 green.
+
+**Session 30 (Jun 9) — audit fixes A+B+D:**
+- D: deleted dead **Emergency AL** code (emergency_screen/dates + att:em branch) — unreachable since
+  the owner removed it from the menu; confirmed SEPARATE from short-notice AL (kept).
+- A: fixed STALE dry-run/walkthrough previews — sick "3-day→payback" → pay-back-from-declaration +
+  2-day papers cancel + nightly return-check (catalogue4 ⑨/⑦/②, walkthrough end-line); OT owner-
+  approve-gate → reject-only/silence-approval/staff-consent-first (catalogue6 ④/⑧/⑪, ot_owner_card).
+- B: owner test-coaching "approve as two seniors" → "(2; or 1 if the requester is a senior)".
+- C RESOLVED (owner): OT ⚡ Now shows "starts at shift end" AND a start pick ON PURPOSE — so staff
+  read "now" as the clean shift-end (4pm), not the current clock time (4:36pm). Do NOT "fix" it.
+  Suite 399 green.
+
+**Session 30 (Jun 9) — death/birth confirm prompts: warm + direct (owner):**
+- Dropped "no reason needed" and the flat "Sends condolences/congratulations and notifies the
+  Supervisors" descriptions (those were MY wording, not ChatGPT). Death now leads "🤍 So sorry for
+  your loss" + leave (N days) + date; birth leads "👶 Congratulations!" + leave (2 days) + date.
+- (Sick prompts famf/mecant still carry mild "notifies the Supervisors / opens a sick case" meta —
+  not yet reworded; flagged.)
+
+**Session 30 (Jun 9) — marriage = no reason (confirm button):**
+- Marriage no longer asks for a typed reason (it's their own wedding). Now a `_confirm_prompt`:
+  "Marriage leave (N days) · Date: from → to · If you need more days you can request AL" + ✅ I confirm
+  (→ att:go → submits to seniors). Dispatch submits reason "Marriage leave" (no appended text).
+- Suite 399 green.
+
+**Session 30 (Jun 9) — coverage-gap Supervisors FYIs (round 2):**
+- Added 4 more group FYIs: **sick papers accepted** ("X on covered sick leave for N days"), **OT
+  cancelled by owner** (only if it was confirmed/banked/booked), **no-show** (informational — decided
+  the NEXT-MORNING 08:00 sweep over yesterday, so it's after-the-fact, not "please cover"), **AL day
+  cancelled** ("X cancelled AL on D — back to work"). Now the group hears every coverage-relevant event.
+  Still silent (intentionally): AL/swap REJECTED (no schedule change), sick no-papers-final (internal).
+- Suite 399 green.
+
+**Session 30 (Jun 9) — Supervisors-group FYIs + sick return-check buttons:**
+- Added Supervisors FYIs: **own sick declared** ("X out sick today") and **OT confirmed** ("X on extra
+  OT — window"). The light-duty "come" note now goes to the **Supervisors group** (was per-senior DMs;
+  they're already in the group).
+- **Sick nightly return-check now has buttons** (`att:sret:`): ✅ coming tomorrow / 🛌 still resting /
+  ⏰ coming in today at… (hour picker) → each posts a Supervisors FYI (returns tomorrow / not back /
+  coming today at HH). `_sick_return_callback` + `_sick_return_kb` + `_sret_time_kb`. Wired into the
+  nightly job + the test 'skip' preview.
+- Suite 399 green.
+
+**Session 30 (Jun 9) — senior self-AL/swap needs only 1 approval:**
+- `al.approvals_needed(is_senior)` → 1 for a senior's own AL/swap, 2 for regular staff. `quorum_reached`
+  /`quorum_rejected` take a `needed` arg. Wired into `_al_approval_callback` + `_swap_senior_callback`
+  (needed derived from the REQUESTER's is_senior). Suite 399 green.
+
+**Session 30 (Jun 9) — paperless-sick model corrected (owner): pay-back from declaration:**
+- RULE (owner): paperless sick is **pay-back from the moment they declare** (any length); accepted
+  doctor's papers within **2 days** (PAPERS_GRACE_DAYS 3→2) CANCEL it; after 2 days it's final.
+- `_att_dispatch` sick_me now creates the pay-back debt at declaration (`payback_add_debt`, missed
+  shift). Papers are mentioned ONCE at declaration; nudges NEVER mention papers or pay-back (they
+  know). Owner Accept (cov:Xd) within the window → `_wipe_sick_payback` cancels the debt; Skip → it
+  stands ("✓ Noted"). The deadline job no longer CREATES debt — it sends the nightly **return check**
+  ("coming in tomorrow?", `_SICK_RETURN_CHECK`) while open, finalizes (`no_papers`) after the 2-day
+  window. Test 'skip' previews the return-check so the flow continues.
+- Suite 398 green.
+
+**Session 30 (Jun 9) — tap-to-confirm + bilingual Back:**
+- No-reason flows (own-sick, family-sick, family-death ×2, wife-birth) now show a **"✅ I confirm ·
+  ខ្ញុំបញ្ជាក់"** button (`att:go`) instead of asking to type 'go'. New `_confirm_prompt` + bot
+  `_att_go_callback` (owner→user_data pending, live→flow_state) fires the real submit_* via
+  `_att_dispatch(reason="(confirmed)")`. `_att_dispatch` made callback-safe (no `message.text`).
+- **Back button bilingual:** `_back_row` → "← Back · ត្រឡប់ក្រោយ" (applies everywhere).
+- Suite 396 green (+ att:go-confirms, back-row-bilingual).
+
+**Session 30 (Jun 9) — AL date-picker polish + day-off-aware count/span:**
+- Selected dates now show **✅** (green-tick emoji) not the `✓` unicode; al_screen header trimmed to
+  "You have X AL days left" (Eng+Kh) — dropped the "Choose dates (tap to ✓…)" line.
+- **Day-off is never charged AL + from→to span:** `al.al_charged_days` / `al.al_span_label` /
+  `al_day_count(day_off=…, non_working=…)`. Picking 3 days where one is the day off = **2 AL**; leave
+  shows "Tue 23/06 → Thu 25/06", bridging the day off whether or not tapped. A genuine WORKING-day gap
+  does NOT bridge.
+- **Span bridges ANY absence, not just the weekly day-off** (owner): `non_working` set from new
+  `database.staff_absent_dates(staff_id)` = approved AL + special-leave spans + swap day-off overrides.
+  So a gap that's another AL/leave bridges into one from→to span (and isn't re-charged).
+- **PUBLIC-HOLIDAY placeholder wired (empty):** `database.public_holidays()` reads gm_state
+  ['public_holidays'] (JSON list, empty default) and is folded into `staff_absent_dates`. Add dates
+  via **/holiday add YYYY-MM-DD** (owner/Tyty) — they then auto-bridge AL spans and cost NO AL / NO
+  points, no code change. `set_public_holidays()` + `/holiday` (list/add/del) shipped. (Per-person
+  paid-free grants could extend the same seam later.)
+- Suite 394 green (+ al-day-off-excluded-and-span, updated summary test).
+
+**Session 30 (Jun 9) — AL card redesign + edit-in-place on decision:**
+- AL senior cards are now **English-only, BOLD space-separated dates** (`_al_summary`, HTML parse_mode);
+  buttons English ("✅ Approve" / "❌ Not approve").
+- **Decision edits the card in place** — `submit_al_request` stores each card's (chat_id, msg_id) in
+  `bot_data["al_cards"][req_id]`; `_al_finalize` edits every card to "{request}…✅/❌ <verdict> by X and Y"
+  and DROPS the old per-senior "Approved by X" new messages. Fallback recap if card refs lost (restart).
+  Requester + Supervisors notices kept (bilingual; owner sees English via strip).
+- `_att_send` now takes `parse_mode` and RETURNS the sent Message (so cards can be edited later).
+- AUDIT (decision → new msg vs edit card): AL fixed. Already edit-in-place: OT yes/can't, OT reject,
+  OT buyback, swap-partner, sick-papers, death-upgrade. STILL TO CONVERT (owner to decide): **swap
+  SENIOR cards** (only the voter's card updates; others go stale) — best next candidate for the same
+  edit-all-cards style; minor: OT owner-reject leaves the staff's pending card stale.
+- Suite 391 green (+ _al_summary, _al_finalize-edits-in-place).
+
+**Session 30 (Jun 9) — location-mix fix + swap/OT edit-in-place:**
+- **LOCATION BUG (owner): DELIS staff leaked into TWB AL coverage.** `_al_availability_lines` built its
+  roster from ALL active staff. Fixed → TWB only (excl Tyty). Audited every `staff_all` aggregation:
+  also filtered `_seniors` (TWB only — defensive; no Delis senior today), the `/test` persona picker,
+  and the dry-run sample. (The greeting/started report intentionally labels "(Delis)" — left as-is.)
+  Org values are `TWB` / `DELIS`; the 4 seniors are all TWB; Tyty is TWB & not senior.
+- **Swap senior cards now edit-in-place** (like AL): `_swap_partner_callback` stores card refs in
+  `bot_data["swap_cards"]`; `_swap_apply` edits them all to "Day-off swap … ✅/❌ verdict" (no more
+  stale non-voter cards).
+- **OT owner-reject** now edits the staff's pending Yes/Can't card to "cancelled" (stored in
+  `bot_data["ot_staff_card"]`) instead of leaving it stale + a new message; senior still memo'd.
+- Suite 393 green (+ al-availability-excludes-Delis, swap-apply-edits-cards).
+
+**Session 30 (Jun 9) — OT approval model = silence-is-approval (owner):**
+- **OT no longer waits for owner approval.** Senior gives OT (Now or Later) → the STAFF is engaged
+  IMMEDIATELY (Now = bank on the spot + buyback picker; Later = Yes/Can't ask) and the owner gets a
+  **REJECT-ONLY** notice. Owner silence = approval; owner can veto until the OT START time
+  (`_ot_started`); a Now grant that already banked is REVERSED on veto. Statuses: banked / staff_asked
+  → booked / declined / rejected. Old pending_owner→approve gate removed.
+- Files: `submit_ot_grant`, `_ot_owner_callback` (now veto-only + window check + bank reversal),
+  `_ot_future_callback` (staff_asked→booked/declined), `_ot_started`, dispatcher OT confirm text.
+- **OT confirmations show the real time window** (e.g. `4pm-5pm`), never "now" — `_ot_window()` (Now =
+  shift-end→end; Later = date + window); used in the owner notice + the staff ask.
+- **Staff consent FIRST for BOTH Now and Later:** submit_ot_grant now ASKS the staff Yes/Can't first
+  (no auto-bank). NOW banks + offers buyback only in `_ot_future_callback` AFTER the staff accepts;
+  LATER books. (Was: NOW auto-banked at grant without asking.)
+- **Take-back ≠ payback:** earned-OT buyback slots are now at the shift EDGES (come in late / leave
+  early) via new `payback.takeback_windows`, not the before/after-shift payback windows. Labeled
+  🌅 in late / 🌙 leave early.
+- **OWNER never gets Khmer — but ONLY in message BODIES, not the shell.** `attendance.strip_khmer()` is
+  applied in `_att_send` when the recipient is the owner (test-routed previews + owner notices →
+  English). The `/test` shell menus/screens STAY BILINGUAL so the owner previews exactly what staff see
+  (owner corrected the scope, session 30 — do NOT strip the shell/menu). Live staff always bilingual.
+- Suite 389 green (+ _ot_started, Later/Now ask-first, now-accept-banks, _ot_window, takeback_windows,
+  strip_khmer).
+
+**Session 30 (Jun 9) — /testseed + restart test-mode sync + /testmode diagnostic:**
+- **/testseed [name]** (owner/Tyty): mirrors real approved ALs + open payback debts into is_test copies
+  so TEST mode shows realistic data after a /testreset wipe (idempotent — clears prior test copies
+  first; real rows never touched). `database.attendance_testseed()` + generic `_copy_test_rows` (schema-
+  proof via information_schema). Ends the "re-seed Visal by hand each reset" loop.
+- **Restart bug fixed:** `build_app` now restores `set_att_test(gm_get_state('attendance_test_mode'))`
+  on boot — a restart no longer silently flips att_test_on() to False while the DB says test_mode=true
+  (which made TEST mode show REAL rows instead of the is_test sandbox — likely source of earlier
+  "ALs still gone in test" confusion).
+- **/testmode no-confirmation: RESOLVED.** Temp debug log proved command reaches the handler (uid=owner,
+  chat=private, args=['on']) and replies (sendMessage 200) after a clean restart. Earlier silence was a
+  transient (process not processing updates during the overload/restart churn) — not reproduced, not a
+  code bug. Debug line removed.
+- **Give OT ⚡ Now picker fixed:** was listing the WHOLE roster; now only staff present right now —
+  on shift OR finished < 1h ago (new `attendance_ui._present_now`, schedule-based, excludes day-off/AL-
+  today). Empty → points to 📅 Later. Back from "to whom" now goes to the now/later screen.
+- Suite 382 green (+ test_copy_test_rows, + test_present_now_for_ot, both DB-free).
+
+**Session 30 (Jun 9) — precision standard + data fixes:**
+- **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no
+  teeth lost) in BOTH global ~/.claude/CLAUDE.md and project CLAUDE.md. New first-class **Rule 2 PROOF,
+  NOT ECHO** — operation echo ≠ persisted state: PUSHED ≠ LIVE and WRITTEN ≠ SAVED (commit/close then
+  re-read on a SEPARATE connection; RETURNING / return value / 2xx / enqueue-ack are not proof).
+- **Visal AL corrected real+test:** req 17 was 9/10/12 but the 10th is his day off (Wed) → now 9/11/12
+  approved (is_test=False); seeded matching test copy (req 20) + Por 240 test payback (debt 11).
+- **Root cause of the "/testreset won't restore Visal's ALs" saga:** NOT a bot bug and NOT test
+  isolation. My earlier inline `ssh … psycopg2.connect()` restore scripts never called commit
+  (autocommit defaults off) → implicit ROLLBACK on process exit; RETURNING showed the in-txn value so
+  it looked restored. The REPO write path (`shared/database.py::_db()` context manager) commits
+  correctly — every bot/helper write is sound. Fix: ad-hoc DB scripts use _db() or autocommit + a
+  fresh-connection readback (now Rule 2).
+
+**Session 29 (Jun 8):**
+- **DEPLOYMENT-DRIFT AUDIT (owner feared lost work):** verified ALL last-night work safe — 20 commits
+  pushed, server HEAD==origin, 19 attendance tables live in prod, attendance_live=OFF, all 5 services
+  running current code. Root cause of "Give OT shows no time": fixes were pushed to GitHub but the
+  twbshop-gm service was never restarted. LESSON: after any gm_bot/ push, `ssh twbshop pull + systemctl
+  restart twbshop-gm` — code on GitHub ≠ code running. coverage_requirements is NOT a table (hardcoded
+  in coverage.window_target).
+- **OT /test flow fixed:** added the missing WHEN step — 📅 Later now picks day + start-time before the
+  owner card; ⚡ Now skips it (it's now). Owner card + stub show the real chosen window.
+- **EVERY LADDER WALKS TO THE END (no more "Next build" dead-ends):** new generic walkthrough engine in
+  attendance_ui (att:walk:{name}:{idx}) + step sequences for late→payback, AL, day-off swap, sick(me/
+  family), marriage, family-death, wife-birth. Each stub has "▶️ See the rest of this flow" stepping
+  through every following message (senior cards, group notices, final staff confirm) — preview only,
+  gated. Personal OT view points to My schedule; dead Emergency "Later" stub removed.
+- **FULL KHMER REVIEW EXPORT for ChatGPT:** C:\Users\Papa\Documents\khmer_full_review.txt — Section A =
+  195 EXISTING bilingual messages (the "21" was only last-night's new strings; ~174 were already done in
+  prior sessions), Section B = 61 genuine staff-facing English-only gaps (mostly the just-extended
+  walkthrough lines, marked "(KH pending)"). Owner translating via ChatGPT. NEXT: regenerate the export
+  after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
+- Suite green: 369.
+
+### Superseded RESUME pointer (session 29 — go-live sequence)
+
+**▶ RESUME HERE (session 29): TEST HARNESS COMPLETE — ready for the owner's single role-play test.**
+All 8 flows are wired test-aware AND drivable from /test in test mode: AL · late/payback · check-in ·
+Give-OT · day-off swap · sick (declare + papers) · marriage · death/birth. In /testmode on, every
+flow runs the REAL submit_* code; every message (staff/senior/group) routes to the OWNER labeled
+[→ role]; the owner taps the other roles' buttons (actor-override); every write is is_test-tagged;
+real balances/data are NEVER touched. Commands: /testmode on|off · /teststatus · /testreset.
+Mechanism: shell terminals set att_test_pending {flow, persona, picks} + prompt the reason → bot
+_att_test_dispatch fires the real submit_* (no-reason flows use 'type go'). Safety: PreToolUse
+HIGH-RISK guard (.claude/hooks/highrisk_guard.py, per-action ask, fail-closed) + scripts/verify_live.py
+(ground-truth deploy check) installed; live hook-wiring needs a fresh-session check by the owner.
+Dry-runs/walkthroughs DEMOTED to read-only previews (persona picker says trust /testmode).
+NEXT: (1) owner runs the single role-play test (walk every topic, tweak wording/Khmer). (2) Then
+go-live: /testreset → /testmode off → send the greeting (Documents/gm_greeting_FINAL.txt) + attach the
+persistent 📋 Menu button → flip attendance_live='true' (live-location requirement waits until owner
+explains it + all staff pressed Start). Design: docs/ATTENDANCE_TEST_MODE.md.
+attendance_live=OFF, attendance_test_mode=OFF.
+
