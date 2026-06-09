@@ -287,6 +287,12 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — marriage = no reason (confirm button):**
+- Marriage no longer asks for a typed reason (it's their own wedding). Now a `_confirm_prompt`:
+  "Marriage leave (N days) · Date: from → to · If you need more days you can request AL" + ✅ I confirm
+  (→ att:go → submits to seniors). Dispatch submits reason "Marriage leave" (no appended text).
+- Suite 399 green.
+
 **Session 30 (Jun 9) — coverage-gap Supervisors FYIs (round 2):**
 - Added 4 more group FYIs: **sick papers accepted** ("X on covered sick leave for N days"), **OT
   cancelled by owner** (only if it was confirmed/banked/booked), **no-show** (informational — decided

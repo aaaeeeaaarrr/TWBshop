@@ -1924,11 +1924,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update.effective_user.id,
                     {"flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child})
-                return await show(_arm_prompt(p, context,
-                    "Marriage leave (%d day%s). · ច្បាប់រៀបការ (%d ថ្ងៃ)។\n\n"
-                    "📝 Type the reason — your next message submits it for senior approval.\n"
-                    "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើទៅបងៗដើម្បីអនុម័ត។"
-                    % (1 if child else 3, "" if child else "s", 1 if child else 3), "att:sp:mar"))
+                ndays = 1 if child else 3
+                d0 = date.fromisoformat(data[3])
+                dn = d0 + timedelta(days=ndays - 1)
+                span = (d0.strftime("%a %d/%m") if ndays == 1
+                        else "%s → %s" % (d0.strftime("%a %d/%m"), dn.strftime("%a %d/%m")))
+                return await show(_confirm_prompt(p, context,
+                    "Marriage leave (%d day%s) · ច្បាប់រៀបការ (%d ថ្ងៃ)\n"
+                    "Date · កាលបริច្ឆេទ៖ %s\n\n"
+                    "If you need more days, you can request AL.\n"
+                    "បើត្រូវការច្រើនថ្ងៃ អ្នកអាចស្នើ AL បន្ថែម។"
+                    % (ndays, "" if child else "s", ndays, span), "att:sp:mar"))
             return await show(marriage_stub(p, data[3], child=child))
         if sub == "death":
             return await show(death_menu(p))

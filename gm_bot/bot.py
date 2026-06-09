@@ -3515,7 +3515,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         days = ([pend["start_date"]] if pend.get("child")
                 else [(d0 + _td(days=i)).isoformat() for i in range(3)])
         await submit_al_request(context, persona, "days", days, None, None,
-                                "Marriage leave — " + reason, req_uid)
+                                "Marriage leave", req_uid)   # own wedding — no reason needed
         await confirm(
             "✅ Marriage leave sent for senior approval. Congratulations 🎉\n"
             "✅ បានផ្ញើសំណើច្បាប់រៀបការសម្រាប់អនុម័ត។ សូមអបអរសាទរ 🎉",
