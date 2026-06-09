@@ -180,9 +180,27 @@ def test_late_simarr_fires_payback(monkeypatch):
         calls["offer"] += 1
 
     monkeypatch.setattr(bot, "_offer_payback", _offer)
-    upd = _CbUpdate(bot.config.OWNER_TELEGRAM_ID, "att:simarr:11:30")
+    upd = _CbUpdate(bot.config.OWNER_TELEGRAM_ID, "att:simarr:11:late:30")
     asyncio.run(bot._late_simarr_callback(upd, _Ctx()))
     assert calls["payback"] == 1 and calls["offer"] == 1
+
+
+def test_late_simarr_ontime_is_free(monkeypatch):
+    """Simulating an on-time (±5) arrival → free: no payback, just the Checked-in verdict."""
+    from gm_bot import bot
+    calls = {"payback": 0, "sent": 0}
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [dict(_PERSONA)])
+    monkeypatch.setattr(bot, "payback_add_debt",
+                        lambda *a, **k: calls.__setitem__("payback", calls["payback"] + 1))
+
+    async def _send(*a, **k):
+        calls["sent"] += 1
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    upd = _CbUpdate(bot.config.OWNER_TELEGRAM_ID, "att:simarr:11:ontime")
+    asyncio.run(bot._late_simarr_callback(upd, _Ctx()))
+    assert calls["payback"] == 0 and calls["sent"] == 1   # free — verdict only, no payback
 
 
 def test_present_now_for_ot(monkeypatch):

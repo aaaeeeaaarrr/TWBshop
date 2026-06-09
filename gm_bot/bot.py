@@ -222,6 +222,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             uid = update.effective_user.id
             rec = staff_get_by_uid(uid) if _attendance_live() else None
             if rec and rec.get("status") == "active" and rec.get("org") == "TWB":
+                from gm_bot import attendance_ui
                 if len(rec.get("telegram_ids", [])) > 1:
                     from shared.database import staff_bind_uid
                     staff_bind_uid(rec["id"], uid)
@@ -1268,12 +1269,22 @@ def _fmt_min(m: int) -> str:
     return ("%d:%02d%s" % (h12, mm, sfx)) if mm else ("%d%s" % (h12, sfx))
 
 
-async def _offer_payback(context, staff: dict, balance: int, uid: int) -> None:
-    """Send the payback slot picker (the locked bilingual line)."""
+async def _offer_payback(context, staff: dict, balance: int, uid: int,
+                         late_min: int | None = None) -> None:
+    """Send the payback slot picker. On a FRESH late arrival (late_min given) the check-in verdict is
+    COMBINED into this one message — so the reason ('X late, counts as pay-back') and the picker can't
+    be read separately. Other contexts (re-offers/ladder) get the plain 'You owe X' header."""
     kb = _payback_slot_keyboard(staff, balance)
-    text = ("You owe %d min. Pick when to work it off — these are the times we need you most:\n"
-            "អ្នកនៅត្រូវសង %d min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
-            % (balance, balance))
+    if late_min is not None:
+        text = ("Checked in ✓ — %d min late (counts as pay-back). Pick when to work it off — the "
+                "times we need you most:\n"
+                "ចុះវត្តមានរួច ✓ — យឺត %d នាទី (រាប់ជាម៉ោងសងវិញ)។ "
+                "សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                % (late_min, late_min))
+    else:
+        text = ("You owe %d min. Pick when to work it off — these are the times we need you most:\n"
+                "អ្នកនៅត្រូវសង %d min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                % (balance, balance))
     await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
                     text, kb=kb)
 
@@ -1338,15 +1349,18 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         if state == "early":
             await msg.reply_text(ui._V_EARLY % (early, early))
         elif state == "late":
-            await msg.reply_text(ui._V_LATE % (late, late))
-            # late arrival → create/grow the payback debt + offer slots
+            # late arrival → ONE combined message: the verdict + the payback picker (so the reason
+            # and the slot picker can't be read separately).
             try:
                 payback_add_debt(staff["id"], late, "late arrival", shift_date)
                 d = payback_open_debt(staff["id"])
                 if d:
-                    await _offer_payback(context, staff, d["balance"], user.id)
+                    await _offer_payback(context, staff, d["balance"], user.id, late_min=late)
+                else:
+                    await msg.reply_text(ui._V_LATE % (late, late))
             except Exception as e:
                 logger.error("payback debt create failed: %s", e)
+                await msg.reply_text(ui._V_LATE % (late, late))
         else:
             await msg.reply_text(ui._V_ONTIME)
     return True
@@ -3380,6 +3394,7 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
         # active staffer opens their own menu. Falls through to roll-call when not live.
         if _attendance_live():
             from shared.database import flow_load, flow_clear
+            from gm_bot import attendance_ui
             fs = flow_load(uid)
             if fs and fs.get("flow") == "att_pending":
                 pend = fs.get("data") or {}
@@ -3395,26 +3410,36 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def _late_simarr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:simarr:{persona}:{mins} — TEST ONLY: simulate the late staffer arriving + sharing a
-    correct live location → fire the real arrival payback (debt + slot picker), mirroring live."""
+    """att:simarr:{persona}:{early|ontime|late}[:{mins}] — TEST ONLY: simulate the staffer's actual
+    arrival (they declared late but may arrive earlier) → run the REAL check-in verdict + messages.
+    early >5 = +points, on-time (±5) = free, late >5 = combined verdict+payback picker."""
     query = update.callback_query
     await query.answer()
     if not _att_test_mode() or update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
+    from gm_bot import attendance_ui
     parts = query.data.split(":")
     persona = next((s for s in staff_all("active") if s["id"] == int(parts[2])), None)
     if not persona:
         return
-    mins = int(parts[3])
-    today = datetime.now(finance.PP_TZ).date().isoformat()
-    payback_add_debt(persona["id"], mins, "late arrival (test)", today)
-    d = payback_open_debt(persona["id"])
+    outcome = parts[3]
+    nm = persona.get("call_name") or persona["canonical_name"]
+    suid = (persona.get("telegram_ids") or [None])[0]
     try:
-        await query.edit_message_text((query.message.text or "") + "\n\n📍 Arrived (simulated).")
+        await query.edit_message_text((query.message.text or "") + "\n\n📍 Arrived (simulated: %s)." % outcome)
     except Exception:
         pass
-    if d:
-        await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID)
+    if outcome == "early":
+        await _att_send(context, suid, "Staff", nm, attendance_ui._V_EARLY % (10, 10))
+    elif outcome == "ontime":
+        await _att_send(context, suid, "Staff", nm, attendance_ui._V_ONTIME)
+    else:   # late >5 — combined verdict + payback picker
+        mins = int(parts[4])
+        today = datetime.now(finance.PP_TZ).date().isoformat()
+        payback_add_debt(persona["id"], mins, "late arrival (test)", today)
+        d = payback_open_debt(persona["id"])
+        if d:
+            await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID, late_min=mins)
 
 
 async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3493,15 +3518,20 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "%s នឹងមកយឺតប្រហែល %d នាទីសម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
             % (nm, mins, reason, nm, mins, reason), group=True)
         if not live:
-            # TEST: mirror the LIVE split — declare = heads-up only; the payback picker appears on
-            # ARRIVAL. Offer a button to SIMULATE arrival + a correct live-location share (not an
-            # auto-collapse), so the owner tests the real two-step flow.
-            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-                "📍 Simulate arrival — shared correct live location",
-                callback_data="att:simarr:%d:%d" % (persona["id"], mins))]])
+            # TEST: mirror the LIVE split — declare = heads-up only; the outcome appears on ARRIVAL.
+            # They CLICKED late, but might actually arrive early / on-time / late — so offer all three
+            # to simulate, each running the REAL check-in verdict (5-min grace included).
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📍 Arrived >5 min EARLY (in zone)",
+                                      callback_data="att:simarr:%d:early" % persona["id"])],
+                [InlineKeyboardButton("📍 Arrived on-time (±5 min — free)",
+                                      callback_data="att:simarr:%d:ontime" % persona["id"])],
+                [InlineKeyboardButton("📍 Arrived >5 min LATE (~%d min)" % mins,
+                                      callback_data="att:simarr:%d:late:%d" % (persona["id"], mins))]])
             await update.message.reply_text(
-                "🧪 Late declared (test) — Supervisors heads-up sent. In LIVE the payback picker "
-                "appears when they ARRIVE & share live location. Tap to simulate that:", reply_markup=kb)
+                "🧪 Late declared (test) — Supervisors heads-up sent. In LIVE the outcome appears when "
+                "they ARRIVE & share live location. Simulate the arrival (they may be earlier than they "
+                "thought):", reply_markup=kb)
             return
         # LIVE: heads-up only — payback appears on real arrival via _handle_staff_location.
         await confirm(

@@ -287,6 +287,16 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — late arrival = ONE combined message + 3-outcome test sim:**
+- Live late arrival is now ONE message: `_offer_payback(late_min=…)` combines the check-in verdict
+  ("X min late, counts as pay-back") WITH the picker, so reason+action can't be read separately.
+- TEST simulate-arrival now offers 3 buttons (they declared late but may arrive otherwise): **early >5**
+  (+points verdict), **on-time ±5** (free, verdict only), **late >5** (combined verdict+picker) — each
+  running the real verdict (5-min grace). `_late_simarr_callback` reworked.
+- ⚠ FIXED 2 LATENT NameErrors: `cmd_start` + `_private_text_router` used `attendance_ui` without a
+  local import (module imports it locally everywhere) — would've crashed at GO-LIVE when a live
+  staffer texts/Starts. Now import locally. Suite 401 green.
+
 **Session 30 (Jun 9) — late TEST: simulate-arrival button (mirrors live):**
 - TEST late no longer auto-collapses to the payback picker. It now sends the heads-up + a
   "📍 Simulate arrival — shared correct live location" button (`att:simarr:{persona}:{mins}`,
