@@ -3243,14 +3243,36 @@ def al_leave_days_set(staff_id: int) -> set:
     return out
 
 
+def public_holidays() -> set:
+    """Company-wide PAID free days (public holidays / granted no-work days) that cost NO AL and NO
+    points. PLACEHOLDER seam: returns the ISO dates stored in gm_state['public_holidays'] (a JSON
+    list) — EMPTY by default. It's already wired into staff_absent_dates(), so the day you add dates
+    (via /holiday or set_public_holidays) they AUTOMATICALLY bridge AL spans and are never charged —
+    no other code change needed. (Per-person free grants could extend the same seam later.)"""
+    import json as _json
+    raw = gm_get_state("public_holidays")
+    if not raw:
+        return set()
+    try:
+        return set(_json.loads(raw))
+    except Exception:
+        return set()
+
+
+def set_public_holidays(dates) -> None:
+    """Replace the public-holiday / paid-free-day list (ISO dates)."""
+    import json as _json
+    gm_set_state("public_holidays", _json.dumps(sorted(set(dates))))
+
+
 def staff_absent_dates(staff_id: int) -> set:
     """Every ISO date the staff is already AWAY besides their weekly day-off: approved AL,
-    special-leave spans (marriage / family-death / wife-birth / family-sick), and swap day-off
-    overrides. Used so an AL span bridges across ANY absence, not just the weekly day off.
-    (Public holidays are not tracked yet — add a holiday list to fold those in too.)"""
+    special-leave spans (marriage / family-death / wife-birth / family-sick), swap day-off
+    overrides, AND company-wide public holidays. Used so an AL span bridges across ANY absence,
+    not just the weekly day off."""
     import json as _json
     from datetime import date as _d, timedelta as _td
-    out = set()
+    out = set(public_holidays())   # PLACEHOLDER source — empty until holidays are added
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved'",

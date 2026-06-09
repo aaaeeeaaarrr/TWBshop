@@ -3127,6 +3127,47 @@ async def cmd_teststatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                     % (mode, "ON" if _attendance_live() else "off", body))
 
 
+async def cmd_holiday(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/holiday — manage company-wide PAID free days (public holidays). These cost NO AL and NO
+    points, and AL spans bridge across them automatically.
+    /holiday                       → list
+    /holiday add YYYY-MM-DD …      → add date(s)
+    /holiday del YYYY-MM-DD …      → remove date(s)"""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    from shared.database import public_holidays, set_public_holidays
+    from datetime import date as _d
+    args = context.args or []
+    cur = set(public_holidays())
+    if not args:
+        lst = "\n".join("• " + x for x in sorted(cur)) or "• (none set)"
+        await update.message.reply_text(
+            "📅 Public holidays / paid free days (no AL, no points; AL bridges across them):\n%s\n\n"
+            "/holiday add YYYY-MM-DD  ·  /holiday del YYYY-MM-DD" % lst)
+        return
+    action = args[0].lower()
+    dates = [a for a in args[1:] if _valid_iso(a)]
+    if action == "add" and dates:
+        set_public_holidays(cur | set(dates))
+    elif action in ("del", "remove", "rm") and dates:
+        set_public_holidays(cur - set(dates))
+    else:
+        await update.message.reply_text(
+            "Use: /holiday  ·  /holiday add YYYY-MM-DD  ·  /holiday del YYYY-MM-DD")
+        return
+    now = sorted(public_holidays())
+    await update.message.reply_text("✓ Updated. Public holidays now: %s" % (", ".join(now) or "(none)"))
+
+
+def _valid_iso(s: str) -> bool:
+    from datetime import date as _d
+    try:
+        _d.fromisoformat(s)
+        return True
+    except Exception:
+        return False
+
+
 async def cmd_testseed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/testseed [name] — copy real approved ALs + open paybacks into is_test copies so TEST mode
     shows realistic data. Idempotent (clears prior test copies first). Then /testmode on to see it,
@@ -4015,6 +4056,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
+    app.add_handler(CommandHandler("holiday",     cmd_holiday))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall

@@ -304,8 +304,12 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   does NOT bridge.
 - **Span bridges ANY absence, not just the weekly day-off** (owner): `non_working` set from new
   `database.staff_absent_dates(staff_id)` = approved AL + special-leave spans + swap day-off overrides.
-  So a gap that's another AL/leave bridges into one from→to span (and isn't re-charged). ⚠ PUBLIC
-  HOLIDAYS are NOT yet tracked — there's no holiday list in the system; add one to fold PH in too.
+  So a gap that's another AL/leave bridges into one from→to span (and isn't re-charged).
+- **PUBLIC-HOLIDAY placeholder wired (empty):** `database.public_holidays()` reads gm_state
+  ['public_holidays'] (JSON list, empty default) and is folded into `staff_absent_dates`. Add dates
+  via **/holiday add YYYY-MM-DD** (owner/Tyty) — they then auto-bridge AL spans and cost NO AL / NO
+  points, no code change. `set_public_holidays()` + `/holiday` (list/add/del) shipped. (Per-person
+  paid-free grants could extend the same seam later.)
 - Suite 394 green (+ al-day-off-excluded-and-span, updated summary test).
 
 **Session 30 (Jun 9) — AL card redesign + edit-in-place on decision:**

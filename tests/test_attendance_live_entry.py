@@ -284,6 +284,15 @@ def test_al_day_off_excluded_and_span_bridges():
     assert alm.al_day_count(days, "days") == 3.0
 
 
+def test_public_holidays_placeholder(monkeypatch):
+    """PH placeholder: empty by default, parses the gm_state JSON list when set."""
+    from shared import database as db
+    monkeypatch.setattr(db, "gm_get_state", lambda k: None)
+    assert db.public_holidays() == set()                       # empty until holidays are added
+    monkeypatch.setattr(db, "gm_get_state", lambda k: '["2026-04-14", "2026-04-15"]')
+    assert db.public_holidays() == {"2026-04-14", "2026-04-15"}
+
+
 def test_al_span_bridges_any_absence():
     """The span bridges ANY non-working day (other AL, PH, swap…), not just the weekly day off."""
     from gm_bot import al as alm
