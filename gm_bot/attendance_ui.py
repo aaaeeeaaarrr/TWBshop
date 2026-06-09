@@ -1752,10 +1752,10 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                                               callback_data="att:my:cancel:%s:%d" % (d, rid))])
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
-                   "AL left · AL នៅសល់: %s days\n"
-                   "Payback debt · ជំពាក់ម៉ោងសងវិញ: %d min\n"
-                   "OT bank · OT សន្សំ: %gh\n"
-                   "Upcoming AL · AL ខាងមុខ: %s"
+                   "AL left: %s days\n"
+                   "Payback debt: %d min\n"
+                   "OT bank: %gh\n"
+                   "Upcoming AL: %s"
                 % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")),
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
                    debt_min, bank_min / 60, up_txt)), \
