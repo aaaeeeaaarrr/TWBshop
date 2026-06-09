@@ -36,6 +36,16 @@ def slot_windows(ws_min: int, we_min: int, minutes: int) -> list[tuple[str, int,
     ]
 
 
+def takeback_windows(ws_min: int, we_min: int, minutes: int) -> list[tuple[str, int, int]]:
+    """For TAKING BACK earned OT as rest (not payback): the rest sits at the EDGES of the shift,
+    eating into it — come in later (rest the START) or leave earlier (rest the END). Returns
+    [(label, start_min, end_min)] where the window is the rest period INSIDE the shift."""
+    return [
+        ("start late", ws_min % 1440, (ws_min + minutes) % 1440),   # come in `minutes` later
+        ("leave early", (we_min - minutes) % 1440, we_min % 1440),  # leave `minutes` earlier
+    ]
+
+
 def apply_payback(balance_min: int, worked_min: int) -> tuple[int, int]:
     """Credit worked minutes against the balance. Returns (credited, new_balance).
     Over-work doesn't go negative — caps at the balance (extra is just early/OT elsewhere)."""

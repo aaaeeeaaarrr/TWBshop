@@ -296,8 +296,19 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
 - Files: `submit_ot_grant`, `_ot_owner_callback` (now veto-only + window check + bank reversal),
   `_ot_future_callback` (staff_asked→booked/declined), `_ot_started`, dispatcher OT confirm text.
 - **OT confirmations show the real time window** (e.g. `4pm-5pm`), never "now" — `_ot_window()` (Now =
-  shift-end→end; Later = date + window); used in the owner notice + the Later staff ask.
-- Suite 386 green (+ _ot_started window, Later-asks-staff-without-owner, Now-banks+buyback, _ot_window).
+  shift-end→end; Later = date + window); used in the owner notice + the staff ask.
+- **Staff consent FIRST for BOTH Now and Later:** submit_ot_grant now ASKS the staff Yes/Can't first
+  (no auto-bank). NOW banks + offers buyback only in `_ot_future_callback` AFTER the staff accepts;
+  LATER books. (Was: NOW auto-banked at grant without asking.)
+- **Take-back ≠ payback:** earned-OT buyback slots are now at the shift EDGES (come in late / leave
+  early) via new `payback.takeback_windows`, not the before/after-shift payback windows. Labeled
+  🌅 in late / 🌙 leave early.
+- **OWNER never gets Khmer:** `attendance.strip_khmer()` applied per-recipient — `_att_send` strips when
+  the recipient is the owner (test-routed previews + owner notices), and the `/test` shell strips text
+  + button labels for the owner (live staff keep full bilingual). One bilingual source, stripped only
+  for the owner at output.
+- Suite 389 green (+ _ot_started, Later/Now ask-first, now-accept-banks, _ot_window, takeback_windows,
+  strip_khmer).
 
 **Session 30 (Jun 9) — /testseed + restart test-mode sync + /testmode diagnostic:**
 - **/testseed [name]** (owner/Tyty): mirrors real approved ALs + open payback debts into is_test copies

@@ -215,6 +215,7 @@ class _Query:
     def __init__(self, data):
         self.data = data
         self.edited = []
+        self.message = types.SimpleNamespace(text="card")
 
     async def answer(self, *a, **k):
         pass
@@ -231,18 +232,19 @@ class _CbUpdate:
 
 
 def test_reason_terminals_format_bilingual(monkeypatch):
-    """Drive the REAL callback for every %-formatted terminal — proves the bilingual prompts
-    format without a ValueError (the only runtime risk after adding Khmer with embedded numbers)."""
+    """Drive the REAL callback for every %-formatted terminal — proves the prompts format without a
+    ValueError (the runtime risk from Khmer with embedded numbers). Owner shell = English-only, so
+    we assert the English survives (the Khmer is correctly stripped for the owner)."""
     import config
     monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [dict(_PERSONA)])
     monkeypatch.setattr(ui, "att_test_on", lambda: True)         # armed (owner test mode)
     monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
     cases = [
-        ("att:ot:en:now:11:0:480:540", "នាទី"),       # OT 60 min (2× %d)
-        ("att:late:o:30", "នាទី"),                     # late ~30 min (2× %d)
-        ("att:sp:mard:2026-06-25", "ថ្ងៃ"),            # marriage 3 days (%d %s %d)
-        ("att:sp:famf:mother:2026-06-25", "គ្រួសារ"),  # family sick (2× %s)
-        ("att:al:full", "AL"),                          # AL full-day suffix
+        ("att:ot:en:now:11:0:480:540", "60 min"),         # OT 60 min (2× %d)
+        ("att:late:o:30", "30 min"),                       # late ~30 min (2× %d)
+        ("att:sp:mard:2026-06-25", "Marriage leave"),      # marriage 3 days (%d %s %d)
+        ("att:sp:famf:mother:2026-06-25", "Family sick"),  # family sick (2× %s)
+        ("att:al:full", "AL"),                              # AL full-day suffix
     ]
     for data, needle in cases:
         upd = _CbUpdate(config.OWNER_TELEGRAM_ID, data)
@@ -250,6 +252,25 @@ def test_reason_terminals_format_bilingual(monkeypatch):
         asyncio.run(ui.callback(upd, ctx))
         out = upd.callback_query.edited[-1]
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
+
+
+def test_takeback_windows_are_shift_edges():
+    """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
+    INSIDE the shift — not the before/after-shift windows used for payback."""
+    from gm_bot import payback as pb
+    wins = pb.takeback_windows(480, 1020, 60)        # shift 8am-5pm, 1h
+    assert ("start late", 480, 540) in wins           # rest 8-9am → come in at 9
+    assert ("leave early", 960, 1020) in wins         # rest 4-5pm → leave at 4
+    # payback (work extra) is the opposite — before/after the shift
+    assert ("before", 420, 480) in pb.slot_windows(480, 1020, 60)
+
+
+def test_strip_khmer_owner_english_only():
+    from gm_bot.attendance import strip_khmer
+    assert strip_khmer("Hello.\nសួស្តី។") == "Hello."
+    assert strip_khmer("What would you like? · តើអ្នកចង់អ្វី?") == "What would you like?"
+    assert strip_khmer("OT cancelled.\nOT ត្រូវបានលុបចោល។") == "OT cancelled."
+    assert strip_khmer("English only, no khmer") == "English only, no khmer"
 
 
 def test_ot_window_shows_time_not_now():
@@ -292,28 +313,57 @@ def test_submit_ot_later_asks_staff_without_owner_approval(monkeypatch):
     assert "staff_asked" in sets                        # staff consent pending, no owner approval gate
 
 
-def test_submit_ot_now_banks_and_offers_buyback(monkeypatch):
-    """NOW OT: banks on the spot + offers buyback immediately; owner still gets a reject notice."""
+def test_submit_ot_now_asks_staff_first(monkeypatch):
+    """NOW OT: the staff is ASKED first (no auto-bank); owner gets a reject notice. Nothing banks
+    until the staff accepts."""
     from gm_bot import bot
-    seen, sets = [], []
+    seen, sets, banked = [], [], []
 
     async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False):
         seen.append(role)
 
     async def _buy(*a, **k):
-        seen.append("buyback")
+        banked.append("buyback")
 
     monkeypatch.setattr(bot, "_att_send", _send)
     monkeypatch.setattr(bot, "_offer_buyback", _buy)
     monkeypatch.setattr(bot, "ot_grant_create", lambda *a, **k: 5)
     monkeypatch.setattr(bot, "ot_grant_set", lambda gid, **k: sets.append(k.get("status")))
     monkeypatch.setattr(bot, "ot_bank_balance", lambda sid: 0)
-    monkeypatch.setattr(bot, "ot_bank_add", lambda sid, m: 120)
+    monkeypatch.setattr(bot, "ot_bank_add", lambda sid, m: banked.append(m) or 120)
     senior = {"id": 1, "canonical_name": "S", "call_name": "S"}
     staff = {"id": 2, "canonical_name": "Tra", "call_name": "Tra", "telegram_ids": [222]}
     asyncio.run(bot.submit_ot_grant(_Ctx(), senior, staff, "now", 120, None, 540, "x"))
-    assert "Owner" in seen and "buyback" in seen        # owner notice + immediate buyback
-    assert "banked" in sets
+    assert "Owner" in seen and "Staff" in seen          # both engaged; staff ASKED
+    assert "staff_asked" in sets
+    assert banked == []                                  # NOTHING banked/offered until consent
+
+
+def test_ot_future_now_accept_banks(monkeypatch):
+    """NOW OT consent: when the staff taps Yes, THEN it banks + offers buyback (status=banked)."""
+    from gm_bot import bot
+    seen = {"bank": 0, "buyback": 0, "status": None}
+    g = {"id": 7, "staff_id": 2, "senior_id": 1, "kind": "now", "minutes": 60,
+         "status": "staff_asked", "when_date": None, "start_min": 960}
+    monkeypatch.setattr(bot, "ot_grant_get", lambda i: g)
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 2, "canonical_name": "Tra", "call_name": "Tra", "telegram_ids": [222]}])
+
+    def _bank(sid, m):
+        seen["bank"] += 1
+        return 60
+
+    monkeypatch.setattr(bot, "ot_bank_add", _bank)
+    monkeypatch.setattr(bot, "ot_grant_set",
+                        lambda i, **k: seen.__setitem__("status", k.get("status") or seen["status"]))
+
+    async def _buy(*a, **k):
+        seen["buyback"] += 1
+
+    monkeypatch.setattr(bot, "_offer_buyback", _buy)
+    asyncio.run(bot._ot_future_callback(_CbUpdate(222, "att:otf:yes:7"), _Ctx()))
+    assert seen["bank"] == 1 and seen["buyback"] == 1 and seen["status"] == "banked"
 
 
 def test_dispatch_live_rejects_unknown_uid(monkeypatch):

@@ -1163,18 +1163,23 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
     - test mode: deliver to the OWNER, labeled [→ role: name], buttons kept functional so the
       owner taps as that role.
     - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True)."""
+    from gm_bot.attendance import strip_khmer
     if _att_test_mode():
+        # everything routes to the OWNER in test → English-only (owner doesn't want Khmer)
         prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
         try:
-            await context.bot.send_message(config.OWNER_TELEGRAM_ID, prefix + text, reply_markup=kb)
+            await context.bot.send_message(config.OWNER_TELEGRAM_ID, strip_khmer(prefix + text),
+                                           reply_markup=kb)
         except Exception as e:
             logger.error("att_send(test) failed: %s", e)
         return
     target = config.SUPERVISORS_CHAT_ID if group else to_uid
     if not target:
         return
+    # the owner reads English only; staff/groups get the full bilingual text
+    body = strip_khmer(text) if target == config.OWNER_TELEGRAM_ID else text
     try:
-        await context.bot.send_message(target, text, reply_markup=kb)
+        await context.bot.send_message(target, body, reply_markup=kb)
     except Exception as e:
         logger.error("att_send to %s failed: %s", target, e)
 
@@ -1451,22 +1456,19 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
     await _att_send(context, config.OWNER_TELEGRAM_ID, "Owner", "",
         body + "\n\nSilence = approval — the staff is already asked. Reject any time before it starts.\n"
         "ស្ងៀម = យល់ព្រម — បានសួរបុគ្គលិករួចហើយ។ បដិសេធបានគ្រប់ពេលមុនវាចាប់ផ្តើម។", kb=owner_kb)
-    # STAFF: engage immediately (do NOT wait for the owner)
+    # STAFF: ask Yes/Can't FIRST — for BOTH Now and Later. Nothing banks until the staff accepts
+    # (the owner can still veto until the OT starts). The accept handler banks Now + offers buyback.
     suid = (staff.get("telegram_ids") or [None])[0]
-    if kind == "now":
-        new_bal = ot_bank_add(staff["id"], minutes)
-        ot_grant_set(gid, status="banked")
-        await _offer_buyback(context, staff, new_bal, suid, minutes)
-    else:
-        ot_grant_set(gid, status="staff_asked")
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
-            [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
-        ])
-        win = _ot_window("later", when_date, start_min, minutes)
-        await _att_send(context, suid, "Staff", sn,
-            "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
-            % (win, win), kb=kb)
+    ot_grant_set(gid, status="staff_asked")
+    win = _ot_window(kind, when_date, start_min, minutes)
+    whenphrase = ("today %s" % win) if kind == "now" else win
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
+        [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
+    ])
+    await _att_send(context, suid, "Staff", sn,
+        "You're asked for OT (%s) — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT (%s) — អ្នកអាចធ្វើបានទេ?"
+        % (whenphrase, whenphrase), kb=kb)
     return gid
 
 
@@ -1536,6 +1538,15 @@ async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         ot_grant_set(g["id"], status="declined", staff_ok=False)
         await query.edit_message_text(query.message.text + "\n\n❌ Declined (no problem).")
         return
+    # accepted — NOW banks HERE (only after consent) + offers buyback; LATER becomes a booked slot
+    if g["kind"] == "now":
+        new_bal = ot_bank_add(g["staff_id"], int(g["minutes"]))
+        ot_grant_set(g["id"], status="banked", staff_ok=True)
+        await query.edit_message_text(query.message.text +
+            "\n\n✅ Thanks — added to your OT bank.\n✅ អរគុណ — បានបញ្ចូលទៅ OT bank របស់អ្នក។")
+        await _offer_buyback(context, staff, new_bal, (staff.get("telegram_ids") or [None])[0],
+                             int(g["minutes"]))
+        return
     ot_grant_set(g["id"], status="booked", staff_ok=True)
     await query.edit_message_text(query.message.text +
         "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)\n"
@@ -1557,10 +1568,11 @@ async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_add
         scored = []
         for d in days:
             wd = d.strftime("%a")
-            for _lbl, s_min, e_min in pb.slot_windows(ws, we, bank_min):
+            for lbl, s_min, e_min in pb.takeback_windows(ws, we, bank_min):
                 surp = cov.slot_surplus(staff.get("expertise") or [], s_min, e_min, wd,
                                         roster, set(), to_min)
-                txt = "%s %s-%s" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
+                tag = "🌅 in late" if lbl == "start late" else "🌙 leave early"
+                txt = "%s %s-%s · %s" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min), tag)
                 scored.append((surp, [InlineKeyboardButton(
                     txt, callback_data="att:otb:%d:%s:%d:%d:%d"
                     % (staff["id"], d.isoformat(), s_min, e_min, bank_min))]))
@@ -3251,8 +3263,9 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await confirm(
             "✅ OT sent — the staff is asked now; the owners got a reject-only notice (silence = approval).\n"
             "✅ បានផ្ញើ OT — បានសួរបុគ្គលិករួច; ម្ចាស់ហាងទទួលបានសារ (ស្ងៀម = យល់ព្រម)។",
-            "🧪 OT submitted (test) — you got BOTH the staff side (NOW → buyback picker / LATER → Yes/Can't) "
-            "AND the owner reject-only notice. Silence = approval; reject before it starts. /testreset to wipe.")
+            "🧪 OT submitted (test) — you got BOTH the staff Yes/Can't ask AND the owner reject-only "
+            "notice. On Yes: NOW banks + buyback picker, LATER books. Silence = approval; reject before "
+            "start. /testreset to wipe.")
     elif flow == "swap":
         partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
         if not partner:

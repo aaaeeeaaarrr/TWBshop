@@ -13,6 +13,34 @@ Times are handled as minutes-from-midnight. The CSV importer turns 'HH:MM' into 
 from __future__ import annotations
 
 import math
+import re
+
+_KHMER_RE = re.compile("[ក-៿᧠-᧿]")
+
+
+def strip_khmer(text: str) -> str:
+    """Return an English-only version of a bilingual message (the OWNER doesn't want Khmer; staff
+    still get the full bilingual text). Handles the two house styles:
+      - 'English line\\nKhmer line'  → drop the Khmer line
+      - 'English · ខ្មែរ' (or ' — ', ' | ') → keep the English half."""
+    if not text or not _KHMER_RE.search(text):
+        return text
+    out = []
+    for line in text.split("\n"):
+        if not _KHMER_RE.search(line):
+            out.append(line)
+            continue
+        kept = None
+        for sep in (" · ", " — ", " | "):
+            if sep in line:
+                left = line.split(sep, 1)[0].rstrip()
+                if left and not _KHMER_RE.search(left) and re.search(r"[A-Za-z0-9]", left):
+                    kept = left
+                break
+        if kept is not None:
+            out.append(kept)
+        # else: a pure-Khmer translation line → drop it
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
 
 # The Wine Bakery coordinates (same as the B2B bakery origin).
 TWB_LAT = 11.5387774
