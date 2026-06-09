@@ -91,7 +91,9 @@ def test_zero_presence():
 
 
 # ---- picker options ----
-def test_pre_shift_options():
-    assert ot.pre_shift_start_options(420) == [180, 240, 300, 360]   # 3,4,5,6am
-def test_post_shift_options():
-    assert ot.post_shift_end_options(960) == [1020, 1080, 1140, 1200]  # 5,6,7,8pm
+def test_pre_shift_options_30min():
+    # 30-min steps, 4h before a 7am shift: 3:00 .. 6:30, earliest first
+    assert ot.pre_shift_start_options(420) == [180, 210, 240, 270, 300, 330, 360, 390]
+def test_post_shift_options_30min():
+    # 30-min steps, up to 4h after 4pm: 4:30 .. 8:00
+    assert ot.post_shift_end_options(960) == [990, 1020, 1050, 1080, 1110, 1140, 1170, 1200]

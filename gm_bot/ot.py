@@ -40,6 +40,7 @@ EARLY_GRACE_MIN = 5      # must beat the OT start by MORE than this to earn the 
 PTS_EARLY = 10
 PTS_NO_SHOW = -10
 MAX_PRE_SHIFT_HOURS = 4  # picker: OT may start at most this many hours before the shift
+OT_STEP_MIN = 30         # picker granularity for OT start/end options (flip to 15 if you want finer)
 
 
 def union_windows(shift_start, shift_end, grants):
@@ -96,12 +97,12 @@ def ot_outcome(shift_start, shift_end, grants, checkin, checkout):
     return (worked, "ok", 0)
 
 
-def pre_shift_start_options(shift_start, max_hours=MAX_PRE_SHIFT_HOURS, step_min=60):
-    """Picker: before-shift OT start options, earliest first (e.g. 3,4,5,6am for a 7am shift, 4h cap).
-    Each auto-confirms to [option, shift_start]."""
+def pre_shift_start_options(shift_start, max_hours=MAX_PRE_SHIFT_HOURS, step_min=OT_STEP_MIN):
+    """Picker: before-shift OT start options, earliest first (30-min steps, 4h cap). Each
+    auto-confirms to [option, shift_start]. Pay stays minute-accurate (timestamp-based) regardless."""
     return [shift_start - m for m in range(max_hours * 60, 0, -step_min)]
 
 
-def post_shift_end_options(shift_end, max_hours=MAX_PRE_SHIFT_HOURS, step_min=60):
-    """Picker: after-shift OT end options (start pinned at shift_end), nearest first."""
+def post_shift_end_options(shift_end, max_hours=MAX_PRE_SHIFT_HOURS, step_min=OT_STEP_MIN):
+    """Picker: after-shift OT end options (start pinned at shift_end), nearest first (30-min steps)."""
     return [shift_end + m for m in range(step_min, max_hours * 60 + 1, step_min)]
