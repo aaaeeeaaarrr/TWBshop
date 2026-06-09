@@ -26,6 +26,43 @@ def working_days_ahead(day_off: str | None, leave_iso: set[str], start: date,
     return out
 
 
+def dayoff_dates_ahead(day_off: str | None, leave_iso: set[str], start: date,
+                       n_days: int) -> list[date]:
+    """The DAY-OFF-weekday dates within the next `n_days` from `start` (inclusive), skipping leave.
+    Inverse of working_days_ahead — for day-off payback / day-off OT options."""
+    off = _DOW.get((day_off or "")[:3].title())
+    if off is None:
+        return []
+    out, d, scanned = [], start, 0
+    while scanned < n_days:
+        if d.weekday() == off and d.isoformat() not in leave_iso:
+            out.append(d)
+        d += timedelta(days=1)
+        scanned += 1
+    return out
+
+
+def dayoff_windows(ws_min: int, we_min: int, minutes: int, step_min: int = 30,
+                   margin_min: int = 0) -> list[tuple[int, int]]:
+    """Candidate day-off windows (for payback OR OT) = a `minutes`-long block placed WITHIN the
+    staff's regular shift hours [ws,we] — a 9pm–6am person gets night windows on their day off, never
+    a 5am call (owner spec). Overnight-safe (we<ws wraps). `margin_min` widens the allowed band by that
+    many minutes on each side of the regular hours (0 = strictly within-hours; 120 = ±2h). If the
+    amount fills the whole band, the only window is the band itself. Returns [(start,end)] in clock
+    minutes (mod 1440) for the caller to need-rank; the caller picks the neediest one."""
+    span = ((we_min - ws_min) % 1440) or 1440
+    band_start = ws_min - margin_min
+    band_span = span + 2 * margin_min
+    win = min(minutes, band_span)
+    out, s, last = [], band_start, band_start + band_span - win
+    while s <= last:
+        out.append((s % 1440, (s + win) % 1440))
+        s += step_min
+    if not out:
+        out = [(band_start % 1440, (band_start + win) % 1440)]
+    return out
+
+
 def slot_windows(ws_min: int, we_min: int, minutes: int) -> list[tuple[str, int, int]]:
     """For a working day: the before-shift and after-shift windows sized to `minutes`.
     Returns [(label, start_min, end_min)] — 'before' ends at shift start, 'after' begins
