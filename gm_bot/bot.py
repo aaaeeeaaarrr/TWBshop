@@ -1279,6 +1279,22 @@ def _payback_slot_keyboard(staff: dict, balance: int):
                 txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, balance))]))
     scored.sort(key=lambda t: -t[0])
     rows = [btn for _score, btn in scored]
+    # + ONE day-off option (owner spec, now wired): the neediest slot WITHIN their regular shift hours
+    # on an upcoming day off (a night-shift person gets a night window, never a 5am call). Natural cap
+    # = a shift-length (dayoff_windows sizes the window to min(balance, shift span)).
+    do_best = None
+    for do in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos,
+                                    datetime.now(finance.PP_TZ).date(), 14):
+        for s_min, e_min in pb.dayoff_windows(ws, we, balance):
+            sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, set(), to_min)
+            if do_best is None or sc > do_best[0]:
+                do_best = (sc, do, s_min, e_min)
+    if do_best:
+        _sc, do, s_min, e_min = do_best
+        mins = (e_min - s_min) % 1440 or balance
+        txt = "🛌 %s %s-%s · day off" % (do.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
+        rows.append([InlineKeyboardButton(
+            txt, callback_data="att:pb:book:%s:%d:%d:%d" % (do.isoformat(), s_min, e_min, mins))])
     # partial options
     for part in (60, 120):
         if part < balance:
