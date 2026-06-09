@@ -300,7 +300,10 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   chat=private, args=['on']) and replies (sendMessage 200) after a clean restart. Earlier silence was a
   transient (process not processing updates during the overload/restart churn) — not reproduced, not a
   code bug. Debug line removed.
-- Suite 381 green (+ test_copy_test_rows, DB-free).
+- **Give OT ⚡ Now picker fixed:** was listing the WHOLE roster; now only staff present right now —
+  on shift OR finished < 1h ago (new `attendance_ui._present_now`, schedule-based, excludes day-off/AL-
+  today). Empty → points to 📅 Later. Back from "to whom" now goes to the now/later screen.
+- Suite 382 green (+ test_copy_test_rows, + test_present_now_for_ot, both DB-free).
 
 **Session 30 (Jun 9) — precision standard + data fixes:**
 - **Precision standard trimmed + sharpened (v2026-06-09-A):** 15 HARD RULES → 6 RULES (deduped, no

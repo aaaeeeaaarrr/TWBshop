@@ -23,7 +23,7 @@ from telegram.ext import ContextTypes
 
 import config
 from gm_bot.attendance import to_min, overlaps
-from shared.database import staff_all, att_test_on, staff_get_by_uid, flow_save
+from shared.database import staff_all, att_test_on, staff_get_by_uid, flow_save, al_leave_days_set
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -46,6 +46,29 @@ def _shift_running(p: dict) -> bool:
     if ws is None or ln is None:
         return False
     return (_now_min() - ws) % 1440 < ln
+
+
+def _present_now(r: dict, grace_min: int = 60) -> bool:
+    """For ⚡ Now OT: is this staffer present RIGHT NOW — on shift, or ended their shift within the
+    last `grace_min` minutes — so a senior can give them OT now? Schedule-based (the right proxy
+    before attendance_live); excludes day-off-today and AL-today."""
+    ws = to_min(r.get("work_start"))
+    ln = shift_len_min(r.get("work_start"), r.get("work_end")) if ws is not None else None
+    if ws is None or ln is None:
+        return False
+    elapsed = (_now_min() - ws) % 1440        # minutes since today's shift start (wraps overnight)
+    if elapsed >= ln + grace_min:             # not started yet, or ended > grace ago
+        return False
+    today = _today()
+    off = _DOW_NAME.get((r.get("day_off") or "")[:3].title())
+    if off is not None and today.weekday() == off:
+        return False
+    try:
+        if today.isoformat() in al_leave_days_set(r["id"]):
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def _near_days(picked: set[str]) -> list[str]:
@@ -1329,10 +1352,19 @@ def _ot_receiver(sid: int, dayidx: int):
 def ot_staff_pick(p: dict, kind: str) -> tuple[str, InlineKeyboardMarkup]:
     """Pick who gets the OT. (Duration is no longer chosen first — same start→end picker
     as AL; Now's start is fixed to shift-end, Later's start is chosen.)"""
-    rows = [_back_row("att:ot:%s" % kind)]
+    pool = [r for r in staff_all("active")
+            if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]
+    if kind == "now":
+        pool = [r for r in pool if _present_now(r)]
+        if not pool:
+            return _hdr(p, "Give OT — ⚡ Now\n\nNo one is on shift right now (or finished within the "
+                          "last hour). Use 📅 Later to schedule OT instead.\n"
+                          "គ្មាននរណាកំពុងធ្វើការ ឬទើបចប់ក្នុង 1 ម៉ោងចុងក្រោយទេ។ សូមប្រើ 📅 ពេលក្រោយ។"), \
+                InlineKeyboardMarkup([_back_row("att:ot:give")])
+    rows = [_back_row("att:ot:give")]
     rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:ot:s:%s:%d" % (kind, r["id"]))]
-             for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"][:35]
-    note = ("(⚡ Now: staff present right now — OT starts at their shift end)" if kind == "now"
+             for r in pool][:35]
+    note = ("(⚡ Now: on shift now or finished < 1h ago — OT starts at their shift end)" if kind == "now"
             else "(📅 Later: any staff — next pick the day, then start & end time)")
     return _hdr(p, "Give OT — to whom? %s\nអនុញ្ញាត OT — ឱ្យអ្នកណា?" % note), InlineKeyboardMarkup(rows)
 

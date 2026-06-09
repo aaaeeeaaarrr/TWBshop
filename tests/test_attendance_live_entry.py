@@ -165,6 +165,22 @@ def test_dispatch_late_test_collapses_payback(monkeypatch):
     assert calls["offer"] == 1
 
 
+def test_present_now_for_ot(monkeypatch):
+    """⚡ Now OT must offer only staff on shift now or finished < 1h ago — not the whole roster."""
+    import datetime as _dt
+    monkeypatch.setattr(ui, "_today", lambda: _dt.date(2026, 6, 8))   # a Monday
+    monkeypatch.setattr(ui, "al_leave_days_set", lambda sid: set())
+    r = {"id": 1, "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}  # ws=480, ln=540
+    monkeypatch.setattr(ui, "_now_min", lambda: 600);  assert ui._present_now(r)        # 10:00 on shift
+    monkeypatch.setattr(ui, "_now_min", lambda: 1050); assert ui._present_now(r)        # 17:30 ended 30m
+    monkeypatch.setattr(ui, "_now_min", lambda: 1085); assert not ui._present_now(r)    # 18:05 ended 65m
+    monkeypatch.setattr(ui, "_now_min", lambda: 400);  assert not ui._present_now(r)    # 06:40 pre-shift
+    monkeypatch.setattr(ui, "_now_min", lambda: 600)
+    assert not ui._present_now({**r, "day_off": "Mon"})                                 # day off today
+    monkeypatch.setattr(ui, "al_leave_days_set", lambda sid: {"2026-06-08"})
+    assert not ui._present_now(r)                                                       # AL today
+
+
 def test_copy_test_rows_builds_is_test_insert():
     """/testseed core: copy real rows → is_test=TRUE duplicates, id excluded, columns passed
     through, is_test forced TRUE. DB-free (fake cursor) so the suite never writes to prod."""
