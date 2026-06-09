@@ -41,6 +41,15 @@ def _now_min() -> int:
     return n.hour * 60 + n.minute
 
 
+def _hm(minutes) -> str:
+    """Readable duration for staff (no dividing by 60): '4h', '4h 30m', '45m', '0h'."""
+    minutes = int(round(minutes or 0))
+    if minutes <= 0:
+        return "0h"
+    h, m = divmod(minutes, 60)
+    return ("%dh %dm" % (h, m)) if (h and m) else (("%dh" % h) if h else ("%dm" % m))
+
+
 def _shift_running(p: dict) -> bool:
     ws = to_min(p.get("work_start"))
     ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
@@ -1753,12 +1762,12 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
                    "AL left: %s days\n"
-                   "Payback debt: %d min\n"
-                   "OT bank: %gh\n"
+                   "Payback debt: %s\n"
+                   "OT bank: %s\n"
                    "Upcoming AL: %s"
                 % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")),
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
-                   debt_min, bank_min / 60, up_txt)), \
+                   _hm(debt_min), _hm(bank_min), up_txt)), \
         InlineKeyboardMarkup(rows)
 
 
