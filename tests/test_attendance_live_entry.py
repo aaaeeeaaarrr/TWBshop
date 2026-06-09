@@ -252,6 +252,14 @@ def test_reason_terminals_format_bilingual(monkeypatch):
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
 
 
+def test_ot_window_shows_time_not_now():
+    """OT confirmations show the real time window (e.g. 4pm-5pm), never just 'now'."""
+    from gm_bot import bot
+    assert bot._ot_window("now", None, 960, 60) == "4pm-5pm"
+    assert bot._ot_window("later", "2026-06-20", 540, 120) == "2026-06-20 9am-11am"
+    assert bot._ot_window("now", None, None, 60) == "now"   # fallback if no start recorded
+
+
 def test_ot_started_veto_window():
     """Owner veto window: open until OT start. Yesterday's OT started; tomorrow's hasn't."""
     from gm_bot import bot, finance

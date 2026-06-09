@@ -1423,6 +1423,15 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
     return leave_id
 
 
+def _ot_window(kind: str, when_date: str | None, start_min: int | None, minutes: int) -> str:
+    """Human 'when' for an OT grant — the real time window (e.g. '4pm-5pm'), never just 'now'.
+    Now = today's window (shift-end → end); Later = 'date window'."""
+    if start_min is None:
+        return "now" if kind == "now" else (when_date or "?")
+    win = "%s-%s" % (_fmt_min(start_min), _fmt_min(start_min + minutes))
+    return win if kind == "now" else ("%s %s" % (when_date or "?", win))
+
+
 async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes: int,
                           when_date: str | None, start_min: int | None, reason: str) -> int:
     """Senior grants OT. Model (owner, session 30): the staff is engaged IMMEDIATELY and the owner
@@ -1434,7 +1443,7 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
     snr = senior.get("call_name") or senior["canonical_name"]
     bank = ot_bank_balance(staff["id"])
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    whentxt = ("now (at shift end)" if kind == "now" else (when_date or "?"))
+    whentxt = _ot_window(kind, when_date, start_min, minutes)
     body = ("OT grant: %s → %s, %s, when: %s. Why: %s\nReceiver's bank: %gh / 14h"
             % (snr, sn, label, whentxt, reason, bank / 60))
     # OWNER: reject-only notice — silence = approval, veto allowed until the OT starts
@@ -1454,9 +1463,10 @@ async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes
             [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
             [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
         ])
+        win = _ot_window("later", when_date, start_min, minutes)
         await _att_send(context, suid, "Staff", sn,
             "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
-            % (when_date or "?", when_date or "?"), kb=kb)
+            % (win, win), kb=kb)
     return gid
 
 

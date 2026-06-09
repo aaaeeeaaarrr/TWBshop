@@ -295,7 +295,9 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   → booked / declined / rejected. Old pending_owner→approve gate removed.
 - Files: `submit_ot_grant`, `_ot_owner_callback` (now veto-only + window check + bank reversal),
   `_ot_future_callback` (staff_asked→booked/declined), `_ot_started`, dispatcher OT confirm text.
-- Suite 385 green (+ _ot_started window, Later-asks-staff-without-owner, Now-banks+buyback).
+- **OT confirmations show the real time window** (e.g. `4pm-5pm`), never "now" — `_ot_window()` (Now =
+  shift-end→end; Later = date + window); used in the owner notice + the Later staff ask.
+- Suite 386 green (+ _ot_started window, Later-asks-staff-without-owner, Now-banks+buyback, _ot_window).
 
 **Session 30 (Jun 9) — /testseed + restart test-mode sync + /testmode diagnostic:**
 - **/testseed [name]** (owner/Tyty): mirrors real approved ALs + open payback debts into is_test copies
