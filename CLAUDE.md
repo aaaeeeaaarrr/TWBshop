@@ -521,6 +521,22 @@ precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused "won't r
   after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
 - Suite green: 369.
 
+**▶ RESUME HERE (session 30 → next session, after a fresh-session RESTART):**
+Two global "How to Behave" habits were added (Simpler-path/cost-honesty + Scope-honesty) — advisor-
+approved, applied to ~/.claude/CLAUDE.md, pushed via `bootstrap.py --push-global`; the 6 Real-Path
+rules were NOT touched. OT-end checkout is now MIDNIGHT-SAFE (`ot_now_end_times`, datetime-based);
+deployed + verified (HEAD 4d14918, twbshop-gm active). Drill done: DB write-path is clean (all GM
+writes go through committing `_db()`); the HIGH-RISK hook PASSES script-level acceptance 9/9.
+**FIRST after restart — prove the live hook wiring** (it loads from .claude/settings.json at session
+start; it was NOT active last session — a `systemctl restart` Bash call did not prompt). Test: attempt
+a protected action (e.g. a Bash `systemctl restart …` or an Edit to secrets.py) → it MUST pop an
+"approve this exact action" prompt. If it doesn't, the hook isn't wired — investigate settings.json.
+THEN pick one open attendance thread:
+  (a) **Bank-on-completion for OT** — the only fix for "leave early, keep OT pay" (flagged, not built);
+  (b) **Go-live prep** — owner role-play test → /testreset → /testmode off → greeting + 📋 Menu →
+      flip attendance_live (see the session-29 RESUME just below for the full go-live sequence).
+attendance_live=OFF, attendance_test_mode=OFF.
+
 **▶ RESUME HERE (session 29): TEST HARNESS COMPLETE — ready for the owner's single role-play test.**
 All 8 flows are wired test-aware AND drivable from /test in test mode: AL · late/payback · check-in ·
 Give-OT · day-off swap · sick (declare + papers) · marriage · death/birth. In /testmode on, every
