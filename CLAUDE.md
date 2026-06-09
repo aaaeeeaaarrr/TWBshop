@@ -294,8 +294,9 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   2-day papers cancel + nightly return-check (catalogue4 ⑨/⑦/②, walkthrough end-line); OT owner-
   approve-gate → reject-only/silence-approval/staff-consent-first (catalogue6 ④/⑧/⑪, ot_owner_card).
 - B: owner test-coaching "approve as two seniors" → "(2; or 1 if the requester is a senior)".
-- STILL OPEN (C, owner to decide): OT ⚡ Now says "starts at shift end" but also "pick the start" —
-  fixed-at-shift-end vs let-them-pick. Suite 399 green.
+- C RESOLVED (owner): OT ⚡ Now shows "starts at shift end" AND a start pick ON PURPOSE — so staff
+  read "now" as the clean shift-end (4pm), not the current clock time (4:36pm). Do NOT "fix" it.
+  Suite 399 green.
 
 **Session 30 (Jun 9) — death/birth confirm prompts: warm + direct (owner):**
 - Dropped "no reason needed" and the flat "Sends condolences/congratulations and notifies the

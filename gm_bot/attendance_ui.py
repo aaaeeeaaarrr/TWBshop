@@ -1354,7 +1354,9 @@ def _ot_receiver(sid: int, dayidx: int):
 
 def ot_staff_pick(p: dict, kind: str) -> tuple[str, InlineKeyboardMarkup]:
     """Pick who gets the OT. (Duration is no longer chosen first — same start→end picker
-    as AL; Now's start is fixed to shift-end, Later's start is chosen.)"""
+    as AL; Now's start is anchored to shift-end, Later's start is chosen.)
+    NOTE (owner, session 30): Now shows "starts at shift end" AND a start pick ON PURPOSE — so staff
+    read "now" as the clean shift-end (e.g. 4pm), not the messy current clock time (4:36pm). Keep it."""
     pool = [r for r in staff_all("active")
             if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]
     if kind == "now":
