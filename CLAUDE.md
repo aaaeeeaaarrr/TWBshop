@@ -257,9 +257,24 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-09 (session 30 — LIVE staff entry wired for the attendance flows (gated,
-inert until attendance_live); precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused
-the "won't restore" bug = ad-hoc ssh scripts skipped commit)
+**Last updated:** 2026-06-09 (session 30 — OT-end checkout made MIDNIGHT-SAFE (datetime, not
+minute-of-day); rejected the confirm-button as exploitable, kept GPS proof; LIVE staff entry wired;
+precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused "won't restore" = ssh-skipped-commit)
+
+**Session 30 (Jun 9) — OT-end checkout: midnight worry closed (kept GPS, rejected the button):**
+- Owner floated replacing the GPS OT-end checkout with a "senior (+ staff) confirm OT done" button to
+  dodge the midnight edge. Thought it human-side: a staff SELF-confirm is EXPLOITABLE (OT banks at
+  ACCEPT → tap-done-and-leave-early keeps full pay); busy senior / hasty staff just don't tap → never
+  verified. GPS (must be physically in-zone at OT-end) is the STRONGER anti-fake → kept GPS.
+- Fixed the real wart instead: `ot_now_ends_today` → **`ot_now_end_times(today, tz)`** returns the
+  LATEST OT-end as a tz-aware DATETIME (queries today+yesterday grants → an overnight OT granted
+  yesterday that ends after midnight IS included). `_checkin_scheduler_job` fires at real
+  elapsed-minute offsets 0/10/20/40 from that datetime → correct ACROSS MIDNIGHT, no minute-of-day
+  wrap, no `end_min>=1440` skip. 'already out' is now a datetime compare. Suite 402 green.
+- FLAGGED, NOT solved by this (owner to decide): "leave early, keep OT pay" is a bank-on-ACCEPT
+  question, fixable only by banking OT on COMPLETION — checkout UI can't fix it. On the discuss list.
+- Advisor rule "SIMPLER-PATH / COST-HONESTY" written as a self-contained ~7-line block (a How-to-Behave
+  habit, NOT a 7th law); handed to owner to forward — NOT yet added to standing rules (preview-first).
 
 **Session 30 (Jun 9) — LIVE STAFF ENTRY for attendance (gated OFF):**
 - **What:** a real ACTIVE TWB staffer can now open their OWN attendance menu (Check-in / Late / About
@@ -294,9 +309,10 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   `when_date=today` so it's findable; `database.ot_now_ends_today()` returns the latest end per staff;
   the scheduler suppresses the plain shift-end checkout while OT runs, then fires the OT-end one
   (derives "already out" from `checked_out_at >= end`). Suite 402.
-- KNOWN edges (flagged, safe): **overnight OT-end (crosses midnight) is skipped** (not handled yet, no
-  misfire); overlapping-OT double-bank is a separate OT-pay concern. Live firing is scheduler-driven
-  (gated by attendance_live) → provable only at go-live; logic unit-tested (ot_now_ends_today).
+- **UPDATE (later same session): the overnight edge is now FIXED** — `ot_now_end_times` is datetime-based
+  (see the midnight-safe note above), so cross-midnight OT-ends fire correctly. Remaining: overlapping-OT
+  double-bank is a separate OT-pay concern. Live firing is scheduler-driven (gated by attendance_live) →
+  provable only at go-live; logic unit-tested (`ot_now_end_times`).
 
 **Session 30 (Jun 9) — checkout window 60-min + nudges +10/+20/+40 (owner):**
 - Check-out capture window 90→**60 min**; nudge ("Did you leave early? share location") now fires at

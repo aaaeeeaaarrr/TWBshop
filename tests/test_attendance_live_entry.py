@@ -427,14 +427,17 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert "Requester" in roles and "Partner" in roles and "Supervisors group" in roles
 
 
-def test_ot_now_ends_today_latest_per_staff(monkeypatch):
-    """A 2nd Now-OT extends, not duplicates — ot_now_ends_today returns the LATEST end per staff."""
+def test_ot_now_end_times_latest_per_staff(monkeypatch):
+    """A 2nd Now-OT extends, not duplicates — ot_now_end_times returns the LATEST end per staff,
+    as a tz-aware DATETIME (midnight-safe), and an overnight grant from yesterday is included."""
     from shared import database as db
+    from datetime import timezone
     rows = [
-        {"staff_id": 2, "start_min": 960, "minutes": 120},   # 16:00 +2h = 1080
-        {"staff_id": 2, "start_min": 960, "minutes": 240},   # 16:00 +4h = 1200 (later → wins)
-        {"staff_id": 5, "start_min": 1020, "minutes": 60},   # 1080
-        {"staff_id": 7, "start_min": None, "minutes": 60},   # ignored (no start)
+        {"staff_id": 2, "when_date": "2026-06-09", "start_min": 960, "minutes": 120},  # 16:00 +2h = 18:00
+        {"staff_id": 2, "when_date": "2026-06-09", "start_min": 960, "minutes": 240},  # 16:00 +4h = 20:00 (wins)
+        {"staff_id": 5, "when_date": "2026-06-09", "start_min": 1020, "minutes": 60},  # 17:00 +1h = 18:00
+        {"staff_id": 9, "when_date": "2026-06-08", "start_min": 1380, "minutes": 180}, # 23:00 yest +3h = 02:00 today
+        {"staff_id": 7, "when_date": "2026-06-09", "start_min": None, "minutes": 60},  # ignored (no start)
     ]
 
     class _Cur:
@@ -450,7 +453,11 @@ def test_ot_now_ends_today_latest_per_staff(monkeypatch):
         def cursor(self): return _CM(_Cur())
 
     monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
-    assert db.ot_now_ends_today("2026-06-09") == {2: 1200, 5: 1080}
+    out = db.ot_now_end_times("2026-06-09", timezone.utc)
+    assert (out[2].hour, out[2].minute) == (20, 0) and out[2].date().isoformat() == "2026-06-09"
+    assert (out[5].hour, out[5].minute) == (18, 0)
+    assert (out[9].hour, out[9].minute) == (2, 0) and out[9].date().isoformat() == "2026-06-09"  # crossed midnight
+    assert 7 not in out
 
 
 def test_takeback_windows_are_shift_edges():

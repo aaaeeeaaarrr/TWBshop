@@ -2929,21 +2929,26 @@ def ot_grant_create(senior_id, staff_id, kind, minutes, when_date, start_min, re
             return cur.fetchone()["id"]
 
 
-def ot_now_ends_today(today_iso: str) -> dict:
-    """For each staffer with an ACCEPTED Now-OT dated `today`, the LATEST OT-end (minute-of-day) —
-    so the scheduler fires an end-of-OT checkout there, and suppresses the plain shift-end checkout
-    while the OT runs (Part 3). 'banked' = the staff accepted the Now-OT. Mode-scoped by is_test."""
+def ot_now_end_times(today_iso: str, tz) -> dict:
+    """For each staffer with an ACCEPTED Now-OT whose end falls on `today` — INCLUDING an overnight
+    OT granted yesterday that ends after midnight today — the LATEST OT-end as a tz-aware DATETIME.
+    Datetimes (not minute-of-day) so the scheduler fires it correctly ACROSS MIDNIGHT, and suppresses
+    the plain shift-end checkout while the OT runs (Part 3). 'banked' = the staff accepted the OT."""
+    from datetime import date as _d, datetime as _dt, timedelta as _td
+    today = _d.fromisoformat(today_iso)
+    yday = (today - _td(days=1)).isoformat()
     out = {}
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT staff_id, start_min, minutes FROM ot_grants
-                           WHERE kind='now' AND status='banked' AND when_date=%s AND is_test=%s""",
-                        (today_iso, _ATT_TEST))
+            cur.execute("""SELECT staff_id, when_date, start_min, minutes FROM ot_grants
+                           WHERE kind='now' AND status='banked' AND when_date IN (%s,%s) AND is_test=%s""",
+                        (today_iso, yday, _ATT_TEST))
             for r in cur.fetchall():
                 if r["start_min"] is None:
                     continue
-                end = int(r["start_min"]) + int(r["minutes"])
-                if end > out.get(r["staff_id"], -1):
+                base = _dt.combine(_d.fromisoformat(str(r["when_date"])), _dt.min.time(), tzinfo=tz)
+                end = base + _td(minutes=int(r["start_min"]) + int(r["minutes"]))
+                if r["staff_id"] not in out or end > out[r["staff_id"]]:
                     out[r["staff_id"]] = end
     return out
 
