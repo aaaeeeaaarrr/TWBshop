@@ -287,6 +287,16 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
+**Session 30 (Jun 9) — OT approval model = silence-is-approval (owner):**
+- **OT no longer waits for owner approval.** Senior gives OT (Now or Later) → the STAFF is engaged
+  IMMEDIATELY (Now = bank on the spot + buyback picker; Later = Yes/Can't ask) and the owner gets a
+  **REJECT-ONLY** notice. Owner silence = approval; owner can veto until the OT START time
+  (`_ot_started`); a Now grant that already banked is REVERSED on veto. Statuses: banked / staff_asked
+  → booked / declined / rejected. Old pending_owner→approve gate removed.
+- Files: `submit_ot_grant`, `_ot_owner_callback` (now veto-only + window check + bank reversal),
+  `_ot_future_callback` (staff_asked→booked/declined), `_ot_started`, dispatcher OT confirm text.
+- Suite 385 green (+ _ot_started window, Later-asks-staff-without-owner, Now-banks+buyback).
+
 **Session 30 (Jun 9) — /testseed + restart test-mode sync + /testmode diagnostic:**
 - **/testseed [name]** (owner/Tyty): mirrors real approved ALs + open payback debts into is_test copies
   so TEST mode shows realistic data after a /testreset wipe (idempotent — clears prior test copies

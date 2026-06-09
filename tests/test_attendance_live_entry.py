@@ -252,6 +252,62 @@ def test_reason_terminals_format_bilingual(monkeypatch):
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])
 
 
+def test_ot_started_veto_window():
+    """Owner veto window: open until OT start. Yesterday's OT started; tomorrow's hasn't."""
+    from gm_bot import bot, finance
+    import datetime as _dt
+    today = _dt.datetime.now(finance.PP_TZ).date()
+    past = (today - _dt.timedelta(days=1)).isoformat()
+    future = (today + _dt.timedelta(days=1)).isoformat()
+    assert bot._ot_started({"when_date": past, "start_min": 600}) is True
+    assert bot._ot_started({"when_date": future, "start_min": 600}) is False
+    assert bot._ot_started({"when_date": future, "start_min": None}) is False
+
+
+def test_submit_ot_later_asks_staff_without_owner_approval(monkeypatch):
+    """LATER OT: staff is asked immediately + owner gets a reject-only notice — NO owner gate."""
+    from gm_bot import bot
+    sent, sets = [], []
+
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False):
+        sent.append((role, kb is not None))
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    monkeypatch.setattr(bot, "ot_grant_create", lambda *a, **k: 99)
+    monkeypatch.setattr(bot, "ot_grant_set", lambda gid, **k: sets.append(k.get("status")))
+    monkeypatch.setattr(bot, "ot_bank_balance", lambda sid: 0)
+    senior = {"id": 1, "canonical_name": "Samphass", "call_name": "Samphass"}
+    staff = {"id": 2, "canonical_name": "Tra", "call_name": "Tra", "telegram_ids": [222]}
+    asyncio.run(bot.submit_ot_grant(_Ctx(), senior, staff, "later", 120, "2026-06-20", 540, "busy"))
+    roles = [r for r, _kb in sent]
+    assert "Owner" in roles and "Staff" in roles      # both engaged, in parallel
+    assert "staff_asked" in sets                        # staff consent pending, no owner approval gate
+
+
+def test_submit_ot_now_banks_and_offers_buyback(monkeypatch):
+    """NOW OT: banks on the spot + offers buyback immediately; owner still gets a reject notice."""
+    from gm_bot import bot
+    seen, sets = [], []
+
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False):
+        seen.append(role)
+
+    async def _buy(*a, **k):
+        seen.append("buyback")
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    monkeypatch.setattr(bot, "_offer_buyback", _buy)
+    monkeypatch.setattr(bot, "ot_grant_create", lambda *a, **k: 5)
+    monkeypatch.setattr(bot, "ot_grant_set", lambda gid, **k: sets.append(k.get("status")))
+    monkeypatch.setattr(bot, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(bot, "ot_bank_add", lambda sid, m: 120)
+    senior = {"id": 1, "canonical_name": "S", "call_name": "S"}
+    staff = {"id": 2, "canonical_name": "Tra", "call_name": "Tra", "telegram_ids": [222]}
+    asyncio.run(bot.submit_ot_grant(_Ctx(), senior, staff, "now", 120, None, 540, "x"))
+    assert "Owner" in seen and "buyback" in seen        # owner notice + immediate buyback
+    assert "banked" in sets
+
+
 def test_dispatch_live_rejects_unknown_uid(monkeypatch):
     from gm_bot import bot
     monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: None)

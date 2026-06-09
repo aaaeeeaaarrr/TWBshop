@@ -1425,73 +1425,94 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
 
 async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes: int,
                           when_date: str | None, start_min: int | None, reason: str) -> int:
-    """Senior grants OT → owner approval card (both owners CC'd is implicit: owner is the approver)."""
+    """Senior grants OT. Model (owner, session 30): the staff is engaged IMMEDIATELY and the owner
+    gets a REJECT-ONLY notice — owner silence = approval, with a veto window open until the OT
+    actually starts. NOW banks on the spot (reversed if the owner rejects in time + offers buyback);
+    LATER asks the staff to accept. The owner never has to act for the OT to proceed."""
     gid = ot_grant_create(senior["id"], staff["id"], kind, minutes, when_date, start_min, reason)
     sn = staff.get("call_name") or staff["canonical_name"]
     snr = senior.get("call_name") or senior["canonical_name"]
     bank = ot_bank_balance(staff["id"])
     label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    whentxt = ("now" if kind == "now" else (when_date or "?"))
+    whentxt = ("now (at shift end)" if kind == "now" else (when_date or "?"))
     body = ("OT grant: %s → %s, %s, when: %s. Why: %s\nReceiver's bank: %gh / 14h"
             % (snr, sn, label, whentxt, reason, bank / 60))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve", callback_data="att:ot:ok:%d" % gid)],
-        [InlineKeyboardButton("❌ No", callback_data="att:ot:no:%d" % gid)],
-    ])
-    await context.bot.send_message(config.OWNER_TELEGRAM_ID, body, reply_markup=kb)
+    # OWNER: reject-only notice — silence = approval, veto allowed until the OT starts
+    owner_kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Reject", callback_data="att:ot:no:%d" % gid)]])
+    await _att_send(context, config.OWNER_TELEGRAM_ID, "Owner", "",
+        body + "\n\nSilence = approval — the staff is already asked. Reject any time before it starts.\n"
+        "ស្ងៀម = យល់ព្រម — បានសួរបុគ្គលិករួចហើយ។ បដិសេធបានគ្រប់ពេលមុនវាចាប់ផ្តើម។", kb=owner_kb)
+    # STAFF: engage immediately (do NOT wait for the owner)
+    suid = (staff.get("telegram_ids") or [None])[0]
+    if kind == "now":
+        new_bal = ot_bank_add(staff["id"], minutes)
+        ot_grant_set(gid, status="banked")
+        await _offer_buyback(context, staff, new_bal, suid, minutes)
+    else:
+        ot_grant_set(gid, status="staff_asked")
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
+            [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
+        ])
+        await _att_send(context, suid, "Staff", sn,
+            "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
+            % (when_date or "?", when_date or "?"), kb=kb)
     return gid
 
 
+def _ot_started(g: dict) -> bool:
+    """Has the granted OT already started? The owner's veto window closes at OT start."""
+    sm = g.get("start_min")
+    if sm is None:
+        return False
+    from datetime import date as _date, time as _time
+    d = g.get("when_date") or datetime.now(finance.PP_TZ).date().isoformat()
+    try:
+        start_dt = datetime.combine(_date.fromisoformat(d),
+                                    _time(hour=(int(sm) // 60) % 24, minute=int(sm) % 60),
+                                    tzinfo=finance.PP_TZ)
+    except Exception:
+        return False
+    return datetime.now(finance.PP_TZ) >= start_dt
+
+
 async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:ot:ok|no:{id} — owner approves/rejects an OT grant."""
+    """att:ot:no:{id} — owner VETOES an OT grant (silence = approval). Allowed only until the OT
+    starts; a NOW grant that already banked is reversed."""
     query = update.callback_query
     await query.answer()
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
-    _, _, decision, gid_s = query.data.split(":")
-    g = ot_grant_get(int(gid_s))
-    if not g or g["status"] != "pending_owner":
+    gid = int(query.data.split(":")[3])
+    g = ot_grant_get(gid)
+    if not g:
+        return
+    if g["status"] in ("rejected", "declined"):
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
+        return
+    if _ot_started(g):
+        await query.edit_message_text(query.message.text +
+            "\n\n⏱ Too late to reject — the OT has already started.")
         return
     staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
     senior = next((s for s in staff_all("active") if s["id"] == g["senior_id"]), None)
-    if decision == "no":
-        ot_grant_set(int(gid_s), status="rejected")
-        await query.edit_message_text(query.message.text + "\n\n❌ Rejected.")
-        # memo both senior + staff (reject-before-start path)
-        for s, role in ((staff, "Staff"), (senior, "Senior")):
-            if s:
-                await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
-                                s.get("call_name") or s["canonical_name"],
-                                "The OT was not approved this time.\nOT មិនត្រូវបានអនុម័តលើកនេះទេ។")
-        return
-    ot_grant_set(int(gid_s), status="approved")
-    await query.edit_message_text(query.message.text + "\n\n✅ Approved.")
-    # NOW = bank immediately (first version; location/senior-confirm proof = wave note);
-    # FUTURE = ask staff to accept (becomes a work slot)
-    if not staff or not (staff.get("telegram_ids") or []):
-        return
-    if g["kind"] == "now":
-        new_bal = ot_bank_add(staff["id"], g["minutes"])
-        ot_grant_set(int(gid_s), status="done")
-        await _offer_buyback(context, staff, new_bal, staff["telegram_ids"][0], g["minutes"])
-    else:
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % int(gid_s))],
-            [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % int(gid_s))],
-        ])
-        await _att_send(context, staff["telegram_ids"][0], "Staff",
-            staff.get("call_name") or staff["canonical_name"],
-            "You're asked for OT on %s — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT នៅ %s — អ្នកអាចធ្វើបានទេ?"
-            % (g.get("when_date") or "?", g.get("when_date") or "?"), kb=kb)
+    if g["kind"] == "now" and g["status"] == "banked":
+        ot_bank_add(g["staff_id"], -int(g["minutes"]))   # reverse the on-the-spot bank (no-op in test)
+    ot_grant_set(gid, status="rejected")
+    await query.edit_message_text(query.message.text + "\n\n❌ Rejected (before start).")
+    for s, role in ((staff, "Staff"), (senior, "Senior")):
+        if s:
+            await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
+                            s.get("call_name") or s["canonical_name"],
+                            "The OT was cancelled by the owner.\nOT ត្រូវបានលុបចោលដោយម្ចាស់ហាង។")
 
 
 async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:otf:yes|no:{id} — staff accepts/declines a FUTURE OT (accept = commitment)."""
+    """att:otf:yes|no:{id} — staff accepts/declines a LATER OT (accept = commitment)."""
     query = update.callback_query
     await query.answer()
     g = ot_grant_get(int(query.data.split(":")[3]))
-    if not g or g["status"] != "approved":
+    if not g or g["status"] != "staff_asked":
         return
     if _att_test_mode():
         staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
@@ -1502,10 +1523,10 @@ async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not staff:
         return
     if query.data.split(":")[2] == "no":
-        ot_grant_set(g["id"], status="rejected", staff_ok=False)
+        ot_grant_set(g["id"], status="declined", staff_ok=False)
         await query.edit_message_text(query.message.text + "\n\n❌ Declined (no problem).")
         return
-    ot_grant_set(g["id"], staff_ok=True)
+    ot_grant_set(g["id"], status="booked", staff_ok=True)
     await query.edit_message_text(query.message.text +
         "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)\n"
         "✅ អរគុណ — បានកក់ឱ្យអ្នកហើយ។ (វាដំណើរការដូចវេនធ្វើការ៖ ចុះវត្តមានពេលអ្នកមកដល់។)")
@@ -3218,9 +3239,10 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await submit_ot_grant(context, persona, receiver, pend["kind"], pend["minutes"],
                               pend.get("when_date"), pend.get("start_min"), reason)
         await confirm(
-            "✅ OT grant sent to the owners for approval.\n✅ បានផ្ញើសំណើ OT ទៅម្ចាស់ហាងសម្រាប់អនុម័ត។",
-            "🧪 OT grant submitted (test) — the owner approval card was routed to you. Approve it; "
-            "NOW-OT → buyback picker, LATER → the staff consent ask. /testreset to wipe.")
+            "✅ OT sent — the staff is asked now; the owners got a reject-only notice (silence = approval).\n"
+            "✅ បានផ្ញើ OT — បានសួរបុគ្គលិករួច; ម្ចាស់ហាងទទួលបានសារ (ស្ងៀម = យល់ព្រម)។",
+            "🧪 OT submitted (test) — you got BOTH the staff side (NOW → buyback picker / LATER → Yes/Can't) "
+            "AND the owner reject-only notice. Silence = approval; reject before it starts. /testreset to wipe.")
     elif flow == "swap":
         partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
         if not partner:
