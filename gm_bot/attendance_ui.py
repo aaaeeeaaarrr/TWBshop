@@ -1545,7 +1545,8 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         with _db() as conn:
             with conn.cursor() as cur:
                 cur.execute("""SELECT id, days FROM al_requests
-                               WHERE staff_id=%s AND status='approved'""", (p["id"],))
+                               WHERE staff_id=%s AND status='approved' AND is_test=%s""",
+                            (p["id"], att_test_on()))
                 for r in cur.fetchall():
                     for d in _json.loads(r["days"] or "[]"):
                         if d >= _today().isoformat():

@@ -3085,10 +3085,12 @@ def al_cancel_day(req_id: int, iso: str) -> tuple[int, int | None]:
     import json as _json
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT days, staff_id FROM al_requests WHERE id=%s", (req_id,))
+            cur.execute("SELECT days, staff_id, is_test FROM al_requests WHERE id=%s", (req_id,))
             row = cur.fetchone()
             if not row:
                 return (-1, None)
+            if bool(row["is_test"]) != _ATT_TEST:
+                return (-1, None)   # never cross modes: test can't cancel real, live can't cancel test
             days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
             if days:
                 cur.execute("UPDATE al_requests SET days=%s WHERE id=%s", (_json.dumps(days), req_id))
