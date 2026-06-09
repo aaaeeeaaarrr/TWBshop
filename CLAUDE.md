@@ -51,18 +51,8 @@ real work never softens. The user may demand the evidence block at ANY time; its
 
 ---
 
-## Connectivity Reference (run only when something seems broken)
-
-| # | What | Check command | Good result |
-|---|------|--------------|-------------|
-| 1 | SSH — server | `ssh twbshop "echo ok"` | `ok` |
-| 2 | GitHub push access | `git ls-remote origin` | lists refs |
-| 3 | DigitalOcean API | `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/account` | `200` |
-| 4 | DO Droplet | `curl -s -H "Authorization: Bearer $DO_API_TOKEN" https://api.digitalocean.com/v2/droplets \| python3 -c "import sys,json;d=json.load(sys.stdin);print(d['droplets'][0]['status'])"` | `active` |
-| 5 | DO Database | same but `/v2/databases` | `online` |
-| 6 | Anthropic API | `curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models` | `200` |
-| 7 | Telegram retail | `curl -s "https://api.telegram.org/bot$BOT_TOKEN/getMe"` -> `.result.username` | `WineB_bot` |
-| 8 | Telegram B2B | same with `$B2B_BOT_TOKEN` | `twb_b2b_bot` |
+## Connectivity Reference
+*Broken something? Connectivity checks (SSH · GitHub · DO API/droplet/db · Anthropic · Telegram) → `docs/CONNECTIVITY.md`.*
 
 ---
 
@@ -122,36 +112,7 @@ relevant in future sessions without hitting context limits.
 ---
 
 ## Repo Structure
-One repo, one business. Each system gets its own folder. Shared infrastructure lives in `shared/`.
-
-```
-TWBshop/
-├── CLAUDE.md                   ← project-wide rules and status
-├── config.py                   ← tracked in git; imports secrets from secrets.py
-├── config.example.py           ← reference template
-├── requirements.txt
-├── run_bot.py                  ← retail entry point
-├── run_b2b_bot.py              ← B2B entry point
-│
-├── shared/
-│   ├── database.py             ← PostgreSQL: all tables and queries
-│   └── ai_client.py            ← Anthropic client (vision + text)
-│
-├── telegram_bot/               ← retail bot
-│   ├── bot.py                  ← handler registration and scheduled jobs
-│   ├── orders.py               ← order intake, menu matching, confirmation flow
-│   ├── menu.py                 ← menu items, aliases, synonym tables
-│   ├── summaries.py            ← production totals and fulfillment lists
-│   ├── photos.py               ← photo receiving, storage, AI analysis
-│   ├── staff_monitor.py        ← staff message logging and AI monitoring
-│   └── reminders.py            ← missing photo deadline checks
-│
-├── b2b_bot/                    ← B2B wholesale bot (see section below)
-├── deploy/                     ← systemd service files + server setup script
-├── archive/                    ← removed code kept for reference
-├── photos/                     ← shared photo storage (gitignored)
-└── logs/                       ← shared logs (gitignored)
-```
+*Need the file layout? → `docs/REPO_STRUCTURE.md` (or just read the filesystem).*
 
 ---
 
@@ -186,71 +147,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 ---
 
-## REPORT Finance Tracking (GM bot) — LIVE
-TWB REPORT group (chat_id in Connectivity). Business day 06:00→06:00; ~16:00 mid + ~05:00 final report.
-GM parses each report, recomputes the drawer (600 + cash in − cash out; Over/Lost = count − expected),
-flags Lost>$2 in-group + opens a clarification, DMs owner anomalies. FX margin (4000 riel=$1) → a small
-"Over" is EXPECTED, never flag. Level-1 reconciliation LIVE (cash sheet / POS / ABA vs report).
-OPEN (remind owner): #1 overexpense-carryover model (deficit carried to next day off the $600 float —
-owner wants cleaner). Sales-anomaly framework built; activates once years of FB Messenger reports import.
-Full decoded format + resolved decisions → docs/HISTORY.md.
-
----
-
-## Supervisors / Management — Lateness · AL · Tagging — mostly BUILT
-Global staff tagging: config.STAFF_CALL_NAME + call_name_for() + _staff_mention (call-name + tg://user
-ping). Group lateness ladder BUILT but SILENCED (config.GM_ATTENDANCE_GROUP_ACTIVE=False) — all
-attendance moved to the private-DM system (below). AL math + accrual (+1.5/mo arrears) PENDING owner
-seeding balances. Full owner spec + build detail → docs/HISTORY.md.
-
----
-
-## Delivery System (WOC) — SHELVED
-Mine the WOC delivery-photo archive into structured data (customers/phones/orders/food catalog/prices).
-Parked by owner; pilot validated (~$500–800 full-year API). ⚠ Grab/Foodpanda privacy-law flag on
-customer numbers. Full design + pilot findings → docs/HISTORY.md.
-
----
-
-## Staff Registry · Ex-staff Offboarding · Paperless /stock — BUILT
-staff_registry (canonical/call/aliases/uids/status/schedule/salary). /exstaff or plain owner DM → confirm
-card → mark ex_staff (history kept) + ban from internal groups WHERE the bot is admin (currently
-mark+report only — promote an admin account to enable auto-kick). Paperless /stock overhaul + the
-143-item order CSV import are PENDING. Full spec → docs/HISTORY.md.
-
----
-
-## Private-DM Attendance Overhaul — IN BUILD (current focus)
-Button-driven private-DM attendance: check-in (live-location geofence) · late+payback (time-bank) ·
-AL + senior approval · Special Leave (sick/marriage/death/birth) · day-off swap · Give-OT time-bank ·
-points · no-shows · payroll. Replaces the silenced group ladder. Full spec → docs/ATTENDANCE_SYSTEM_DETAILED.md
-+ docs/ATTENDANCE_SYSTEM_MAP.md. Test harness → docs/ATTENDANCE_TEST_MODE.md.
-
----
-
-## STRATEGIC — POS convergence (owner, session 27)
-> Owner is building a separate UNIVERSAL CLOUD POS (cloud source-of-truth + local-PC backup so ops don't
-> break when internet is down). Endgame: fold tested features (stock, attendance, GM brain) into the POS.
-> DECISION: stock staff-entry starts on **AppSheet** as a THROWAWAY/BRIDGE front-end (validate workflow fast),
-> NOT the destination. GUARDRAILS: (1) keep OUR Postgres the SOURCE OF TRUTH — sync AppSheet→Postgres; the
-> brain (order list, minimums, suppliers, points) stays in our code, AppSheet is just a data-entry skin →
-> migration = swap front-end only, no rebuild. (2) Shape the data model to POS inventory needs (item id,
-> unit, count, min, order_qty, supplier, counted_by, timestamp). FUTURE: when POS basics exist, cross-
-> reference BOTH repos (add POS as a 2nd working dir / share its design) to design the convergence with both
-> codebases in hand. Keep everything TWBshop-side POS-friendly meanwhile. Custom-own beats AppSheet long-term
-> because inventory IS a POS module and offline-sync is the same hard problem the POS must solve.
-
----
-
-## GM Backlog & Roadmap
-The remaining GM "shop-brain" roadmap (finance brain · attendance brain · stock/ops brain · cross-group
-knowledge brief · added ideas) → docs/ROADMAP.md (reference only, not an auto-run task list).
-
----
-
-## Operations Intelligence System — mostly BUILT (Phase 3)
-Telethon listener + historical import + AI analysis tiers + hiring bot are built/live. Original Phase-3
-plan → docs/HISTORY.md.
+## GM Subsystems — status index
+*One-line status; full detail → `docs/SUBSYSTEMS.md` (+ the per-topic docs named there).*
+- **REPORT finance tracking (GM bot):** LIVE.
+- **Supervisors/Management — lateness·AL·tagging:** mostly BUILT; group ladder SILENCED (moved to private-DM).
+- **Delivery System (WOC):** SHELVED.
+- **Staff Registry · Ex-staff offboarding · Paperless /stock:** BUILT (stock overhaul + 143-item CSV import PENDING).
+- **Private-DM Attendance Overhaul:** IN BUILD, gated OFF (current focus) → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`.
+- **STRATEGIC — POS convergence:** keep our Postgres source-of-truth; AppSheet is a throwaway stock front-end.
+- **GM Backlog & Roadmap:** → `docs/ROADMAP.md` (reference, not an auto-run list).
+- **Operations Intelligence System:** mostly BUILT (Phase 3 — listener + import + AI tiers + hire bot).
 
 ---
 
@@ -308,55 +214,4 @@ migration/payroll/payment task, and no later than **2026-06-30**. Don't let it b
 ---
 
 ## B2B Orders Bot — b2b_bot/
-
-Handles wholesale orders from restaurant and bar customers via their own Telegram groups.
-
-### B2B Design Rules
-- Group chat = the customer. Anyone in the group can order.
-- **Multi-user policy (intentional):** State is keyed by group chat_id, not by individual user_id. Any member of the group can build, edit, confirm, or cancel the group's order. This is by design — B2B customers are businesses where multiple staff may need to interact. Actor (name + user_id) is logged at every confirm/edit/cancel/location-change for audit purposes.
-- Re-order same day: bot asks "is this extra?", then re-confirms full merged order.
-- Gram-required items: pulls from history first, falls back to standard grams (shown in confirmation).
-- Attributes (e.g. sesame type): pulls from history first, falls back to menu standard.
-- Delivery/pickup: stored per group. New group asked once on first order.
-- 10:10:10pm Phnom Penh (UTC+7 = 15:10 UTC): nightly summary to B2B staff group.
-- No AI in Phase 1 — rule-based matching only.
-
-### B2B Repo Structure
-```
-b2b_bot/
-├── bot.py              ← handler registration and 10:10pm scheduled job
-├── menu.py             ← B2B menu items, grams, attributes, aliases
-├── menu_keyboards.py   ← cart state dicts, all keyboard builders
-├── menu_handlers.py    ← menu command + callback handlers, _do_confirm
-├── menu_flow.py        ← facade (re-exports menu_keyboards + menu_handlers)
-├── order_parsing.py    ← parsing, history resolution, confirmation formatting
-├── order_handlers.py   ← state dicts, notifications, order save + callbacks
-├── orders.py           ← facade (re-exports order_parsing + order_handlers)
-├── customers.py        ← group chat ID → business name registry
-├── summaries.py        ← nightly production total + per-customer breakdown
-├── cake_menu.py        ← cake menu data
-├── pricing.py          ← pricing helpers
-└── billing.py          ← billing functions
-run_b2b_bot.py          ← entry point: python run_b2b_bot.py
-```
-
-### B2B Build Phases
-- [x] Phase 1 — Foundation + full order flow
-  - Menu, customers, history resolution (grams, attributes), confirmation gate
-  - Delivery/pickup stored per group; Grab Express cost via OSRM ($0.68 base + $0.025/90m)
-  - Auto-registration: trusted admin adds bot → location pin prompted → cost calculated
-  - Bakery coordinates set (11.5387774, 104.9147998)
-  - Free delivery threshold ($10+), delivery fee shown when under
-  - 9pm pre-summary (totals only, deleted when full fires), 10:10pm full summary
-  - 4:30am + 6:10am dispatch reminders (replied to 10:10pm message); 9am 48h mini-order reminder
-  - Payment photos/PDFs: AI classifies → billing or order flow; forwarded to OWNER_TELEGRAM_ID
-  - Billing: unpaid balances tracked per customer, marked paid oldest-delivery-date-first
-  - Daily 6am payment reminder (yesterday's unpaid) + weekly Monday 6am (accumulated balance)
-  - /balance and /summary staff commands
-- [x] Phase 2 — Recurring daily/weekly orders
-  - DB: b2b_recurring_orders + b2b_recurring_confirmations
-  - 7am/1pm/6pm reminders the day before fulfillment
-  - [Confirm] / [Skip tomorrow] buttons; auto-skip at 10:10pm if still pending
-  - Grace period: no reminder if order created ≤1 day before fulfillment
-  - Permanent cancel: status = 'cancelled', record kept, bot never sends again
-- [ ] Phase 3 — Claude API for smarter matching and future AI features
+*Working on the B2B wholesale bot? Full design rules, repo structure, and build phases → `docs/B2B.md`.*
