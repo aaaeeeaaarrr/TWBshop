@@ -1123,7 +1123,7 @@ def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("📜 Rules · ច្បាប់ហាង", callback_data="att:rules")],
     ]
     if p.get("is_senior"):
-        rows.append([InlineKeyboardButton("➕ Give OT", callback_data="att:ot:give")])
+        rows.append([InlineKeyboardButton("➕ Give OT / change shift", callback_data="att:scp:staff")])
     return _hdr(p, "🧰 About Work"), InlineKeyboardMarkup(rows)
 
 
@@ -1327,6 +1327,112 @@ def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "👉 OT bank បច្ចុប្បន្នរបស់អ្នកនៅក្នុង 📋 កាលវិភាគរបស់ខ្ញុំ។"), \
         InlineKeyboardMarkup([_back_row("att:am"),
                               [InlineKeyboardButton("📋 My schedule · កាលវិភាគ", callback_data="att:my")]])
+
+
+# ===== Session 31: UNIFIED Give-OT / shift-redefine picker (see docs/OT_DESIGN.md) =====
+# staff → work-day → [Change time | Change day] → start ladder → end ladder (+PB/+OT) → reason →
+# submit_shift_change. OT is emergent = end beyond (start + normal length). Callbacks under att:scp:.
+def _sc_pool():
+    return [r for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]
+
+
+def sc_staff_pick(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """Give OT / change a shift — pick the staffer."""
+    rows = [_back_row("att:aw")]
+    rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:scp:d:%d" % r["id"])]
+             for r in _sc_pool()][:35]
+    return _hdr(p, "Give OT / change a shift — for whom?\nឱ្យ OT / ប្តូរវេន — ឱ្យអ្នកណា?"), \
+        InlineKeyboardMarkup(rows)
+
+
+def _sc_workdays(sid: int, n: int = 7) -> list[tuple[int, date]]:
+    """The next n WORKING days for this staffer (their day-off weekday excluded), today first.
+    Returns (dayidx_from_today, date)."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    off = _DOW_NAME.get(((rec or {}).get("day_off") or "")[:3].title())
+    out = []
+    for i in range(0, 21):
+        d = _today() + timedelta(days=i)
+        if off is None or d.weekday() != off:
+            out.append((i, d))
+        if len(out) >= n:
+            break
+    return out
+
+
+def sc_day_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    rows = [_back_row("att:scp:staff")]
+    rows += grid([InlineKeyboardButton(day_label(d), callback_data="att:scp:m:%d:%d" % (sid, i))
+                  for i, d in _sc_workdays(sid)], 2)
+    return _hdr(p, "Change %s's shift — which work day?\nប្តូរវេនរបស់ %s — ថ្ងៃធ្វើការណា?" % (nm, nm)), \
+        InlineKeyboardMarkup(rows)
+
+
+def sc_mode(p: dict, sid: int, didx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Retime/extend THIS day (Change time → straight to the start ladder), or move it to a day off
+    (Change day → pick a day off, then the start ladder)."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    d = _today() + timedelta(days=didx)
+    rows = [
+        _back_row("att:scp:d:%d" % sid),
+        [InlineKeyboardButton("⏱ Change time · ប្តូរម៉ោង", callback_data="att:scp:ss:%d:%d" % (sid, didx))],
+        [InlineKeyboardButton("📅 Change day · ប្តូរថ្ងៃ", callback_data="att:scp:cd:%d:%d" % (sid, didx))],
+    ]
+    return _hdr(p, "%s — %s. Retime/extend, or move to a day off?\n"
+                   "%s — %s។ ប្តូរម៉ោង/បន្ថែម ឬផ្លាស់ទៅថ្ងៃឈប់?" % (nm, day_label(d), nm, day_label(d))), \
+        InlineKeyboardMarkup(rows)
+
+
+def sc_dayoff_pick(p: dict, sid: int, didx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Change DAY: move this shift to one of the staffer's nearest 2 day-offs (then the start ladder)."""
+    from gm_bot import payback as pb
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    offs = pb.dayoff_dates_ahead((rec or {}).get("day_off"), set(), _today(), 21)[:2]
+    rows = [_back_row("att:scp:m:%d:%d" % (sid, didx))]
+    for od in offs:
+        rows.append([InlineKeyboardButton(day_label(od) + " (off)",
+                     callback_data="att:scp:ss:%d:%d" % (sid, (od - _today()).days))])
+    msg = ("Move %s's shift to which day off?\nផ្លាស់វេនរបស់ %s ទៅថ្ងៃឈប់ណា?" % (nm, nm)) if offs \
+        else ("No upcoming day off found for %s.\nគ្មានថ្ងៃឈប់ខាងមុខសម្រាប់ %s។" % (nm, nm))
+    return _hdr(p, msg), InlineKeyboardMarkup(rows)
+
+
+def sc_start(p: dict, sid: int, tdidx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """START ladder for the target day (tdidx = days from today). Today drops past times."""
+    from gm_bot import ot as ot_mod
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, tdidx)
+    earliest = _now_min() if tdidx == 0 else 0
+    rows = [_back_row("att:scp:d:%d" % sid)]
+    rows += grid([InlineKeyboardButton(fmt12(s), callback_data="att:scp:st:%d:%d:%d" % (sid, tdidx, s))
+                  for s in ot_mod.start_options(earliest_min=earliest)], 4)
+    return _hdr(p, "%s — START time?\n%s — ម៉ោងចាប់ផ្តើម?" % (day_label(d), day_label(d))), \
+        InlineKeyboardMarkup(rows)
+
+
+def sc_end(p: dict, sid: int, tdidx: int, start: int) -> tuple[str, InlineKeyboardMarkup]:
+    """END ladder: normal end (no tag) then each hour beyond carries +NPB (clears debt) then +MOT."""
+    from gm_bot import ot as ot_mod
+    from shared.database import payback_open_debt
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, tdidx)
+    normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+    debt = payback_open_debt(sid)
+    pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
+    normal_end = start + normal_len
+    btns = []
+    for extra in range(0, ot_mod.MAX_EXTRA_HOURS * 60 + 1, 60):
+        end_abs = normal_end + extra
+        pb_cleared, ot_m = ot_mod.split_ot_pb(extra, pb)
+        tag = ot_mod._ext_tag(pb_cleared, ot_m)
+        label = fmt12(end_abs % 1440) + ((" " + tag) if tag else "")
+        btns.append(InlineKeyboardButton(label,
+                    callback_data="att:scp:cf:%d:%d:%d:%d" % (sid, tdidx, start, end_abs)))
+    rows = [_back_row("att:scp:ss:%d:%d" % (sid, tdidx))] + grid(btns, 2)
+    return _hdr(p, "%s — END time? (start %s)\n%s — ម៉ោងបញ្ចប់?" % (day_label(d), fmt12(start), day_label(d))), \
+        InlineKeyboardMarkup(rows)
 
 
 def ot_nowlater(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -2133,6 +2239,40 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # att:ot:appd:{sid}:{minutes}
             return await show(ot_approved_preview(p, int(data[3]), int(data[4])))
         return await show(ot_screen(p))
+    if action == "scp":   # session 31: unified Give-OT / shift-redefine picker
+        sub = data[2] if len(data) > 2 else ""
+        if sub == "staff":
+            return await show(sc_staff_pick(p))
+        if sub == "d":
+            return await show(sc_day_pick(p, int(data[3])))
+        if sub == "m":
+            return await show(sc_mode(p, int(data[3]), int(data[4])))
+        if sub == "cd":
+            return await show(sc_dayoff_pick(p, int(data[3]), int(data[4])))
+        if sub == "ss":
+            return await show(sc_start(p, int(data[3]), int(data[4])))
+        if sub == "st":
+            return await show(sc_end(p, int(data[3]), int(data[4]), int(data[5])))
+        if sub == "cf":
+            # att:scp:cf:{sid}:{tdidx}:{start}:{end} → arm a shift-redefine pending → reason → submit
+            sid, tdidx, start, end = int(data[3]), int(data[4]), int(data[5]), int(data[6])
+            if _armed(context):
+                rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+                normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+                _arm_pending(context, update.effective_user.id,
+                    {"flow": "shift", "persona_id": p["id"], "staff_id": sid,
+                     "when_date": (_today() + timedelta(days=tdidx)).isoformat(),
+                     "start_min": start, "end_min": end, "normal_len": normal_len})
+                extra = max(0, end - (start + normal_len))
+                rnm = (rec or {}).get("call_name") or "the staffer"
+                return await show(_arm_prompt(p, context,
+                    "Shift change — %s %s-%s%s for %s.\n\n📝 Type the reason — your next message sends it "
+                    "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅសុំការអនុម័ត។"
+                    % (day_label(_today() + timedelta(days=tdidx)), fmt12(start), fmt12(end % 1440),
+                       (" (+%dh OT)" % (extra // 60)) if extra else "", rnm),
+                    "att:scp:staff"))
+            return await show(sc_staff_pick(p))
+        return await show(sc_staff_pick(p))
     if action == "ci":
         return await show(checkin_screen(p))
     if action == "cis":

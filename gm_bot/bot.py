@@ -3698,6 +3698,19 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "🧪 OT submitted (test) — you got BOTH the staff Yes/Can't ask AND the owner reject-only "
             "notice. On Yes: NOW banks + buyback picker, LATER books. Silence = approval; reject before "
             "start. /testreset to wipe.")
+    elif flow == "shift":
+        receiver = next((s for s in staff_all("active") if s["id"] == pend.get("staff_id")), None)
+        if not receiver:
+            await update.message.reply_text("staff not found." if live else "🧪 staff not found.")
+            return
+        await submit_shift_change(context, persona, receiver, pend["when_date"],
+                                  pend["start_min"], pend["end_min"], pend["normal_len"], reason)
+        await confirm(
+            "✅ Shift change sent — the staff is asked to approve.\n"
+            "✅ បានផ្ញើការប្តូរវេន — បានសុំបុគ្គលិកអនុម័ត។",
+            "🧪 Shift change submitted (test) — you got the staff's Approve/Can't card. On Approve, that "
+            "day uses the new times; OT (beyond normal length) banks at checkout, clearing payback first. "
+            "/testreset to wipe.")
     elif flow == "swap":
         partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
         if not partner:
