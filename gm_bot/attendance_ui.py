@@ -1556,12 +1556,15 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     upcoming.sort()
     up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
     today_iso = _today().isoformat()
-    for d, rid in upcoming[:6]:
-        # only offer cancel for dates that haven't STARTED (future, or today before the shift begins)
-        if d < today_iso or (d == today_iso and _shift_running(p)):
-            continue
-        rows.append([InlineKeyboardButton("✕ Cancel AL · បោះបង់ AL %s" % day_label(date.fromisoformat(d)),
-                                          callback_data="att:my:cancel:%s:%d" % (d, rid))])
+    # CANCEL buttons ONLY in the role-play (test) shell — the /test shell must never mutate REAL data.
+    # (Real staff will cancel their own real ALs through the live staff entry, not here.)
+    if att_test_on():
+        for d, rid in upcoming[:6]:
+            # only offer cancel for dates that haven't STARTED (future, or today before shift begins)
+            if d < today_iso or (d == today_iso and _shift_running(p)):
+                continue
+            rows.append([InlineKeyboardButton("✕ Cancel AL · បោះបង់ AL %s" % day_label(date.fromisoformat(d)),
+                                              callback_data="att:my:cancel:%s:%d" % (d, rid))])
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
                    "AL left · AL នៅសល់: %s days\n"
@@ -2029,6 +2032,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if action == "my":
         if len(data) > 2 and data[2] == "cancel":
+            if not att_test_on():
+                await query.answer("Role-play shell — turn /testmode on. This never changes real data.",
+                                   show_alert=True)
+                return await show(my_screen(p))
             iso, rid = data[3], int(data[4])
             from shared.database import al_cancel_day, al_deduct
             today_iso = _today().isoformat()
