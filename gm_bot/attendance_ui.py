@@ -23,7 +23,8 @@ from telegram.ext import ContextTypes
 
 import config
 from gm_bot.attendance import to_min, overlaps
-from shared.database import staff_all, att_test_on, staff_get_by_uid, flow_save, al_leave_days_set
+from shared.database import (staff_all, att_test_on, staff_get_by_uid, flow_save,
+                             al_leave_days_set, staff_absent_dates)
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -2005,8 +2006,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if sub == "full":
                 from gm_bot import al as alm
                 doff = p.get("day_off")
-                charged = alm.al_charged_days(picked, doff)     # day-off never costs AL
-                span = alm.al_span_label(picked, doff)          # from → to, bridging the day off
+                nw = staff_absent_dates(p["id"])                # other AL / special leave / swaps
+                charged = alm.al_charged_days(picked, doff, nw)  # never charge a day they're away
+                span = alm.al_span_label(picked, doff, nw)       # from → to, bridging ANY absence
                 near = _near_days(set(charged))
                 detail = ("Full-day AL: %s — %d AL day(s).\nAL ពេញមួយថ្ងៃ៖ %s — %d ថ្ងៃ។"
                           % (span, len(charged), span, len(charged)))

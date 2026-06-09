@@ -284,6 +284,18 @@ def test_al_day_off_excluded_and_span_bridges():
     assert alm.al_day_count(days, "days") == 3.0
 
 
+def test_al_span_bridges_any_absence():
+    """The span bridges ANY non-working day (other AL, PH, swap…), not just the weekly day off."""
+    from gm_bot import al as alm
+    picked = ["2026-06-22", "2026-06-25"]                 # Mon, Thu
+    nw = {"2026-06-23", "2026-06-24"}                      # Tue+Wed = e.g. another AL + a PH
+    assert alm.al_span_label(picked, non_working=nw) == "Mon 22/06 → Thu 25/06"
+    # without the absence info, a genuine working gap does NOT bridge
+    assert "→" not in alm.al_span_label(picked, non_working=set())
+    # a tapped day that's already an absence isn't charged again
+    assert alm.al_day_count(["2026-06-22", "2026-06-23"], "days", non_working={"2026-06-23"}) == 1.0
+
+
 def test_al_finalize_edits_cards_in_place(monkeypatch):
     """On decision the senior cards are EDITED in place (request intact + verdict); no new
     per-senior messages; requester + Supervisors notices still sent."""

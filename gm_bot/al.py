@@ -38,35 +38,47 @@ def fractional_al(hours_start_min: int, hours_end_min: int, shift_minutes: int) 
 _DOW = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
 
-def al_charged_days(al_days: list[str], day_off: str | None = None) -> list[str]:
-    """The selected dates that actually COST AL — the staff's weekly day-off is never charged
-    (a day off is already free, whether they tapped it or it falls inside the leave span)."""
+def _al_off(d: date, off_wd: int | None, non_working: set) -> bool:
+    """Is this date a NON-WORKING day for the staff — their weekly day-off, or any other absence
+    passed in `non_working` (another approved AL, a public holiday, a swap day-off, etc.)?"""
+    return (off_wd is not None and d.weekday() == off_wd) or (d.isoformat() in non_working)
+
+
+def al_charged_days(al_days: list[str], day_off: str | None = None,
+                    non_working: set | None = None) -> list[str]:
+    """The selected dates that actually COST AL — never the staff's day-off, nor any other day
+    they're already away (in `non_working`: other approved AL, PH, swap-off…)."""
     off = _DOW.get((day_off or "")[:3].title()) if day_off else None
-    return [d for d in sorted(al_days)
-            if off is None or date.fromisoformat(d).weekday() != off]
+    nw = non_working or set()
+    if off is None and not nw:
+        return sorted(al_days)   # nothing to exclude → no date parsing (accepts non-ISO placeholders)
+    return [d for d in sorted(al_days) if not _al_off(date.fromisoformat(d), off, nw)]
 
 
 def al_day_count(al_days: list[str], kind: str, frac_per_day: float = 1.0,
-                 day_off: str | None = None) -> float:
-    """Total AL deducted: full days = #charged days; hours = frac × #charged days. The staff's
-    weekly day-off dates are excluded (never charged)."""
-    n = len(al_charged_days(al_days, day_off))
+                 day_off: str | None = None, non_working: set | None = None) -> float:
+    """Total AL deducted: full days = #charged days; hours = frac × #charged days. Day-off and any
+    other already-absent day (`non_working`) are excluded (never charged)."""
+    n = len(al_charged_days(al_days, day_off, non_working))
     return round(n * (frac_per_day if kind == "hours" else 1.0), 2)
 
 
-def al_span_label(al_days: list[str], day_off: str | None = None) -> str:
-    """Format the leave as 'from → to' segments, BRIDGING the staff's day-off days: a day off
-    sitting between two AL days means one continuous absence (out from the first to the last).
-    A genuine WORKING-day gap splits into separate segments (so we never imply days off he works)."""
+def al_span_label(al_days: list[str], day_off: str | None = None,
+                  non_working: set | None = None) -> str:
+    """Format the leave as 'from → to' segments, BRIDGING any day the staff is NOT in for any
+    reason — their day-off, another approved AL, a public holiday, a swap day-off (all passed via
+    `non_working`/`day_off`). A genuine WORKING-day gap splits into separate segments (so we never
+    imply days off he actually works)."""
     days = sorted({date.fromisoformat(d) for d in al_days})
     if not days:
         return ""
     off = _DOW.get((day_off or "")[:3].title()) if day_off else None
+    nw = non_working or set()
     segs, s, e = [], days[0], days[0]
     for d in days[1:]:
         between = [e + timedelta(days=i) for i in range(1, (d - e).days)]
-        if (d - e).days == 1 or (between and all(g.weekday() == off for g in between)):
-            e = d                       # consecutive, or only day-off(s) in the gap → bridge
+        if (d - e).days == 1 or (between and all(_al_off(g, off, nw) for g in between)):
+            e = d                       # consecutive, or only non-working day(s) in the gap → bridge
         else:
             segs.append((s, e)); s = e = d
     segs.append((s, e))

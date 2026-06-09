@@ -3243,6 +3243,38 @@ def al_leave_days_set(staff_id: int) -> set:
     return out
 
 
+def staff_absent_dates(staff_id: int) -> set:
+    """Every ISO date the staff is already AWAY besides their weekly day-off: approved AL,
+    special-leave spans (marriage / family-death / wife-birth / family-sick), and swap day-off
+    overrides. Used so an AL span bridges across ANY absence, not just the weekly day off.
+    (Public holidays are not tracked yet — add a holiday list to fold those in too.)"""
+    import json as _json
+    from datetime import date as _d, timedelta as _td
+    out = set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved'",
+                        (staff_id,))
+            for r in cur.fetchall():
+                try:
+                    out.update(_json.loads(r["days"] or "[]"))
+                except Exception:
+                    pass
+            cur.execute("SELECT start_date, days FROM special_leaves WHERE staff_id=%s", (staff_id,))
+            for r in cur.fetchall():
+                try:
+                    sd = _d.fromisoformat(str(r["start_date"]))
+                    n = max(int(r["days"] or 1), 1)
+                    out.update((sd + _td(days=i)).isoformat() for i in range(n))
+                except Exception:
+                    pass
+            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND kind='off'",
+                        (staff_id,))
+            for r in cur.fetchall():
+                out.add(str(r["the_date"]))
+    return out
+
+
 def payback_bookings_due_reminder(within_hours: int = 12) -> list[dict]:
     """Booked payback slots starting within `within_hours` not yet 12h-reminded."""
     with _db() as conn:
