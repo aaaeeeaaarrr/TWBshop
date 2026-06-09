@@ -2372,6 +2372,25 @@ def init_attendance_db() -> None:
                     status     TEXT DEFAULT 'booked',
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                -- session 31: UNIFIED redefine-a-shift (retime / move / extend a working day's shift).
+                -- The APPROVED row IS that day's shift for attendance; OT = worked - normal_len, netted
+                -- against payback at checkout. Purely additive — never alters an existing table.
+                CREATE TABLE IF NOT EXISTS shift_changes (
+                    id          SERIAL PRIMARY KEY,
+                    senior_id   INTEGER REFERENCES staff_registry(id),
+                    staff_id    INTEGER REFERENCES staff_registry(id),
+                    when_date   DATE,
+                    start_min   INTEGER,
+                    end_min     INTEGER,
+                    normal_len  INTEGER,
+                    reason      TEXT,
+                    status      TEXT DEFAULT 'proposed',  -- proposed|approved|declined|cancelled|done
+                    approved_at TIMESTAMPTZ,
+                    ot_banked   INTEGER,
+                    created_at  TIMESTAMPTZ DEFAULT NOW(),
+                    is_test     BOOLEAN DEFAULT FALSE
+                );
+                CREATE INDEX IF NOT EXISTS idx_shift_changes_staff_date ON shift_changes (staff_id, when_date);
                 -- session 28: dated day-off overrides (swaps) — schedule resolvers consult these
                 CREATE TABLE IF NOT EXISTS dayoff_overrides (
                     id        SERIAL PRIMARY KEY,
@@ -2479,7 +2498,7 @@ def init_attendance_db() -> None:
 _TEST_TABLES = ["al_approvals", "al_requests", "payback_bookings", "payback_debts",
                 "ot_buyback", "ot_grants", "lateness_records", "no_show_records",
                 "special_leaves", "sick_cases", "dayoff_overrides", "dayoff_swaps",
-                "points_events", "attendance_sessions", "location_pings"]
+                "points_events", "attendance_sessions", "location_pings", "shift_changes"]
 
 # Process-global TEST flag. When True, attendance INSERT helpers stamp is_test=TRUE and
 # balance mutators become no-ops (the shown balance is computed with an overlay). Safe as a
@@ -2977,6 +2996,61 @@ def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
                 VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
                 (staff_id, slot_date, start_min, end_min, minutes, _ATT_TEST))
             return cur.fetchone()["id"]
+
+
+# ---- session 31: redefine-a-shift lifecycle (see docs/OT_DESIGN.md) ----
+def shift_change_create(senior_id, staff_id, when_date, start_min, end_min,
+                        normal_len, reason) -> int:
+    """A senior PROPOSES a redefined shift for staff on when_date. Status 'proposed' until the staff
+    approves. start_min/end_min are minute-of-day (end_min may exceed 1440 for overnight)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO shift_changes
+                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason, _ATT_TEST))
+            return cur.fetchone()["id"]
+
+
+def shift_change_get(change_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM shift_changes WHERE id=%s", (change_id,))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def shift_change_set_status(change_id: int, status: str) -> None:
+    """proposed|approved|declined|cancelled|done. 'approved' stamps approved_at."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if status == "approved":
+                cur.execute("UPDATE shift_changes SET status=%s, approved_at=NOW() WHERE id=%s",
+                            (status, change_id))
+            else:
+                cur.execute("UPDATE shift_changes SET status=%s WHERE id=%s", (status, change_id))
+
+
+def shift_change_active(staff_id: int, when_date: str) -> dict | None:
+    """The APPROVED/done redefinition for a staff+date, if any — attendance uses this as that day's
+    shift instead of the normal schedule. Latest approved wins (a re-edit replaces). Test-isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT * FROM shift_changes
+                           WHERE staff_id=%s AND when_date=%s AND status IN ('approved','done')
+                             AND is_test=%s
+                           ORDER BY approved_at DESC NULLS LAST, id DESC LIMIT 1""",
+                        (staff_id, when_date, _ATT_TEST))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def shift_change_set_banked(change_id: int, ot_banked: int) -> None:
+    """At checkout/completion: record the OT minutes banked (after payback netting) + mark done."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE shift_changes SET ot_banked=%s, status='done' WHERE id=%s",
+                        (ot_banked, change_id))
 
 
 def dayoff_set_override(staff_id: int, the_date: str, kind: str, reason: str = "") -> None:
