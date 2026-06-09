@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from datetime import date
 
-PAPERS_GRACE_DAYS = 3      # paperless own-sick: papers within 3 days wipe the debt
+PAPERS_GRACE_DAYS = 2      # paperless own-sick is pay-back from declaration; accepted doctor's
+#                            papers within 2 days CANCEL it. After 2 days the pay-back is final.
 FAMILY_POOL_DAYS = 7       # special-leave pool per year
 
 WHO_KH = {"child": "កូនរបស់អ្នក", "spouse": "ប្តី/ប្រពន្ធរបស់អ្នក", "parent": "ឪពុក/ម្តាយរបស់អ្នក"}

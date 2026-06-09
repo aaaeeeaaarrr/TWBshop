@@ -6,8 +6,8 @@ from gm_bot import sick
 
 def test_papers_deadline():
     created = date(2026, 6, 8)
-    assert sick.papers_deadline_passed(created, date(2026, 6, 10)) is False  # 2 days
-    assert sick.papers_deadline_passed(created, date(2026, 6, 11)) is True   # 3 days
+    assert sick.papers_deadline_passed(created, date(2026, 6, 9)) is False  # 1 day — within window
+    assert sick.papers_deadline_passed(created, date(2026, 6, 10)) is True  # 2 days — window closed
 
 
 def test_family_pool_remaining():

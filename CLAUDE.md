@@ -287,12 +287,15 @@ the "won't restore" bug = ad-hoc ssh scripts skipped commit)
   ot) format without error. Owner should still eyeball via ChatGPT before go-live (my drafts, not yet
   owner-reviewed). The dispatcher confirmations were already bilingual.
 
-**Session 30 (Jun 9) — sick-papers nightly nudges (label was a lie) + test continues:**
-- The "Skip → nightly nudges" button promised nudges but `_sick_papers_deadline_job` only converted
-  to pay-back AFTER 3 days — ZERO nudges before. Now the daily job sends a gentle nightly reminder
-  (`_SICK_NUDGE`) each run while within the 3-day grace, then converts on the deadline (`_SICK_NOPAPERS`).
-- The test 'skip' terminal now PREVIEWS the nudge (+ in test, the day-3 payback outcome) so the flow
-  continues instead of dead-ending. Shared text constants reused by both the live job and the preview.
+**Session 30 (Jun 9) — paperless-sick model corrected (owner): pay-back from declaration:**
+- RULE (owner): paperless sick is **pay-back from the moment they declare** (any length); accepted
+  doctor's papers within **2 days** (PAPERS_GRACE_DAYS 3→2) CANCEL it; after 2 days it's final.
+- `_att_dispatch` sick_me now creates the pay-back debt at declaration (`payback_add_debt`, missed
+  shift). Papers are mentioned ONCE at declaration; nudges NEVER mention papers or pay-back (they
+  know). Owner Accept (cov:Xd) within the window → `_wipe_sick_payback` cancels the debt; Skip → it
+  stands ("✓ Noted"). The deadline job no longer CREATES debt — it sends the nightly **return check**
+  ("coming in tomorrow?", `_SICK_RETURN_CHECK`) while open, finalizes (`no_papers`) after the 2-day
+  window. Test 'skip' previews the return-check so the flow continues.
 - Suite 398 green.
 
 **Session 30 (Jun 9) — tap-to-confirm + bilingual Back:**

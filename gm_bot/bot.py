@@ -2097,11 +2097,20 @@ def _tyty_uid() -> int | None:
     return ids[0] if ids else None
 
 
-_SICK_NUDGE = ("Gentle reminder 🤍 please send a photo of your doctor's papers — without them within "
-               "3 days, the missed time becomes pay-back.\n"
-               "សូមរំលឹកដោយសុភាព 🤍 សូមផ្ញើរូបថតឯកសារពេទ្យ — បើគ្មានក្នុង 3 ថ្ងៃ ម៉ោងខកខាននឹងក្លាយជាម៉ោងសងវិញ។")
-_SICK_NOPAPERS = ("No papers came — the missed time goes to your pay-back balance.\n"
-                  "មិនមានឯកសារពេទ្យផ្ញើមកទេ — ម៉ោងដែលខកខាននឹងចូលទៅក្នុង balance ម៉ោងសងវិញរបស់អ្នក។")
+# The nightly nudge is a RETURN CHECK only — never mentions papers or pay-back (they already know
+# paperless sick is paid back; papers are mentioned once at declaration).
+_SICK_RETURN_CHECK = ("Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
+                      "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។")
+
+
+def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
+    """Cancel the paperless-sick pay-back debt for this sick date (accepted papers within window)."""
+    for d in payback_all_open():
+        if (d["staff_id"] == staff_id and "sick" in (d.get("reason") or "").lower()
+                and str(d.get("created_date")) == the_date_iso and d["balance"] > 0):
+            payback_credit(d["id"], d["balance"])
+            return True
+    return False
 
 
 async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2118,22 +2127,28 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
     uid = (staff.get("telegram_ids") or [None])[0] if staff else None
+    nm0 = (staff.get("call_name") or staff["canonical_name"]) if staff else ""
     if sub == "cov":
         days = int(parts[4])
-        sick_set(case_id, status="papered" if days else "provisional", covered_days=days or None)
-        await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd." % days if days
-                                                            else "\n\n→ nightly nudges (no fixed days)."))
-        nm0 = (staff.get("call_name") or staff["canonical_name"]) if staff else ""
         if days:
+            # papers accepted → CANCEL the paperless-sick pay-back, but only within the 2-day window
+            from gm_bot import sick as sk
+            within = not sk.papers_deadline_passed(case["the_date"],
+                                                   datetime.now(finance.PP_TZ).date())
+            wiped = _wipe_sick_payback(case["staff_id"], case["the_date"].isoformat()) if within else False
+            sick_set(case_id, status="papered", covered_days=days)
+            await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd%s." % (
+                days, " — pay-back cancelled" if wiped else " (after 2-day window — pay-back stands)"
+                if not within else "")))
             await _att_send(context, uid, "Staff", nm0,
-                "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
-                "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
+                "Saved ✓ — your sick day is confirmed. Get well 🤍\n"
+                "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
         else:
-            # the staff gets a gentle nightly reminder (the real job sends it each night until the
-            # 3-day deadline); show it here so the flow continues. In test, also show the day-3 outcome.
-            await _att_send(context, uid, "Staff", nm0, _SICK_NUDGE)
-            if _att_test_mode():
-                await _att_send(context, uid, "Staff", nm0, "(Day 3, still no papers →) " + _SICK_NOPAPERS)
+            # no cover — the pay-back created at declaration just stands (don't spell it out to them)
+            sick_set(case_id, status="provisional")
+            await query.edit_message_text(query.message.text + "\n\n✓ Noted.")
+            if _att_test_mode():   # show the next step (the nightly return-check) so the test continues
+                await _att_send(context, uid, "Staff", nm0, _SICK_RETURN_CHECK)
     elif sub == "duty":
         await query.edit_message_text(query.message.text + "\n\n💺 Part-duty offered.")
         if uid or _att_test_mode():
@@ -2246,31 +2261,24 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Daily (gated): provisional own-sick cases past the 3-day papers grace with no papers →
-    the missed shift becomes payback debt (the paperless rule)."""
+    """Daily (gated): while an own-sick case is open, send a nightly RETURN CHECK ('coming in
+    tomorrow?') — never about papers or pay-back. The pay-back was created at declaration; after the
+    2-day papers window with no accepted papers the case is finalized and nudges stop. No debt is
+    created here (paperless sick is already pay-back from the start)."""
     if not _att_active():
         return
     from gm_bot import sick as sk
-    from gm_bot.attendance import to_min
     today = datetime.now(finance.PP_TZ).date()
     for c in sick_provisional_open():
-        if c.get("papers_seen"):
-            continue
         staff = next((s for s in staff_all("active") if s["id"] == c["staff_id"]), None)
         if not staff:
             continue
         uid = (staff.get("telegram_ids") or [None])[0]
         nm = staff.get("call_name") or staff["canonical_name"]
-        if not sk.papers_deadline_passed(c["the_date"], today):
-            # still within grace → gentle NIGHTLY nudge to bring the papers (one per daily run)
-            await _att_send(context, uid, "Staff", nm, _SICK_NUDGE)
+        if sk.papers_deadline_passed(c["the_date"], today):
+            sick_set(c["id"], status="no_papers")   # window closed; the pay-back made at declaration stands
             continue
-        ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
-        shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
-        payback_add_debt(staff["id"], shift_min, "paperless sick (no papers in 3 days)",
-                         c["the_date"].isoformat())
-        sick_set(c["id"], status="no_papers")
-        await _att_send(context, uid, "Staff", nm, _SICK_NOPAPERS)
+        await _att_send(context, uid, "Staff", nm, _SICK_RETURN_CHECK)
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3460,6 +3468,12 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "/testreset to wipe.")
     elif flow == "sick_me":
         sick_create(persona["id"], "me", pend["date"], "provisional")
+        # paperless sick is PAY-BACK from the moment they declare (papers within 2 days cancel it).
+        from gm_bot.attendance import to_min
+        ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
+        shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
+        payback_add_debt(persona["id"], shift_min, "paperless sick", pend["date"])
+        # papers are mentioned ONCE here; never repeated in the nudges, and pay-back is never spelled out.
         await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
             persona.get("call_name") or persona["canonical_name"],
             "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
