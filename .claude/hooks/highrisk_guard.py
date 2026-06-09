@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
-"""PreToolUse HIGH-RISK guard (Hook 1) — TWBshop.
+"""PreToolUse HIGH-RISK guard (Hook 1) -- TWBshop.
 
-Per-action approval for dangerous actions. Reads the Claude Code hook JSON on stdin and emits a
-PreToolUse permission decision:
-  - "ask"  -> classified HIGH-RISK: the user must approve THIS exact action (no session-wide bypass,
-              no persisted 'always allow'). Claude cannot answer the prompt itself.
-  - "deny" -> FAIL-CLOSED: input we could not parse / classify that still looks like it touches a
-              protected surface. Safer to block than to let it through.
-  - (silent exit 0) -> everything else flows through the normal permission system unchanged.
+Stops dangerous actions. Reads the Claude Code hook JSON on stdin and decides:
+  - HARD BLOCK (exit 2)  -> classified HIGH-RISK. The action does NOT run; the reason is fed back to
+        Claude, which must STOP, explain what it is about to do and why, and only then re-issue the
+        SAME command WITH the deliberate per-action override marker (see OVERRIDE below).
+  - ALLOW (exit 0, silent) -> the override marker is deliberately present, OR the action is not
+        HIGH-RISK. The override is per-action and auditable (it appears in the command), never a
+        session-wide bypass.
+  - FAIL CLOSED (exit 2) -> input we could not parse/classify that still looks protected. Block.
 
-Design rules honored:
-  * FAIL CLOSED: a parse error / missing fields on a protected-looking request -> deny, never
-    silently allow. (A clean, recognized, clearly-safe command is still allowed so normal work
-    isn't bricked.)
-  * Inspects BOTH Bash commands AND Edit/Write/MultiEdit file paths (a denylist leaks via Bash:
-    sed -i / cat > / tee / redirections are matched in the command string too).
-  * No "always allow" is ever emitted for HIGH-RISK; it asks every time.
-NOTE (honest): a denylist is never complete. The real lock for the prod DB is a staging/local
-Postgres so prod creds aren't in dev — see the dated backlog note in CLAUDE.md. This is the backstop.
+WHY HARD BLOCK IN EVERY MODE (not "ask"): the owner runs Claude in a permission-bypass mode AND (by
+their own account) approves every prompt reflexively -- so an "ask" prompt protects nothing, in any
+mode. Only exit 2 actually stops an action (proven, session 31). Protection therefore lives OFF the
+human rubber-stamp and ON a hard stop that accidents/reflexes/runaways cannot pass: they don't carry
+the deliberate OVERRIDE marker. Claude must consciously add it after articulating the risk. Covers the
+Bash AND PowerShell tools (deploys run via PowerShell on Windows) plus Edit/Write/MultiEdit paths.
+
+NOTE (honest): a denylist is never complete, and this still trusts Claude's *deliberate* judgement
+(it adds the marker). The REAL lock for prod data is a staging/local Postgres so prod creds aren't in
+dev -- see the dated backlog note in CLAUDE.md. This guard is the backstop against accidents + reflex.
 """
 import sys
 import json
 import re
 
-# ---- HIGH-RISK patterns (case-insensitive). Match -> "ask" (per-action approval). ----
+# Deliberate per-action consent marker. Built by concatenation so the literal token does NOT appear
+# verbatim in this file -- editing this guard does not accidentally carry its own override.
+OVERRIDE = "#HIGHRISK" + "-OK"
+
+# ---- HIGH-RISK patterns (case-insensitive). ----
 RX = re.IGNORECASE
 PROTECTED = [
     ("destructive SQL",        re.compile(r"\b(drop\s+table|truncate\b|delete\s+from|drop\s+database|alter\s+table\b.*\bdrop\b)", RX)),
@@ -44,18 +50,20 @@ KEYWORDS = re.compile(r"(drop\s+table|truncate|delete\s+from|\brm\s+-[a-z]*[rf]|
                       r"khqr|bakong|migrate|staff_registry|\.claude[\\/]settings)", RX)
 
 
-def decide(decision, reason):
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": decision,
-        "permissionDecisionReason": reason,
-    }}))
-    sys.exit(0)
+def hard_block(reason):
+    """Exit 2 = blocking error. The only decision proven to stop an action in bypass mode."""
+    sys.stderr.write("HIGH-RISK BLOCKED -- %s\n"
+                     "This action did NOT run. It is irreversible/sensitive, so it is hard-blocked in "
+                     "every mode. To proceed: STOP, state plainly what you are about to do and why, then "
+                     "re-issue the SAME command with the marker `%s` appended (deliberate, per-action "
+                     "consent). Accidents/reflexes never carry the marker.\n"
+                     % (reason, OVERRIDE))
+    sys.exit(2)
 
 
 def classify(tool, tool_input):
     """Return the text to inspect for a recognized tool, or None if we can't (fail-closed upstream)."""
-    if tool == "Bash":
+    if tool in ("Bash", "PowerShell"):
         return tool_input.get("command", "") or ""
     if tool in ("Edit", "Write", "MultiEdit"):
         return tool_input.get("file_path", "") or ""
@@ -73,12 +81,14 @@ def main(raw):
     text = classify(tool, tool_input)
     if text is None:
         # unrecognized tool: only block if it smells protected, else let normal flow handle it
-        if KEYWORDS.search(raw):
-            decide("deny", "unrecognized tool touching a protected surface (fail-closed)")
+        if KEYWORDS.search(raw) and OVERRIDE not in raw:
+            hard_block("unrecognized tool touching a protected surface (fail-closed)")
         sys.exit(0)
+    if OVERRIDE in raw:
+        sys.exit(0)  # deliberate, per-action consent present -> allow
     for label, rx in PROTECTED:
         if rx.search(text):
-            decide("ask", "HIGH-RISK (%s) — approve this exact action. No session-wide bypass." % label)
+            hard_block("HIGH-RISK (%s)" % label)
     sys.exit(0)  # clean, recognized, not protected -> allow via normal flow
 
 
@@ -88,7 +98,7 @@ if __name__ == "__main__":
         main(raw)
     except Exception as e:
         # FAIL CLOSED: couldn't parse/classify. Block only if it looks protected; else don't brick work.
-        if KEYWORDS.search(raw or ""):
-            decide("deny", "guard could not classify a protected-looking request (fail-closed): %s"
-                   % type(e).__name__)
+        if KEYWORDS.search(raw or "") and OVERRIDE not in (raw or ""):
+            hard_block("guard could not classify a protected-looking request (fail-closed): %s"
+                       % type(e).__name__)
         sys.exit(0)

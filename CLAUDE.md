@@ -257,9 +257,33 @@ plan → docs/HISTORY.md.
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–28) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-09 (session 30 — OT-end checkout made MIDNIGHT-SAFE (datetime, not
-minute-of-day); rejected the confirm-button as exploitable, kept GPS proof; LIVE staff entry wired;
-precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused "won't restore" = ssh-skipped-commit)
+**Last updated:** 2026-06-09 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED: hook fires but its
+"ask" was a no-op under bypass-permissions mode; now hard-blocks (exit 2) in EVERY mode unless the
+deliberate per-action marker `#HIGHRISK-OK` is appended; added PowerShell-tool coverage)
+
+**Session 31 (Jun 9) — HIGH-RISK guard: proven live, then hardened (owner: "I always say yes"):**
+- **Proved the live hook wiring** (the session-30 resume task). The PreToolUse guard DOES fire
+  (instrumented probe: invoked every call, CLAUDE_PROJECT_DIR correct — Claude runs it via Git Bash).
+  BUT this session runs in a permission-BYPASS mode (a non-allowlisted `rm -rf` ran with NO prompt), so
+  the guard's `permissionDecision:"ask"` was a NO-OP — `systemctl restart` etc. ran unguarded. Same
+  cause as session-30's "systemctl didn't prompt." Only `exit 2` actually blocks in bypass mode (proven
+  with a sentinel). My very first manual probe "failed" only because MY shell lacked CLAUDE_PROJECT_DIR
+  — not a wiring bug.
+- **Owner insight → design change:** owner ALWAYS approves prompts reflexively, so "ask" never protected
+  them. Protection moved OFF the human rubber-stamp ONTO a hard stop. Guard now HARD-BLOCKS (exit 2)
+  every HIGH-RISK match in ALL modes unless the per-action, auditable marker `#HIGHRISK-OK` is appended
+  to the command (accidents/reflexes/runaways never carry it; Claude adds it only after articulating the
+  risk). Dropped the mode-aware "ask" path entirely (simpler + strictly more protective for this owner).
+- **Red-team caught a real gap:** the matcher missed the **PowerShell tool** — how deploys run on
+  Windows (`PowerShell(ssh twbshop "...systemctl restart...")`) — so destructive PS ops sailed past.
+  Added PowerShell to BOTH the settings.json matcher AND classify(). ⚠ The matcher change activates only
+  NEXT session (loaded at startup); Bash is guarded live NOW (proven).
+- **Verified:** live block of `systemctl restart` (did NOT run) + live allow with marker; script harness
+  green across all modes (block / marker-allow / safe-allow / PowerShell block / fail-closed block /
+  edit-secrets.py block); py_compile OK; settings.json valid JSON. Files: `.claude/hooks/highrisk_guard.py`,
+  `.claude/settings.json`. All probe/diagnostic code removed; git clean except the two intended files.
+- **STILL the real lock (NOT this guard):** the staging/local Postgres so prod creds aren't in dev
+  (dated backlog, due 2026-06-30). This guard is the accident/reflex backstop, not the wall.
 
 **Session 30 (Jun 9) — OT-end checkout: midnight worry closed (kept GPS, rejected the button):**
 - Owner floated replacing the GPS OT-end checkout with a "senior (+ staff) confirm OT done" button to
@@ -521,17 +545,13 @@ precision-standard v2026-06-09-A; Visal AL 10th→11th fix; root-caused "won't r
   after this batch to capture the new walkthrough lines; then wire Khmer into the walkthroughs.
 - Suite green: 369.
 
-**▶ RESUME HERE (session 30 → next session, after a fresh-session RESTART):**
-Two global "How to Behave" habits were added (Simpler-path/cost-honesty + Scope-honesty) — advisor-
-approved, applied to ~/.claude/CLAUDE.md, pushed via `bootstrap.py --push-global`; the 6 Real-Path
-rules were NOT touched. OT-end checkout is now MIDNIGHT-SAFE (`ot_now_end_times`, datetime-based);
-deployed + verified (HEAD 4d14918, twbshop-gm active). Drill done: DB write-path is clean (all GM
-writes go through committing `_db()`); the HIGH-RISK hook PASSES script-level acceptance 9/9.
-**FIRST after restart — prove the live hook wiring** (it loads from .claude/settings.json at session
-start; it was NOT active last session — a `systemctl restart` Bash call did not prompt). Test: attempt
-a protected action (e.g. a Bash `systemctl restart …` or an Edit to secrets.py) → it MUST pop an
-"approve this exact action" prompt. If it doesn't, the hook isn't wired — investigate settings.json.
-THEN pick one open attendance thread:
+**▶ RESUME HERE (session 31 → next session):**
+HIGH-RISK hook wiring is PROVEN + HARDENED (session-31 note above): it fires live, and now hard-blocks
+(exit 2) in every mode unless the marker `#HIGHRISK-OK` is appended to the command. ⚠ The PowerShell-
+coverage matcher change activates only after a fresh session RESTART (Bash already guarded live). After
+restart, optionally re-confirm: a `systemctl restart …` via the PowerShell tool should hard-block.
+OT-end checkout is MIDNIGHT-SAFE (`ot_now_end_times`); DB write-path clean. Pick one open attendance
+thread:
   (a) **Bank-on-completion for OT** — the only fix for "leave early, keep OT pay" (flagged, not built);
   (b) **Go-live prep** — owner role-play test → /testreset → /testmode off → greeting + 📋 Menu →
       flip attendance_live (see the session-29 RESUME just below for the full go-live sequence).
