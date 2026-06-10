@@ -179,8 +179,18 @@ type it = self-approval; catastrophic actions will switch to block-and-owner-run
   `_att_dispatch`'s `confirm`, gated on `pend['_summary']`). **Wired:** AL (days + hours), the new
   shift-redefine (`scp`), day-off swap. **Not wired (by design):** sick/marriage/death/birth (already
   tappable confirm CARDS, not stale prompts) and the dormant old Now/Later OT picker (slated for removal).
-- Suite **420** green (+ `test_dispatch_al_edits_prompt_into_awaiting_card`; the 3 `_arm_pending`
+- Suite green (+ `test_dispatch_al_edits_prompt_into_awaiting_card`; the 3 `_arm_pending`
   signature tests updated to pass an `update`). Owner verifies the live edit in `/test` post-deploy.
+- **Persistent "👁 Show / 🙈 Hide who's working" toggle across EVERY card state.** One unified
+  `_al_card(audience=senior|staff)` renders the senior card AND the requester's own card in
+  pending/approved/rejected, each carrying the toggle: the requester's reason prompt now edits into
+  THEIR own AL card (toggle + "⏳ Awaiting approval"), registered in `al_staff_cards` so `_al_finalize`
+  flips it to the verdict; senior cards KEEP the toggle after the decision (was: buttons vanished).
+  `_al_coverage_toggle` is audience-aware + works in any status. **Day-off swap** got the same:
+  `_swap_senior_card` + `_swap_coverage_html` (BOTH affected days' coverage) + `att:swcov:` toggle,
+  persisting through partner_ok → approved/rejected. Suite **421**. NOT yet wired (reported to owner):
+  the toggle on the pre-reason PICKER prompt, and the requester/partner swap cards (only senior swap
+  cards carry it).
 
 **⏳ IN PROGRESS (session 31) — OT / shift-redefine rebuild → full settled design in `docs/OT_DESIGN.md`.**
 Owner redesigned OT into a UNIFIED **"redefine-a-shift"** model: a senior retimes / moves / extends a

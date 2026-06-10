@@ -450,7 +450,7 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     sw = {"id": 9, "requester_id": 1, "partner_id": 2, "req_off_date": "2026-06-21",
           "partner_off_date": "2026-06-24", "reason": "x", "status": "partner_ok"}
     monkeypatch.setattr(bot, "swap_get", lambda i: sw)
-    monkeypatch.setattr(bot, "swap_set_status", lambda *a, **k: None)
+    monkeypatch.setattr(bot, "swap_set_status", lambda i, st: sw.__setitem__("status", st))
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
         {"id": 1, "canonical_name": "Req", "call_name": "Req", "telegram_ids": [11]},
         {"id": 2, "canonical_name": "Par", "call_name": "Par", "telegram_ids": [22]}])
@@ -462,8 +462,9 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     monkeypatch.setattr(bot, "_att_send", _send)
 
     class _Bot:
-        async def edit_message_text(self, text, chat_id=None, message_id=None, parse_mode=None):
-            edits.append((chat_id, message_id, text))
+        async def edit_message_text(self, text, chat_id=None, message_id=None,
+                                    parse_mode=None, reply_markup=None):
+            edits.append((chat_id, message_id, text, reply_markup))
 
     ctx = _Ctx()
     ctx.bot = _Bot()
@@ -472,6 +473,42 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert len(edits) == 2
     assert "✅ Approved" in edits[0][2] and "Day-off swap" in edits[0][2]
     assert "Requester" in roles and "Partner" in roles and "Supervisors group" in roles
+    # the decided senior swap card KEEPS the both-days Show-who's-working toggle
+    tog = [b.text for row in edits[0][3].inline_keyboard for b in row]
+    assert any("who's working" in b for b in tog)
+
+
+def test_swap_senior_card_states_and_both_days_toggle(monkeypatch):
+    """The senior day-off-swap card: Approve+toggle while partner_ok; expanded shows BOTH affected
+    days' coverage; once decided the verdict shows and the toggle STAYS (no Approve)."""
+    from gm_bot import bot
+    roster = [
+        {"id": 1, "canonical_name": "Req", "call_name": "Req", "work_start": "08:00",
+         "work_end": "17:00", "org": "TWB", "day_off": "Sun"},
+        {"id": 2, "canonical_name": "Par", "call_name": "Par", "work_start": "08:00",
+         "work_end": "17:00", "org": "TWB", "day_off": "Wed"},
+        {"id": 3, "canonical_name": "Other", "call_name": "Other", "work_start": "08:00",
+         "work_end": "17:00", "org": "TWB", "day_off": "Mon"}]
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: roster)
+    req, partner = roster[0], roster[1]
+    sw = {"id": 9, "requester_id": 1, "partner_id": 2, "req_off_date": "2026-06-21",   # Sun
+          "partner_off_date": "2026-06-24", "reason": "x", "status": "partner_ok"}     # Wed
+
+    body, kb = bot._swap_senior_card(sw, req, partner, show_cov=False)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    assert any("Approve" in l for l in labels) and any("Show who's working" in l for l in labels)
+    assert "Working those days" not in body
+
+    body2, _ = bot._swap_senior_card(sw, req, partner, show_cov=True)
+    assert "Working those days" in body2
+    assert "Sun 21/06" in body2 and "Wed 24/06" in body2     # BOTH affected days
+
+    sw["status"] = "approved"
+    body3, kb3 = bot._swap_senior_card(sw, req, partner, show_cov=False)
+    assert "✅ Approved" in body3
+    labels3 = [b.text for row in kb3.inline_keyboard for b in row]
+    assert not any("Approve" in l for l in labels3)          # decided → no Approve
+    assert any("Show who's working" in l for l in labels3)   # toggle persists
 
 
 def test_ot_now_end_times_latest_per_staff(monkeypatch):

@@ -1795,6 +1795,72 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
            d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min))))
 
 
+def _swap_coverage_html(req: dict, partner: dict, sw: dict) -> str:
+    """The '👥 Working those days' block for a swap — BOTH affected days: who's working on the
+    requester's off date (requester away) AND on the partner's off date (partner away)."""
+    import html
+    parts = []
+    for who_off, iso in ((req, str(sw["req_off_date"])), (partner, str(sw["partner_off_date"]))):
+        ln = _al_availability_lines(who_off, [iso])     # excludes who_off, uses their shift hours
+        if ln:
+            parts.append(ln)
+    if not parts:
+        return ""
+    avail = "\n".join(
+        ("<b>%s</b>:%s" % (html.escape(l.split(":", 1)[0]), html.escape(l.split(":", 1)[1]))
+         if ":" in l else html.escape(l))
+        for l in "\n".join(parts).split("\n"))
+    return "\n\n👥 Working those days:\n%s" % avail
+
+
+def _swap_senior_card(sw: dict, req: dict, partner: dict,
+                      show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    """The senior's day-off-swap card, in every state (partner_ok / approved / rejected), carrying a
+    persistent 👁/🙈 Show-who's-working toggle (both days) that survives the decision."""
+    import html
+    from datetime import date as _date
+    rn = req.get("call_name") or req["canonical_name"]
+    pn = partner.get("call_name") or partner["canonical_name"]
+    d1 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+    d2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
+    st = sw.get("status")
+    body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s"
+            % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
+               html.escape(sw.get("reason") or "—")))
+    if st in ("approved", "rejected"):
+        body += "\n\n" + ("✅ Approved" if st == "approved" else "❌ Not approved")
+    if show_cov:
+        body += _swap_coverage_html(req, partner, sw)
+    cov = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    rows = []
+    if st == "partner_ok":
+        rows.append([InlineKeyboardButton("✅ Approve · អនុម័ត",
+                     callback_data="att:swps:%d:approve" % sw["id"])])
+        rows.append([InlineKeyboardButton("❌ Not approve · មិនអនុម័ត",
+                     callback_data="att:swps:%d:not_approve" % sw["id"])])
+    rows.append([InlineKeyboardButton(cov[0], callback_data="att:swcov:%d:%d" % (sw["id"], cov[1]))])
+    return body, InlineKeyboardMarkup(rows)
+
+
+async def _swap_coverage_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:swcov:{id}:{flag} — show/hide both-days coverage on a senior swap card, any state."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    sw = swap_get(int(parts[2]))
+    if not sw:
+        return
+    req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
+    partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
+    if not req or not partner:
+        return
+    body, kb = _swap_senior_card(sw, req, partner, show_cov=bool(int(parts[3])))
+    try:
+        await query.edit_message_text(body, reply_markup=kb, parse_mode="HTML")
+    except Exception:
+        pass
+
+
 async def submit_swap(context, requester: dict, partner: dict, req_off_date: str,
                       partner_off_date: str, reason: str) -> int:
     """Create a day-off swap and ask the PARTNER first (their veto is cheapest)."""
@@ -1843,21 +1909,15 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
     swap_set_partner(int(sw["id"]), True)
     await query.edit_message_text(query.message.text + "\n\n✅ You agreed — sending to seniors.\n"
                                   "✅ អ្នកបានយល់ព្រមហើយ — កំពុងផ្ញើទៅបងៗ/អ្នកគ្រប់គ្រង។")
-    # now seniors
+    # now seniors — the card carries a persistent 👁 Show-who's-working toggle (both affected days)
     req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
-    _swap_a = req.get("call_name") if req else "?"
-    _swap_b = (partner.get("call_name") or partner["canonical_name"]) if partner else "partner"
-    _swap_r = sw.get("reason") or "—"
-    body = ("Day-off swap: %s ↔ %s. Reason: %s\nប្តូរថ្ងៃឈប់៖ %s ↔ %s។ មូលហេតុ៖ %s"
-            % (_swap_a, _swap_b, _swap_r, _swap_a, _swap_b, _swap_r))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:swps:%d:approve" % sw["id"])],
-        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:swps:%d:not_approve" % sw["id"])],
-    ])
+    sw = swap_get(int(sw["id"]))   # re-read: status is now 'partner_ok' (drives the senior card)
     cards = context.bot_data.setdefault("swap_cards", {}).setdefault(sw["id"], [])
     for sen in _seniors(exclude_staff_id=sw["requester_id"]):
+        body, kb = _swap_senior_card(sw, req, partner, show_cov=False)
         msg = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                              sen.get("call_name") or sen["canonical_name"], body, kb=kb)
+                              sen.get("call_name") or sen["canonical_name"], body, kb=kb,
+                              parse_mode="HTML")
         if msg is not None:
             cards.append((msg.chat_id, msg.message_id))
 
@@ -1894,18 +1954,14 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
     partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
     if not req or not partner:
         return
-    # edit the senior cards in place (the swap request stays intact + the verdict) — like AL
-    from datetime import date as _date0
-    _rn0 = req.get("call_name") or req["canonical_name"]
-    _pn0 = partner.get("call_name") or partner["canonical_name"]
-    _rd0 = _date0.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
-    _pd0 = _date0.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
-    _final = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s\n\n%s"
-              % (_rn0, _pn0, _rn0, _rd0, _pn0, _pd0, sw.get("reason") or "—",
-                 "✅ Approved" if approved else "❌ Not approved"))
+    # edit the senior cards in place (request stays intact + the verdict) — and KEEP the
+    # 👁 Show-who's-working toggle so coverage stays checkable after the decision (like AL).
+    sw2 = swap_get(sw["id"])   # status now approved/rejected
+    _fbody, _fkb = _swap_senior_card(sw2, req, partner, show_cov=False)
     for _cid, _mid in context.bot_data.get("swap_cards", {}).pop(sw["id"], []):
         try:
-            await context.bot.edit_message_text(_final, chat_id=_cid, message_id=_mid)
+            await context.bot.edit_message_text(_fbody, chat_id=_cid, message_id=_mid,
+                                                reply_markup=_fkb, parse_mode="HTML")
         except Exception:
             pass
     if approved:
@@ -4486,6 +4542,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_al_coverage_toggle, pattern=r"^att:alcov:"))
     app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))
     app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
+    app.add_handler(CallbackQueryHandler(_swap_coverage_toggle, pattern=r"^att:swcov:"))
     app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
     app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
