@@ -46,6 +46,21 @@ Format per item: **English** — `Khmer draft` — *(where it shows)*.
 - `📝 Type the reason — your next message submits the AL request for senior approval.` — `📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។`
 - `📝 Type the reason — your partner agrees first, then the seniors approve.` — `📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។`
 
+## 7. June-8 backlog — older "(KH pending review)" strings, swept in session 32
+> These are the staff-facing texts from the June-8 dry-run/shell build that pre-date this file.
+> They appear today as owner `/test` previews, but the LIVE flows will send the same wording — so
+> they need the same native pass. (Two were excluded: the Hours-AL help line is already in §1; the
+> "outside the shop too long / 30-min allowance" line belongs to the DROPPED whole-shift-tracking
+> model and should be deleted, not translated.)
+
+- `Asking to leave from now. One senior ✅ lets them go; a 2nd confirms after.` — `សុំចេញពីពេលនេះ។ បង 1 នាក់ ✅ អនុញ្ញាតឱ្យចេញ; បងទី 2 បញ្ជាក់តាមក្រោយ។` — *(senior card, from-now mid-shift AL — the 1-senior-to-leave rule)*
+- `Note: {name} only has 1.5 AL days left but is requesting 3 — your call.` — `ចំណាំ៖ {name} នៅសល់ AL តែ 1.5 ថ្ងៃ តែស្នើ 3 ថ្ងៃ — សម្រេចតាមអ្នក។` — *(senior card, insufficient-balance flag — seniors still decide)*
+- `Your AL is approved ✓ {from} → {to}. You have {N} AL days left. 🤍` — `AL របស់អ្នកអនុម័តហើយ ✓ {from} → {to}។ ប្អូននៅសល់ AL {N} ថ្ងៃទៀត។ 🤍` — *(to the requester after 2 ✅ — warm confirmation + new balance)*
+- `{name} on leave 9pm–12am on {days}. Back at work: 12am each of those nights (rest of shift as normal).` — *(NO KH AT ALL yet — Supervisors group notice for HOURS-AL; needs full Khmer line)*
+- `Your marriage leave is approved ✓ {from} → {to}. Congratulations! 🤍` — `ច្បាប់រៀបការរបស់ប្អូនអនុម័តហើយ ✓ {from} → {to}។ អបអរសាទរ! 🤍` — *(marriage approved — warm confirmation)*
+- `We're very sorry for your loss 🤍 1 day of leave today. No approval needed.` — `យើងសូមចូលរួមរំលែកទុក្ខ 🤍 សម្រាក 1 ថ្ងៃថ្ងៃនេះ។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។` — *(death COMPASSION tier — sibling/grandparent, instant 1 day, zero questions; tone is critical here)*
+- `Please message me directly about your time off 🤍` — `សូមផ្ញើសារមកខ្ញុំផ្ទាល់អំពីការឈប់សម្រាករបស់អ្នក 🤍` — *(group redirect — someone posts leave/late in a group, GM sends them private)*
+
 ---
 
 ### Open questions for ChatGPT
