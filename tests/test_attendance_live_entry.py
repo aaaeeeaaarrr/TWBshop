@@ -818,6 +818,73 @@ def test_settle_clamps_to_approved_window(monkeypatch):
     assert banked == []
 
 
+def test_payback_ladder_shielded_by_agreed_ot(monkeypatch):
+    """OT_DESIGN §4 shield: an agreed upcoming OT landing before the debt's 14-day deadline pauses
+    the ignore-ladder (no warn, no auto-book); without it the ladder runs as before. Stateless —
+    re-exposure is just the query no longer matching."""
+    import datetime as _dt
+    from gm_bot import bot, finance
+    from shared import database as db
+    today = _dt.datetime.now(finance.PP_TZ).date()
+    debt = {"id": 1, "staff_id": 11, "balance": 60,
+            "created_date": today - _dt.timedelta(days=6)}        # ≥4 ladder days → autobook stage
+    staff = {"id": 11, "canonical_name": "Visal", "call_name": "Visal", "telegram_ids": [555],
+             "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}
+    booked, sent, asked = [], [], []
+    monkeypatch.setattr(bot, "_att_active", lambda: True)
+    monkeypatch.setattr(bot, "payback_all_open", lambda: [debt])
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [staff])
+    monkeypatch.setattr(bot, "al_leave_days_set", lambda sid: set())
+    monkeypatch.setattr(bot, "payback_book", lambda *a, **k: booked.append(a))
+
+    async def _send(*a, **k):
+        sent.append(a)
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+
+    def _shield(sid, t, ddl):
+        asked.append((sid, t, ddl))
+        return {"id": 9}
+
+    monkeypatch.setattr(db, "ot_shield_until", _shield)
+    asyncio.run(bot._payback_ladder_job(_Ctx()))
+    assert booked == [] and sent == []                            # shield → ladder fully paused
+    assert asked and asked[0][0] == 11
+    ddl = _dt.date.fromisoformat(asked[0][2])
+    assert ddl == debt["created_date"] + _dt.timedelta(days=14)   # deadline = created + 14
+
+    monkeypatch.setattr(db, "ot_shield_until", lambda sid, t, ddl: None)
+    asyncio.run(bot._payback_ladder_job(_Ctx()))
+    assert booked and sent                                        # no shield → autobook fires
+
+
+def test_ot_shield_until_requires_real_ot(monkeypatch):
+    """The shield needs the latest redefine to actually CARRY OT — a retime without extension
+    (end ≤ start+normal_len) never shields."""
+    from shared import database as db
+    rows = []
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return rows
+
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    # plain retime (9h window, 9h normal) → no shield
+    rows = [{"id": 1, "start_min": 780, "end_min": 780 + 540, "normal_len": 540}]
+    assert db.ot_shield_until(11, "2026-06-16", "2026-06-30") is None
+    # +2h extension → shields
+    rows = [{"id": 2, "start_min": 780, "end_min": 780 + 660, "normal_len": 540}]
+    assert db.ot_shield_until(11, "2026-06-16", "2026-06-30")["id"] == 2
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

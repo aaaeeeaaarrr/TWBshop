@@ -215,9 +215,17 @@ in an elevated shell, then back to attendance.)
   raw minutes on the shift-date base). Early arrival earns points never OT; lingering past the approved
   end banks nothing; late still reduces. + `test_settle_clamps_to_approved_window` (on-time / early+
   linger / 2h-late). Suite **429**. All four overnight-audit problems are now FIXED.
-- ⏳ **Attendance NEXT:** the shield (approved OT pauses the PB ladder before its deadline),
-  `_offer_buyback` on settle (take banked OT as rest), `/test` simulate-checkout showing the banking,
-  then go-live prep (owner role-play → /testreset → flip). attendance_live=OFF, attendance_test_mode=OFF.
+- **SHIELD built (OT_DESIGN §4):** `ot_shield_until(staff_id, today, by_date)` — the latest-per-date
+  APPROVED redefine that still CARRIES OT (end > start+normal_len) landing in [today, debt deadline].
+  `_payback_ladder_job` skips warn/auto-book while it stands (deadline = `created_date +
+  payback.PB_DEADLINE_DAYS` (14, new constant)). **Stateless re-exposure by construction:** decline/
+  cancel = status change, re-edit-to-no-OT = latest-per-date wins, absence = date passes — all just
+  stop matching and the ladder resumes next daily run; 'done' never matches (its OT already settled
+  the debt at checkout). NOTE: the calm daily check-in line still shows (debt genuinely exists until
+  the OT clears it) — only warn/auto-book pause. +2 tests. Suite **431**.
+- ⏳ **Attendance NEXT:** `_offer_buyback` on settle (take banked OT as rest), `/test`
+  simulate-checkout showing the banking, then go-live prep (owner role-play → /testreset → flip).
+  attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

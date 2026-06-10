@@ -3053,6 +3053,30 @@ def shift_change_set_banked(change_id: int, ot_banked: int) -> None:
                         (ot_banked, change_id))
 
 
+def ot_shield_until(staff_id: int, today_iso: str, by_date_iso: str) -> dict | None:
+    """The staff's upcoming APPROVED shift-redefine that still carries OT (end beyond
+    start+normal_len) landing in [today, by_date] — the PB-ladder SHIELD (OT_DESIGN §4): agreed OT
+    will clear the debt at checkout, so the ignore-ladder pauses while it stands. Stateless
+    re-exposure by construction: a decline/cancel changes status, a re-edit-to-no-OT wins the
+    latest-per-date pick, an absence lets the date pass — all simply stop matching and the ladder
+    resumes. 'done' never matches (its OT already settled the debt). Test-isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT DISTINCT ON (when_date) *
+                   FROM shift_changes
+                   WHERE staff_id=%s AND status='approved'
+                     AND when_date >= %s AND when_date <= %s AND is_test=%s
+                   ORDER BY when_date, approved_at DESC NULLS LAST, id DESC""",
+                (staff_id, today_iso, by_date_iso, _ATT_TEST))
+            for r in cur.fetchall():
+                if r["start_min"] is None or r["end_min"] is None:
+                    continue
+                if (int(r["end_min"]) - int(r["start_min"])) > int(r["normal_len"] or 0):
+                    return dict(r)
+    return None
+
+
 def shift_changes_active_map(date_isos: list[str]) -> dict:
     """{(staff_id, when_date_iso): (start_min, end_min)} for every approved/done redefine landing on
     any of `date_isos`. Latest-wins per (staff, date). Test-isolated. Batch form of shift_change_active

@@ -11,6 +11,8 @@ from datetime import date, timedelta
 
 _DOW = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
+PB_DEADLINE_DAYS = 14   # a debt must be worked off within 14 days (owner spec, session 28)
+
 
 def working_days_ahead(day_off: str | None, leave_iso: set[str], start: date,
                        n_days: int, count: int) -> list[date]:

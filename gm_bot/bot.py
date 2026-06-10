@@ -2177,11 +2177,20 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _att_active():
         return
     from gm_bot import payback as pb
+    from shared.database import ot_shield_until
     today = datetime.now(finance.PP_TZ).date()
     for debt in payback_all_open():
         staff = next((s for s in staff_all("active") if s["id"] == debt["staff_id"]), None)
         if not staff or not (staff.get("telegram_ids") or []):
             continue
+        # OT SHIELD (OT_DESIGN §4): an agreed upcoming OT landing before this debt's deadline will
+        # clear it at checkout — pause warn/auto-book while it stands. Stateless: decline / re-edit
+        # to no-OT / absence (date passes) simply stop matching and the ladder resumes next run.
+        if debt.get("created_date"):
+            from datetime import timedelta as _sd
+            ddl = (debt["created_date"] + _sd(days=pb.PB_DEADLINE_DAYS)).isoformat()
+            if ot_shield_until(debt["staff_id"], today.isoformat(), ddl):
+                continue
         uid = staff["telegram_ids"][0]
         # ladder days = calendar days since created MINUS legitimate-leave days (freeze rule) and the
         # staff's day-off weekday (they can still tap, but we don't count it as a chance missed)
