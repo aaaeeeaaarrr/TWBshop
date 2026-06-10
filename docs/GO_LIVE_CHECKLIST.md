@@ -1,0 +1,47 @@
+# Attendance Go-Live Checklist
+
+> The single tracked list for flipping `attendance_live`. Updated as items close. Companion to
+> `ATTENDANCE_SYSTEM_DETAILED.md` (the full spec). Everything below is gated OFF until the flip.
+
+## A. Built & shipped this session (✅ done, live on server, gated OFF)
+- ✅ **OT / shift-redefine** end-to-end: propose → staff approve → attendance uses redefined times →
+  checkout banks OT (clamped to the approved window) → buyback offer. Overnight-safe (right date).
+- ✅ **Shield** — an approved upcoming OT pauses the payback ignore-ladder before its deadline.
+- ✅ **Auto-checkout** — live share still in-zone at shift end closes silently + thanks them; detects
+  a stopped share so it can't be gamed.
+- ✅ **My Schedule** — `Payback debt: 5h (4h booked)` + `OT bank: Xh (Yh upcoming)`, no double-count.
+- ✅ **Khmer batch** wired (ChatGPT pass) + `+10 points ⭐` convention; coverage label `ពេលនោះ`.
+- ✅ **Owner tools:** `/pb` (who owes pay-back + booked), `/commands` (full help list).
+- ✅ **Group-redirect** — Supervisors group only, rotating zero-API wording, tags the sender (uid-safe).
+- ✅ **`/test` harness:** simulate-checkout, test clock (`/testclock`), job triggers (`/testrun`).
+- ✅ **Guard tuning** (dev-machine only): allow our own app-bot restarts; don't scan commit-message text.
+
+## B. To wire/finish before the flip (⏳)
+1. ⏳ **Summary/digest SOURCE switch (owner request, this is the active item).** When `attendance_live`,
+   the weekly digest (`_weekly_attendance_digest_job`) must read the **structured attendance tables**
+   (lateness_records · al_requests/approvals · no_show_records · payback_debts · ot_bank · special_leaves)
+   — the real button-press data — instead of the AI-read-from-group lateness cases + staffing concerns
+   it uses now. Include the spec's **time-ledger line** ("staff owe shop Xh · shop owes staff Yh") + open
+   debts + the week's lateness/AL/no-show. Keep the AI digest as the pre-live/fallback. *(Design pending
+   owner confirmation — see the open question below.)*
+2. ⏳ **Final Khmer proof-read in `/test`.** Test mode strips Khmer to English for the owner; a
+   `/testkhmer on` toggle (small build) would let the owner eyeball the real bilingual bodies.
+3. ⏳ **Owner role-play sign-off** — walk every flow as each persona + every `/testrun` job; tweak any
+   wording. Then `/testreset`.
+4. ⏳ **Points activation** — values stay dormant until the owner finalizes them (catalogued, not blocking).
+
+## C. The flip
+1. Owner confirms role-play is clean → `/testreset` (wipe test rows) → `/teststatus` shows zero.
+2. Brief staff; everyone has pressed Start (done 33/33).
+3. Set `attendance_live='true'`. Live-location requirement waits until the owner has explained it.
+
+## D. Standing (not attendance, but on the books)
+- 🔒 **Bedrock delta 2** — owner OS-locks the global guard files (elevated shell).
+- ⏰ **Staging Postgres** by 2026-06-30 — get the prod DB credential out of dev.
+
+---
+### Open question for the digest-source item (B1)
+- When live, **replace** the AI digest with the structured one, or **show both** (structured facts +
+  AI's softer pattern notes)?
+- Any **other** GM summaries beyond the weekly digest that should switch source? (daily report
+  watchdogs and the receipt/finance reports read different systems and likely stay as-is.)
