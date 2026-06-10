@@ -71,6 +71,28 @@ A Telegram-based bakery operations system that handles:
 
 **Read the "Current Status" section of this file immediately.** It is the only source of truth for what to work on next. Never use memory notes — they are local to one machine and go stale across machines.
 
+**Also read `docs/ACTIONS_LEDGER.md`** — any operational/real-data instruction that's still Open.
+
+---
+
+## Operational Instructions — never drop a real-data change
+
+Real-data instructions (clear/adjust **payback**, deduct/add **AL**, change a **balance**, **staff
+record**, **payment**, or any "do X to the numbers") are HIGH-RISK and must NEVER sit unacted — a
+dropped one makes the shop's numbers wrong. The rule:
+
+1. **Do it immediately** when instructed, with before/after proof from an INDEPENDENT read (separate
+   process/connection) — never defer a data change to "later in the task" or treat it as a chat aside.
+2. If it genuinely can't be done right now, **log it to `docs/ACTIONS_LEDGER.md` → Open** the moment
+   it's given, and tell the owner plainly it is NOT done yet.
+3. **Read `docs/ACTIONS_LEDGER.md` at session start** (with Current Status). At the end of any turn
+   where the owner gave instructions, **state the open loops** — "Open items: none" or the list.
+
+Why: an instruction acknowledged only in chat, never executed or written to a file, gets buried by
+context compaction and the numbers silently go wrong. Files are truth; chat is disposable. (Once
+`attendance_live` flips, most of these happen through the bot's audited button flows, not by hand —
+which shrinks this risk on its own.)
+
 ---
 
 ## Deploy Discipline (restart-safety — read before restarting any service)
