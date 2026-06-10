@@ -370,16 +370,16 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① the SENIOR's approval card (every senior gets it privately — even on their day off)",
          "Meng requests AL: Tue 23/06 → Thu 25/06 (full day). Reason: family trip\n"
          "Meng ស្នើ AL: Tue 23/06 → Thu 25/06 (ពេញមួយថ្ងៃ)។ មូលហេតុ៖ family trip\n\n"
-         "Working those hours: Davy, Nak, Sey\nអ្នកធ្វើការម៉ោងនោះ៖ Davy, Nak, Sey", appr_kb),
+         "Working those hours: Davy, Nak, Sey\nអ្នកធ្វើការពេលនោះ៖ Davy, Nak, Sey", appr_kb),
         ("② SHORT-NOTICE request (within 7 days) — costs points, computed total shown",
          "⚠ Short notice (within 7 days) — about −54 points for a full day (−0.1/min).\n"
          "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
         ("③ HOURS-AL (part of a day)",
          "Hours AL: 9pm → 12am (3h of a 9h shift = 0.3 AL).\n"
-         "AL តាមម៉ោង៖ 9pm → 12am (3h ក្នុង 9h = 0.3 AL)។  (KH pending review)", None),
+         "AL តាមម៉ោង៖ 9pm → 12am (3h ក្នុងវេន 9h = 0.3 AL)។", None),
         ("④ FROM-NOW (today, mid-shift) — 1 senior can let them leave, 2nd ratifies after",
          "Asking to leave from now. One senior ✅ lets them go; a 2nd confirms after.\n"
-         "សុំចេញពីពេលនេះ។ បង 1 នាក់ ✅ អនុញ្ញាតឱ្យចេញ; បងទី 2 បញ្ជាក់តាមក្រោយ។  (KH pending review)", None),
+         "សុំចេញពីពេលនេះ។ បង 1 នាក់ ✅ អាចអនុញ្ញាតឱ្យចេញបាន; បងទី 2 បញ្ជាក់តាមក្រោយ។", None),
         ("⑤ INSUFFICIENT balance — owner flagged, seniors still decide",
          "Note: Meng only has 1.5 AL days left but is requesting 3 — your call.\n"
          "ចំណាំ៖ Meng នៅសល់ AL តែ 1.5 ថ្ងៃ តែស្នើ 3 ថ្ងៃ — សម្រេចតាមអ្នក។  (KH pending review)", None),
@@ -387,7 +387,7 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។", None),
         ("⑦ to the requester — approved + new balance",
          "Your AL is approved ✓ Tue 23/06 → Thu 25/06. You have 4.5 AL days left. 🤍\n"
-         "AL របស់អ្នកអនុម័តហើយ ✓ Tue 23/06 → Thu 25/06។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត។ 🤍  (KH pending review)",
+         "AL របស់ប្អូនបានអនុម័តហើយ ✓ Tue 23/06 → Thu 25/06។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត 🤍",
          None),
         ("⑧ to the requester — not approved (seniors-only recap, nothing to the group)",
          "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
@@ -480,7 +480,7 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "💍 រៀបការរបស់អ្នក៖ 3 ថ្ងៃ, Mon 14/07 → Wed 16/07។", None),
         ("② marriage approved → warm confirmation",
          "Your marriage leave is approved ✓ Mon 14/07 → Wed 16/07. Congratulations! 🤍\n"
-         "ច្បាប់រៀបការរបស់ប្អូនអនុម័តហើយ ✓ Mon 14/07 → Wed 16/07។ អបអរសាទរ! 🤍  (KH pending review)", None),
+         "ច្បាប់រៀបការរបស់ប្អូនបានអនុម័តហើយ ✓ Mon 14/07 → Wed 16/07។ អបអរសាទរ! 🤍", None),
         ("③ CHILD's marriage (1 day)",
          "👰 Child's marriage: 1 day on Sat 19/07.\n👰 រៀបការកូន៖ 1 ថ្ងៃ នៅ Sat 19/07។", None),
         ("④ FAMILY DEATH — law tier (child/parent/spouse): instant, NO approval, 3–7 days",
@@ -492,7 +492,7 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Davy ឈប់សម្រាក Tue 09/06 → Thu 11/06 (មរណភាព ឪពុក/ម្តាយ)។", None),
         ("⑥ death COMPASSION tier (sibling/grandparent): 1 day instant, zero questions",
          "We're very sorry for your loss 🤍 1 day of leave today. No approval needed.\n"
-         "យើងសូមចូលរួមរំលែកទុក្ខ 🤍 សម្រាក 1 ថ្ងៃថ្ងៃនេះ។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។  (KH pending review)",
+         "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍 ថ្ងៃនេះប្អូនអាចសម្រាក 1 ថ្ងៃបានភ្លាមៗ។ មិនចាំបាច់រង់ចាំការអនុម័តទេ។",
          None),
         ("⑦ [→ OWNER] compassion case → one-tap upgrade if it warrants",
          "Davy reported a sibling's death — gave 1 day (compassion). Upgrade?", upgrade_kb),
@@ -548,7 +548,7 @@ def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          None),
         ("② GROUP REDIRECT — someone posts leave/late in a group → GM sends them private",
          "Please message me directly about your time off 🤍\n"
-         "សូមផ្ញើសារមកខ្ញុំផ្ទាល់អំពីការឈប់សម្រាករបស់អ្នក 🤍  (KH pending review)", None),
+         "សូមផ្ញើសារមកខ្ញុំផ្ទាល់អំពីការឈប់សម្រាករបស់ប្អូន 🤍", None),
         ("③ CALL-OUT — private DM when a pattern shows (warm, by name, Sonnet-written)",
          "Hi Davy — we noticed Mondays have been hard lately (3 of your last 4 lates). "
          "Everything okay? Let's fix Mondays together. 🤍\n(AI-written bilingual at send time; CC to owners)",
@@ -667,11 +667,11 @@ def _al_prompt(p: dict, context, detail: str, days: list, hs, he, show_cov: bool
         except Exception:
             cov = ""
         if cov:
-            _lab = ("Working those hours · អ្នកធ្វើការម៉ោងនោះ" if hs
+            _lab = ("Working those hours · អ្នកធ្វើការពេលនោះ" if hs
                     else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
             line += "\n\n👥 %s:\n%s" % (_lab, cov)
     line += ("\n\n📝 Type the reason — your next message submits the AL request for senior approval.\n"
-             "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។")
+             "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើសំណើ AL ទៅបងៗ ដើម្បីសុំការអនុម័ត។")
     lbl, flag = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
                  else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
     extra = [[InlineKeyboardButton(lbl, callback_data="att:al:cov:%d" % flag)]]
@@ -709,7 +709,7 @@ def _swap_prompt(p: dict, context, base: str, partner_id, req_off: str, partner_
         if cov:
             line += "\n\n👥 Working those days · អ្នកធ្វើការថ្ងៃនោះ:\n%s" % cov
     line += ("\n\n📝 Type the reason — your partner agrees first, then the seniors approve.\n"
-             "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។")
+             "📝 សរសេរមូលហេតុ — ដៃគូត្រូវយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។")
     lbl, flag = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
                  else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
     extra = [[InlineKeyboardButton(lbl, callback_data="att:do:cov:%d" % flag)]]
@@ -1464,7 +1464,7 @@ def sc_day_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
         # reach that date; start is locked → straight to the END ladder (att:scp:st routes to sc_end)
         tdidx, ws_eff, _iso = run
         rows.append([InlineKeyboardButton(
-            "⚡ Extend the shift running NOW (started %s) · បន្ថែមវេនកំពុងដំណើរការ" % fmt12(ws_eff),
+            "⚡ Extend the shift running NOW (started %s) · បន្ថែមវេនដែលកំពុងដំណើរការ" % fmt12(ws_eff),
             callback_data="att:scp:st:%d:%d:%d" % (sid, tdidx, ws_eff))])
     rows += grid([InlineKeyboardButton(day_label(d), callback_data="att:scp:m:%d:%d" % (sid, i))
                   for i, d in _sc_workdays(sid)], 2)
@@ -1484,13 +1484,13 @@ def sc_mode(p: dict, sid: int, didx: int) -> tuple[str, InlineKeyboardMarkup]:
     if run and run[0] == 0:
         rows = [
             _back_row("att:scp:d:%d" % sid),
-            [InlineKeyboardButton("⏱ Extend the end (started %s) · បន្ថែមម៉ោងបញ្ចប់" % fmt12(run[1]),
+            [InlineKeyboardButton("⏱ Extend the end (started %s) · បន្ថែមម៉ោងចប់" % fmt12(run[1]),
                                   callback_data="att:scp:st:%d:0:%d" % (sid, run[1]))],
             [InlineKeyboardButton("📅 Change day · ប្តូរថ្ងៃ", callback_data="att:scp:cd:%d:%d" % (sid, didx))],
         ]
         return _hdr(p, "%s is MID-SHIFT (started %s) — the start is locked. Extend the end, "
-                       "or move a day?\n%s កំពុងធ្វើការ (ចាប់ផ្តើម %s) — ម៉ោងចាប់ផ្តើមផ្លាស់ប្តូរមិនបានទេ។ "
-                       "បន្ថែមម៉ោងបញ្ចប់ ឬប្តូរថ្ងៃ?"
+                       "or move a day?\n%s កំពុងធ្វើវេន (ចាប់ផ្តើម %s) — ម៉ោងចាប់ផ្តើមផ្លាស់ប្តូរមិនបានទេ។ "
+                       "បន្ថែមម៉ោងចប់ ឬប្តូរថ្ងៃ?"
                     % (nm, fmt12(run[1]), nm, fmt12(run[1]))), InlineKeyboardMarkup(rows)
     rows = [
         _back_row("att:scp:d:%d" % sid),
@@ -1661,7 +1661,7 @@ _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\
 
 # Sent on EVERY successful checkout — manual share-to-checkout AND silent auto-checkout (owner).
 _CO_DONE = ("Checked out ✓ Thank you, have a nice day! 🤍\n"
-            "ចុះវត្តមានចេញរួច ✓ អរគុណ សូមមានថ្ងៃល្អ! 🤍")
+            "ចុះវត្តមានចេញរួច ✓ អរគុណ សូមឱ្យថ្ងៃនេះល្អៗ 🤍")
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -2066,7 +2066,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 detail = ("Full-day AL: %s — %d AL day(s).\nAL ពេញមួយថ្ងៃ៖ %s — %d ថ្ងៃ។"
                           % (span, len(charged), span, len(charged)))
                 if len(charged) != len(picked):
-                    detail += "\nDay off = Free"
+                    detail += "\nDay off = No AL used · ថ្ងៃឈប់ = មិនដក AL"
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                     pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
@@ -2098,7 +2098,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 detail = ("AL: %s · %s–%s = %g AL.\nAL៖ %s · %s–%s = %g AL។"
                           % (_span, fmt12(f), fmt12(t), _total, _span, fmt12(f), fmt12(t), _total))
                 if len(_charged) != len(_picked):
-                    detail += "\nDay off = Free"
+                    detail += "\nDay off = No AL used · ថ្ងៃឈប់ = មិនដក AL"
                 near = _near_days(picked)
                 if near:
                     window = t - f
@@ -2140,7 +2140,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
                      "req_off_date": req_off, "partner_off_date": partner_off,
                      "_summary": _swap_sum})
-                return await show(_swap_prompt(p, context, "%s · ប្តូរថ្ងៃឈប់។" % _swap_sum,
+                _swap_kh = ("ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ ដៃគូឈប់ %s។"
+                            % (day_label(ro), day_label(date.fromisoformat(partner_off))))
+                return await show(_swap_prompt(p, context, "%s\n%s" % (_swap_sum, _swap_kh),
                                                int(data[3]), req_off, partner_off, False))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
@@ -2188,7 +2190,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                      "_summary": _shift_sum})
                 return await show(_arm_prompt(p, context,
                     "%s\n\n📝 Type the reason — your next message sends it "
-                    "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅសុំការអនុម័ត។"
+                    "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការអនុម័ត។"
                     % _shift_sum, "att:scp:staff"))
             return await show(sc_staff_pick(p))
         return await show(sc_staff_pick(p))

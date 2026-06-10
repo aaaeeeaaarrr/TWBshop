@@ -1726,22 +1726,27 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
                 % (html.escape(rn), html.escape(rn), d1, d2, reason,
                    html.escape(rn), html.escape(rn), d1, d2, reason))
     elif audience == "requester":
-        body = ("Day-off swap — your off %s ↔ %s off %s. Reason: %s"
-                % (d1, html.escape(pn), d2, reason))
+        body = ("Day-off swap — your off %s ↔ %s off %s. Reason: %s\n"
+                "ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ %s ឈប់ %s។ មូលហេតុ៖ %s"
+                % (d1, html.escape(pn), d2, reason,
+                   d1, html.escape(pn), d2, reason))
     else:  # senior
-        body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s"
-                % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2, reason))
+        body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s\n"
+                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s។ %s ឈប់ %s, %s ឈប់ %s។ មូលហេតុ៖ %s"
+                % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2, reason,
+                   html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2, reason))
     status_line = None
     if st == "approved":
         status_line = "✅ Approved · បានអនុម័ត"
     elif st == "rejected":
-        status_line = ("✋ Declined by partner · ដៃគូបានបដិសេធ" if partner_ok is False
+        status_line = ("✋ Declined by partner · ដៃគូមិនបានយល់ព្រម" if partner_ok is False
                        else "❌ Not approved · មិនបានអនុម័ត")
     elif st == "partner_ok":
-        status_line = ("✅ You agreed — sent to seniors · បានផ្ញើទៅបងៗ" if audience == "partner"
-                       else "⏳ Awaiting senior approval · កំពុងរង់ចាំការអនុម័ត")
+        status_line = ("✅ You agreed — sent to seniors · ប្អូនបានយល់ព្រមហើយ — បានផ្ញើទៅបងៗ"
+                       if audience == "partner"
+                       else "⏳ Awaiting senior approval · កំពុងរង់ចាំបងៗអនុម័ត")
     elif st == "pending" and audience == "requester":
-        status_line = "⏳ Awaiting partner · កំពុងរង់ចាំដៃគូ"
+        status_line = "⏳ Awaiting partner · កំពុងរង់ចាំដៃគូយល់ព្រម"
     if status_line:
         body += "\n\n" + status_line
     if show_cov:
@@ -1985,7 +1990,7 @@ def _al_coverage_html(requester: dict, days: list[str],
         ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
          if ":" in ln else html.escape(ln))
         for ln in avail.split("\n"))
-    label = ("Working those hours · អ្នកធ្វើការម៉ោងនោះ" if hours_start
+    label = ("Working those hours · អ្នកធ្វើការពេលនោះ" if hours_start
              else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
     return "\n\n👥 %s:\n%s" % (label, avail_html)
 
@@ -2172,7 +2177,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         new_bal = al_deduct(req["staff_id"], amount)
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
-            "AL របស់អ្នកសម្រាប់ %s ត្រូវបានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត។ 🤍"
+            "AL របស់ប្អូនសម្រាប់ %s បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត 🤍"
             % (days_txt, new_bal, days_txt, new_bal))
         day_off = requester.get("day_off") or "—"
         await _att_send(context, None, "Supervisors group", "",

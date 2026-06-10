@@ -267,8 +267,16 @@ in an elevated shell, then back to attendance.)
   `payroll`/`salary`/`staff_registry` etc. — including a **git commit whose MESSAGE** mentions them.
   Worked around by rewording; a future guard-tuning pass should exempt commit-message bodies.
 
-**Session 32 (Jun 11) — owner fixes from the first ChatGPT KH pass (`docs/KH_REVIEW.md` now holds the
-polished output):**
+**Session 32 (Jun 11) — ChatGPT KH batch WIRED into code:** applied the polished native Khmer from
+`docs/KH_REVIEW.md` to the live strings — checkout thank-you (`សូមឱ្យថ្ងៃនេះល្អៗ`), AL-approved
+(`ប្អូន`/`បានអនុម័ត`), all swap status lines (`កំពុងរង់ចាំបងៗអនុម័ត`, `កំពុងរង់ចាំដៃគូយល់ព្រម`,
+`ប្អូនបានយល់ព្រមហើយ`, softer `ដៃគូមិនបានយល់ព្រម`), coverage toggle (`ពេលនោះ`), reason prompts,
+mid-shift extension (`ធ្វើវេន`/`ម៉ោងចប់`/`ដែលកំពុងដំណើរការ`), bereavement-compassion (warmer), group
+redirect + swap prompt/cards now bilingual (`ប្អូន`), `Day off = No AL used · ថ្ងៃឈប់ = មិនដក AL`. The
+shift-change card got `+10 points ⭐`. Cleared the live `(KH pending review)` tags. Deviations logged
+at the top of KH_REVIEW. Suite **440**; both modules import clean.
+
+**Session 32 (Jun 11) — earlier owner fixes from the KH pass:**
 - **⭐ positive-points convention:** every positive-points mention carries the star (`+10 points ⭐`).
   Fixed the one outlier — the shift-change approval card said `+10 points` / `+10 ពិន្ទុ` (no star);
   now `+10 points ⭐` both languages, with ChatGPT's better KH body.

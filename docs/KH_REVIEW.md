@@ -8,6 +8,14 @@
 
 ---
 
+> **STATUS — WIRED INTO CODE (session 32, 2026-06-11).** All the polished live strings below are now
+> applied in `gm_bot/`. Judgment-call deviations: (a) kept English "Working those hours/days" rather
+> than "Working during that time" — keeps the hours/days pair consistent; only the KH changed to
+> `ពេលនោះ`. (b) `Day off = Free` → `Day off = No AL used · ថ្ងៃឈប់ = មិនដក AL` (applied). (c) The §2.6
+> insufficient-balance senior card was RETIRED (replaced by the staff-side block — see the NEW section
+> at the bottom), so its line is left only as a dead dry-run preview. A few owner-only dry-run preview
+> lines still carry the source wording but no longer block go-live.
+
 # KH_REVIEW — polished Khmer output
 
 ## 1. Check-in & check-out
