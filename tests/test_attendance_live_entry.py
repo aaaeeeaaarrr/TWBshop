@@ -1079,6 +1079,58 @@ def test_is_share_stop():
     assert ci.is_share_stop(False, 3600) is False        # new message + live → share START
 
 
+def test_ot_pending_extension_min(monkeypatch):
+    """Sum of approved upcoming redefines' OT (end-start beyond normal_len), positive part only."""
+    from shared import database as db
+    rows = [
+        {"start_min": 120, "end_min": 900, "normal_len": 540},   # 13h window, 9h normal → +4h OT
+        {"start_min": 540, "end_min": 1080, "normal_len": 540},  # 9h window, 9h normal → 0 OT
+    ]
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return rows
+
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    assert db.ot_pending_extension_min(11, "2026-06-11") == 240   # 4h + 0
+
+
+def test_my_schedule_shows_booked_payback(monkeypatch):
+    """My Schedule shows '(Xh booked)' next to the debt when an approved upcoming OT will clear it."""
+    from gm_bot import attendance_ui as ui
+    from shared import database as db
+    p = {"id": 11, "canonical_name": "Seth", "call_name": "Seth", "work_start": "21:00",
+         "work_end": "06:00", "day_off": "Sun", "al_left": 5, "expertise": ["bakery"]}
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: {"balance": 300})   # 5h debt
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "ot_pending_extension_min", lambda sid, iso: 240)    # 4h agreed OT
+    monkeypatch.setattr(ui, "att_test_on", lambda: False)
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return []
+
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    text, _kb = ui.my_screen(p)
+    assert "Payback debt: 5h (4h booked" in text
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

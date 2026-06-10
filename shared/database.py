@@ -3077,6 +3077,24 @@ def ot_shield_until(staff_id: int, today_iso: str, by_date_iso: str) -> dict | N
     return None
 
 
+def ot_pending_extension_min(staff_id: int, today_iso: str) -> int:
+    """Total OT minutes (end−start beyond normal_len, only the positive part) from APPROVED redefines
+    on or after today — agreed-but-not-yet-worked OT. At checkout this OT clears payback FIRST, so
+    My Schedule shows it as '(Xh booked)' next to the debt: the debt is already being covered. Test-
+    isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT start_min, end_min, normal_len FROM shift_changes
+                           WHERE staff_id=%s AND status='approved' AND when_date >= %s AND is_test=%s""",
+                        (staff_id, today_iso, _ATT_TEST))
+            total = 0
+            for r in cur.fetchall():
+                if r["start_min"] is None or r["end_min"] is None:
+                    continue
+                total += max(0, (int(r["end_min"]) - int(r["start_min"])) - int(r["normal_len"] or 0))
+            return total
+
+
 def shift_changes_active_map(date_isos: list[str]) -> dict:
     """{(staff_id, when_date_iso): (start_min, end_min)} for every approved/done redefine landing on
     any of `date_isos`. Latest-wins per (staff, date). Test-isolated. Batch form of shift_change_active

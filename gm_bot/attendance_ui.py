@@ -1667,11 +1667,15 @@ _CO_DONE = ("Checked out ✓ Thank you, have a nice day! 🤍\n"
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Live personal dashboard — real balances from the DB (AL, payback debt, OT bank, upcoming)."""
     import json as _json
-    from shared.database import (_db, payback_open_debt, ot_bank_balance)
+    from shared.database import (_db, payback_open_debt, ot_bank_balance, ot_pending_extension_min)
     exp = ", ".join(p.get("expertise") or []) or "-"
     debt = payback_open_debt(p["id"])
     debt_min = debt["balance"] if debt else 0
     bank_min = ot_bank_balance(p["id"])
+    # agreed-but-not-yet-worked OT clears payback FIRST at checkout, so show how much of the debt is
+    # already covered by an approved upcoming shift-redefine: "5h (4h booked)".
+    booked_min = min(ot_pending_extension_min(p["id"], _today().isoformat()), debt_min) if debt_min else 0
+    debt_txt = _hm(debt_min) + ((" (%s booked · កក់រួច)" % _hm(booked_min)) if booked_min else "")
     # upcoming approved AL/special dates
     upcoming = []
     rows = [_back_row("att:am")]
@@ -1707,7 +1711,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "Upcoming AL: %s"
                 % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")),
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
-                   _hm(debt_min), _hm(bank_min), up_txt)), \
+                   debt_txt, _hm(bank_min), up_txt)), \
         InlineKeyboardMarkup(rows)
 
 
