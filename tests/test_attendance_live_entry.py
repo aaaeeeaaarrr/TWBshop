@@ -780,6 +780,44 @@ def test_sc_end_back_skips_start_ladder_for_yesterday(monkeypatch):
     assert kb.inline_keyboard[0][0].callback_data == "att:scp:d:11"
 
 
+def test_settle_clamps_to_approved_window(monkeypatch):
+    """OT banked at checkout = presence INSIDE the approved [start,end] only. Early arrival /
+    lingering past the approved end can't inflate the bank; late arrival still reduces it."""
+    import datetime as _dt
+    from shared import database as db
+    from gm_bot import bot, finance
+    sc = {"id": 5, "status": "approved", "normal_len": 540,        # normal 9h
+          "start_min": 780, "end_min": 1440}                        # approved 1pm–12am = 11h (+2h OT)
+    banked = []
+    monkeypatch.setattr(db, "shift_change_active", lambda sid, iso: sc)
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    monkeypatch.setattr(db, "payback_credit", lambda did, m: None)
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "ot_bank_add", lambda sid, m: banked.append(m))
+    monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+
+    def _at(hh, mm, day=15):
+        return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
+
+    staff = {"id": 11}
+    sess = {"checked_in_at": _at(13, 0)}
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: sess)
+
+    # on time, checkout at the approved midnight end → exactly the agreed 2h bank
+    bot._settle_redefined_shift(staff, "2026-06-15", _at(0, 0, day=16))
+    assert banked == [120]
+
+    # arrived 30 min EARLY + lingered 15 min past the end → still exactly 2h (clamped both sides)
+    banked.clear(); sess["checked_in_at"] = _at(12, 30)
+    bot._settle_redefined_shift(staff, "2026-06-15", _at(0, 15, day=16))
+    assert banked == [120]
+
+    # arrived 2h LATE → worked 9h = normal length → nothing banks
+    banked.clear(); sess["checked_in_at"] = _at(15, 0)
+    bot._settle_redefined_shift(staff, "2026-06-15", _at(0, 0, day=16))
+    assert banked == []
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

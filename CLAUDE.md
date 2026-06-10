@@ -210,10 +210,14 @@ in an elevated shell, then back to attendance.)
   the shift is running today (covers Back-nav); `sc_end`'s Back for tdidx<0 goes to the day list, never
   a start ladder for a date whose start happened. +7 tests (running detection day/overnight/redefine/
   day-off; the 3 screens; both leak guards). New KH drafts → docs/KH_REVIEW.md §5b. Suite **428**.
-- ⏳ **Attendance NEXT (owner-agreed order):** (a) **settle over-pay cap** (problem 3) — clamp worked
-  at the approved window length in `_settle_redefined_shift` so early arrival/lingering can't inflate
-  banked OT; then the shield (approved OT pauses the PB ladder), `_offer_buyback` on settle, `/test`
-  simulate-checkout, go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
+- **SETTLE OVER-PAY CLAMPED (problem 3):** `_settle_redefined_shift` now counts only presence INSIDE
+  the approved `[start,end]` — `worked = min(co, appr_end) − max(ci, appr_start)` (overnight-safe via
+  raw minutes on the shift-date base). Early arrival earns points never OT; lingering past the approved
+  end banks nothing; late still reduces. + `test_settle_clamps_to_approved_window` (on-time / early+
+  linger / 2h-late). Suite **429**. All four overnight-audit problems are now FIXED.
+- ⏳ **Attendance NEXT:** the shield (approved OT pauses the PB ladder before its deadline),
+  `_offer_buyback` on settle (take banked OT as rest), `/test` simulate-checkout showing the banking,
+  then go-live prep (owner role-play → /testreset → flip). attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

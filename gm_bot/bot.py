@@ -1553,7 +1553,16 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
         ci_dt = sess.get("checked_in_at")
         if not ci_dt:
             return
-        worked = round((now_pp - ci_dt).total_seconds() / 60)
+        # Worked = presence INSIDE the approved [start,end] only. Early arrival earns points, never
+        # OT; lingering past the approved end banks nothing; late arrival still reduces (by design).
+        from datetime import date as _date, timedelta as _td
+        base = datetime.combine(_date.fromisoformat(str(shift_date)), datetime.min.time(),
+                                tzinfo=finance.PP_TZ)
+        appr_start = base + _td(minutes=int(sc["start_min"]))
+        appr_end = base + _td(minutes=int(sc["end_min"]))
+        worked = round((min(now_pp, appr_end) - max(ci_dt, appr_start)).total_seconds() / 60)
+        if worked <= 0:
+            return
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
         ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
