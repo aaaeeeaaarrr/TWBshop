@@ -116,6 +116,9 @@ human discipline, not code — honor them on every deploy (Claude enforces them 
 (atomic claim) so a crash-redelivered duplicate can't double-bank — keep new balance-moving paths
 idempotent too (flip status FIRST, before the write).
 
+**All "system down" safeguards live in `docs/RESILIENCE.md`** — the single record (layers, status,
+proof, known gaps, incident history). Update it whenever a safeguard is added or changed.
+
 ---
 
 ## Core Architectural Rules (READ BEFORE WRITING ANY CODE)

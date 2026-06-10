@@ -13,6 +13,12 @@
 
 ## Done (with proof)
 
+- **2026-06-11 — cron daemon enabled on the server (the watchdog was never running).** The
+  session-28 collection watchdog (`run_collection_watchdog.py`, crontab every 1 min) had NEVER
+  executed: the cron daemon itself was `inactive`. `systemctl enable --now cron` → `active` +
+  `enabled`; proof: the next minute's cron tick wrote `logs/watchdog.log` ("ok") on its own.
+  ⏳ Owner-step pending: fire the alert path once (stop a bot briefly) to see the 🚨 DM arrive.
+
 - **2026-06-11 — Chantrea (id 15): cleared ALL open payback.** Real debt id 2 (27 min) + test debt
   id 43 (27 min) → both `None`/cleared. Her AL untouched (2.0). Method: `payback_credit` of the full
   remaining balance. Verified by an independent fresh-process re-read.
