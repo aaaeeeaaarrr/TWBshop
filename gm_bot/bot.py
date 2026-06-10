@@ -1599,7 +1599,7 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
     try:
         from shared.database import (shift_change_active, att_get_session, payback_open_debt,
                                      payback_credit, ot_bank_add, ot_bank_balance,
-                                     shift_change_set_banked)
+                                     shift_change_set_banked, shift_change_claim_settle)
         from gm_bot import ot as ot_mod
         sc = shift_change_active(staff["id"], shift_date)
         if not sc or sc.get("status") != "approved" or not sc.get("normal_len"):
@@ -1618,6 +1618,11 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         worked = round((min(now_pp, appr_end) - max(ci_dt, appr_start)).total_seconds() / 60)
         if worked <= 0:
             return 0, 0
+        # Atomic claim BEFORE any balance moves: exactly one checkout path banks this shift. A loser
+        # (concurrent auto+manual checkout, or a crash-redelivered duplicate) gets the live balance and
+        # banks nothing. Failure mode is now underpay-but-visible, never a silent double-bank.
+        if not shift_change_claim_settle(sc["id"]):
+            return 0, ot_bank_balance(staff["id"])
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
         ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)

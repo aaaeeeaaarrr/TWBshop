@@ -846,6 +846,7 @@ def test_settle_clamps_to_approved_window(monkeypatch):
     monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
     monkeypatch.setattr(db, "ot_bank_add", lambda sid, m: banked.append(m))
     monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+    monkeypatch.setattr(db, "shift_change_claim_settle", lambda cid: True)   # each scenario is its own shift
 
     def _at(hh, mm, day=15):
         return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
@@ -1297,3 +1298,52 @@ def test_dispatch_live_rejects_unknown_uid(monkeypatch):
     asyncio.run(bot._att_dispatch(upd, ctx, {"flow": "al", "days": ["2026-06-20"]}, live=True))
     # no persona → silently no-op, nothing sent
     assert upd.message.replies == []
+
+
+def test_settle_claims_once_no_double_bank(monkeypatch):
+    """OT banking is idempotent. The atomic claim lets exactly ONE checkout path bank a redefined
+    shift; a second call — the auto-checkout scheduler firing the same minute as a manual checkout,
+    or a duplicate Telegram update re-delivered after a crash — banks nothing. No silent double-pay."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    from datetime import date, datetime, timedelta
+
+    sd = "2026-06-15"
+    tz = bot.finance.PP_TZ
+    base = datetime.combine(date.fromisoformat(sd), datetime.min.time(), tzinfo=tz)
+    ci_dt = base + timedelta(minutes=360)      # checked in at the approved start (06:00)
+    now_pp = base + timedelta(minutes=900)     # checking out at the approved end (15:00)
+    sc = {"id": 7, "status": "approved", "normal_len": 480, "start_min": 360, "end_min": 900}
+
+    calls = {"bank": 0, "credit": 0}
+    claimed = {"v": False}
+
+    def _claim(cid):                            # the real atomic compare-and-swap, in memory
+        if claimed["v"]:
+            return False
+        claimed["v"] = True
+        return True
+
+    monkeypatch.setattr(db, "shift_change_active", lambda sid, d: dict(sc))
+    monkeypatch.setattr(db, "att_get_session", lambda sid, d: {"checked_in_at": ci_dt})
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "shift_change_claim_settle", _claim)
+    monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+
+    def _credit(did, m):
+        calls["credit"] += 1
+        return {}
+
+    def _bank(sid, m):
+        calls["bank"] += 1
+        return m
+
+    monkeypatch.setattr(db, "payback_credit", _credit)
+    monkeypatch.setattr(db, "ot_bank_add", _bank)
+
+    staff = {"id": 3}
+    b1, _ = bot._settle_redefined_shift(staff, sd, now_pp)
+    b2, _ = bot._settle_redefined_shift(staff, sd, now_pp)   # re-delivery / concurrent second path
+    assert b1 == 60 and b2 == 0          # 540 worked − 480 normal = 60 OT, banked once only
+    assert calls["bank"] == 1            # ot_bank_add hit exactly once, never twice

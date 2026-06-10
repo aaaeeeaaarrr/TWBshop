@@ -3053,6 +3053,19 @@ def shift_change_set_banked(change_id: int, ot_banked: int) -> None:
                         (ot_banked, change_id))
 
 
+def shift_change_claim_settle(change_id: int) -> bool:
+    """Atomic idempotency claim for OT banking. Flips approved->done in ONE conditional UPDATE and
+    returns True only if THIS caller made the flip (the row was still 'approved'). Every other
+    checkout path that reaches the same shift — the auto-checkout scheduler firing the same minute as
+    a manual checkout, or a duplicate Telegram update re-delivered after a hard crash — gets False and
+    must NOT bank. This is the compare-and-swap that makes the money path safe to run more than once."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE shift_changes SET status='done' "
+                        "WHERE id=%s AND status='approved' RETURNING id", (change_id,))
+            return cur.fetchone() is not None
+
+
 def ot_shield_until(staff_id: int, today_iso: str, by_date_iso: str) -> dict | None:
     """The staff's upcoming APPROVED shift-redefine that still carries OT (end beyond
     start+normal_len) landing in [today, by_date] — the PB-ladder SHIELD (OT_DESIGN §4): agreed OT
