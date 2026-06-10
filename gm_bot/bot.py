@@ -1703,7 +1703,7 @@ def _swap_coverage_html(req: dict, partner: dict, sw: dict) -> str:
         ("<b>%s</b>:%s" % (html.escape(l.split(":", 1)[0]), html.escape(l.split(":", 1)[1]))
          if ":" in l else html.escape(l))
         for l in "\n".join(parts).split("\n"))
-    return "\n\n👥 Working those days · អ្នកធ្វើការថ្ងៃនោះ:\n%s" % avail
+    return "\n\n👥 Working those days · អ្នកធ្វើការពេលនោះ:\n%s" % avail
 
 
 def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
@@ -1991,7 +1991,7 @@ def _al_coverage_html(requester: dict, days: list[str],
          if ":" in ln else html.escape(ln))
         for ln in avail.split("\n"))
     label = ("Working those hours · អ្នកធ្វើការពេលនោះ" if hours_start
-             else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
+             else "Working those days · អ្នកធ្វើការពេលនោះ")
     return "\n\n👥 %s:\n%s" % (label, avail_html)
 
 

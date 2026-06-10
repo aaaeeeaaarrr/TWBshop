@@ -668,7 +668,7 @@ def _al_prompt(p: dict, context, detail: str, days: list, hs, he, show_cov: bool
             cov = ""
         if cov:
             _lab = ("Working those hours · អ្នកធ្វើការពេលនោះ" if hs
-                    else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
+                    else "Working those days · អ្នកធ្វើការពេលនោះ")
             line += "\n\n👥 %s:\n%s" % (_lab, cov)
     line += ("\n\n📝 Type the reason — your next message submits the AL request for senior approval.\n"
              "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើសំណើ AL ទៅបងៗ ដើម្បីសុំការអនុម័ត។")
@@ -707,7 +707,7 @@ def _swap_prompt(p: dict, context, base: str, partner_id, req_off: str, partner_
     if show_cov:
         cov = _swap_both_days_lines(p, partner_id, req_off, partner_off)
         if cov:
-            line += "\n\n👥 Working those days · អ្នកធ្វើការថ្ងៃនោះ:\n%s" % cov
+            line += "\n\n👥 Working those days · អ្នកធ្វើការពេលនោះ:\n%s" % cov
     line += ("\n\n📝 Type the reason — your partner agrees first, then the seniors approve.\n"
              "📝 សរសេរមូលហេតុ — ដៃគូត្រូវយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។")
     lbl, flag = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
