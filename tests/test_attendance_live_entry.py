@@ -111,6 +111,8 @@ def test_arm_pending_uses_user_data_in_test(monkeypatch):
 
 def test_dispatch_late_live_declares_only(monkeypatch):
     from gm_bot import bot
+    import datetime as _dt
+    monkeypatch.setattr(bot, "_now_pp", lambda: _dt.datetime(2026, 6, 11, 12, 0, tzinfo=bot.finance.PP_TZ))
     calls = {"late": 0, "payback": 0, "offer": 0, "send": 0}
 
     async def _send(*a, **k):
@@ -184,6 +186,8 @@ def test_dispatch_late_test_defers_to_simulate_arrival(monkeypatch):
     """TEST late: declare = heads-up only + a 'simulate arrival' button. NO auto-payback (it now
     mirrors live — the picker comes from the simulate-arrival tap)."""
     from gm_bot import bot
+    import datetime as _dt
+    monkeypatch.setattr(bot, "_now_pp", lambda: _dt.datetime(2026, 6, 11, 12, 0, tzinfo=bot.finance.PP_TZ))
     calls = {"payback": 0, "offer": 0}
 
     async def _send(*a, **k):
@@ -962,6 +966,41 @@ def test_now_pp_only_overrides_in_test_mode(monkeypatch):
     # test mode OFF → the wall clock, never the override (live staff are never time-warped)
     monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
     assert bot._now_pp().date().isoformat() != "2026-06-20"
+
+
+def test_job_gate_force_run(monkeypatch):
+    """A job body is normally skipped when not live/active, but /testrun forces it ON in test mode."""
+    from gm_bot import bot
+    monkeypatch.setattr(bot, "_attendance_live", lambda: False)
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)        # test mode, NOT live
+    # normal: live-only job skipped, test+live job runs (test mode counts as active)
+    assert bot._job_gate(live_only=True) is False
+    assert bot._job_gate() is True
+    # forced (during /testrun): both run, even the live-only ones
+    monkeypatch.setattr(bot, "_TEST_FORCE_RUN", True)
+    assert bot._job_gate(live_only=True) is True
+    # force NEVER applies outside test mode (real staff never force-fired)
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    assert bot._job_gate(live_only=True) is False
+
+
+def test_testrun_fires_job_with_force(monkeypatch):
+    """/testrun checkin sets the force flag, awaits the job, and clears the flag afterwards."""
+    from gm_bot import bot
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "_tyty_uid", lambda: None)
+    seen = {}
+
+    async def _fake_checkin(context):
+        seen["forced_during"] = bot._TEST_FORCE_RUN          # flag must be set while it runs
+
+    monkeypatch.setattr(bot, "_checkin_scheduler_job", _fake_checkin)
+    upd = _Update(bot.config.OWNER_TELEGRAM_ID, "")
+    ctx = _Ctx()
+    ctx.args = ["checkin"]
+    asyncio.run(bot.cmd_testrun(upd, ctx))
+    assert seen.get("forced_during") is True                 # ran with force ON
+    assert bot._TEST_FORCE_RUN is False                      # flag cleared after
 
 
 def test_can_auto_checkout(monkeypatch):

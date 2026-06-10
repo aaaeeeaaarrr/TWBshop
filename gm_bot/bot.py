@@ -1181,6 +1181,18 @@ def _today_pp():
     return _now_pp().date()
 
 
+_TEST_FORCE_RUN = False   # True only while /testrun fires a job body on demand (test mode)
+
+
+def _job_gate(live_only: bool = False) -> bool:
+    """Whether a scheduled job's body should execute. Normally live-only or live+test per the job.
+    During an explicit /testrun in test mode it forces ON, so the owner can watch a time-driven job
+    fire on demand against the test clock (writes are is_test, messages route to the owner)."""
+    if _TEST_FORCE_RUN and _att_test_mode():
+        return True
+    return _attendance_live() if live_only else _att_active()
+
+
 async def _att_send(context, to_uid, role: str, to_name: str, text: str,
                     kb=None, group: bool = False, parse_mode: str | None = None):
     """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
@@ -1213,7 +1225,7 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Per-minute: fire due check-in events (T−10/T0/T+5/check-out/leave-early) to staff.
     GATED: returns immediately unless attendance_live. Suppresses prompts for staff already
     checked in (T0/T+5) / checked out. State + sessions in DB so restarts are safe."""
-    if not _attendance_live():
+    if not _job_gate(live_only=True):
         return
     from gm_bot import attendance_ui as ui, checkin as ci
     now_pp = _now_pp()
@@ -2218,7 +2230,7 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     (The calm daily check-in line is delivered by the check-in flow; this job handles warn/autobook.)
     Runs in live OR test mode; payback_all_open() returns the matching dataset (real vs is_test),
     and _att_send routes to the owner in test."""
-    if not _att_active():
+    if not _job_gate():
         return
     from gm_bot import payback as pb
     from shared.database import ot_shield_until
@@ -2528,7 +2540,7 @@ async def _callout_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily 08:00 PP (gated): yesterday's scheduled staff who never checked in AND had no
     approved leave/sick = no-show → record + points event + owner note (1 day's pay, owner-gated)."""
-    if not _attendance_live():
+    if not _job_gate(live_only=True):
         return
     from gm_bot import attendance_ui as ui
     from gm_bot.attendance import to_min
@@ -2571,7 +2583,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     tomorrow?') — never about papers or pay-back. The pay-back was created at declaration; after the
     2-day papers window with no accepted papers the case is finalized and nudges stop. No debt is
     created here (paperless sick is already pay-back from the start)."""
-    if not _att_active():
+    if not _job_gate():
         return
     from gm_bot import sick as sk
     today = _today_pp()
@@ -2589,7 +2601,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Gated, hourly: 12h-before reminder for booked payback slots (reward-neutral, encouraging)."""
-    if not _att_active():
+    if not _job_gate():
         return
     from datetime import datetime as _dt
     now = _now_pp()
@@ -3467,6 +3479,50 @@ async def cmd_testclock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     gm_set_state("att_test_now", dt.isoformat())
     warn = "" if _att_test_mode() else "\n⚠ Test mode is OFF — this only takes effect once you /testmode on."
     await update.message.reply_text("⏰ Test clock set → %s%s" % (dt.strftime("%a %Y-%m-%d %H:%M %Z"), warn))
+
+
+def _testrun_jobs():
+    """Name → job body, for /testrun. Excludes _callout_job (spends Opus) and real-data jobs."""
+    return {"checkin": _checkin_scheduler_job, "noshow": _no_show_sweep_job,
+            "ladder": _payback_ladder_job, "booking": _booking_reminder_job,
+            "sickdeadline": _sick_papers_deadline_job}
+
+
+async def cmd_testrun(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testrun <job> — owner/test: fire a scheduled job's body ONCE right now, against the test
+    clock, bypassing the live-only gate — so you can WATCH time-driven behaviour instead of waiting.
+    Writes are is_test, messages route to you. Pair with /testclock (set the pretend day first).
+      /testrun                → list jobs + the current test clock
+      /testrun checkin        → the T−10/T0/T+5/checkout scheduler tick (auto-checkout too)
+      /testrun ladder         → payback ignore-ladder (day-3 warn / day-4 auto-book)
+      /testrun noshow         → yesterday's no-show sweep
+      /testrun booking        → 12h-before booked-slot reminders
+      /testrun sickdeadline   → paperless-sick papers deadline pass"""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    if not _att_test_mode():
+        await update.message.reply_text("Turn on test mode first: /testmode on")
+        return
+    jobs = _testrun_jobs()
+    name = (context.args or [""])[0].lower()
+    if name not in jobs:
+        await update.message.reply_text(
+            "Fire a job now — test clock is %s.\nJobs: %s\nUsage: /testrun checkin"
+            % (_now_pp().strftime("%a %Y-%m-%d %H:%M"), " · ".join(jobs)))
+        return
+    global _TEST_FORCE_RUN
+    _TEST_FORCE_RUN = True
+    try:
+        await jobs[name](context)
+    except Exception as e:
+        logger.error("testrun %s failed: %s", name, e)
+        await update.message.reply_text("⚠ '%s' errored: %s" % (name, e))
+        return
+    finally:
+        _TEST_FORCE_RUN = False
+    await update.message.reply_text(
+        "✅ Fired '%s' at test-now %s — anything it produced was routed to you above."
+        % (name, _now_pp().strftime("%a %H:%M")))
 
 
 async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4607,6 +4663,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("payroll",   cmd_payroll))
     app.add_handler(CommandHandler("testmode",   cmd_testmode))
     app.add_handler(CommandHandler("testclock",  cmd_testclock))
+    app.add_handler(CommandHandler("testrun",    cmd_testrun))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
