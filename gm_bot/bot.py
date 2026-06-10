@@ -1230,6 +1230,7 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             if ci.can_auto_checkout(att_last_ping(staff["id"]), now_pp):
                 att_check_out(staff["id"], sd, now_pp.isoformat())
                 _settle_redefined_shift(staff, sd, now_pp)
+                await _att_send(context, uid, "Staff", name, ui._CO_DONE)
                 continue
         await _att_send(context, uid, "Staff", name, text)
         # arm check-out capture: next in-zone share while this is set = checked out (60-min window).
@@ -1349,8 +1350,12 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         ws = int(_sc["start_min"]) % 1440
     if ws is None:
         return True
+    # A STOPPED live-share (edited update, live_period gone) is NOT presence proof — record it
+    # in-zone=False so the auto-checkout never trusts a share the staffer just turned off.
+    is_stop = ci.is_share_stop(bool(update.edited_message), getattr(loc, "live_period", None))
     try:
-        att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone, now_pp.isoformat())
+        att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone and not is_stop,
+                        now_pp.isoformat())
     except Exception:
         pass
     # check-OUT capture: if a check-out request armed this, an in-zone share closes the shift
@@ -1361,8 +1366,7 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         att_check_out(staff["id"], sd, now_pp.isoformat())
         flow_clear(user.id)
         _settle_redefined_shift(staff, sd, now_pp)   # banks OT (net of payback) iff this day was redefined
-        await msg.reply_text("Checked out ✓ — thank you, rest well 🤍\n"
-                             "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍")
+        await msg.reply_text(ui._CO_DONE)
         return True
     if not in_zone:
         if not update.edited_message:

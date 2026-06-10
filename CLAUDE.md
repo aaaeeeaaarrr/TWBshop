@@ -223,6 +223,15 @@ in an elevated shell, then back to attendance.)
   stop matching and the ladder resumes next daily run; 'done' never matches (its OT already settled
   the debt at checkout). NOTE: the calm daily check-in line still shows (debt genuinely exists until
   the OT clears it) — only warn/auto-book pause. +2 tests. Suite **431**.
+- **AUTO-CHECKOUT built + hardened (owner):** at shift end, if the live share stayed ON + IN-ZONE the
+  scheduler closes the session silently + settles OT (auto-banks overnight OT) — `checkin.can_auto_checkout`
+  (pure) + `att_last_ping`. **Grace = 3 min** (owner lowered from 12: tighter end-of-shift gap; still
+  fires for a stationary phone's sparse heartbeats). **Live-share STOP detected** —
+  `checkin.is_share_stop(is_edited, live_period)`: a stopped share = an EDITED update with live_period
+  gone → recorded in-zone=False so auto-checkout never trusts a share they just turned off (a static
+  pin is a NEW msg, an active update keeps live_period — neither matches). **Every successful checkout
+  (manual + auto) now sends `_CO_DONE` = "Checked out ✓ Thank you, have a nice day! 🤍" (KH draft in
+  KH_REVIEW §1.1).** +2 tests (grace-3 boundary; stop discriminator). Suite **433**.
 - ⏳ **Attendance NEXT:** `_offer_buyback` on settle (take banked OT as rest), `/test`
   simulate-checkout showing the banking, then go-live prep (owner role-play → /testreset → flip).
   attendance_live=OFF, attendance_test_mode=OFF.

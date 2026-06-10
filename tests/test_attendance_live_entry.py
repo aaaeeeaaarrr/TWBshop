@@ -896,11 +896,22 @@ def test_can_auto_checkout(monkeypatch):
         return {"in_zone": in_zone, "ts": now - _dt.timedelta(minutes=age_min)}
 
     assert ci.can_auto_checkout(ping(True, 2), now) is True       # fresh + in-zone → yes
-    assert ci.can_auto_checkout(ping(True, 11), now) is True      # within the 12-min grace
+    assert ci.can_auto_checkout(ping(True, 4), now) is False      # past the 3-min grace → ask
     assert ci.can_auto_checkout(ping(True, 20), now) is False     # share went stale → ask
     assert ci.can_auto_checkout(ping(False, 2), now) is False     # in shop? no — walked off → ask
     assert ci.can_auto_checkout(None, now) is False               # never shared → ask
     assert ci.can_auto_checkout({"in_zone": True, "ts": None}, now) is False
+
+
+def test_is_share_stop():
+    """A stopped live-share = an EDITED update whose live_period is gone. A static pin (new message)
+    and an active live update (live_period set) never match."""
+    from gm_bot import checkin as ci
+    assert ci.is_share_stop(True, None) is True          # edited + no live_period → STOP
+    assert ci.is_share_stop(True, 0) is True             # edited + live_period 0 → STOP
+    assert ci.is_share_stop(True, 3600) is False         # edited + live → active movement update
+    assert ci.is_share_stop(False, None) is False        # new message + no live_period → static pin
+    assert ci.is_share_stop(False, 3600) is False        # new message + live → share START
 
 
 def test_takeback_windows_are_shift_edges():

@@ -13,7 +13,16 @@ from __future__ import annotations
 
 GRACE_MIN = 5          # ≤5 min late is free
 EARLY_BONUS_MIN = 5    # >5 min early earns the +10
-AUTO_CHECKOUT_GRACE_MIN = 12   # a live share seen in-zone within this many min of shift end = present
+AUTO_CHECKOUT_GRACE_MIN = 3    # a live share seen in-zone within this many min of shift end = present
+
+
+def is_share_stop(is_edited: bool, live_period) -> bool:
+    """A live-location share that has been STOPPED (the live message turns static) arrives as an
+    EDITED message whose `live_period` is gone. That is not a presence proof — the scheduler must
+    not auto-check-out on it, and we record it as 'no longer present'. A one-shot static PIN arrives
+    as a NEW message (never an edit), so it never matches here; an active live update keeps
+    live_period set, so it doesn't match either. Pure — no Telegram objects."""
+    return bool(is_edited) and not live_period
 
 
 def can_auto_checkout(ping, now, grace_min: int = AUTO_CHECKOUT_GRACE_MIN) -> bool:
@@ -21,8 +30,9 @@ def can_auto_checkout(ping, now, grace_min: int = AUTO_CHECKOUT_GRACE_MIN) -> bo
     know they were here to the last minute — close silently, no "did you leave early?" chase. True
     only when the freshest ping is in-zone AND recent enough to mean the share is still live (a
     stationary Telegram live-share heartbeats every few minutes; `grace_min` absorbs the gaps).
-    A stale ping (share turned off) or an out-of-zone ping (they walked off) → False → ask normally.
-    `ping` = {in_zone, ts(tz-aware)} or None; `now` = tz-aware now. Pure — no DB/Telegram."""
+    A stale ping (share turned off) or an out-of-zone ping (they walked off, OR a stop was recorded
+    as not-in-zone) → False → ask the normal way. `ping` = {in_zone, ts(tz-aware)} or None;
+    `now` = tz-aware now. Pure — no DB/Telegram."""
     if not ping or not ping.get("in_zone") or not ping.get("ts"):
         return False
     return 0 <= (now - ping["ts"]).total_seconds() <= grace_min * 60

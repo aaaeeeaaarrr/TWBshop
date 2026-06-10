@@ -55,11 +55,13 @@ warm and human — a caring manager, never a cold system.
 
 ## 1. Check-in & check-out (the daily rhythm — staff, ប្អូន)
 
-### 1.1 Checked-out confirmation
-- **EN:** `Checked out ✓ — thank you, rest well 🤍`
-- **KH draft:** `ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍`
-- **Seen by:** staff. **Where/when:** the moment their end-of-shift checkout is recorded.
-- **Tone:** warm, end-of-day care.
+### 1.1 Checked-out confirmation (sent on EVERY successful checkout)
+- **EN:** `Checked out ✓ Thank you, have a nice day! 🤍`
+- **KH draft:** `ចុះវត្តមានចេញរួច ✓ អរគុណ សូមមានថ្ងៃល្អ! 🤍`
+- **Seen by:** staff. **Where/when:** the moment a checkout is recorded — BOTH when they manually
+  share location to check out AND when the bot auto-checks-them-out (live share stayed on in-zone).
+  **Tone:** warm, friendly sign-off. **Note:** many staff finish at 6am (night shift) — confirm
+  "have a nice day" reads fine in Khmer for a morning finish, or suggest a time-neutral warm closer.
 
 ---
 

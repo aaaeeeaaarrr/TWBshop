@@ -1655,6 +1655,10 @@ _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\
                 "អ្នកចេញមុនម៉ោងមែនទេ? បើមិនមែន សូមចែករំលែកទីតាំងបន្តផ្ទាល់ ដើម្បីចុះវត្តមានចេញ។\n\n"
                 + _CI_HOWTO)
 
+# Sent on EVERY successful checkout — manual share-to-checkout AND silent auto-checkout (owner).
+_CO_DONE = ("Checked out ✓ Thank you, have a nice day! 🤍\n"
+            "ចុះវត្តមានចេញរួច ✓ អរគុណ សូមមានថ្ងៃល្អ! 🤍")
+
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Live personal dashboard — real balances from the DB (AL, payback debt, OT bank, upcoming)."""
