@@ -73,6 +73,29 @@ A Telegram-based bakery operations system that handles:
 
 ---
 
+## Deploy Discipline (restart-safety — read before restarting any service)
+
+A restart is a ~2–3s blip: the bots long-poll, so Telegram **queues** messages during the gap and the
+bot drains them on resume — nothing is lost. Polling is the safety net; **never switch to webhooks**
+(a down endpoint drops the POST). The risks are small and these three habits remove them. They are
+human discipline, not code — honor them on every deploy (Claude enforces them when asked to deploy):
+
+1. **Restart in the quiet window, not at a shift edge.** The only moments a restart can skip a
+   prompt are when check-in/checkout jobs fire — roughly **05:30–07:00 · 14:00–15:30 · 20:30–21:30**
+   (Phnom-Penh). Deploy in a mid-afternoon lull and even the self-healing risks vanish.
+2. **Batch deploys.** Accumulate the day's changes and restart once — don't restart per micro-edit.
+   Check `git log origin/main..HEAD` before deploying to see what's actually shipping.
+3. **Restart only the changed service.** A `gm` deploy must never touch `twbshop-retail` /
+   `twbshop-b2b` (the customer-facing + payment bots). Restart customer bots only when their code
+   changed.
+
+**Always verify after restart** (independent proof, not "active"): server `HEAD == origin`, service
+`is-active`, and the running code carries the change (grep it). The OT-banking path is idempotent
+(atomic claim) so a crash-redelivered duplicate can't double-bank — keep new balance-moving paths
+idempotent too (flip status FIRST, before the write).
+
+---
+
 ## Core Architectural Rules (READ BEFORE WRITING ANY CODE)
 
 ### 1. AI API Calls Only via shared/ai_client.py

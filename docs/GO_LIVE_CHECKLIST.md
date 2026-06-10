@@ -37,6 +37,9 @@
 ## D. Standing (not attendance, but on the books)
 - 🔒 **Bedrock delta 2** — owner OS-locks the global guard files (elevated shell).
 - ⏰ **Staging Postgres** by 2026-06-30 — get the prod DB credential out of dev.
+- 🔁 **Deploy discipline** — quiet-window · batched · single-service restarts, always verify after.
+  Full rule in `CLAUDE.md` → "Deploy Discipline". OT-banking is crash-safe (atomic claim); keep new
+  balance-moving paths idempotent (status flips FIRST). `TimeoutStopSec=15` set on all `twbshop-*` units.
 
 ---
 ### Open question for the digest-source item (B1)
