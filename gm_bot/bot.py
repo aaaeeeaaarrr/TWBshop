@@ -63,7 +63,8 @@ from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
-    extract_daily_report_ai, generate_attendance_digest, narrate_attendance_week, detect_leave_request,
+    extract_daily_report_ai, generate_attendance_digest, narrate_attendance_week,
+    categorize_reasons, detect_leave_request,
     classify_stock_photo, read_stock_sheet, read_medical_paper, generate_callout,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
@@ -4267,12 +4268,14 @@ async def _left_member_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                          why="%s just left the %s group." % (staff["canonical_name"], label))
 
 
-def _weekly_brain_block(facts: dict, today):
-    """BRAIN: render the exact weekly facts the owner sees (time-ledger, counts, open debts) + the
-    frequency pattern flags (deterministic, never miscounts). Returns (owner_text, facts_summary for
-    Opus, reasons_block for Opus, flags). frequency.detect does the pattern math — Opus never counts."""
+def _weekly_brain_block(facts: dict, today, mix: dict | None = None):
+    """BRAIN: render the exact weekly facts the owner sees (time-ledger, counts, open debts), the
+    frequency pattern flags, AND — for the staffers that matter — their 30-day reason MIX, which Brain
+    aggregated from the model's category labels (`mix` = {staff: {category: count}}). Deterministic;
+    Opus never counts. Returns (owner_text, facts_summary for Opus, reasons_block, flags)."""
     from gm_bot.attendance_ui import _hm
     from gm_bot import frequency as fq
+    mix = mix or {}
     flags = []
     for staff, dates in sorted((facts.get("late_dates_by_staff") or {}).items()):
         f = fq.detect(dates, today)
@@ -4287,6 +4290,12 @@ def _weekly_brain_block(facts: dict, today):
     ]
     if flags:
         lines.append("Patterns: " + " · ".join("%s — %s" % (s, d) for s, d in flags))
+    # reason MIX for flagged staffers (Brain's exact tally of the model's category labels, 30d)
+    for staff, _d in flags:
+        m = mix.get(staff)
+        if m:
+            top = sorted(m.items(), key=lambda kv: -kv[1])
+            lines.append("  %s reasons (30d): %s" % (staff, ", ".join("%s×%d" % (k, v) for k, v in top)))
     if facts["open_debts"]:
         top = sorted(facts["open_debts"], key=lambda x: -x["min"])[:8]
         lines.append("Open debts: " + ", ".join("%s %s" % (d["staff"], _hm(d["min"])) for d in top))
@@ -4314,14 +4323,24 @@ async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> N
         if _attendance_live():
             # SPLIT DIGEST: Brain computes ALL the numbers + pattern flags (exact, never miscounts);
             # Opus 4.8 only narrates over the verbatim REASONS. Best of both — facts free + insight.
-            from shared.database import gm_weekly_attendance_facts
-            facts = gm_weekly_attendance_facts(now_pp.date().isoformat())
+            from shared.database import gm_weekly_attendance_facts, gm_lateness_reasons_since
+            today_iso = now_pp.date().isoformat()
+            facts = gm_weekly_attendance_facts(today_iso)
             has = any(facts[k] for k in ("lates", "no_shows", "als", "specials", "open_debts")) \
                 or facts["bank_min"]
             if not has:
                 logger.info("Weekly digest (live): no data, skipping")
                 return
-            brain_text, facts_summary, reasons_block, _flags = _weekly_brain_block(facts, now_pp.date())
+            # Reason MIX: model (Haiku) labels each 30-day reason → category; Brain tallies the labels
+            # into exact per-staff trends (analysis-time, one cheap batched call).
+            rows = gm_lateness_reasons_since(today_iso, 30)
+            mix: dict = {}
+            if rows:
+                cats = await categorize_reasons([r["reason"] for r in rows])
+                for r, c in zip(rows, cats):
+                    bucket = mix.setdefault(r["staff"], {})
+                    bucket[c] = bucket.get(c, 0) + 1
+            brain_text, facts_summary, reasons_block, _flags = _weekly_brain_block(facts, now_pp.date(), mix)
             narrative = await narrate_attendance_week(facts_summary, reasons_block)
             header = "🗓️ Weekly attendance digest (%s)\n\n" % now_pp.strftime("%d %b %Y")
             body = brain_text + (("\n\n📝 " + narrative) if narrative else "")

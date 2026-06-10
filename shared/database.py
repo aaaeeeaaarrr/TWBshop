@@ -3095,6 +3095,22 @@ def ot_pending_extension_min(staff_id: int, today_iso: str) -> int:
             return total
 
 
+def gm_lateness_reasons_since(today_iso: str, days: int = 30) -> list[dict]:
+    """[{staff, reason}] for lateness with a typed reason in the last `days` (mode-scoped). The model
+    labels each into a category; Brain then aggregates the labels into exact per-staff trends."""
+    from datetime import date as _date, timedelta as _td
+    since = (_date.fromisoformat(today_iso) - _td(days=days)).isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT l.reason, s.call_name, s.canonical_name
+                           FROM lateness_records l JOIN staff_registry s ON s.id=l.staff_id
+                           WHERE l.for_shift >= %s AND l.reason IS NOT NULL AND l.reason <> ''
+                             AND l.is_test=%s
+                           ORDER BY l.for_shift""", (since, _ATT_TEST))
+            return [{"staff": (r.get("call_name") or r.get("canonical_name") or "?"),
+                     "reason": (r["reason"] or "").strip()} for r in cur.fetchall()]
+
+
 def gm_weekly_attendance_facts(today_iso: str) -> dict:
     """BRAIN-computed weekly attendance facts from the button data (mode-scoped). Deterministic —
     exact counts, the time-ledger, open debts, plus the verbatim REASONS and per-staff 30-day

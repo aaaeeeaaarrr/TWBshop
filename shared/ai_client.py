@@ -838,6 +838,45 @@ async def generate_attendance_digest(lateness_cases: list[dict],
         return ""
 
 
+REASON_CATEGORIES = ["transport", "family", "health", "oversleep", "weather", "other"]
+_CATEGORIZE_SYSTEM = (
+    "Classify each staff lateness/absence reason into EXACTLY ONE category from this fixed list: "
+    "transport, family, health, oversleep, weather, other. Reasons may be in Khmer or English. "
+    "transport = traffic/moto/bus/bridge/car; family = child/parent/spouse/family matter; "
+    "health = own sickness/doctor/injury; oversleep = slept in / alarm; weather = rain/flood/storm; "
+    "other = anything else or unclear. Return ONLY a JSON array of category strings — same length and "
+    "order as the numbered input, nothing else."
+)
+
+
+async def categorize_reasons(reasons: list[str]) -> list[str]:
+    """Haiku (cheap, batched = one call for many): label each free-text reason into a fixed category.
+    Brain then aggregates these labels into exact trends. Analysis-time, never at confession time.
+    Falls back to all 'other' with no key / on error so the pipeline never breaks. Always returns a
+    list the same length as `reasons`."""
+    if not reasons:
+        return []
+    if not config.ANTHROPIC_API_KEY:
+        return ["other"] * len(reasons)
+    import json as _json
+    numbered = "\n".join("%d. %s" % (i + 1, (r or "").strip()) for i, r in enumerate(reasons))
+    try:
+        resp = await _get_client().messages.create(
+            model="claude-haiku-4-5-20251001", max_tokens=600,
+            system=[{"type": "text", "text": _CATEGORIZE_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": numbered}],
+        )
+        txt = resp.content[0].text.strip()
+        arr = _json.loads(txt[txt.index("["):txt.rindex("]") + 1])
+        out = [(c if c in REASON_CATEGORIES else "other") for c in arr]
+    except Exception as exc:
+        logger.error("categorize_reasons failed: %s", exc)
+        out = []
+    if len(out) < len(reasons):
+        out += ["other"] * (len(reasons) - len(out))
+    return out[:len(reasons)]
+
+
 _GM_WEEK_NARRATE_SYSTEM = (
     "You are the GM of a bakery in Phnom Penh writing to the OWNER (English). You are given EXACT "
     "figures and pattern flags that were already computed by code — treat every number as final: do "

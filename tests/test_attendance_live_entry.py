@@ -1201,16 +1201,49 @@ def test_weekly_brain_block(monkeypatch):
         "late_dates_by_staff": {"Davy": ["2026-06-01", "2026-06-08", "2026-05-25", "2026-05-18"],
                                 "Seth": ["2026-06-10"]},
     }
-    owner, summary, reasons, flags = bot._weekly_brain_block(facts, today)
+    # Brain aggregated the model's labels into a per-staff category tally (30d)
+    mix = {"Davy": {"transport": 3, "oversleep": 1}}
+    owner, summary, reasons, flags = bot._weekly_brain_block(facts, today, mix)
     assert "staff owe 6h 30m (2 debts) · shop owes 2h (1 banks)" in owner   # exact time-ledger
     assert "Late: 3 · No-show: 1 · AL approved: 1 · Special leave: 0" in owner
     assert "Open debts: Seth 5h, Davy 1h 30m" in owner                  # sorted, biggest first
     assert any("Davy" in s and "Monday" in d for s, d in flags)         # Brain frequency flag
     assert "Davy" in owner and "Monday" in owner
+    assert "Davy reasons (30d): transport×3, oversleep×1" in owner       # mix shown for the flagged staffer
     # reasons block (for Opus) carries verbatim reasons incl. the AL reason + uninformed tag
     assert "moto broke" in reasons and "uninformed" in reasons and "Meng (AL): dentist" in reasons
     # the figures are NOT repeated in the summary header line (Opus must not recount)
     assert "📊 This week" not in summary
+
+
+def test_categorize_reasons_shape(monkeypatch):
+    """Haiku categorizer: valid labels kept, unknown → 'other', length always matches input,
+    no API key → all 'other'. Brain depends on a clean, same-length list."""
+    import asyncio as _aio
+    from shared import ai_client as ai
+
+    class _Block:
+        def __init__(self, t): self.text = t
+    class _Resp:
+        def __init__(self, t): self.content = [_Block(t)]
+    class _Msgs:
+        async def create(self, **k): return _Resp('["transport", "weird", "family"]')
+    class _Cli:
+        messages = _Msgs()
+
+    monkeypatch.setattr(ai.config, "ANTHROPIC_API_KEY", "x")
+    monkeypatch.setattr(ai, "_get_client", lambda: _Cli())
+    out = _aio.run(ai.categorize_reasons(["traffic", "??", "kid sick"]))
+    assert out == ["transport", "other", "family"]                      # unknown 'weird' → 'other'
+    # length mismatch (model returned fewer) → padded with 'other'
+    class _Msgs2:
+        async def create(self, **k): return _Resp('["health"]')
+    _Cli.messages = _Msgs2()
+    out2 = _aio.run(ai.categorize_reasons(["a", "b", "c"]))
+    assert out2 == ["health", "other", "other"]
+    # no API key → all 'other', never calls the model
+    monkeypatch.setattr(ai.config, "ANTHROPIC_API_KEY", "")
+    assert _aio.run(ai.categorize_reasons(["x", "y"])) == ["other", "other"]
 
 
 def test_takeback_windows_are_shift_edges():
