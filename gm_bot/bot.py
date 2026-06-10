@@ -3638,6 +3638,146 @@ async def cmd_pb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(head + "\n" + "\n".join(lines))
 
 
+def _caps_call(s: dict) -> str:
+    """The CAPSED call name (owner's staff-list convention); canonical when no call name."""
+    cn = (s.get("call_name") or "").strip()
+    return cn.upper() if cn else s["canonical_name"]
+
+
+def _own_staff_sorted() -> list[dict]:
+    """Active TWB staff (excl. Tyty), alphabetical by call name — the owner-menu roster."""
+    rows = [s for s in staff_all("active")
+            if s.get("org") == "TWB" and s["canonical_name"] != "Tyty"]
+    return sorted(rows, key=lambda r: (r.get("call_name") or r["canonical_name"]).lower())
+
+
+def _own_pbot_text(today_iso: str) -> str:
+    """PB + OT — only staff with something on the time ledger. Same no-double-count partition as
+    My Schedule: booked = min(extension, debt) next to PB; only the leftover is upcoming OT."""
+    from shared.database import payback_open_debt, ot_bank_balance, ot_pending_extension_min
+    from gm_bot.attendance_ui import _hm
+    from gm_bot import ot as ot_mod
+    lines = []
+    for s in _own_staff_sorted():
+        debt = payback_open_debt(s["id"])
+        pb = debt["balance"] if debt else 0
+        bank = ot_bank_balance(s["id"])
+        ext = ot_pending_extension_min(s["id"], today_iso)
+        booked = min(ext, pb)
+        upcoming = min(max(0, ext - pb), ot_mod.cap_room(bank))
+        if not (pb or bank or upcoming):
+            continue
+        seg = []
+        if pb:
+            seg.append("PB %s%s" % (_hm(pb), (" (%s booked)" % _hm(booked)) if booked else ""))
+        if bank or upcoming:
+            seg.append("OT %s%s" % (_hm(bank), (" (+%s upcoming)" % _hm(upcoming)) if upcoming else ""))
+        lines.append("• %s — %s" % (_caps_call(s), " · ".join(seg)))
+    head = "⏱ PB + OT%s\n" % (" · 🧪 test" if _att_test_mode() else "")
+    return head + ("\n".join(lines) if lines else "(nobody owes or banks time ✓)")
+
+
+def _own_al_text() -> str:
+    """AL + Joined — every staffer: CAPSED name, AL balance, hire date when known (/joined sets it)."""
+    lines = []
+    for s in _own_staff_sorted():
+        line = "• %s — %g AL" % (_caps_call(s), float(s.get("al_left") or 0))
+        j = s.get("joined_date")
+        if j:
+            line += " · %s" % j.strftime("%d/%m/%Y")
+        lines.append(line)
+    return "🏖 AL + Joined\n" + "\n".join(lines) + \
+        "\n\n(no date = not on record — set with /joined <name> <date>)"
+
+
+def _own_sal_text(which: int) -> str:
+    """Salaries 1st/2nd pay — staff with payroll on record, CAPSED names, total underneath."""
+    field = "first_pay_usd" if which == 1 else "second_pay_usd"
+    lines, total = [], 0.0
+    for s in _own_staff_sorted():
+        if s.get("salary_usd") is None:
+            continue
+        v = float(s.get(field) or 0)
+        total += v
+        lines.append("• %s — $%.2f" % (_caps_call(s), v))
+    return ("💵 Salaries — %s pay\n" % ("1st" if which == 1 else "2nd")) + "\n".join(lines) + \
+        "\n\nTotal: $%.2f" % total
+
+
+_OWN_STAFF_KB_ROWS = [
+    [("⏱ PB + OT", "own:pbot")],
+    [("🏖 AL + Joined", "own:al")],
+    [("💵 Salaries 1st", "own:sal1")],
+    [("💵 Salaries 2nd", "own:sal2")],
+    [("⬅ Back", "own:menu")],
+]
+
+
+def _own_kb(rows) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton(t, callback_data=c) for t, c in r]
+                                 for r in rows])
+
+
+async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/menu — OWNER ONLY (salaries live in here, so not even Tyty)."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    await update.message.reply_text("🗂 Owner menu",
+        reply_markup=_own_kb([[("👥 Staff info", "own:staff")]]))
+
+
+async def _owner_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """own:* — the owner's private menu. Hard-gated to the owner uid."""
+    query = update.callback_query
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        await query.answer()
+        return
+    await query.answer()
+    a = query.data.split(":")[1]
+    back = _own_kb([[("⬅ Back", "own:staff")]])
+    if a == "menu":
+        await query.edit_message_text("🗂 Owner menu",
+                                      reply_markup=_own_kb([[("👥 Staff info", "own:staff")]]))
+    elif a == "staff":
+        await query.edit_message_text("👥 Staff info", reply_markup=_own_kb(_OWN_STAFF_KB_ROWS))
+    elif a == "pbot":
+        await query.edit_message_text(_own_pbot_text(_today_pp().isoformat()), reply_markup=back)
+    elif a == "al":
+        await query.edit_message_text(_own_al_text(), reply_markup=back)
+    elif a in ("sal1", "sal2"):
+        await query.edit_message_text(_own_sal_text(1 if a == "sal1" else 2), reply_markup=back)
+
+
+async def cmd_joined(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/joined <name> <YYYY-MM-DD | DD/MM/YYYY> — owner: set a staffer's hire date."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    from shared.database import staff_set_joined
+    args = context.args or []
+    if len(args) < 2:
+        await update.message.reply_text("Usage: /joined <name> <YYYY-MM-DD or DD/MM/YYYY>")
+        return
+    raw = args[-1]
+    try:
+        if "/" in raw:
+            d, m, y = (int(x) for x in raw.split("/"))
+            iso = "%04d-%02d-%02d" % (y, m, d)
+        else:
+            iso = datetime.strptime(raw, "%Y-%m-%d").strftime("%Y-%m-%d")
+    except Exception:
+        await update.message.reply_text("Couldn't read the date — use YYYY-MM-DD or DD/MM/YYYY.")
+        return
+    name = " ".join(args[:-1]).lower()
+    hits = [s for s in staff_all("active")
+            if name in (s.get("call_name") or "").lower() or name in s["canonical_name"].lower()]
+    if len(hits) != 1:
+        await update.message.reply_text(
+            "Matched %d staff for '%s' — be more specific." % (len(hits), name))
+        return
+    staff_set_joined(hits[0]["id"], iso)
+    await update.message.reply_text("✓ %s joined %s saved." % (_caps_call(hits[0]), iso))
+
+
 async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/commands — owner: the full list of GM commands, grouped, with one-line descriptions."""
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
@@ -3654,6 +3794,8 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/testseed [name] — copy real ALs/paybacks into test so flows have realistic data\n"
         "/testreset — wipe all test data\n"
         "\n— Attendance · live overviews —\n"
+        "/menu — your private menu: Staff info → PB+OT · AL+Joined · Salaries 1st/2nd\n"
+        "/joined <name> <date> — set a staffer's hire date (shows in AL+Joined)\n"
         "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
         "/holiday — manage paid public holidays (cost no AL; AL spans bridge them)\n"
         "/payroll [YYYY-MM] — payslip preview for a work-month (defaults to last month)\n"
@@ -4902,6 +5044,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
     app.add_handler(CommandHandler("holiday",     cmd_holiday))
     app.add_handler(CommandHandler("pb",          cmd_pb))
+    app.add_handler(CommandHandler("menu",        cmd_menu))
+    app.add_handler(CommandHandler("joined",      cmd_joined))
+    app.add_handler(CallbackQueryHandler(_owner_menu_callback, pattern=r"^own:"))
     app.add_handler(CommandHandler("commands",    cmd_commands))
     app.add_handler(CommandHandler("help",        cmd_commands))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))

@@ -1364,8 +1364,8 @@ def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
         if diff <= 180:  # starts within 3h of each other = "similar/close shift times"
             cands.append(r)
     rows = [_back_row("att:do")]
-    rows += [[InlineKeyboardButton(c["canonical_name"], callback_data="att:do:p:%d" % c["id"])]
-             for c in cands[:8]]
+    rows += [[InlineKeyboardButton(staff_btn_label(c), callback_data="att:do:p:%d" % c["id"])]
+             for c in staff_sort(cands)[:8]]
     d = date.fromisoformat(iso)
     return _hdr(p, "Swap day-off for %s — with whom? (similar shift times; within 7 days)\n"
                    "ប្តូរថ្ងៃឈប់ទៅ %s — ជាមួយអ្នកណា? (ម៉ោងវេនប្រហាក់ប្រហែល; ក្នុង 7 ថ្ងៃ)"
@@ -1395,8 +1395,8 @@ def _sc_pool():
 def sc_staff_pick(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Give OT / change a shift — pick the staffer."""
     rows = [_back_row("att:aw")]
-    rows += [[InlineKeyboardButton(r["canonical_name"], callback_data="att:scp:d:%d" % r["id"])]
-             for r in _sc_pool()][:35]
+    rows += [[InlineKeyboardButton(staff_btn_label(r), callback_data="att:scp:d:%d" % r["id"])]
+             for r in staff_sort(_sc_pool())][:35]
     return _hdr(p, "Give OT / change a shift — for whom?\nឱ្យ OT / ប្តូរវេន — ឱ្យអ្នកណា?"), \
         InlineKeyboardMarkup(rows)
 
@@ -1727,9 +1727,21 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         InlineKeyboardMarkup(rows)
 
 
+def staff_btn_label(r: dict) -> str:
+    """Staff-pick button text: 'POR — Chea Chaktopor' (the CAPSED call name first, owner session 32).
+    No call name on record → just the canonical name."""
+    cn = (r.get("call_name") or "").strip()
+    return ("%s — %s" % (cn.upper(), r["canonical_name"])) if cn else r["canonical_name"]
+
+
+def staff_sort(rows: list[dict]) -> list[dict]:
+    """Alphabetical by the name we CALL them (call_name, falling back to canonical)."""
+    return sorted(rows, key=lambda r: (r.get("call_name") or r.get("canonical_name") or "").lower())
+
+
 def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
-    staff = [r for r in staff_all("active")
-             if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]   # TWB only
+    staff = staff_sort([r for r in staff_all("active")
+                        if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"])   # TWB only
     chunk = staff[page * 8:(page + 1) * 8]
     rows = [[InlineKeyboardButton("🧪 Dry-run 1: Check-in (full lifecycle)",
                                   callback_data="att:dr:go")],
@@ -1745,7 +1757,7 @@ def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
                                   callback_data="att:dr:go7")],
             [InlineKeyboardButton("🧪 Dry-run 8: Acks · redirect · call-outs · welcome",
                                   callback_data="att:dr:go8")]] if page == 0 else []
-    rows += [[InlineKeyboardButton("%s (%s)" % (r["canonical_name"], r.get("org") or "?"),
+    rows += [[InlineKeyboardButton(staff_btn_label(r),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
     if page > 0:

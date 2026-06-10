@@ -1382,3 +1382,61 @@ def test_dryrun_checkout_uses_live_constant():
     from gm_bot import attendance_ui as ui
     texts = [t for _, t, _ in ui.build_catalogue(_PERSONA)]
     assert ui._CO_DONE in texts            # the dry-run shows exactly what staff get
+
+
+def _own_roster():
+    import datetime as _dt
+    return [
+        {"id": 1, "canonical_name": "Chea Chaktopor", "call_name": "Por", "org": "TWB",
+         "status": "active", "al_left": 12, "salary_usd": 300, "first_pay_usd": 150,
+         "second_pay_usd": 170, "joined_date": None},
+        {"id": 2, "canonical_name": "An Davy", "call_name": "Davy", "org": "TWB",
+         "status": "active", "al_left": 14, "salary_usd": 250, "first_pay_usd": 120,
+         "second_pay_usd": 140, "joined_date": _dt.date(2023, 5, 3)},
+        {"id": 3, "canonical_name": "Zo NoCall", "call_name": None, "org": "TWB",
+         "status": "active", "al_left": 0, "salary_usd": None, "joined_date": None},
+    ]
+
+
+def test_staff_btn_label_and_sort():
+    """Picker buttons: 'POR — Chea Chaktopor' (CAPSED call name first), alphabetical by call name;
+    no call name on record → canonical only."""
+    r = _own_roster()
+    assert ui.staff_btn_label(r[0]) == "POR — Chea Chaktopor"
+    assert ui.staff_btn_label(r[2]) == "Zo NoCall"
+    assert [x["id"] for x in ui.staff_sort(r)] == [2, 1, 3]   # Davy < Por < Zo
+
+
+def test_owner_pbot_partition_and_skip(monkeypatch):
+    """PB+OT view mirrors My Schedule's no-double-count: booked=min(ext,debt) beside PB, only the
+    leftover is upcoming OT; staff with nothing on the ledger are skipped entirely."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: _own_roster())
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    debts = {1: {"balance": 220}}                       # Por owes 3h40
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: debts.get(sid))
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 60 if sid == 2 else 0)
+    monkeypatch.setattr(db, "ot_pending_extension_min", lambda sid, iso: 120 if sid == 1 else 0)
+    t = bot._own_pbot_text("2026-06-11")
+    assert "POR — PB 3h 40m (2h booked)" in t            # ext 2h all eaten by the debt
+    assert "upcoming" not in t                           # nothing left over → no upcoming OT
+    assert "DAVY — OT 1h" in t                           # bank only
+    assert "Zo NoCall" not in t                          # both zero → skipped
+
+
+def test_owner_al_and_salary_views(monkeypatch):
+    """AL+Joined shows every staffer (date only when known); the pay lists show payroll staff with
+    a total underneath; CAPSED call names throughout."""
+    import gm_bot.bot as bot
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: _own_roster())
+    al = bot._own_al_text()
+    assert "• DAVY — 14 AL · 03/05/2023" in al
+    assert "• POR — 12 AL" in al
+    assert "Zo NoCall — 0 AL" in al                      # everyone shows, even 0 / no date
+    s1 = bot._own_sal_text(1)
+    assert "• DAVY — $120.00" in s1 and "• POR — $150.00" in s1
+    assert "Total: $270.00" in s1
+    assert "Zo" not in s1                                # nothing on record → not listed
+    s2 = bot._own_sal_text(2)
+    assert "Total: $310.00" in s2
