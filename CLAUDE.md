@@ -186,12 +186,46 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-10 (session 32 — Bedrock deltas 1+3+5 SHIPPED + wiring-tested 12/12. The
+**Last updated:** 2026-06-11 (session 32 — split-digest idea A + restart-safety #3/#4 SHIPPED &
+deployed. Suite 446. attendance_live=OFF, attendance_test_mode=OFF.)
+
+**Session 32 (Jun 11) — Reason categorization (split-digest idea "A") + restart-safety hardening:**
+- **Reason categorization (idea A) — DONE, deployed (`224a659`).** The inverse Brain+model pairing:
+  free-text is the model's job, counting is Brain's. `categorize_reasons` (Haiku, one batched call)
+  labels each typed lateness reason → fixed category (transport/family/health/oversleep/weather/other),
+  analysis-time only, falls back to 'other' on no-key/error, always same-length list.
+  `gm_lateness_reasons_since(today, 30)` feeds it (no schema change — computed each digest). The weekly
+  digest aggregates the labels (Brain, exact) into a per-staffer 30-day reason MIX shown for flagged
+  staffers ("Davy reasons (30d): transport×3, oversleep×1"); Opus 4.8 sees the mix too. Ideas B–E
+  (payslip explain · coverage→hire profile · sick-paper cross-check · digest Q&A) PARKED by owner until
+  more systems feed the Brain. +2 tests.
+- **Restart-safety audit + fixes (owner asked "how harmful are our restarts?").** Architecture verdict:
+  long-polling → Telegram QUEUES messages during the ~2–3s blip, nothing lost; separate processes →
+  a gm restart never touches retail/b2b; `Restart=always` auto-recovers. Keep polling, never webhooks.
+  - **#3 — OT-banking idempotency, DONE & deployed (`fa93251`).** Audit found every balance-moving path
+    already safe (status flips FIRST, before the write): AL approve, shift-change approve, daily AL
+    deduction, no-show (UNIQUE). The ONE hole: `_settle_redefined_shift` — its double-bank guard
+    (`set_banked→done`) ran LAST, after `payback_credit`+`ot_bank_add`, and 3 checkout paths reach it
+    (manual · auto-checkout scheduler · crash-redelivered duplicate) → two interleaving = silent
+    double-bank. Fix, NO schema change: `shift_change_claim_settle` = atomic `UPDATE…WHERE
+    status='approved' RETURNING id` (compare-and-swap on the existing status col); settle now CLAIMS
+    before moving any balance, only the winner banks. Failure mode flipped from silent overpay →
+    visible underpay (recoverable). +1 regression test (2nd settle banks nothing).
+  - **#4 — bounded shutdown, DONE & verified.** `TimeoutStopSec=15` added to all 5 `twbshop-*` units
+    (b2b/gm/hire/listener/retail) so a hung stop can't sit at systemd's silent 90s default. Done on the
+    server with per-file `.bak` + `daemon-reload`; loaded value verified `15s` via `systemctl show` on
+    every unit (no restart needed — applies next stop; all stayed active).
+  - **Deploy discipline (rules 1+2+5) — lighter trip, no script (owner choice).** `CLAUDE.md` "Deploy
+    Discipline" block: quiet-window (05:30–07:00·14:00–15:30·20:30–21:30 PP) · batch deploys · restart
+    only the changed service · always verify after (HEAD==origin, active, grep the change). Loads every
+    session; Claude enforces on deploy. Pointer in `docs/GO_LIVE_CHECKLIST.md`.
+
+**Session 32 (Jun 10) — Bedrock deltas 1+3+5 SHIPPED + wiring-tested 12/12.** The
 `#HIGHRISK-OK` self-approval marker is GONE: catastrophic actions now hard-block with NO override and a
 `🛑 NEEDS YOU — run: ! <cmd>` owner-paste message. Guard split command-checks from path-checks (fixes
 read-only false-positives). secret_guard now scans staged/unpushed diffs before commit+push. Ratchet
 removal trigger written. → `docs/BEDROCK.md`. REMAINING: delta 2 = OWNER OS-locks the global guard files
-in an elevated shell, then back to attendance.)
+in an elevated shell, then back to attendance.
 
 **Session 32 (Jun 10) — Bedrock guards hardened + proven (deltas 1/3/5):**
 - Rewrote `highrisk_guard.py` + `secret_guard.py` in repo `.claude/hooks/` AND live global
