@@ -94,6 +94,8 @@ def main() -> None:
     database.init_db()
 
     app = Application.builder().token(config.BOT_TOKEN).build()
+    from shared.error_handler import make_error_handler
+    app.add_error_handler(make_error_handler("Retail"))   # crashes are never silent
 
     # Customer handlers
     app.add_handler(CommandHandler("start", start))

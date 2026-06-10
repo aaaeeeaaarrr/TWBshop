@@ -1328,6 +1328,8 @@ def build_application(token: str) -> Application:
     questions.load_all_questions()
 
     app = Application.builder().token(token).build()
+    from shared.error_handler import make_error_handler
+    app.add_error_handler(make_error_handler("Hire"))   # crashes are never silent
 
     # Backup recorder for the senior groups — its own handler group, never interferes
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _backup_recorder), group=-2)

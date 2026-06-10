@@ -186,6 +186,8 @@ def main() -> None:
         .pool_timeout(20.0)
         .build()
     )
+    from shared.error_handler import make_error_handler
+    app.add_error_handler(make_error_handler("B2B"))   # crashes are never silent
 
     # /start in private → redirect to group(s)
     app.add_handler(CommandHandler("start", cmd_start))

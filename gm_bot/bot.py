@@ -1184,45 +1184,6 @@ def _today_pp():
     return _now_pp().date()
 
 
-_LAST_ERR_DM = 0.0
-
-
-async def _global_error_handler(update, context) -> None:
-    """Catch-all for ANY unhandled exception in a handler. Before this, a crash killed the tap
-    SILENTLY ('No error handlers are registered') — that's how gm_save_concern failed 69 times
-    unseen. Now: full traceback to the log, a throttled ⚠ DM to the owner, and a best-effort
-    answer on the callback so the user's button never just spins."""
-    global _LAST_ERR_DM
-    import time as _time
-    err = context.error
-    logger.error("UNHANDLED in handler: %s", err, exc_info=err)
-    try:
-        if isinstance(update, Update) and update.callback_query:
-            await update.callback_query.answer("⚠ Something broke — Papa has been told.")
-    except Exception:
-        pass
-    now = _time.time()
-    if now - _LAST_ERR_DM < 1800:        # one DM per 30 min — the log keeps every occurrence
-        return
-    _LAST_ERR_DM = now
-    where = ""
-    try:
-        if isinstance(update, Update):
-            if update.callback_query:
-                where = " (button: %s)" % (update.callback_query.data or "?")
-            elif update.effective_message and update.effective_message.text:
-                where = " (message: %.40s)" % update.effective_message.text
-    except Exception:
-        pass
-    try:
-        await context.bot.send_message(config.OWNER_TELEGRAM_ID,
-            "⚠ GM bot: a flow crashed%s\n%s: %.200s\n(full traceback in the server log; "
-            "more crashes in the next 30 min are logged but not re-sent)"
-            % (where, type(err).__name__, err))
-    except Exception as e:
-        logger.error("error-handler DM failed: %s", e)
-
-
 def _msg_time_pp(update, fallback: datetime) -> datetime:
     """The Telegram-stamped time of this update, in PP tz. Queued updates (bot down/restarting,
     long-poll backlog) must be judged by when the STAFFER acted, not when we got to process them —
@@ -5158,7 +5119,8 @@ def build_app() -> Application:
         raise ValueError("GM_BOT_TOKEN not set in config/secrets")
 
     app = Application.builder().token(config.GM_BOT_TOKEN).build()
-    app.add_error_handler(_global_error_handler)   # nothing dies silently (the gm_save_concern lesson)
+    from shared.error_handler import make_error_handler
+    app.add_error_handler(make_error_handler("GM"))   # nothing dies silently (the gm_save_concern lesson)
 
     # Restore the test-mode process flag from the DB so a restart can't silently flip
     # att_test_on() to False while attendance_test_mode='true' (which would make TEST mode show

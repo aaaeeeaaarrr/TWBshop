@@ -1459,6 +1459,37 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "Total: $360.00" in s2
 
 
+def test_global_error_handler(monkeypatch):
+    """The shared catch-all (every bot): logs, answers the spinning button, DMs the owner once
+    per bot per 30 min — and never raises itself, even when every send fails."""
+    from telegram import Update
+    from shared import error_handler as eh
+    eh._last_dm.clear()
+    sent, answered = [], []
+
+    class _Q:
+        data = "att:something"
+        async def answer(self, *a, **k):
+            answered.append(a)
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **k):
+            sent.append(text)
+
+    upd = Update(update_id=1)                       # PTB Update is frozen → bypass for the test
+    object.__setattr__(upd, "callback_query", _Q())
+    ctx = types.SimpleNamespace(error=RuntimeError("boom"), bot=_Bot())
+    h = eh.make_error_handler("TestBot")
+    asyncio.run(h(upd, ctx))
+    assert answered, "callback must be answered so the button doesn't spin"
+    assert len(sent) == 1 and "TestBot bot: a flow crashed" in sent[0] and "boom" in sent[0]
+    asyncio.run(h(upd, ctx))        # second crash within 30 min → logged, NOT re-sent
+    assert len(sent) == 1
+    # a totally broken context (no bot) must never raise out of the handler
+    eh._last_dm.clear()
+    asyncio.run(h(None, types.SimpleNamespace(error=ValueError("x"), bot=None)))
+
+
 def test_no_shadow_import_bugs():
     """REGRESSION (two prod crashes, Jun 10): a function-local import makes that name local to the
     WHOLE function, so any use in an earlier branch dies with UnboundLocalError — even when the
