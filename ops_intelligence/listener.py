@@ -88,6 +88,47 @@ async def _catch_up(client) -> None:
     logger.info("catch-up complete: %d messages across %d chats", n_msgs, n_chats)
 
 
+_ERR_TIMES: list = []          # recent processing-error timestamps
+_ERR_LAST_ALERT = 0.0
+
+
+def _alert_owner(text: str) -> None:
+    """Throttled owner DM via the GM bot token (Bot API works regardless of any polling process —
+    same pattern as the collection watchdog). The listener is a Telethon userbot, so the shared
+    PTB error handler can't cover it; this closes the per-message blind spot: errors used to be
+    log-only and invisible (the gm_save_concern lesson)."""
+    global _ERR_LAST_ALERT
+    import time as _t
+    import urllib.parse
+    import urllib.request
+    now = _t.time()
+    if now - _ERR_LAST_ALERT < 1800:
+        return
+    token = getattr(config, "GM_BOT_TOKEN", "") or config.BOT_TOKEN
+    try:
+        data = urllib.parse.urlencode({"chat_id": config.OWNER_TELEGRAM_ID,
+                                       "text": "⚠ Listener: " + text}).encode()
+        urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % token,
+                               data=data, timeout=15)
+        _ERR_LAST_ALERT = now
+    except Exception:
+        logger.exception("owner alert failed")
+
+
+def _note_processing_error(chat_id) -> None:
+    """Track error bursts: one transient failure is just logged; 3+ within 10 minutes means
+    message COLLECTION is degrading (DB down, schema break, API change) → tell the owner."""
+    import time as _t
+    now = _t.time()
+    _ERR_TIMES.append(now)
+    del _ERR_TIMES[:-20]
+    recent = [t for t in _ERR_TIMES if now - t < 600]
+    if len(recent) >= 3:
+        _alert_owner("%d message-processing errors in the last 10 min (latest chat %s) — "
+                     "messages may not be recorded. Full tracebacks in the listener log."
+                     % (len(recent), chat_id))
+
+
 async def run() -> None:
     init_ops_db()
 
@@ -141,6 +182,7 @@ async def run() -> None:
             logger.info("[%s] %s: %s", chat_title, sender_name or "?", (msg.text or "")[:80])
         except Exception:
             logger.exception("Error processing message from chat %s", event.chat_id)
+            _note_processing_error(event.chat_id)
 
     logger.info("Listening — Ctrl+C to stop")
     await client.run_until_disconnected()

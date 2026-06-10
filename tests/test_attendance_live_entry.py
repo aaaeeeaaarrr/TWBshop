@@ -1637,3 +1637,17 @@ def test_owner_al_month_only_display(monkeypatch):
     assert "• POR — 12 AL · 11/2022" in al               # month/year only
     assert "01/11/2022" not in al                        # the stored day-1 never shows
     assert "• DAVY — 14 AL · 03/05/2023" in al           # full dates unchanged
+
+
+def test_listener_error_burst_alert(monkeypatch):
+    """Listener per-message errors: 1-2 in 10 min are log-only; the 3rd raises the owner alert
+    (collection degrading). Closes the Telethon-side silent-failure blind spot."""
+    from ops_intelligence import listener as li
+    alerts = []
+    monkeypatch.setattr(li, "_alert_owner", lambda t: alerts.append(t))
+    li._ERR_TIMES.clear()
+    li._note_processing_error(-100)
+    li._note_processing_error(-100)
+    assert alerts == []                      # transient → quiet
+    li._note_processing_error(-100)
+    assert len(alerts) == 1 and "3 message-processing errors" in alerts[0]
