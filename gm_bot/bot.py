@@ -3850,6 +3850,71 @@ async def cmd_joined(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     shown = iso[:7] if month_only else iso
     await update.message.reply_text("✓ %s joined %s saved.%s"
         % (_caps_call(hits[0]), shown, " (month only — day unknown)" if month_only else ""))
+    # NEW HIRE this month → the join date is load-bearing: auto-prorate their first month's
+    # split (owner rule in payroll.prorate_join_month) and register the automatic restore.
+    note = _maybe_prorate_new_hire(hits[0], iso, month_only)
+    if note:
+        await update.message.reply_text(note)
+
+
+def _maybe_prorate_new_hire(staff: dict, joined_iso: str, month_only: bool) -> str | None:
+    """If the joined date is a full date in the CURRENT PP month (day > 1) and the staffer has a
+    salary on record: apply the prorated join-month split and save a pay_restore record so the
+    daily job restores their FULL split automatically once the join month passes.
+    Returns the owner-facing note, or None when no proration applies (e.g. backfilling history)."""
+    import json as _json
+    from gm_bot import payroll as pr
+    from shared.database import gm_get_state, gm_set_state, staff_set_pay_split
+    if month_only or staff.get("salary_usd") is None:
+        return None
+    now = datetime.now(finance.PP_TZ)
+    if joined_iso[:7] != now.strftime("%Y-%m") or int(joined_iso[8:10]) <= 1:
+        return None
+    sid = staff["id"]
+    if gm_get_state("pay_restore:%d" % sid):
+        return None                          # already prorated once — never stack
+    salary = float(staff.get("salary_usd") or 0)
+    bonus = float(staff.get("bonus_usd") or 0)
+    orig_first = float(staff.get("first_pay_usd") or 0)
+    orig_second = float(staff.get("second_pay_usd") or 0)
+    p = pr.prorate_join_month(salary, int(joined_iso[8:10]))
+    new_second = round(p["second_base"] + bonus, 2)
+    staff_set_pay_split(sid, p["first"], new_second)
+    gm_set_state("pay_restore:%d" % sid, _json.dumps(
+        {"first": orig_first, "second": orig_second, "after": joined_iso[:7]}))
+    return ("🧮 New hire this month → first month prorated automatically:\n"
+            "salary $%g × %d/30 days = $%g · 1st pay $%g (80%% rounded up to 5/0) · "
+            "2nd $%g base%s.\nFull split ($%g / $%g) restores automatically on the 1st of "
+            "next month." % (salary, 30 - (int(joined_iso[8:10]) - 1), p["prorated"], p["first"],
+                             p["second_base"], (" +$%g bonus" % bonus) if bonus else "",
+                             orig_first, orig_second))
+
+
+async def _pay_restore_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily: once a new hire's join month has PASSED, restore their full stored split (the
+    join-month proration was temporary) and tell the owner. Real wall clock — never the test
+    clock (real pay data, like the AL accrual jobs)."""
+    import json as _json
+    from shared.database import gm_state_prefix, gm_set_state, staff_set_pay_split
+    cur_month = datetime.now(finance.PP_TZ).strftime("%Y-%m")
+    for key, val in gm_state_prefix("pay_restore:"):
+        try:
+            rec = _json.loads(val)
+        except Exception:
+            continue
+        if rec.get("after", "9999-12") >= cur_month:
+            continue                          # join month not over yet
+        sid = int(key.split(":")[1])
+        staff_set_pay_split(sid, rec["first"], rec["second"])
+        gm_set_state(key, "")
+        staff = next((s for s in staff_all("active") if s["id"] == sid), None)
+        nm = _caps_call(staff) if staff else ("staff id %d" % sid)
+        try:
+            await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+                "✓ %s's join-month proration ended — full pay split restored "
+                "(1st $%g · 2nd $%g)." % (nm, rec["first"], rec["second"]))
+        except Exception as e:
+            logger.error("pay restore notify failed: %s", e)
 
 
 async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5177,6 +5242,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_callout_job,
                             time=__import__("datetime").time(hour=1, minute=30),
                             name="gm_callout")
+    # new-hire join-month proration restore: daily 07:05 PP (00:05 UTC), real clock, ungated
+    app.job_queue.run_daily(_pay_restore_job,
+                            time=__import__("datetime").time(hour=0, minute=5),
+                            name="gm_pay_restore")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

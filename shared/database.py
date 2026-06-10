@@ -1755,6 +1755,16 @@ def gm_get_state(key: str) -> str | None:
             return row["value"] if row else None
 
 
+def gm_state_prefix(prefix: str) -> list[tuple[str, str]]:
+    """All non-empty gm_state rows whose key starts with prefix — for small registries kept in
+    state (e.g. pay_restore:{staff_id})."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key, value FROM gm_state WHERE key LIKE %s AND COALESCE(value,'')<>''",
+                        (prefix + "%",))
+            return [(r["key"], r["value"]) for r in cur.fetchall()]
+
+
 def gm_set_state(key: str, value: str) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
@@ -2762,6 +2772,14 @@ def staff_all(status: str | None = None) -> list[dict]:
             else:
                 cur.execute("SELECT * FROM staff_registry ORDER BY canonical_name")
             return [_staff_row(r) for r in cur.fetchall()]
+
+
+def staff_set_pay_split(staff_id: int, first: float, second: float) -> None:
+    """Set the stored 1st/2nd pay amounts (join-month proration + its automatic restore)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET first_pay_usd=%s, second_pay_usd=%s, "
+                        "updated_at=NOW() WHERE id=%s", (first, second, staff_id))
 
 
 def staff_set_joined(staff_id: int, joined_iso: str, month_only: bool = False) -> None:

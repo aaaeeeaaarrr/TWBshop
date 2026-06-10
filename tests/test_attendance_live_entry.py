@@ -1459,6 +1459,47 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "Total: $360.00" in s2
 
 
+def test_prorate_join_month_owner_rule():
+    """30-day basis always; missed = join_day−1; 1st = 80% of prorated rounded UP to next 5/0
+    (never above prorated); 2nd base = remainder. Kimying (owner-worked example) is the anchor."""
+    from gm_bot.payroll import prorate_join_month
+    p = prorate_join_month(160, 4)                       # Kimying: Jun 4 → 27/30
+    assert p == {"prorated": 144.0, "first": 120.0, "second_base": 24.0}
+    p1 = prorate_join_month(160, 1)                      # joined the 1st → full month
+    assert p1["prorated"] == 160.0 and p1["first"] == 130.0   # 128 → up to 130
+    pr5 = prorate_join_month(100, 16)                    # 50 → 80% = 40, already a 5/0 → stays
+    assert pr5 == {"prorated": 50.0, "first": 40.0, "second_base": 10.0}
+    tiny = prorate_join_month(10, 28)                    # 1.0 → 80% = .8 → ceil to 5 BUT capped
+    assert tiny["first"] == tiny["prorated"] == 1.0 and tiny["second_base"] == 0
+
+
+def test_pay_restore_job_due_and_not_due(monkeypatch):
+    """The daily job restores the FULL split only once the join month has PASSED; current-month
+    records wait; the record is cleared after restoring (never restores twice)."""
+    import gm_bot.bot as bot
+    from shared import database as db
+
+    restored, cleared, dms = [], [], []
+    monkeypatch.setattr(db, "gm_state_prefix", lambda p: [
+        ("pay_restore:42", '{"first": 145.0, "second": 30.0, "after": "2026-05"}'),   # passed → due
+        ("pay_restore:7",  '{"first": 100.0, "second": 20.0, "after": "2099-12"}'),   # future → wait
+    ])
+    monkeypatch.setattr(db, "staff_set_pay_split", lambda sid, f, s: restored.append((sid, f, s)))
+    monkeypatch.setattr(db, "gm_set_state", lambda k, v: cleared.append(k))
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: [
+        {"id": 42, "canonical_name": "Sun Kimying", "call_name": "Kimying"}])
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **k):
+            dms.append(text)
+
+    ctx = types.SimpleNamespace(bot=_Bot())
+    asyncio.run(bot._pay_restore_job(ctx))
+    assert restored == [(42, 145.0, 30.0)]               # only the passed month restored
+    assert cleared == ["pay_restore:42"]                 # record cleared → can't restore twice
+    assert any("KIMYING" in d and "$145" in d for d in dms)   # owner told
+
+
 def test_parse_joined_full_and_month_only():
     """/joined accepts full dates AND month/year when the day is unknown — stored as the 1st but
     flagged month_only so the views show mm/yyyy, never a fake '01/'."""

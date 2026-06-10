@@ -16,6 +16,19 @@ def day_pay(salary: float) -> float:
     return round((salary or 0) / DAYS_IN_MONTH, 2)
 
 
+def prorate_join_month(salary: float, join_day: int) -> dict:
+    """A mid-month NEW HIRE's first (partial) month, per the owner rule pinned above:
+    missed = join_day − 1 (30-day basis) · prorated = salary × (30−missed)/30 ·
+    1st pay = 80% of prorated rounded UP to the next 5/0 (never above prorated) ·
+    2nd base = the remainder. Bonus is NOT prorated — it rides the stored 2nd on top.
+    Returns {prorated, first, second_base}."""
+    import math
+    missed = max(0, min(30, int(join_day) - 1))
+    prorated = round((salary or 0) * (DAYS_IN_MONTH - missed) / DAYS_IN_MONTH, 2)
+    first = min(float(math.ceil(prorated * 0.8 / 5) * 5), prorated)
+    return {"prorated": prorated, "first": first, "second_base": round(prorated - first, 2)}
+
+
 def compute_slip(salary: float, bonus: float, first_pay: float, second_pay: float,
                  no_show_count: int, bonus_voided: bool = False) -> dict:
     """Compute a staff payslip for a work-month.
