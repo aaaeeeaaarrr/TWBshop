@@ -564,7 +564,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             cart.clear()
             for it in items:
                 if it.get("grams"):
-                    from b2b_bot.menu_keyboards import _SESAME_LABEL_CODE
+                    # NO local import: it would shadow the module-level _SESAME_LABEL_CODE and
+                    # crash the repeat-order branch (line ~374) with UnboundLocalError.
                     sc  = _SESAME_LABEL_CODE.get(it.get("notes", ""))
                     key = f"{it['item']}|{it['grams']}|{sc}" if sc else f"{it['item']}|{it['grams']}"
                 else:

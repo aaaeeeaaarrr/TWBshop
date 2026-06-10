@@ -1459,6 +1459,38 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "Total: $360.00" in s2
 
 
+def test_no_shadow_import_bugs():
+    """REGRESSION (two prod crashes, Jun 10): a function-local import makes that name local to the
+    WHOLE function, so any use in an earlier branch dies with UnboundLocalError — even when the
+    module imports it at the top. cmd_staff (gm) and the b2b repeat-order branch both had it.
+    AST-scan every bot module; the earliest import line per name is the binding that counts."""
+    import ast
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    bugs = []
+    files = [p for d in ("gm_bot", "b2b_bot", "shared", "hire_bot", "bot", "ops_intelligence")
+             if (root / d).exists() for p in (root / d).rglob("*.py")]
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for fn in [n for n in ast.walk(tree)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+            imports = {}
+            for node in ast.walk(fn):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    for a in node.names:
+                        nm = (a.asname or a.name).split(".")[0]
+                        imports[nm] = min(imports.get(nm, 10**9), node.lineno)
+            if not imports:
+                continue
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                    ln = imports.get(node.id)
+                    if ln and node.lineno < ln:
+                        bugs.append("%s:%d '%s' used before its local import (line %d, in %s)"
+                                    % (path.name, node.lineno, node.id, ln, fn.name))
+    assert not bugs, "shadow-import bugs:\n" + "\n".join(sorted(set(bugs)))
+
+
 def test_shift_changes_active_map_real_sql_types():
     """REGRESSION (the dry-run-1 crash): the batch redefine lookup passes ISO strings into a
     DATE = ANY(...) — Postgres needs the ::date[] cast or every caller (dry-run 1's schedule

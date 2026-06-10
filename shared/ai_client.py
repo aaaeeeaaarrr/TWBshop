@@ -259,6 +259,19 @@ async def classify_b2b_image(image_bytes: bytes, mime_type: str = "image/jpeg") 
         return {"type": "other"}
 
 
+_B2B_ORDER_IMAGE_SYSTEM = (
+    "You extract a bakery order from a photo or scanned document (order sheet, table, handwritten "
+    "list, chat screenshot). Return only valid JSON:\n"
+    '{"items": [{"item": "<product name>", "qty": <integer>}]}\n'
+    "Rules:\n"
+    "- Extract readable product names only — ignore item codes like PP-FOOD-BK-2503; if a row has "
+    "a code column and a description column, use the description.\n"
+    "- Look for quantities in columns named Qty, Quantity, Pcs, or similar; qty must be a positive "
+    "integer.\n"
+    'If no order items are readable, return {"items": []}'
+)
+
+
 async def extract_b2b_order_from_image(image_bytes: bytes, menu_items: list[str] = None, mime_type: str = "image/jpeg") -> list[dict]:
     """Extract item names and quantities from an order photo/document. Returns [{item, qty}]."""
     if not config.ANTHROPIC_API_KEY:
