@@ -3664,10 +3664,12 @@ def _caps_call(s: dict) -> str:
     return cn.upper() if cn else s["canonical_name"]
 
 
-def _own_staff_sorted() -> list[dict]:
-    """Active TWB staff (excl. Tyty), alphabetical by call name — the owner-menu roster."""
+def _own_staff_sorted(org: str | None = "TWB") -> list[dict]:
+    """Active staff (excl. Tyty), alphabetical by call name — the owner-menu roster.
+    org: 'TWB' (default — attendance views), 'DELIS', or None for everyone."""
     rows = [s for s in staff_all("active")
-            if s.get("org") == "TWB" and s["canonical_name"] != "Tyty"]
+            if s["canonical_name"] != "Tyty"
+            and (org is None or (s.get("org") or "").upper() == org.upper())]
     return sorted(rows, key=lambda r: (r.get("call_name") or r["canonical_name"]).lower())
 
 
@@ -3711,17 +3713,37 @@ def _own_al_text() -> str:
 
 
 def _own_sal_text(which: int) -> str:
-    """Salaries 1st/2nd pay — staff with payroll on record, CAPSED names, total underneath."""
-    field = "first_pay_usd" if which == 1 else "second_pay_usd"
-    lines, total = [], 0.0
-    for s in _own_staff_sorted():
-        if s.get("salary_usd") is None:
-            continue
-        v = float(s.get(field) or 0)
-        total += v
-        lines.append("• %s — $%.2f" % (_caps_call(s), v))
-    return ("💵 Salaries — %s pay\n" % ("1st" if which == 1 else "2nd")) + "\n".join(lines) + \
-        "\n\nTotal: $%.2f" % total
+    """Salaries 1st/2nd pay — TWB and Delis sections, each with its own total, grand total last.
+    2nd pay shows the bonus SEPARATELY ('ANAN — $30.00 +$20.00', owner): the stored second pay
+    carries the bonus baked in, so base = second_pay − bonus, and the + is the earnable part."""
+    out = ["💵 Salaries — %s pay" % ("1st" if which == 1 else "2nd")]
+    grand = 0.0
+    for org, label in (("TWB", "TWB"), ("DELIS", "Delis")):
+        lines, total = [], 0.0
+        for s in _own_staff_sorted(org):
+            if s.get("salary_usd") is None:
+                continue
+            if which == 1:
+                v = float(s.get("first_pay_usd") or 0)
+                total += v
+                lines.append("• %s — $%.2f" % (_caps_call(s), v))
+            else:
+                pay2 = float(s.get("second_pay_usd") or 0)
+                bonus = float(s.get("bonus_usd") or 0)
+                total += pay2
+                lines.append("• %s — $%.2f%s"
+                             % (_caps_call(s), pay2 - bonus, (" +$%.2f" % bonus) if bonus else ""))
+        out.append("\n%s:" % label)
+        if lines:
+            out += lines
+            grand += total
+            out.append("%s total: $%.2f" % (label, total))
+        else:
+            out.append("(no pay data on record yet)")
+    out.append("\nTotal: $%.2f" % grand)
+    if which == 2:
+        out.append("(base +bonus — the + pays only when earned)")
+    return "\n".join(out)
 
 
 _OWN_STAFF_KB_ROWS = [
