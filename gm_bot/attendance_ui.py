@@ -1591,11 +1591,15 @@ def ci_sim_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("④ 🎯 Arm: judge my next live location", callback_data="att:cis:arm")],
         [InlineKeyboardButton("⑤ Shift end — check-out request", callback_data="att:cis:out")],
         [InlineKeyboardButton("⑥ +10min — did-you-leave-early ask", callback_data="att:cis:out2")],
+        [InlineKeyboardButton("⑦ ✅ Simulate full checkout (settle + banking)",
+                              callback_data="att:cisco:%d" % p["id"])],
     ]
     return _hdr(p, "▶️ Check-in simulator — each button sends the REAL message exactly as %s would "
                    "receive it (to you only). ④ makes your next shared live location be judged as "
-                   "their check-in (geofence + early/late vs their %s start)."
-                % (p.get("call_name") or p["canonical_name"], fmt12s(p.get("work_start")))), \
+                   "their check-in. ⑦ runs the REAL end-to-end checkout: ensures a check-in, checks "
+                   "out at the shift end, settles OT vs their normal length, and sends the thank-you "
+                   "— so you can walk Give-OT → approve → checkout → banking without going live."
+                % (p.get("call_name") or p["canonical_name"])), \
         InlineKeyboardMarkup(rows)
 
 

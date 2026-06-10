@@ -3635,6 +3635,79 @@ async def _late_simarr_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await _offer_payback(context, persona, d["balance"], config.OWNER_TELEGRAM_ID, late_min=mins)
 
 
+async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:cisco:{persona} — TEST ONLY: simulate a FULL checkout end-to-end. Ensures a check-in
+    session (at the shift's start), checks out at the shift's end, runs the REAL settle, and reports
+    the banking (worked · OT earned vs normal length · payback cleared · OT banked) + sends the same
+    thank-you the staffer would get. Prefers an approved shift-redefine (today or yesterday's
+    overnight) so Give-OT → approve → checkout → banking is walkable; falls back to the normal shift
+    (OT 0). No behaviour fork — it drives the same att_check_in/out + _settle_redefined_shift the
+    live scheduler uses, only with simulated timestamps. Test-isolated (is_test rows; real bank
+    untouched)."""
+    query = update.callback_query
+    await query.answer()
+    if not _att_test_mode() or update.effective_user.id != config.OWNER_TELEGRAM_ID:
+        return
+    persona = next((s for s in staff_all("active") if s["id"] == int(query.data.split(":")[2])), None)
+    if not persona:
+        return
+    from datetime import date as _date, timedelta as _td
+    from shared.database import (shift_change_active, att_check_in, att_check_out, shift_change_get,
+                                 payback_open_debt)
+    from gm_bot.attendance_ui import shift_len_min, _hm
+    from gm_bot.attendance import to_min
+    from gm_bot import attendance_ui as ui
+    nm = persona.get("call_name") or persona["canonical_name"]
+    suid = (persona.get("telegram_ids") or [None])[0]
+    today = datetime.now(finance.PP_TZ).date()
+
+    # which shift? prefer an approved redefine on today, then yesterday (overnight tail)
+    sc, sd = None, today.isoformat()
+    for cand in (today.isoformat(), (today - _td(days=1)).isoformat()):
+        g = shift_change_active(persona["id"], cand)
+        if g:
+            sc, sd = g, cand
+            break
+    if sc:
+        start_min, end_min, normal_len = int(sc["start_min"]), int(sc["end_min"]), int(sc["normal_len"] or 0)
+    else:
+        ws = to_min(persona.get("work_start"))
+        ln = shift_len_min(persona.get("work_start"), persona.get("work_end")) or 0
+        if ws is None or not ln:
+            await query.edit_message_text((query.message.text or "") +
+                "\n\n⚠ %s has no shift times set — can't simulate." % nm)
+            return
+        start_min, end_min, normal_len = ws, ws + ln, ln
+
+    base = datetime.combine(_date.fromisoformat(sd), datetime.min.time(), tzinfo=finance.PP_TZ)
+    ci_dt, co_dt = base + _td(minutes=start_min), base + _td(minutes=end_min)
+
+    debt0 = payback_open_debt(persona["id"])
+    pb0 = max(0, debt0["balance"]) if debt0 else 0
+    att_check_in(persona["id"], sd, ci_dt.isoformat(), True, 0, 0)
+    att_check_out(persona["id"], sd, co_dt.isoformat())
+    _settle_redefined_shift(persona, sd, co_dt)
+    debt1 = payback_open_debt(persona["id"])
+    pb1 = max(0, debt1["balance"]) if debt1 else 0
+
+    worked = end_min - start_min
+    earned = max(0, worked - normal_len)
+    banked = int((shift_change_get(sc["id"]) or {}).get("ot_banked") or 0) if sc else 0
+    pb_cleared = max(0, pb0 - pb1)
+    win = "%s–%s" % (_fmt_min(start_min), _fmt_min(end_min))
+    summary = ("🧪 Simulated checkout — %s, %s %s.\n"
+               "Worked %s · normal %s · OT earned %s.\n"
+               "→ cleared %s payback, banked %s OT.\n"
+               "(test only: the shift-change row is marked done; the real OT bank is untouched.)"
+               % (nm, sd, win, _hm(worked), _hm(normal_len), _hm(earned),
+                  _hm(pb_cleared), _hm(banked)))
+    try:
+        await query.edit_message_text((query.message.text or "") + "\n\n" + summary)
+    except Exception:
+        await _att_send(context, config.OWNER_TELEGRAM_ID, "Owner", "", summary)
+    await _att_send(context, suid, "Staff", nm, ui._CO_DONE)
+
+
 async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:go — tap-to-confirm for the no-reason flows (replaces typing 'go'). Owner test uses the
     user_data pending; a live staffer uses flow_state. Fires the real submit_* via _att_dispatch."""
@@ -4465,6 +4538,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
     app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go$"))
     app.add_handler(CallbackQueryHandler(_late_simarr_callback, pattern=r"^att:simarr:"))
+    app.add_handler(CallbackQueryHandler(_ci_simcheckout_callback, pattern=r"^att:cisco:"))
     # private photo from staff → reason capture / sick papers (gated); harmless otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))

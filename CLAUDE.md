@@ -232,8 +232,14 @@ in an elevated shell, then back to attendance.)
   pin is a NEW msg, an active update keeps live_period — neither matches). **Every successful checkout
   (manual + auto) now sends `_CO_DONE` = "Checked out ✓ Thank you, have a nice day! 🤍" (KH draft in
   KH_REVIEW §1.1).** +2 tests (grace-3 boundary; stop discriminator). Suite **433**.
-- ⏳ **Attendance NEXT:** `_offer_buyback` on settle (take banked OT as rest), `/test`
-  simulate-checkout showing the banking, then go-live prep (owner role-play → /testreset → flip).
+- **`/test` SIMULATE-CHECKOUT built:** check-in simulator → "⑦ ✅ Simulate full checkout (settle +
+  banking)" (`att:cisco:`, `_ci_simcheckout_callback`). Ensures a check-in, checks out at the
+  (redefined, overnight-aware) shift end, runs the REAL `_settle_redefined_shift`, and reports
+  worked · OT earned vs normal · payback cleared · OT banked + sends the `_CO_DONE` thank-you — so
+  Give-OT → approve → checkout → banking is walkable with no live mode (test-isolated; real bank
+  untouched). +1 test. Suite **434**.
+- ⏳ **Attendance NEXT:** `_offer_buyback` on settle (take banked OT as rest); then "simulate the
+  full real in /test" gaps (see below); then go-live prep (owner role-play → /testreset → flip).
   attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
