@@ -66,6 +66,16 @@
    its groups; gm DMs are not backfillable). The 1-minute watchdog makes an unnoticed >24h outage
    practically impossible.
 
+## Fire drill — re-prove the alarm in 60 seconds (run ~monthly, or after any server change)
+A safeguard's failure path is the least-exercised code in the system — "built" rots silently
+(this watchdog was dark for 2 weeks: cron daemon off AND the alert token undeliverable; both
+invisible until an end-to-end drill on 2026-06-11). The drill, owner-pasteable:
+```
+! ssh twbshop "systemctl is-active cron && tail -2 /root/TWBshop/logs/watchdog.log && systemctl stop twbshop-hire && rm -f ~/.watchdog_last_alert && cd /root/TWBshop && /root/venv/bin/python run_collection_watchdog.py 2>&1 | grep -v Deprecation; systemctl start twbshop-hire && sleep 2 && systemctl is-active twbshop-hire"
+```
+PASS = cron `active` · fresh "ok" log lines · `alert sent:` printed · a 🚨 DM in your hand ·
+hire `active` again. Anything else → tell Claude. (The drill clears the 6h alert throttle.)
+
 ## Incident history (worst first)
 - **May 28–31: listener crash-loop, ~3.2 days** (~22,800 restart cycles) — unnoticed because no
   watchdog ran. Produced the session-28 reliability package (watchdog + `_catch_up` + backfill).
