@@ -1672,10 +1672,17 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     debt = payback_open_debt(p["id"])
     debt_min = debt["balance"] if debt else 0
     bank_min = ot_bank_balance(p["id"])
-    # agreed-but-not-yet-worked OT clears payback FIRST at checkout, so show how much of the debt is
-    # already covered by an approved upcoming shift-redefine: "5h (4h booked)".
-    booked_min = min(ot_pending_extension_min(p["id"], _today().isoformat()), debt_min) if debt_min else 0
+    # Agreed-but-not-yet-worked OT (approved upcoming redefines) settles at checkout: it clears
+    # payback FIRST, the leftover banks. Partition it with NO double-count — the same hour is either
+    # 'booked' against the debt OR 'upcoming' into the bank, never both:
+    #   booked PB  = min(extension, debt)            → shown next to the debt
+    #   upcoming OT = max(0, extension − debt)        → shown next to the bank (capped at 14h room)
+    from gm_bot import ot as ot_mod
+    pending_ext = ot_pending_extension_min(p["id"], _today().isoformat())
+    booked_min = min(pending_ext, debt_min)
+    upcoming_ot = min(max(0, pending_ext - debt_min), ot_mod.cap_room(bank_min))
     debt_txt = _hm(debt_min) + ((" (%s booked · កក់រួច)" % _hm(booked_min)) if booked_min else "")
+    bank_txt = _hm(bank_min) + ((" (%s upcoming · នឹងចូល)" % _hm(upcoming_ot)) if upcoming_ot else "")
     # upcoming approved AL/special dates
     upcoming = []
     rows = [_back_row("att:am")]
@@ -1711,7 +1718,7 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    "Upcoming AL: %s"
                 % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")),
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
-                   debt_txt, _hm(bank_min), up_txt)), \
+                   debt_txt, bank_txt, up_txt)), \
         InlineKeyboardMarkup(rows)
 
 

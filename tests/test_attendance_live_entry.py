@@ -1128,7 +1128,56 @@ def test_my_schedule_shows_booked_payback(monkeypatch):
 
     monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
     text, _kb = ui.my_screen(p)
+    # Seth's case: 5h debt, 4h agreed OT → all 4h books against the debt, NOTHING upcoming in the bank
     assert "Payback debt: 5h (4h booked" in text
+    assert "OT bank: 0h\n" in text and "upcoming" not in text
+
+
+def _my_screen_env(monkeypatch, debt_min, bank_min, pending_ext):
+    """Helper: stub the DB for my_screen with the three numbers that drive the booked/upcoming split."""
+    from gm_bot import attendance_ui as ui
+    from shared import database as db
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: {"balance": debt_min} if debt_min else None)
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: bank_min)
+    monkeypatch.setattr(db, "ot_pending_extension_min", lambda sid, iso: pending_ext)
+    monkeypatch.setattr(ui, "att_test_on", lambda: False)
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return []
+
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+
+
+def test_my_schedule_booked_vs_upcoming_no_double_count(monkeypatch):
+    """The agreed extension is partitioned with NO overlap: min(ext,debt) books against the debt,
+    max(0,ext−debt) is upcoming into the bank — and the upcoming part is capped at the 14h bank room."""
+    from gm_bot import attendance_ui as ui
+    p = {"id": 11, "canonical_name": "X", "call_name": "X", "work_start": "21:00",
+         "work_end": "06:00", "day_off": "Sun", "al_left": 5, "expertise": ["bakery"]}
+
+    # ext 6h, debt 2h → 2h books, 4h upcoming (sum = 6h, no double-count)
+    _my_screen_env(monkeypatch, debt_min=120, bank_min=0, pending_ext=360)
+    t, _ = ui.my_screen(p)
+    assert "Payback debt: 2h (2h booked" in t and "OT bank: 0h (4h upcoming" in t
+
+    # no debt, ext 4h → nothing booked, all 4h upcoming
+    _my_screen_env(monkeypatch, debt_min=0, bank_min=0, pending_ext=240)
+    t, _ = ui.my_screen(p)
+    assert "Payback debt: 0h\n" in t and "OT bank: 0h (4h upcoming" in t
+
+    # bank already 13h (60 min room), no debt, ext 4h → upcoming capped at 1h, not 4h
+    _my_screen_env(monkeypatch, debt_min=0, bank_min=13 * 60, pending_ext=240)
+    t, _ = ui.my_screen(p)
+    assert "(1h upcoming" in t and "(4h upcoming" not in t
 
 
 def test_takeback_windows_are_shift_edges():
