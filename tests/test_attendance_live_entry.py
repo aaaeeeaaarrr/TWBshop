@@ -94,7 +94,7 @@ def test_arm_pending_routes_to_flow_state_when_live(monkeypatch):
                         lambda uid, flow, step, data, ttl_min=None: saved.update(
                             uid=uid, flow=flow, step=step, data=data))
     ctx = _Ctx(); ctx.user_data["att_live_self"] = True
-    ui._arm_pending(ctx, 777, {"flow": "al", "days": ["2026-06-20"]})
+    ui._arm_pending(ctx, _Update(777), {"flow": "al", "days": ["2026-06-20"]})
     assert saved["uid"] == 777 and saved["flow"] == "att_pending"
     assert saved["data"]["flow"] == "al"
     assert "att_test_pending" not in ctx.user_data     # live does NOT use user_data
@@ -103,7 +103,7 @@ def test_arm_pending_routes_to_flow_state_when_live(monkeypatch):
 def test_arm_pending_uses_user_data_in_test(monkeypatch):
     monkeypatch.setattr(ui, "att_test_on", lambda: True)
     ctx = _Ctx()
-    ui._arm_pending(ctx, 777, {"flow": "al"})
+    ui._arm_pending(ctx, _Update(777), {"flow": "al"})
     assert ctx.user_data["att_test_pending"]["flow"] == "al"
 
 
@@ -136,6 +136,37 @@ def test_dispatch_late_live_declares_only(monkeypatch):
     assert calls["payback"] == 0       # NO debt at declare (that happens on arrival via location)
     assert calls["offer"] == 0         # NO slot picker at declare
     assert upd.message.replies and "live location" in upd.message.replies[0].lower()
+
+
+def test_dispatch_al_edits_prompt_into_awaiting_card(monkeypatch):
+    """When a flow captured its reason-PROMPT (pend has _summary + coords), typing the reason edits
+    that message in place into an 'awaiting approval' card carrying the same info + the reason."""
+    from gm_bot import bot
+    edited = []
+
+    class _Bot:
+        async def edit_message_text(self, t, **k):
+            edited.append((t, k.get("chat_id"), k.get("message_id")))
+
+    async def _submit(*a, **k):
+        pass
+
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: dict(_PERSONA))
+    monkeypatch.setattr(bot, "submit_al_request", _submit)
+
+    upd = _Update(uid=555, text="dentist")
+    ctx = _Ctx(); ctx.bot = _Bot()
+    pend = {"flow": "al", "kind": "days", "days": ["2026-06-20"],
+            "hours_start": None, "hours_end": None,
+            "_summary": "AL: Sat 20/06 — 1 AL day(s).", "_prompt_chat": 555, "_prompt_msg": 42}
+    asyncio.run(bot._att_dispatch(upd, ctx, pend, live=True))
+
+    assert edited, "prompt was not edited"
+    card, chat_id, msg_id = edited[-1]
+    assert chat_id == 555 and msg_id == 42
+    assert "AL: Sat 20/06" in card          # same info
+    assert "dentist" in card                # the typed reason
+    assert "Awaiting approval" in card      # the new state
 
 
 def test_dispatch_late_test_defers_to_simulate_arrival(monkeypatch):

@@ -358,7 +358,7 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("② SHORT-NOTICE request (within 7 days) — costs points, computed total shown",
          "⚠ Short notice (within 7 days) — about −54 points for a full day (−0.1/min).\n"
          "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
-        ("③ HOURS-AL (part of a day) — fractional deduction",
+        ("③ HOURS-AL (part of a day)",
          "Hours AL: 9pm → 12am (3h of a 9h shift = 0.3 AL).\n"
          "AL តាមម៉ោង៖ 9pm → 12am (3h ក្នុង 9h = 0.3 AL)។  (KH pending review)", None),
         ("④ FROM-NOW (today, mid-shift) — 1 senior can let them leave, 2nd ratifies after",
@@ -656,9 +656,20 @@ def _armed(context) -> bool:
     return att_test_on() or _is_live(context)
 
 
-def _arm_pending(context, uid: int, pend: dict) -> None:
+def _arm_pending(context, update, pend: dict) -> None:
     """Stash the pending reason/'go' for the next typed message. Owner test → user_data (ephemeral);
-    live staffer → flow_state (DB, restart-safe), per docs/ATTENDANCE_TEST_MODE.md item 8."""
+    live staffer → flow_state (DB, restart-safe), per docs/ATTENDANCE_TEST_MODE.md item 8.
+    Also captures the reason-PROMPT message coords so the dispatcher can edit it in place into an
+    'awaiting approval' card once the reason is typed (only when the flow set pend['_summary'])."""
+    uid = update.effective_user.id
+    q = getattr(update, "callback_query", None)
+    msg = getattr(q, "message", None) if q is not None else None
+    if msg is not None:
+        chat_id = getattr(msg, "chat_id", None)
+        msg_id = getattr(msg, "message_id", None)
+        if chat_id is not None and msg_id is not None:
+            pend["_prompt_chat"] = chat_id
+            pend["_prompt_msg"] = msg_id
     if att_test_on():
         context.user_data["att_test_pending"] = pend
     else:
@@ -1993,7 +2004,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(sick_me_time(p, int(data[3])))
         if sub == "mecant":
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()})
                 return await show(_confirm_prompt(p, context,
                     "Sick — can't come to work today. · ឈឺ មកធ្វើការថ្ងៃនេះមិនបាន។",
@@ -2005,7 +2016,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(sick_family_fulltime(p, data[3], data[4]))
         if sub == "famf":
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]})
                 return await show(_confirm_prompt(p, context,
                     "Family sick (%s) — full day. · គ្រួសារឈឺ (%s) ពេញមួយថ្ងៃ។"
@@ -2027,7 +2038,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub in ("mard", "marcd"):
             child = sub == "marcd"
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "marriage", "persona_id": p["id"], "start_date": data[3], "child": child})
                 ndays = 1 if child else 3
                 d0 = date.fromisoformat(data[3])
@@ -2050,7 +2061,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             from gm_bot.special import death_tier
             if death_tier(data[3]) == "compassion":
                 if _armed(context):
-                    _arm_pending(context, update.effective_user.id,
+                    _arm_pending(context, update,
                         {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
                     _d0 = date.fromisoformat(data[4])
                     return await show(_confirm_prompt(p, context,
@@ -2061,7 +2072,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(death_days(p, data[3], data[4]))
         if sub == "deathn":
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "death", "persona_id": p["id"], "who": data[3], "start_date": data[4]})
                 _nd = int(data[5])
                 _d0 = date.fromisoformat(data[4]); _dn = _d0 + timedelta(days=_nd - 1)
@@ -2075,7 +2086,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(birth_dates(p))
         if sub == "birthd":
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "birth", "persona_id": p["id"], "start_date": data[3]})
                 _d0 = date.fromisoformat(data[3]); _dn = _d0 + timedelta(days=1)
                 return await show(_confirm_prompt(p, context,
@@ -2092,7 +2103,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "late":
         if len(data) > 2 and data[2] == "o":
             if _armed(context):
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "late", "persona_id": p["id"], "mins": int(data[3])})
                 return await show(_arm_prompt(p, context,
                     "Late ~%d min. · មកយឺត ~%d នាទី។\n\n"
@@ -2134,9 +2145,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
-                    _arm_pending(context, update.effective_user.id,
+                    _arm_pending(context, update,
                         {"flow": "al", "persona_id": p["id"], "kind": "days",
-                         "days": sorted(picked), "hours_start": None, "hours_end": None})
+                         "days": sorted(picked), "hours_start": None, "hours_end": None,
+                         "_summary": detail})
                     return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
                         "next message submits the AL request for senior approval.\n"
                         "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
@@ -2150,10 +2162,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 f = context.user_data.get("att_al_from")
                 t = int(data[3])
                 from gm_bot import al as alm
-                _span = alm.al_span_label(sorted(picked), p.get("day_off"), staff_absent_dates(p["id"]))
-                detail = ("Hours AL: %s — %s → %s (fractional deduction).\n"
-                          "AL តាមម៉ោង៖ %s — %s → %s (ដកជាចំណែកថ្ងៃ)។"
-                          % (_span, fmt12(f), fmt12(t), _span, fmt12(f), fmt12(t)))
+                _picked = sorted(picked)
+                _doff, _nw = p.get("day_off"), staff_absent_dates(p["id"])
+                _span = alm.al_span_label(_picked, _doff, _nw)
+                _charged = alm.al_charged_days(_picked, _doff, _nw)
+                _sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
+                _total = round(alm.fractional_al(f, t, _sl) * len(_charged), 2)
+                detail = ("AL: %s · %s–%s = %g AL.\nAL៖ %s · %s–%s = %g AL។"
+                          % (_span, fmt12(f), fmt12(t), _total, _span, fmt12(f), fmt12(t), _total))
+                if len(_charged) != len(_picked):
+                    detail += "\nDay off = Free"
                 near = _near_days(picked)
                 if near:
                     window = t - f
@@ -2162,11 +2180,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
-                    _arm_pending(context, update.effective_user.id,
+                    _arm_pending(context, update,
                         {"flow": "al", "persona_id": p["id"], "kind": "hours",
                          "days": sorted(picked),
                          "hours_start": "%02d:%02d" % (f // 60, f % 60),
-                         "hours_end": "%02d:%02d" % (t // 60, t % 60)})
+                         "hours_end": "%02d:%02d" % (t // 60, t % 60),
+                         "_summary": detail})
                     return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
                         "next message submits the AL request for senior approval.\n"
                         "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
@@ -2184,13 +2203,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 off_wd = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
                 partner_off = (ro + timedelta(days=(off_wd - ro.weekday())) if off_wd is not None
                                else ro + timedelta(days=1)).isoformat()
-                _arm_pending(context, update.effective_user.id,
+                _swap_sum = ("Day-off swap — your off %s ↔ partner off %s."
+                             % (day_label(ro), day_label(date.fromisoformat(partner_off))))
+                _arm_pending(context, update,
                     {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
-                     "req_off_date": req_off, "partner_off_date": partner_off})
+                     "req_off_date": req_off, "partner_off_date": partner_off,
+                     "_summary": _swap_sum})
                 return await show(_arm_prompt(p, context,
-                    "Day-off swap — partner picked. · ប្តូរថ្ងៃឈប់ — បានជ្រើសដៃគូ។\n\n"
+                    "%s · ប្តូរថ្ងៃឈប់។\n\n"
                     "📝 Type the reason — your partner agrees first, then the seniors approve.\n"
-                    "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។", "att:do"))
+                    "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។" % _swap_sum, "att:do"))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
                                          "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
@@ -2233,7 +2255,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 kind, sid, dayidx, start, end = (data[3], int(data[4]), int(data[5]),
                                                  int(data[6]), int(data[7]))
                 wd = (_today() + timedelta(days=dayidx)).isoformat() if kind == "later" else None
-                _arm_pending(context, update.effective_user.id,
+                _arm_pending(context, update,
                     {"flow": "ot", "persona_id": p["id"], "staff_id": sid, "kind": kind,
                      "minutes": end - start, "when_date": wd, "start_min": start})
                 return await show(_arm_prompt(p, context,
@@ -2270,18 +2292,20 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 rec = next((r for r in staff_all("active") if r["id"] == sid), None)
                 normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
-                _arm_pending(context, update.effective_user.id,
-                    {"flow": "shift", "persona_id": p["id"], "staff_id": sid,
-                     "when_date": (_today() + timedelta(days=tdidx)).isoformat(),
-                     "start_min": start, "end_min": end, "normal_len": normal_len})
                 extra = max(0, end - (start + normal_len))
                 rnm = (rec or {}).get("call_name") or "the staffer"
+                _shift_sum = ("Shift change — %s %s-%s%s for %s."
+                              % (day_label(_today() + timedelta(days=tdidx)), fmt12(start),
+                                 fmt12(end % 1440), (" (+%dh OT)" % (extra // 60)) if extra else "", rnm))
+                _arm_pending(context, update,
+                    {"flow": "shift", "persona_id": p["id"], "staff_id": sid,
+                     "when_date": (_today() + timedelta(days=tdidx)).isoformat(),
+                     "start_min": start, "end_min": end, "normal_len": normal_len,
+                     "_summary": _shift_sum})
                 return await show(_arm_prompt(p, context,
-                    "Shift change — %s %s-%s%s for %s.\n\n📝 Type the reason — your next message sends it "
+                    "%s\n\n📝 Type the reason — your next message sends it "
                     "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅសុំការអនុម័ត។"
-                    % (day_label(_today() + timedelta(days=tdidx)), fmt12(start), fmt12(end % 1440),
-                       (" (+%dh OT)" % (extra // 60)) if extra else "", rnm),
-                    "att:scp:staff"))
+                    % _shift_sum, "att:scp:staff"))
             return await show(sc_staff_pick(p))
         return await show(sc_staff_pick(p))
     if action == "ci":

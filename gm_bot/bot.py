@@ -3687,6 +3687,16 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         req_uid = config.OWNER_TELEGRAM_ID
 
     async def confirm(live_text: str, test_text: str) -> None:
+        # If the flow captured its reason-PROMPT message (pend['_summary'] + coords), edit it in place
+        # into an "awaiting approval" card carrying the same info + the typed reason, so the prompt no
+        # longer sits stale after the reason is sent.
+        pc, pm, summ = pend.get("_prompt_chat"), pend.get("_prompt_msg"), pend.get("_summary")
+        if pc and pm and summ:
+            card = ("%s\n\n📝 %s\n\n⏳ Awaiting approval · កំពុងរង់ចាំការអនុម័ត" % (summ, reason))
+            try:
+                await context.bot.edit_message_text(card, chat_id=pc, message_id=pm)
+            except Exception:
+                pass
         txt = live_text if live else test_text
         if update.message is not None:
             await update.message.reply_text(txt)

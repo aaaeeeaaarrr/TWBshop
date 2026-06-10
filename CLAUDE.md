@@ -168,6 +168,20 @@ named **Bedrock** (Standards+Guards+Ratchet) and converged via 3 advisor passes 
 Architecture review CLOSED; 5 deltas queued. ⚠ The `#HIGHRISK-OK` marker is DEPRECATED — Claude can
 type it = self-approval; catastrophic actions will switch to block-and-owner-runs-manually next session)
 
+**Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
+- **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help
+  label). Hours-AL now shows the **actual AL amount** ("AL: Mon 23/06 · 9pm–12am = 0.3 AL") instead of
+  the meaningless "Hours AL" — `fractional_al(f,t,shift_len) × charged-days`, day-offs excluded
+  ("Day off = Free").
+- **Reason prompt no longer sits stale.** When a flow captures its prompt (`_arm_pending` now stores
+  the prompt message's coords for EVERY flow), typing the reason **edits that message in place** into a
+  card: same info + `📝 <reason>` + `⏳ Awaiting approval · កំពុងរង់ចាំការអនុម័ត` (done in
+  `_att_dispatch`'s `confirm`, gated on `pend['_summary']`). **Wired:** AL (days + hours), the new
+  shift-redefine (`scp`), day-off swap. **Not wired (by design):** sick/marriage/death/birth (already
+  tappable confirm CARDS, not stale prompts) and the dormant old Now/Later OT picker (slated for removal).
+- Suite **420** green (+ `test_dispatch_al_edits_prompt_into_awaiting_card`; the 3 `_arm_pending`
+  signature tests updated to pass an `update`). Owner verifies the live edit in `/test` post-deploy.
+
 **⏳ IN PROGRESS (session 31) — OT / shift-redefine rebuild → full settled design in `docs/OT_DESIGN.md`.**
 Owner redesigned OT into a UNIFIED **"redefine-a-shift"** model: a senior retimes / moves / extends a
 working day's shift, the staff approves, and OT is EMERGENT = hours worked beyond the normal shift
