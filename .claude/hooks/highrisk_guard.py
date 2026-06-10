@@ -75,6 +75,26 @@ KEYWORDS = re.compile(
     RX)
 
 
+def _descan_commit(cmd):
+    """A git commit MESSAGE is descriptive text, not an action — but it lives in the command string,
+    so words like 'rm -rf' or 'systemctl stop' inside it false-trigger the action patterns. For a
+    `git commit`, blank the LITERAL message text so it isn't scanned, while leaving everything ELSE
+    fully scanned (a real `; <danger>` after the commit is still caught). Blanked (literal — nothing
+    executes inside): a cat-fed command-substitution heredoc "$(cat <<'EOF' ... EOF)"; a single-quoted
+    -m '...'; a double-quoted -m "..." with NO substitution. NOT touched: a double-quoted -m holding
+    $(...)/`...`, and any heredoc not fed to cat (psql/bash heredocs stay scanned). Only suppresses
+    false positives — it never hides an executed command."""
+    if not re.search(r"\bgit\s+commit\b", cmd, RX):
+        return cmd
+    cmd = re.sub(r"\$\(\s*cat\s+<<-?\s*'(\w+)'[^\n]*\n.*?\n[ \t]*\1\b",
+                 "$(cat <<'MSG'\nMSG", cmd, flags=re.S)
+    cmd = re.sub(r"(--message|-m)(=|\s+)'[^']*'", r"\1\2''", cmd)
+    cmd = re.sub(r'(--message|-m)(=|\s+)"([^"`]*)"',
+                 lambda m: m.group(0) if ("$(" in m.group(3) or "${" in m.group(3))
+                 else '%s%s""' % (m.group(1), m.group(2)), cmd)
+    return cmd
+
+
 def hard_block(reason, cmd=""):
     cmd = (cmd or "").strip()
     paste = ("  ! " + cmd + "\n") if cmd else ""
@@ -96,8 +116,9 @@ def main(raw):
 
     if tool in ("Bash", "PowerShell"):
         cmd = ti.get("command", "") or ""
+        scan = _descan_commit(cmd)   # a git-commit MESSAGE is prose, not an action — don't scan it
         for label, rx in CMD_PROTECTED:
-            if rx.search(cmd):
+            if rx.search(scan):
                 hard_block(label, cmd)
 
     elif tool in ("Edit", "Write", "MultiEdit"):
