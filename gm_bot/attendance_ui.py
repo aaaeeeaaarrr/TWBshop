@@ -378,14 +378,16 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("④ FROM-NOW (today, mid-shift) — 1 senior can let them leave, 2nd ratifies after",
          "Asking to leave from now. One senior ✅ lets them go; a 2nd confirms after.\n"
          "សុំចេញពីពេលនេះ។ បង 1 នាក់ ✅ អាចអនុញ្ញាតឱ្យចេញបាន; បងទី 2 បញ្ជាក់តាមក្រោយ។", None),
-        ("⑤ INSUFFICIENT balance — owner flagged, seniors still decide",
-         "Note: Meng only has 1.5 AL days left but is requesting 3 — your call.\n"
-         "ចំណាំ៖ Meng នៅសល់ AL តែ 1.5 ថ្ងៃ តែស្នើ 3 ថ្ងៃ — សម្រេចតាមអ្នក។  (KH pending review)", None),
+        ("⑤ NOT ENOUGH balance — the STAFFER is told to pick a smaller amount (never reaches seniors)",
+         "⚠ You only have 1.5 AL day(s) left, but this request needs 3.\n"
+         "Please choose a smaller amount — you can request up to 1.5.\n"
+         "⚠ ប្អូននៅសល់ AL តែ 1.5 ថ្ងៃប៉ុណ្ណោះ ប៉ុន្តែសំណើនេះត្រូវប្រើ 3 ថ្ងៃ។\n"
+         "សូមជ្រើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានច្រើនបំផុត 1.5 ថ្ងៃ។", None),
         ("⑥ after 2 ✅ — the refreshed recap to all seniors",
          "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។", None),
         ("⑦ to the requester — approved + new balance",
-         "Your AL is approved ✓ Tue 23/06 → Thu 25/06. You have 4.5 AL days left. 🤍\n"
-         "AL របស់ប្អូនបានអនុម័តហើយ ✓ Tue 23/06 → Thu 25/06។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត 🤍",
+         "Your AL for Tue 23/06 → Thu 25/06 is approved ✓. You have 4.5 AL days left. 🤍\n"
+         "AL របស់ប្អូនសម្រាប់ Tue 23/06 → Thu 25/06 បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត 🤍",
          None),
         ("⑧ to the requester — not approved (seniors-only recap, nothing to the group)",
          "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
@@ -519,8 +521,8 @@ def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Davy ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ Davy ឈប់ថ្ងៃពុធ, អ្នកឈប់ថ្ងៃសុក្រ — ក្នុងសប្តាហ៍ដដែល។ "
          "មូលហេតុ៖ clinic", agree_kb),
         ("② partner agrees → goes to the seniors",
-         "You agreed — sending to seniors.\n"
-         "អ្នកបានយល់ព្រមហើយ — កំពុងផ្ញើទៅបងៗ/អ្នកគ្រប់គ្រង។", None),
+         "✅ You agreed — sent to seniors.\n"
+         "✅ ប្អូនបានយល់ព្រមហើយ — បានផ្ញើទៅបងៗ។", None),
         ("③ partner declines OR stays silent → swap doesn't happen, seniors never bothered",
          "Your day-off swap wasn't accepted by your partner.\n"
          "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។", None),
@@ -544,9 +546,12 @@ def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① 👍 ACK — a normal (non-problem) reply gets a thumbs-up so they know they were heard",
          "Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។\n(a reply that IS a problem gets a real answer, never a 👍)",
          None),
-        ("② GROUP REDIRECT — someone posts leave/late in a group → GM sends them private",
-         "Please message me directly about your time off 🤍\n"
-         "សូមផ្ញើសារមកខ្ញុំផ្ទាល់អំពីការឈប់សម្រាករបស់ប្អូន 🤍", None),
+        ("② GROUP REDIRECT — someone posts leave/late in a group → GM nudges them private",
+         "— AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, or it "
+         "won't be recorded 🙂\n"
+         "— AL, ឈឺ និងថ្ងៃឈប់ នឹងរាប់បានតែពេលប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
+         "បើមិនដូច្នេះ វានឹងមិនត្រូវបានកត់ត្រាទេ 🙂\n"
+         "(one of 5 rotating variants — the GM never repeats the same line back-to-back)", None),
         ("③ CALL-OUT — private DM when a pattern shows (warm, by name, Sonnet-written)",
          "Hi Davy — we noticed Mondays have been hard lately (3 of your last 4 lates). "
          "Everything okay? Let's fix Mondays together. 🤍\n(AI-written bilingual at send time; CC to owners)",

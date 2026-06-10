@@ -65,3 +65,16 @@ You're paid for the time you work; come early → +10 points ⭐; normal late/no
 
 
 One implementation warning: for variant 4, I used AL, ឈឺ និងថ្ងៃឈប់ instead of translating “leave” as ច្បាប់ឈប់. ច្បាប់ឈប់ is understandable, but it feels less natural and can sound like “permission/rule” rather than the bot category.
+---
+
+## Z. Remaining KH gap found during dry-run resync (session 32, Jun 11)
+
+**Hours-AL Supervisors notice (dry-run 3 ⑩)** — currently English-only, no Khmer drafted:
+
+> "{name} on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.
+> Back at work: 12am each of those nights (rest of shift as normal)."
+
+Please draft a native Khmer line. Reuse the already-approved fragments from the full-day notice
+(`ឈប់សម្រាក`, `ត្រឡប់មកធ្វើការ`). It mirrors the full-day Supervisors notice but for an
+hours-AL (the staffer is out only for the named window, then back the same night). Tone: neutral
+operational FYI to the Supervisors group.
