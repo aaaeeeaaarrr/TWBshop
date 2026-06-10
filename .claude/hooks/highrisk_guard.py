@@ -34,8 +34,11 @@ CMD_PROTECTED = [
      re.compile(r"\brm\s+-[a-z]*r[a-z]*f\b|\brm\s+-[a-z]*f[a-z]*r\b|\brm\s+-rf\b|remove-item\b.*-recurse", RX)),
     ("force / destructive git",
      re.compile(r"git\s+push\b[^|;&\n]*--force|git\s+reset\s+--hard|git\s+clean\s+-[a-z]*f|filter-branch", RX)),
-    ("prod deploy / restart",
-     re.compile(r"systemctl\s+(restart|stop|disable)\b|service\s+\S+\s+(restart|stop)\b", RX)),
+    ("prod stop/disable, or restart of a non-app service",
+     re.compile(r"systemctl\s+(stop|disable)\b"            # stop/disable anything stays blocked
+                r"|systemctl\s+restart\s+(?!twbshop-)\S"    # restart of a NON-twbshop service
+                r"|\bservice\s+\S+\s+(restart|stop)\b",     # old init-style service mgmt
+                RX)),
     ("write to secret / session / guard file via shell",
      re.compile(
          r"(?:set-content|out-file|add-content)\b[^\n|;]*"
