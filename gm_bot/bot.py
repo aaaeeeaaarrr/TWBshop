@@ -1183,6 +1183,23 @@ def _today_pp():
     return _now_pp().date()
 
 
+def _msg_time_pp(update, fallback: datetime) -> datetime:
+    """The Telegram-stamped time of this update, in PP tz. Queued updates (bot down/restarting,
+    long-poll backlog) must be judged by when the STAFFER acted, not when we got to process them —
+    Telegram queues up to 24h and every update carries its original date (edits carry edit_date).
+    In test mode the test clock (the fallback) wins, so /testclock rehearsals keep working."""
+    if _att_test_mode():
+        return fallback
+    m = update.edited_message or update.message
+    dt = getattr(m, "edit_date", None) or getattr(m, "date", None)
+    if not dt:
+        return fallback
+    try:
+        return dt.astimezone(finance.PP_TZ)
+    except Exception:
+        return fallback
+
+
 _TEST_FORCE_RUN = False   # True only while /testrun fires a job body on demand (test mode)
 
 
@@ -1381,7 +1398,10 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     loc = msg.location
     from gm_bot import attendance as att, checkin as ci, attendance_ui as ui
     in_zone = att.in_work_zone(loc.latitude, loc.longitude)
-    now_pp = _now_pp()
+    # Judge by the TELEGRAM-STAMPED time, not processing time: if the bot was down/restarting,
+    # queued updates arrive late — a punctual staffer must never be marked late (and a stale ping
+    # must never look fresh to auto-checkout) because of OUR downtime.
+    now_pp = _msg_time_pp(update, _now_pp())
     # find today's (or last night's overnight) shift this check-in belongs to
     shift_date = now_pp.date().isoformat()
     ws = att.to_min(staff.get("work_start"))

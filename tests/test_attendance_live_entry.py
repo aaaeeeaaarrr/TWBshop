@@ -1454,6 +1454,40 @@ def test_parse_joined_full_and_month_only():
     assert bot._parse_joined("nonsense") is None
 
 
+def test_msg_time_pp_judges_by_telegram_stamp(monkeypatch):
+    """Queued updates are judged by the staffer's send time (Telegram stamp), never by when a
+    recovering bot processed them — a punctual check-in must not turn late because WE were down.
+    Edits prefer edit_date; test mode keeps the test clock; no stamp → fallback."""
+    import datetime as _dt
+    import gm_bot.bot as bot
+
+    pp = bot.finance.PP_TZ
+    sent_utc = _dt.datetime(2026, 6, 11, 14, 0, tzinfo=_dt.timezone.utc)      # 9pm PP
+    processed = _dt.datetime(2026, 6, 11, 21, 12, tzinfo=pp)                  # bot back 12 min later
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+
+    upd = types.SimpleNamespace(edited_message=None,
+                                message=types.SimpleNamespace(date=sent_utc, edit_date=None))
+    out = bot._msg_time_pp(upd, processed)
+    assert (out.hour, out.minute) == (21, 0)             # the SEND time in PP, not 21:12
+
+    # an edited live-share carries edit_date — that wins over the original send date
+    edit_utc = _dt.datetime(2026, 6, 11, 14, 5, tzinfo=_dt.timezone.utc)
+    upd2 = types.SimpleNamespace(message=None,
+                                 edited_message=types.SimpleNamespace(date=sent_utc, edit_date=edit_utc))
+    assert bot._msg_time_pp(upd2, processed).minute == 5
+
+    # test mode → the test clock (fallback) wins so /testclock rehearsals still work
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    assert bot._msg_time_pp(upd, processed) == processed
+
+    # no Telegram stamp at all → fallback
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    upd3 = types.SimpleNamespace(edited_message=None,
+                                 message=types.SimpleNamespace(date=None, edit_date=None))
+    assert bot._msg_time_pp(upd3, processed) == processed
+
+
 def test_owner_al_month_only_display(monkeypatch):
     """A month-only hire date displays as mm/yyyy in AL+Joined (no invented day)."""
     import datetime as _dt
