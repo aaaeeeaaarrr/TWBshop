@@ -175,9 +175,29 @@ in an elevated shell, then back to attendance.)
   `~/.claude/hooks/`. Smoke harness: 12/12 (destructive SQL · rm -rf · force-push · secrets.py path ·
   guard-hook path · live API key → BLOCK; git status · cat/edit normal file · key→secrets.py → PASS).
   Delta-1 no-override confirmed live (a DROP-bearing test command hard-blocked mid-session, no bypass).
-- ⏳ **NEXT (owner):** delta 2 — elevated shell, `icacls`/`Set-Acl` the global enforcing files to
-  admin-owned + Papa ReadAndExecute, read ACL back to prove. Then resume attendance (redefined-shift
-  times + OT bank-on-completion). Optional: grep for a psycopg2 DDL path that dodges the CMD patterns.
+- ⏳ **Bedrock delta 2 (owner):** elevated shell, `icacls`/`Set-Acl` the global enforcing files to
+  admin-owned + Papa ReadAndExecute, read ACL back to prove. (Optional: grep for a psycopg2 DDL path
+  that dodges the CMD patterns.)
+
+**Session 32 (Jun 10) — OT redefine WIRED into live attendance + dead Now/Later model REMOVED:**
+- **Attendance now obeys the redefine** (was decorative): `shift_changes_active_map` (batch lookup),
+  `staff_day_events(ws_override,len_override)`, `compute_day_events` resolves a redefine per
+  (staff, shift-start-date) and lets `works_on` honor a change-day onto a day-off; the check-in
+  scheduler fires T−10/T0/T+5 + checkout at the redefined `[start,end]` (old `ot_now_end_times` "extend"
+  pass deleted — redefined checkout rides the event stream); `_handle_staff_location` verdict measures
+  lateness vs the **redefined** start. (commit "Attendance obeys redefined shift times", part 1/2)
+- **Dead Now/Later GRANT model ripped** (owner: superseded by Give-OT/change-shift): removed the
+  `att:ot:` picker (ot_nowlater/staff_pick/when_day/start/end/stub/owner_card/approved_preview),
+  `submit_ot_grant`, `_ot_owner_callback`/`_ot_future_callback`/`_ot_started`/`_ot_window`, Dry-run 6,
+  the `flow=="ot"` dispatch + 2 handler regs, and 5 old tests. **KEPT** (shared/future): `_ot_receiver`,
+  `_present_now`, `ot_screen` (personal bank view), `_offer_buyback`/`_ot_buyback_callback`/
+  `takeback_windows` (spend-the-bank side the redefine model still needs), DB `ot_grant_*` dormant.
+  Suite **420** green; both modules import clean. (part 2/2)
+- ⏳ **Attendance NEXT:** (a) **the shield** — an approved OT pauses the PB ignore-ladder before its
+  deadline; (b) wire `_offer_buyback` onto `_settle_redefined_shift` (take banked OT as rest);
+  (c) **overnight checkout-date fix** — checkout arms `shift_date=today`, so an overnight redefine
+  (bakers are 9pm–6am) banks under the wrong date — fix before go-live; (d) `/test` simulate-checkout
+  that shows the banking; then go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

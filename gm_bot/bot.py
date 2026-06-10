@@ -34,7 +34,7 @@ from shared.database import (
     al_leave_days_set, staff_absent_dates, payback_bookings_due_reminder, payback_mark_reminded,
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
     swap_add_senior_vote, swap_set_status,
-    ot_bank_balance, ot_bank_add, ot_grant_create, ot_grant_get, ot_grant_set, ot_buyback_book,
+    ot_bank_balance, ot_bank_add, ot_buyback_book,
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
     no_show_record, no_show_reverse, lateness_dates,
@@ -1470,55 +1470,6 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
     return leave_id
 
 
-def _ot_window(kind: str, when_date: str | None, start_min: int | None, minutes: int) -> str:
-    """Human 'when' for an OT grant — the real time window (e.g. '4pm-5pm'), never just 'now'.
-    Now = today's window (shift-end → end); Later = 'date window'."""
-    if start_min is None:
-        return "now" if kind == "now" else (when_date or "?")
-    win = "%s-%s" % (_fmt_min(start_min), _fmt_min(start_min + minutes))
-    return win if kind == "now" else ("%s %s" % (when_date or "?", win))
-
-
-async def submit_ot_grant(context, senior: dict, staff: dict, kind: str, minutes: int,
-                          when_date: str | None, start_min: int | None, reason: str) -> int:
-    """Senior grants OT. Model (owner, session 30): the staff is engaged IMMEDIATELY and the owner
-    gets a REJECT-ONLY notice — owner silence = approval, with a veto window open until the OT
-    actually starts. NOW banks on the spot (reversed if the owner rejects in time + offers buyback);
-    LATER asks the staff to accept. The owner never has to act for the OT to proceed."""
-    # Stamp Now-OT with today's date so the scheduler can fire its end-of-OT checkout (Part 3).
-    if kind == "now" and not when_date:
-        when_date = datetime.now(finance.PP_TZ).date().isoformat()
-    gid = ot_grant_create(senior["id"], staff["id"], kind, minutes, when_date, start_min, reason)
-    sn = staff.get("call_name") or staff["canonical_name"]
-    snr = senior.get("call_name") or senior["canonical_name"]
-    bank = ot_bank_balance(staff["id"])
-    label = ("%dmin" % minutes) if minutes < 60 else ("%gh" % (minutes / 60))
-    whentxt = _ot_window(kind, when_date, start_min, minutes)
-    body = ("OT grant: %s → %s, %s, when: %s. Why: %s\nReceiver's bank: %gh / 14h"
-            % (snr, sn, label, whentxt, reason, bank / 60))
-    # OWNER: reject-only notice — silence = approval, veto allowed until the OT starts
-    owner_kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Reject", callback_data="att:ot:no:%d" % gid)]])
-    await _att_send(context, config.OWNER_TELEGRAM_ID, "Owner", "",
-        body + "\n\nSilence = approval — the staff is already asked. Reject any time before it starts.\n"
-        "ស្ងៀម = យល់ព្រម — បានសួរបុគ្គលិករួចហើយ។ បដិសេធបានគ្រប់ពេលមុនវាចាប់ផ្តើម។", kb=owner_kb)
-    # STAFF: ask Yes/Can't FIRST — for BOTH Now and Later. Nothing banks until the staff accepts
-    # (the owner can still veto until the OT starts). The accept handler banks Now + offers buyback.
-    suid = (staff.get("telegram_ids") or [None])[0]
-    ot_grant_set(gid, status="staff_asked")
-    win = _ot_window(kind, when_date, start_min, minutes)
-    whenphrase = ("today %s" % win) if kind == "now" else win
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Yes", callback_data="att:otf:yes:%d" % gid)],
-        [InlineKeyboardButton("❌ Can't", callback_data="att:otf:no:%d" % gid)],
-    ])
-    msg = await _att_send(context, suid, "Staff", sn,
-        "You're asked for OT (%s) — can you?\nហាងស្នើឱ្យអ្នកធ្វើ OT (%s) — អ្នកអាចធ្វើបានទេ?"
-        % (whenphrase, whenphrase), kb=kb)
-    if msg is not None:
-        context.bot_data.setdefault("ot_staff_card", {})[gid] = (msg.chat_id, msg.message_id)
-    return gid
-
-
 async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
                               start_min: int, end_min: int, normal_len: int, reason: str) -> int:
     """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
@@ -1614,113 +1565,6 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
         shift_change_set_banked(sc["id"], banked)
     except Exception as e:
         logger.error("OT settle at checkout failed: %s", e)
-
-
-def _ot_started(g: dict) -> bool:
-    """Has the granted OT already started? The owner's veto window closes at OT start."""
-    sm = g.get("start_min")
-    if sm is None:
-        return False
-    from datetime import date as _date, time as _time
-    d = g.get("when_date") or datetime.now(finance.PP_TZ).date().isoformat()
-    try:
-        start_dt = datetime.combine(_date.fromisoformat(d),
-                                    _time(hour=(int(sm) // 60) % 24, minute=int(sm) % 60),
-                                    tzinfo=finance.PP_TZ)
-    except Exception:
-        return False
-    return datetime.now(finance.PP_TZ) >= start_dt
-
-
-async def _ot_owner_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:ot:no:{id} — owner VETOES an OT grant (silence = approval). Allowed only until the OT
-    starts; a NOW grant that already banked is reversed."""
-    query = update.callback_query
-    await query.answer()
-    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
-        return
-    gid = int(query.data.split(":")[3])
-    g = ot_grant_get(gid)
-    if not g:
-        return
-    if g["status"] in ("rejected", "declined"):
-        await query.edit_message_text(query.message.text + "\n\n(already decided)")
-        return
-    if _ot_started(g):
-        await query.edit_message_text(query.message.text +
-            "\n\n⏱ Too late to reject — the OT has already started.")
-        return
-    staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
-    senior = next((s for s in staff_all("active") if s["id"] == g["senior_id"]), None)
-    was_confirmed = g["status"] in ("banked", "booked")   # staff had accepted → group was told it's ON
-    if g["kind"] == "now" and g["status"] == "banked":
-        ot_bank_add(g["staff_id"], -int(g["minutes"]))   # reverse the on-the-spot bank (no-op in test)
-    ot_grant_set(gid, status="rejected")
-    await query.edit_message_text(query.message.text + "\n\n❌ Rejected (before start).")
-    cancel_txt = "This OT was cancelled by the owner.\nOT នេះត្រូវបានលុបចោលដោយម្ចាស់ហាង។"
-    # edit the staff's pending Yes/Can't card in place (no stale card + a separate new message)
-    sc = context.bot_data.get("ot_staff_card", {}).pop(gid, None)
-    staff_edited = False
-    if sc:
-        from gm_bot.attendance import strip_khmer as _sk
-        try:
-            await context.bot.edit_message_text(_sk(cancel_txt) if _att_test_mode() else cancel_txt,
-                                                chat_id=sc[0], message_id=sc[1])
-            staff_edited = True
-        except Exception:
-            pass
-    if staff and not staff_edited:
-        await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff",
-                        staff.get("call_name") or staff["canonical_name"], cancel_txt)
-    if senior:
-        await _att_send(context, (senior.get("telegram_ids") or [None])[0], "Senior",
-                        senior.get("call_name") or senior["canonical_name"], cancel_txt)
-    if was_confirmed and staff:   # the group was told it was ON → tell them it's OFF
-        _cnm = staff.get("call_name") or staff["canonical_name"]
-        await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s's extra OT was cancelled.\nFYI: OT បន្ថែមរបស់ %s ត្រូវបានលុបចោល។" % (_cnm, _cnm),
-            group=True)
-
-
-async def _ot_future_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:otf:yes|no:{id} — staff accepts/declines a LATER OT (accept = commitment)."""
-    query = update.callback_query
-    await query.answer()
-    g = ot_grant_get(int(query.data.split(":")[3]))
-    if not g or g["status"] != "staff_asked":
-        return
-    if _att_test_mode():
-        staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
-    else:
-        staff = staff_get_by_uid(update.effective_user.id)
-        if not staff or staff["id"] != g["staff_id"]:
-            return
-    if not staff:
-        return
-    if query.data.split(":")[2] == "no":
-        ot_grant_set(g["id"], status="declined", staff_ok=False)
-        await query.edit_message_text(query.message.text + "\n\n❌ Declined (no problem).")
-        return
-    # accepted — tell the Supervisors group someone's on extra OT (coverage)
-    _onm = staff.get("call_name") or staff["canonical_name"]
-    _owin = _ot_window(g["kind"], g.get("when_date"), g.get("start_min"), int(g["minutes"]))
-    await _att_send(context, None, "Supervisors group", "",
-        "FYI: %s is on extra OT — %s.\nFYI: %s ធ្វើ OT បន្ថែម — %s។" % (_onm, _owin, _onm, _owin),
-        group=True)
-    # NOW banks HERE (only after consent) + offers buyback; LATER becomes a booked slot
-    if g["kind"] == "now":
-        new_bal = ot_bank_add(g["staff_id"], int(g["minutes"]))
-        ot_grant_set(g["id"], status="banked", staff_ok=True)
-        await query.edit_message_text(query.message.text +
-            "\n\n✅ Thanks — added to your OT bank.\n✅ អរគុណ — បានបញ្ចូលទៅ OT bank របស់អ្នក។")
-        await _offer_buyback(context, staff, new_bal, (staff.get("telegram_ids") or [None])[0],
-                             int(g["minutes"]))
-        return
-    ot_grant_set(g["id"], status="booked", staff_ok=True)
-    await query.edit_message_text(query.message.text +
-        "\n\n✅ Thanks — you're booked. (It runs like a shift: check in when you arrive.)\n"
-        "✅ អរគុណ — បានកក់ឱ្យអ្នកហើយ។ (វាដំណើរការដូចវេនធ្វើការ៖ ចុះវត្តមានពេលអ្នកមកដល់។)")
-    # the worked-then-banked happens at completion (check-in handler / senior confirm — wave note)
 
 
 async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_added: int) -> None:
@@ -3880,20 +3724,6 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ អរគុណដែលប្រាប់ — សូមធ្វើដំណើរដោយសុវត្ថិភាព។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ ខ្ញុំនឹងគណនាម៉ោងឱ្យ។",
             "🧪 Late declared (test) — Supervisors heads-up + the payback slot picker were routed to "
             "you. Tap a slot to book it. /testreset to wipe.")
-    elif flow == "ot":
-        receiver = next((s for s in staff_all("active") if s["id"] == pend.get("staff_id")), None)
-        if not receiver:
-            await update.message.reply_text("OT receiver not found." if live
-                                            else "🧪 OT receiver not found.")
-            return
-        await submit_ot_grant(context, persona, receiver, pend["kind"], pend["minutes"],
-                              pend.get("when_date"), pend.get("start_min"), reason)
-        await confirm(
-            "✅ OT sent — the staff is asked now; the owners got a reject-only notice (silence = approval).\n"
-            "✅ បានផ្ញើ OT — បានសួរបុគ្គលិករួច; ម្ចាស់ហាងទទួលបានសារ (ស្ងៀម = យល់ព្រម)។",
-            "🧪 OT submitted (test) — you got BOTH the staff Yes/Can't ask AND the owner reject-only "
-            "notice. On Yes: NOW banks + buyback picker, LATER books. Silence = approval; reject before "
-            "start. /testreset to wipe.")
     elif flow == "shift":
         receiver = next((s for s in staff_all("active") if s["id"] == pend.get("staff_id")), None)
         if not receiver:
@@ -4595,8 +4425,6 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))
     app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
     app.add_handler(CallbackQueryHandler(_swap_coverage_toggle, pattern=r"^att:swcov:"))
-    app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
-    app.add_handler(CallbackQueryHandler(_ot_future_callback, pattern=r"^att:otf:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_shift_change_callback, pattern=r"^att:sc:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
