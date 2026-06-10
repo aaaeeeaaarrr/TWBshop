@@ -2149,6 +2149,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if sub == "t":
                 f = context.user_data.get("att_al_from")
                 t = int(data[3])
+                from gm_bot import al as alm
                 _span = alm.al_span_label(sorted(picked), p.get("day_off"), staff_absent_dates(p["id"]))
                 detail = ("Hours AL: %s — %s → %s (fractional deduction).\n"
                           "AL តាមម៉ោង៖ %s — %s → %s (ដកជាចំណែកថ្ងៃ)។"
