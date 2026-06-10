@@ -13,6 +13,19 @@ from __future__ import annotations
 
 GRACE_MIN = 5          # ≤5 min late is free
 EARLY_BONUS_MIN = 5    # >5 min early earns the +10
+AUTO_CHECKOUT_GRACE_MIN = 12   # a live share seen in-zone within this many min of shift end = present
+
+
+def can_auto_checkout(ping, now, grace_min: int = AUTO_CHECKOUT_GRACE_MIN) -> bool:
+    """Spec §3.7: at shift end, if the staffer's live location has stayed ON and IN-ZONE we already
+    know they were here to the last minute — close silently, no "did you leave early?" chase. True
+    only when the freshest ping is in-zone AND recent enough to mean the share is still live (a
+    stationary Telegram live-share heartbeats every few minutes; `grace_min` absorbs the gaps).
+    A stale ping (share turned off) or an out-of-zone ping (they walked off) → False → ask normally.
+    `ping` = {in_zone, ts(tz-aware)} or None; `now` = tz-aware now. Pure — no DB/Telegram."""
+    if not ping or not ping.get("in_zone") or not ping.get("ts"):
+        return False
+    return 0 <= (now - ping["ts"]).total_seconds() <= grace_min * 60
 
 
 def relative_minutes(now_min: int, shift_start_min: int) -> tuple[int, int]:

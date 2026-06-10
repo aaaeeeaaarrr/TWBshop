@@ -1222,6 +1222,15 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
+        # AUTO-CHECKOUT (spec §3.7): at shift end, if their live share is still running IN-ZONE we
+        # know they were here to the last minute — close silently + settle OT, no request, no
+        # leave-early chase (the now-set checked_out_at suppresses those on the next ticks).
+        if label.startswith("check-out") and checked_in and not checked_out:
+            from shared.database import att_last_ping, att_check_out
+            if ci.can_auto_checkout(att_last_ping(staff["id"]), now_pp):
+                att_check_out(staff["id"], sd, now_pp.isoformat())
+                _settle_redefined_shift(staff, sd, now_pp)
+                continue
         await _att_send(context, uid, "Staff", name, text)
         # arm check-out capture: next in-zone share while this is set = checked out (60-min window).
         # sd (not today) → the checkout write + the OT settle bind to the shift's real session.

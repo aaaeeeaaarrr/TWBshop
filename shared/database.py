@@ -3481,6 +3481,18 @@ def att_record_ping(staff_id: int, lat: float, lng: float, in_zone: bool, ts: st
                         (staff_id, lat, lng, in_zone, ts, _ATT_TEST))
 
 
+def att_last_ping(staff_id: int) -> dict | None:
+    """The staffer's most recent silent location ping (mode-scoped: test sees only is_test pings).
+    The check-in scheduler uses it to auto-check-out someone whose live share is still running
+    in-zone at their shift end (spec §3.7). Returns {in_zone, ts} or None."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT in_zone, ts FROM location_pings WHERE staff_id=%s AND is_test=%s "
+                        "ORDER BY ts DESC LIMIT 1", (staff_id, _ATT_TEST))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
 def att_get_session(staff_id: int, shift_date: str) -> dict | None:
     with _db() as conn:
         with conn.cursor() as cur:

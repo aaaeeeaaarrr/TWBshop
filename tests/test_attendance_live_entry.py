@@ -885,6 +885,24 @@ def test_ot_shield_until_requires_real_ot(monkeypatch):
     assert db.ot_shield_until(11, "2026-06-16", "2026-06-30")["id"] == 2
 
 
+def test_can_auto_checkout(monkeypatch):
+    """Spec §3.7: a live share still in-zone near shift end → silent auto-checkout; a stale share
+    (turned off) or an out-of-zone ping (walked off) → False (ask the normal way)."""
+    from gm_bot import checkin as ci
+    import datetime as _dt
+    now = _dt.datetime(2026, 6, 16, 6, 0, tzinfo=_dt.timezone.utc)
+
+    def ping(in_zone, age_min):
+        return {"in_zone": in_zone, "ts": now - _dt.timedelta(minutes=age_min)}
+
+    assert ci.can_auto_checkout(ping(True, 2), now) is True       # fresh + in-zone → yes
+    assert ci.can_auto_checkout(ping(True, 11), now) is True      # within the 12-min grace
+    assert ci.can_auto_checkout(ping(True, 20), now) is False     # share went stale → ask
+    assert ci.can_auto_checkout(ping(False, 2), now) is False     # in shop? no — walked off → ask
+    assert ci.can_auto_checkout(None, now) is False               # never shared → ask
+    assert ci.can_auto_checkout({"in_zone": True, "ts": None}, now) is False
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""
