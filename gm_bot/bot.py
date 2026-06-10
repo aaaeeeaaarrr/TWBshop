@@ -3664,11 +3664,13 @@ def _caps_call(s: dict) -> str:
     return cn.upper() if cn else s["canonical_name"]
 
 
-def _own_staff_sorted(org: str | None = "TWB") -> list[dict]:
-    """Active staff (excl. Tyty), alphabetical by call name — the owner-menu roster.
-    org: 'TWB' (default — attendance views), 'DELIS', or None for everyone."""
+def _own_staff_sorted(org: str | None = "TWB", include_tyty: bool = False) -> list[dict]:
+    """Active staff, alphabetical by call name — the owner-menu roster.
+    org: 'TWB' (default — attendance views), 'DELIS', or None for everyone.
+    Tyty is excluded from attendance views but INCLUDED in the pay views (owner: she's
+    on the 1st pay at $1700, no bonus)."""
     rows = [s for s in staff_all("active")
-            if s["canonical_name"] != "Tyty"
+            if (include_tyty or s["canonical_name"] != "Tyty")
             and (org is None or (s.get("org") or "").upper() == org.upper())]
     return sorted(rows, key=lambda r: (r.get("call_name") or r["canonical_name"]).lower())
 
@@ -3720,16 +3722,20 @@ def _own_sal_text(which: int) -> str:
     grand = 0.0
     for org, label in (("TWB", "TWB"), ("DELIS", "Delis")):
         lines, total = [], 0.0
-        for s in _own_staff_sorted(org):
+        for s in _own_staff_sorted(org, include_tyty=True):
             if s.get("salary_usd") is None:
                 continue
             if which == 1:
                 v = float(s.get("first_pay_usd") or 0)
+                if not v:
+                    continue          # nothing on the 1st → not listed there
                 total += v
                 lines.append("• %s — $%.2f" % (_caps_call(s), v))
             else:
                 pay2 = float(s.get("second_pay_usd") or 0)
                 bonus = float(s.get("bonus_usd") or 0)
+                if not pay2 and not bonus:
+                    continue          # 1st-pay-only staff (e.g. Tyty) don't clutter the 2nd list
                 total += pay2
                 lines.append("• %s — $%.2f%s"
                              % (_caps_call(s), pay2 - bonus, (" +$%.2f" % bonus) if bonus else ""))

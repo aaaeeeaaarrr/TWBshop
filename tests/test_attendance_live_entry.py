@@ -1398,6 +1398,9 @@ def _own_roster():
         {"id": 4, "canonical_name": "Sok Anan", "call_name": "Anan", "org": "DELIS",
          "status": "active", "al_left": 5, "salary_usd": 100, "first_pay_usd": 50,
          "second_pay_usd": 50, "bonus_usd": 20, "joined_date": None},
+        {"id": 5, "canonical_name": "Tyty", "call_name": "Tyty", "org": "TWB",
+         "status": "active", "al_left": None, "salary_usd": 1700, "first_pay_usd": 1700,
+         "second_pay_usd": 0, "bonus_usd": 0, "joined_date": None},
     ]
 
 
@@ -1407,7 +1410,7 @@ def test_staff_btn_label_and_sort():
     r = _own_roster()
     assert ui.staff_btn_label(r[0]) == "POR — Chea Chaktopor"
     assert ui.staff_btn_label(r[2]) == "Zo NoCall"
-    assert [x["id"] for x in ui.staff_sort(r)] == [4, 2, 1, 3]   # Anan < Davy < Por < Zo
+    assert [x["id"] for x in ui.staff_sort(r)] == [4, 2, 1, 5, 3]   # Anan < Davy < Por < Tyty < Zo
 
 
 def test_owner_pbot_partition_and_skip(monkeypatch):
@@ -1438,17 +1441,20 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "• POR — 12 AL" in al
     assert "Zo NoCall — 0 AL" in al                      # everyone shows, even 0 / no date
     assert "ANAN" not in al                              # AL view stays TWB-only
+    assert "TYTY" not in al                              # …and keeps excluding Tyty
     s1 = bot._own_sal_text(1)
     assert "• DAVY — $120.00" in s1 and "• POR — $150.00" in s1
-    assert "TWB total: $270.00" in s1
+    assert "• TYTY — $1700.00" in s1                     # Tyty included in the pay views (owner)
+    assert "TWB total: $1970.00" in s1                   # 120+150+1700
     assert "• ANAN — $50.00" in s1                       # Delis gets its own section
     assert "Delis total: $50.00" in s1
-    assert "Total: $320.00" in s1                        # grand total of both orgs
+    assert "Total: $2020.00" in s1                       # grand total of both orgs
     assert "Zo" not in s1                                # nothing on record → not listed
     s2 = bot._own_sal_text(2)
     assert "• DAVY — $120.00 +$20.00" in s2              # base = pay2 − bonus, + the earnable bonus
     assert "• POR — $170.00\n" in s2 or "• POR — $170.00" in s2   # no bonus → no '+'
     assert "• ANAN — $30.00 +$20.00" in s2               # the owner's exact example shape
+    assert "TYTY" not in s2                              # 1st-pay-only → never clutters the 2nd list
     assert "TWB total: $310.00" in s2
     assert "Total: $360.00" in s2
 

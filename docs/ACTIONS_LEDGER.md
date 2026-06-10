@@ -9,9 +9,19 @@
 
 ## Open (not yet done)
 
-- _(none)_
+- **⏰ ~Jul 1: restore Sun Kimying's FULL pay split.** Her stored split is June-prorated (joined
+  Jun 4): 1st 120 · 2nd 39 (=24 base + 15 bonus). From work-month July she's full again — restore
+  1st 145 · 2nd 30 (=15 base + 15 bonus), per her salary 160. (Set 2026-06-11.)
 
 ## Done (with proof)
+
+- **2026-06-11 — Tyty (id 28): pay record corrected + included in /menu pay views.** salary 1500→
+  1700 (stale), 1st stays 1700, 2nd 0, bonus 0 (owner: "only on the 1st, $1700, no bonus"). Views
+  now include her (1st list only; zero-2nd staff skip the 2nd list). Verified fresh-process re-read.
+- **2026-06-11 — Sun Kimying (id 42): June prorated + joined date.** Joined 2026-06-04 → 27/30
+  payroll days → 144 prorated; 1st = 80%×144 = 115.20 → next 5/0 up = **120**; 2nd = 24 base +
+  15 bonus (kept, not prorated) = **39** stored. joined_date set 2026-06-04. Verified fresh-process
+  re-read. Full split restores ~Jul 1 (see Open).
 
 - **2026-06-11 — cron daemon enabled on the server (the watchdog was never running).** The
   session-28 collection watchdog (`run_collection_watchdog.py`, crontab every 1 min) had NEVER
