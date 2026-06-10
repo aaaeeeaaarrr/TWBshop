@@ -1158,6 +1158,29 @@ def _att_active() -> bool:
     return _attendance_live() or _att_test_mode()
 
 
+def _now_pp() -> datetime:
+    """Current time in Phnom-Penh tz — EXCEPT in test mode, where an owner-set frozen 'pretend now'
+    (`att_test_now`, ISO) overrides it. This is the one knob that lets time-conditioned behaviour
+    (payback ladder days, the OT-shield/PB deadlines, AL accrual, sick night-nudges, no-show sweep)
+    be rehearsed in /test without waiting real days. NEVER overrides in live mode — real staff always
+    run on the wall clock. Set via /testclock; clear with /testclock off."""
+    real = datetime.now(finance.PP_TZ)
+    if _att_test_mode():
+        iso = gm_get_state("att_test_now")
+        if iso:
+            try:
+                dt = datetime.fromisoformat(iso)
+                return dt if dt.tzinfo else dt.replace(tzinfo=finance.PP_TZ)
+            except Exception:
+                pass
+    return real
+
+
+def _today_pp():
+    """Today's date in PP tz, honouring the test clock (see _now_pp)."""
+    return _now_pp().date()
+
+
 async def _att_send(context, to_uid, role: str, to_name: str, text: str,
                     kb=None, group: bool = False, parse_mode: str | None = None):
     """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
@@ -1193,7 +1216,7 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _attendance_live():
         return
     from gm_bot import attendance_ui as ui, checkin as ci
-    now_pp = datetime.now(finance.PP_TZ)
+    now_pp = _now_pp()
     now_min = now_pp.hour * 60 + now_pp.minute
     try:
         events = ui.compute_day_events(now_pp.date())   # schedule-driven, skips day-off/AL/Tyty/Delis
@@ -1254,7 +1277,7 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     leave = al_leave_days_set(staff["id"])
     leave_isos = set(leave)
     days = pb.working_days_ahead(staff.get("day_off"), leave_isos,
-                                 datetime.now(finance.PP_TZ).date(), 7, 3)
+                                 _today_pp(), 7, 3)
     roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
     expertise = staff.get("expertise") or []
     # build (score, button) then sort neediest-first (the shop's most-needed times rise to the top)
@@ -1275,7 +1298,7 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     # = a shift-length (dayoff_windows sizes the window to min(balance, shift span)).
     do_best = None
     for do in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos,
-                                    datetime.now(finance.PP_TZ).date(), 14):
+                                    _today_pp(), 14):
         for s_min, e_min in pb.dayoff_windows(ws, we, balance):
             sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, set(), to_min)
             if do_best is None or sc > do_best[0]:
@@ -1341,7 +1364,7 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     loc = msg.location
     from gm_bot import attendance as att, checkin as ci, attendance_ui as ui
     in_zone = att.in_work_zone(loc.latitude, loc.longitude)
-    now_pp = datetime.now(finance.PP_TZ)
+    now_pp = _now_pp()
     # find today's (or last night's overnight) shift this check-in belongs to
     shift_date = now_pp.date().isoformat()
     ws = att.to_min(staff.get("work_start"))
@@ -1608,7 +1631,7 @@ async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_add
     rows = []
     if ws is not None and we is not None:
         days = pb.working_days_ahead(staff.get("day_off"), set(),
-                                     datetime.now(finance.PP_TZ).date(), 7, 3)
+                                     _today_pp(), 7, 3)
         roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
         scored = []
         for d in days:
@@ -2199,7 +2222,7 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     from gm_bot import payback as pb
     from shared.database import ot_shield_until
-    today = datetime.now(finance.PP_TZ).date()
+    today = _today_pp()
     for debt in payback_all_open():
         staff = next((s for s in staff_all("active") if s["id"] == debt["staff_id"]), None)
         if not staff or not (staff.get("telegram_ids") or []):
@@ -2411,8 +2434,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if days:
             # papers accepted → CANCEL the paperless-sick pay-back, but only within the 2-day window
             from gm_bot import sick as sk
-            within = not sk.papers_deadline_passed(case["the_date"],
-                                                   datetime.now(finance.PP_TZ).date())
+            within = not sk.papers_deadline_passed(case["the_date"], _today_pp())
             wiped = _wipe_sick_payback(case["staff_id"], case["the_date"].isoformat()) if within else False
             sick_set(case_id, status="papered", covered_days=days)
             await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd%s." % (
@@ -2510,7 +2532,7 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     from gm_bot import attendance_ui as ui
     from gm_bot.attendance import to_min
-    yday = (datetime.now(finance.PP_TZ).date() - timedelta(days=1))
+    yday = (_today_pp() - timedelta(days=1))
     for p in staff_all("active"):
         if p.get("org") != "TWB" or p["canonical_name"] == "Tyty":
             continue
@@ -2552,7 +2574,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _att_active():
         return
     from gm_bot import sick as sk
-    today = datetime.now(finance.PP_TZ).date()
+    today = _today_pp()
     for c in sick_provisional_open():
         staff = next((s for s in staff_all("active") if s["id"] == c["staff_id"]), None)
         if not staff:
@@ -2570,7 +2592,7 @@ async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _att_active():
         return
     from datetime import datetime as _dt
-    now = datetime.now(finance.PP_TZ)
+    now = _now_pp()
     for b in payback_bookings_due_reminder():
         ids = b.get("telegram_ids")
         try:
@@ -3385,6 +3407,68 @@ async def cmd_payroll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text(text[i:i + 3500])
 
 
+def _parse_testclock(arg: str, base: datetime):
+    """Parse a /testclock argument into an absolute 'pretend now' datetime (PP tz), or None to clear.
+      off|clear|real          → None (use the wall clock)
+      +3d / -2d / +90m / +5h  → base shifted by that delta
+      tomorrow [HH:MM]        → next day (default 08:00) ; today [HH:MM]
+      2026-06-15 [HH:MM]      → that date (default 08:00)
+    Returns (dt_or_None, ok)."""
+    import re as _re
+    a = (arg or "").strip().lower()
+    if a in ("off", "clear", "real", "none"):
+        return None, True
+    m = _re.fullmatch(r"([+-]\d+)\s*([dhm])", a)
+    if m:
+        n = int(m.group(1)); unit = m.group(2)
+        delta = timedelta(days=n) if unit == "d" else (timedelta(hours=n) if unit == "h"
+                                                       else timedelta(minutes=n))
+        return base + delta, True
+    m = _re.fullmatch(r"(today|tomorrow)(?:\s+(\d{1,2}):(\d{2}))?", a)
+    if m:
+        d = base.date() + timedelta(days=1 if m.group(1) == "tomorrow" else 0)
+        hh, mm = (int(m.group(2)), int(m.group(3))) if m.group(2) else (8, 0)
+        return datetime(d.year, d.month, d.day, hh, mm, tzinfo=finance.PP_TZ), True
+    m = _re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?", a)
+    if m:
+        y, mo, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        hh, mm = (int(m.group(4)), int(m.group(5))) if m.group(4) else (8, 0)
+        return datetime(y, mo, dd, hh, mm, tzinfo=finance.PP_TZ), True
+    return None, False
+
+
+async def cmd_testclock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testclock — owner: set a frozen 'pretend now' for the test harness so time-driven behaviour
+    can be rehearsed without waiting. Only effective in test mode; never touches the live clock.
+      /testclock                  → show current
+      /testclock +3d | tomorrow 08:00 | 2026-06-15 06:00
+      /testclock off              → back to the real wall clock"""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    raw = " ".join(context.args or []).strip()
+    if not raw:
+        cur = gm_get_state("att_test_now")
+        mode = "🧪 ON" if _att_test_mode() else "off (set it only matters in test mode)"
+        await update.message.reply_text(
+            "Test clock: %s\nTest mode: %s\nEffective now: %s\n\n"
+            "Set: /testclock +3d  ·  /testclock tomorrow 08:00  ·  /testclock 2026-06-15 06:00\n"
+            "Clear: /testclock off"
+            % (cur or "(real wall clock)", mode, _now_pp().strftime("%a %Y-%m-%d %H:%M %Z")))
+        return
+    dt, ok = _parse_testclock(raw, datetime.now(finance.PP_TZ))
+    if not ok:
+        await update.message.reply_text("Couldn't parse '%s'. Try: +3d · tomorrow 08:00 · "
+                                        "2026-06-15 06:00 · off" % raw)
+        return
+    if dt is None:
+        gm_set_state("att_test_now", "")
+        await update.message.reply_text("⏰ Test clock cleared — back to the real wall clock.")
+        return
+    gm_set_state("att_test_now", dt.isoformat())
+    warn = "" if _att_test_mode() else "\n⚠ Test mode is OFF — this only takes effect once you /testmode on."
+    await update.message.reply_text("⏰ Test clock set → %s%s" % (dt.strftime("%a %Y-%m-%d %H:%M %Z"), warn))
+
+
 async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/testmode on|off — owner: enter/leave the role-play test harness. In test mode every
     attendance message routes to YOU (labeled by recipient) with working buttons, every write is
@@ -3636,7 +3720,7 @@ async def _late_simarr_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _att_send(context, suid, "Staff", nm, attendance_ui._V_ONTIME)
     else:   # late >5 — combined verdict + payback picker
         mins = int(parts[4])
-        today = datetime.now(finance.PP_TZ).date().isoformat()
+        today = _today_pp().isoformat()
         payback_add_debt(persona["id"], mins, "late arrival (test)", today)
         d = payback_open_debt(persona["id"])
         if d:
@@ -3666,7 +3750,7 @@ async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT
     from gm_bot import attendance_ui as ui
     nm = persona.get("call_name") or persona["canonical_name"]
     suid = (persona.get("telegram_ids") or [None])[0]
-    today = datetime.now(finance.PP_TZ).date()
+    today = _today_pp()
 
     # which shift? prefer an approved redefine on today, then yesterday (overnight tail)
     sc, sd = None, today.isoformat()
@@ -3806,7 +3890,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
     elif flow == "late":
         from gm_bot.attendance import to_min
         mins = int(pend.get("mins") or 0)
-        today = datetime.now(finance.PP_TZ).date().isoformat()
+        today = _today_pp().isoformat()
         ws = to_min(persona.get("work_start"))
         nm = persona.get("call_name") or persona["canonical_name"]
         late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
@@ -4522,6 +4606,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("rollcall",  cmd_rollcall))
     app.add_handler(CommandHandler("payroll",   cmd_payroll))
     app.add_handler(CommandHandler("testmode",   cmd_testmode))
+    app.add_handler(CommandHandler("testclock",  cmd_testclock))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))

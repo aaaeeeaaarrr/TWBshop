@@ -244,13 +244,17 @@ in an elevated shell, then back to attendance.)
   offered the safest (most-surplus) shift-edge times to take the earned OT back as rest (`att:otb:`
   booking still live). So the full OT life-cycle — Give-OT → approve → work → checkout → bank → spend
   as rest — is now end-to-end. Suite **434**.
-- ⏳ **Attendance NEXT — "simulate the full real in /test" (the big enabler):** time-driven jobs are
-  gated live-only (`_checkin_scheduler_job`, `_no_show_sweep_job`, `_callout_job`) so their autonomous
-  firing + the payback-ladder/shield/accrual/night-nudge *timing* can't be watched in test. Build:
-  (1) test job-triggers (fire any job now for a persona, bypassing the live gate) + a **test clock**
-  override (pretend "now" = +3 days / tomorrow 08:00) so every time-conditioned behavior is watchable
-  in seconds; (2) optional coverage-scenario seeding. Then go-live prep (owner role-play → /testreset
-  → flip). attendance_live=OFF, attendance_test_mode=OFF.
+- **BUILD #1a — TEST CLOCK done:** `_now_pp()` / `_today_pp()` return a frozen owner-set "pretend now"
+  (`att_test_now`) ONLY in test mode (never time-warps live staff). `/testclock` command + `_parse_testclock`
+  (`+3d` · `-90m` · `tomorrow 08:00` · `2026-06-15 06:00` · `off`). Routed the **is_test-safe** time
+  reads through it: checkin scheduler, payback ladder (+shield deadline), no-show sweep, sick
+  papers-deadline + night-nudge, booking reminder, location verdict, payback/buyback slot lists, the
+  /test sim helpers. **Deliberately NOT routed** (real-data / real-cadence): `_al_accrual_job`,
+  `_al_deduction_job`, report watchdogs, payroll month calc, weekly digest. +2 tests. Suite **436**.
+- ⏳ **BUILD #1b NEXT — job triggers:** `/testrun <job>` (+ a /test menu) to fire a job's body ONCE on
+  demand against the test clock, bypassing the live-only gate, so the scheduler tick / no-show sweep /
+  ladder / nudges are watchable instantly. Then optional coverage-scenario seeding, then go-live prep.
+  attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

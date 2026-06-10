@@ -932,6 +932,38 @@ def _dt_today_iso(bot):
     return _dt.datetime.now(bot.finance.PP_TZ).date().isoformat()
 
 
+def test_parse_testclock():
+    from gm_bot import bot, finance
+    import datetime as _dt
+    base = _dt.datetime(2026, 6, 11, 14, 30, tzinfo=finance.PP_TZ)
+    assert bot._parse_testclock("off", base) == (None, True)
+    assert bot._parse_testclock("real", base) == (None, True)
+    dt, ok = bot._parse_testclock("+3d", base)
+    assert ok and dt == base + _dt.timedelta(days=3)
+    dt, ok = bot._parse_testclock("-90m", base)
+    assert ok and dt == base - _dt.timedelta(minutes=90)
+    dt, ok = bot._parse_testclock("tomorrow 08:00", base)
+    assert ok and (dt.date(), dt.hour, dt.minute) == (_dt.date(2026, 6, 12), 8, 0)
+    dt, ok = bot._parse_testclock("tomorrow", base)            # default 08:00
+    assert ok and (dt.hour, dt.minute) == (8, 0)
+    dt, ok = bot._parse_testclock("2026-06-15 06:00", base)
+    assert ok and (dt.date(), dt.hour) == (_dt.date(2026, 6, 15), 6)
+    assert bot._parse_testclock("garbage", base) == (None, False)
+
+
+def test_now_pp_only_overrides_in_test_mode(monkeypatch):
+    from gm_bot import bot
+    frozen = "2026-06-20T06:00:00+07:00"
+    monkeypatch.setattr(bot, "gm_get_state", lambda k: frozen if k == "att_test_now" else None)
+    # test mode ON → frozen pretend-now is used
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    assert bot._now_pp().date().isoformat() == "2026-06-20"
+    assert bot._today_pp().isoformat() == "2026-06-20"
+    # test mode OFF → the wall clock, never the override (live staff are never time-warped)
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    assert bot._now_pp().date().isoformat() != "2026-06-20"
+
+
 def test_can_auto_checkout(monkeypatch):
     """Spec §3.7: a live share still in-zone near shift end → silent auto-checkout; a stale share
     (turned off) or an out-of-zone ping (walked off) → False (ask the normal way)."""
