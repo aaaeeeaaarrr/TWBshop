@@ -1440,3 +1440,29 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "Zo" not in s1                                # nothing on record → not listed
     s2 = bot._own_sal_text(2)
     assert "Total: $310.00" in s2
+
+
+def test_parse_joined_full_and_month_only():
+    """/joined accepts full dates AND month/year when the day is unknown — stored as the 1st but
+    flagged month_only so the views show mm/yyyy, never a fake '01/'."""
+    import gm_bot.bot as bot
+    assert bot._parse_joined("03/05/2023") == ("2023-05-03", False)
+    assert bot._parse_joined("2023-05-03") == ("2023-05-03", False)
+    assert bot._parse_joined("05/2023") == ("2023-05-01", True)     # month only
+    assert bot._parse_joined("2023-05") == ("2023-05-01", True)
+    assert bot._parse_joined("31/02/2023") is None                  # impossible date rejected
+    assert bot._parse_joined("nonsense") is None
+
+
+def test_owner_al_month_only_display(monkeypatch):
+    """A month-only hire date displays as mm/yyyy in AL+Joined (no invented day)."""
+    import datetime as _dt
+    import gm_bot.bot as bot
+    roster = _own_roster()
+    roster[0]["joined_date"] = _dt.date(2022, 11, 1)
+    roster[0]["joined_month_only"] = True
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: roster)
+    al = bot._own_al_text()
+    assert "• POR — 12 AL · 11/2022" in al               # month/year only
+    assert "01/11/2022" not in al                        # the stored day-1 never shows
+    assert "• DAVY — 14 AL · 03/05/2023" in al           # full dates unchanged

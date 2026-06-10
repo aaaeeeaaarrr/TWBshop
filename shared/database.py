@@ -2255,8 +2255,11 @@ def init_attendance_db() -> None:
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS salary_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS bonus_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS phone TEXT;
-                -- session 32: hire date for the owner's "AL + Joined" view (set via /joined)
+                -- session 32: hire date for the owner's "AL + Joined" view (set via /joined).
+                -- month_only: the owner knows only month/year — stored as the 1st but DISPLAYED as
+                -- mm/yyyy so an unknown day is never shown as a fake "01/".
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_date DATE;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_month_only BOOLEAN DEFAULT FALSE;
                 -- session 28: per-day AL deduction tracking ("take when the dates pass")
                 ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS deducted_days TEXT DEFAULT '[]';
                 -- session 28: flow-state persistence (H1) — one active ladder per uid, survives restart
@@ -2761,12 +2764,13 @@ def staff_all(status: str | None = None) -> list[dict]:
             return [_staff_row(r) for r in cur.fetchall()]
 
 
-def staff_set_joined(staff_id: int, joined_iso: str) -> None:
-    """Set a staffer's hire date (owner /joined command)."""
+def staff_set_joined(staff_id: int, joined_iso: str, month_only: bool = False) -> None:
+    """Set a staffer's hire date (owner /joined command). month_only=True → only month/year is
+    known (stored as the 1st, displayed as mm/yyyy)."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE staff_registry SET joined_date=%s, updated_at=NOW() WHERE id=%s",
-                        (joined_iso, staff_id))
+            cur.execute("UPDATE staff_registry SET joined_date=%s, joined_month_only=%s, "
+                        "updated_at=NOW() WHERE id=%s", (joined_iso, month_only, staff_id))
 
 
 def staff_get_by_uid(uid: int) -> dict | None:

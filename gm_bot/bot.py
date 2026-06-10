@@ -3684,7 +3684,7 @@ def _own_al_text() -> str:
         line = "• %s — %g AL" % (_caps_call(s), float(s.get("al_left") or 0))
         j = s.get("joined_date")
         if j:
-            line += " · %s" % j.strftime("%d/%m/%Y")
+            line += " · %s" % (j.strftime("%m/%Y") if s.get("joined_month_only") else j.strftime("%d/%m/%Y"))
         lines.append(line)
     return "🏖 AL + Joined\n" + "\n".join(lines) + \
         "\n\n(no date = not on record — set with /joined <name> <date>)"
@@ -3748,25 +3748,49 @@ async def _owner_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(_own_sal_text(1 if a == "sal1" else 2), reply_markup=back)
 
 
+def _parse_joined(raw: str):
+    """Hire-date input → (iso, month_only) or None. Full: DD/MM/YYYY · YYYY-MM-DD.
+    Month-only (day unknown): MM/YYYY · YYYY-MM — stored as the 1st, shown as mm/yyyy."""
+    raw = (raw or "").strip()
+    try:
+        if "/" in raw:
+            parts = [int(x) for x in raw.split("/")]
+            if len(parts) == 3:
+                d, m, y = parts
+                return datetime(y, m, d).strftime("%Y-%m-%d"), False
+            if len(parts) == 2:
+                m, y = parts
+                return datetime(y, m, 1).strftime("%Y-%m-%d"), True
+        else:
+            parts = [int(x) for x in raw.split("-")]
+            if len(parts) == 3:
+                y, m, d = parts
+                return datetime(y, m, d).strftime("%Y-%m-%d"), False
+            if len(parts) == 2:
+                y, m = parts
+                return datetime(y, m, 1).strftime("%Y-%m-%d"), True
+    except Exception:
+        pass
+    return None
+
+
 async def cmd_joined(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/joined <name> <YYYY-MM-DD | DD/MM/YYYY> — owner: set a staffer's hire date."""
+    """/joined <name> <date> — owner: set a staffer's hire date.
+    Full date: DD/MM/YYYY or YYYY-MM-DD · only month known: MM/YYYY or YYYY-MM."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
     from shared.database import staff_set_joined
     args = context.args or []
     if len(args) < 2:
-        await update.message.reply_text("Usage: /joined <name> <YYYY-MM-DD or DD/MM/YYYY>")
+        await update.message.reply_text(
+            "Usage: /joined <name> <date>\nFull: 03/05/2023 or 2023-05-03 · month only: 05/2023 or 2023-05")
         return
-    raw = args[-1]
-    try:
-        if "/" in raw:
-            d, m, y = (int(x) for x in raw.split("/"))
-            iso = "%04d-%02d-%02d" % (y, m, d)
-        else:
-            iso = datetime.strptime(raw, "%Y-%m-%d").strftime("%Y-%m-%d")
-    except Exception:
-        await update.message.reply_text("Couldn't read the date — use YYYY-MM-DD or DD/MM/YYYY.")
+    parsed = _parse_joined(args[-1])
+    if not parsed:
+        await update.message.reply_text(
+            "Couldn't read the date — use DD/MM/YYYY (or MM/YYYY when you only know the month).")
         return
+    iso, month_only = parsed
     name = " ".join(args[:-1]).lower()
     hits = [s for s in staff_all("active")
             if name in (s.get("call_name") or "").lower() or name in s["canonical_name"].lower()]
@@ -3774,8 +3798,10 @@ async def cmd_joined(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(
             "Matched %d staff for '%s' — be more specific." % (len(hits), name))
         return
-    staff_set_joined(hits[0]["id"], iso)
-    await update.message.reply_text("✓ %s joined %s saved." % (_caps_call(hits[0]), iso))
+    staff_set_joined(hits[0]["id"], iso, month_only)
+    shown = iso[:7] if month_only else iso
+    await update.message.reply_text("✓ %s joined %s saved.%s"
+        % (_caps_call(hits[0]), shown, " (month only — day unknown)" if month_only else ""))
 
 
 async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3795,7 +3821,7 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/testreset — wipe all test data\n"
         "\n— Attendance · live overviews —\n"
         "/menu — your private menu: Staff info → PB+OT · AL+Joined · Salaries 1st/2nd\n"
-        "/joined <name> <date> — set a staffer's hire date (shows in AL+Joined)\n"
+        "/joined <name> <date> — set a hire date (03/05/2023, or 05/2023 if you only know the month)\n"
         "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
         "/holiday — manage paid public holidays (cost no AL; AL spans bridge them)\n"
         "/payroll [YYYY-MM] — payslip preview for a work-month (defaults to last month)\n"
