@@ -2783,7 +2783,7 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 SELECT a.id, a.staff_id, a.days, a.deducted_days, a.reason,
                        s.canonical_name, s.call_name, s.al_left
                 FROM al_requests a JOIN staff_registry s ON s.id = a.staff_id
-                WHERE a.status = 'approved' AND a.kind = 'days'
+                WHERE a.status = 'approved' AND a.kind = 'days' AND a.is_test = FALSE
             """)
             for r in cur.fetchall():
                 try:
