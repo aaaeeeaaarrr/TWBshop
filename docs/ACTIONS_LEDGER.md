@@ -9,9 +9,10 @@
 
 ## Open (not yet done)
 
-- **⏰ ~Jul 1: restore Sun Kimying's FULL pay split.** Her stored split is June-prorated (joined
-  Jun 4): 1st 120 · 2nd 39 (=24 base + 15 bonus). From work-month July she's full again — restore
-  1st 145 · 2nd 30 (=15 base + 15 bonus), per her salary 160. (Set 2026-06-11.)
+- **⏰ Jul 1 (AUTOMATED — verify it fired): Kimying full-split restore.** `_pay_restore_job`
+  (daily 07:05 PP, in the gm bot) restores 145/30 from her seeded `pay_restore:42` record once
+  June passes, and DMs the owner. New hires get this automatically via /joined now. VERIFY after
+  Jul 1: owner got the DM + her stored split reads 145/30. (Automated 2026-06-11, `42adf31`.)
 
 ## Done (with proof)
 
