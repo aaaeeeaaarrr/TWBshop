@@ -1203,10 +1203,13 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
     - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True)."""
     from gm_bot.attendance import strip_khmer
     if _att_test_mode():
-        # everything routes to the OWNER in test → English-only (owner doesn't want Khmer)
+        # everything routes to the OWNER in test → English-only by default. /testkhmer on keeps the
+        # full bilingual body so the owner can proof-read the real Khmer staff will see.
         prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
+        full = prefix + text
+        body = full if gm_get_state("att_test_khmer") == "true" else strip_khmer(full)
         try:
-            return await context.bot.send_message(config.OWNER_TELEGRAM_ID, strip_khmer(prefix + text),
+            return await context.bot.send_message(config.OWNER_TELEGRAM_ID, body,
                                                   reply_markup=kb, parse_mode=parse_mode)
         except Exception as e:
             logger.error("att_send(test) failed: %s", e)
@@ -3564,6 +3567,29 @@ async def cmd_testmode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                                         "(only matters once attendance_live is on).")
 
 
+async def cmd_testkhmer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/testkhmer on|off — owner: in TEST mode, show the full Khmer+English bodies instead of the
+    default English-only, so the real Khmer can be proof-read. No effect live (staff always get
+    bilingual; the owner always gets English-only live)."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    arg = (context.args or [""])[0].lower()
+    if arg not in ("on", "off"):
+        cur = "ON — bilingual" if gm_get_state("att_test_khmer") == "true" else "off — English only"
+        await update.message.reply_text(
+            "Test Khmer view is currently %s.\nUse /testkhmer on  or  /testkhmer off\n"
+            "(only changes what YOU see in /test — turn on to proof-read the Khmer.)" % cur)
+        return
+    gm_set_state("att_test_khmer", "true" if arg == "on" else "false")
+    if arg == "on":
+        await update.message.reply_text(
+            "🇰🇭 Test Khmer view ON — /test messages now show the full Khmer + English, exactly as "
+            "staff will see them. /testkhmer off to go back to English-only.\n"
+            "(Tip: turn it on now, walk every flow once to read the Khmer, then off to test faster.)")
+    else:
+        await update.message.reply_text("✓ Test Khmer view OFF — back to English-only in /test.")
+
+
 async def cmd_testreset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/testreset — delete EXACTLY the test-tagged attendance rows (real data can't be caught)."""
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
@@ -3622,6 +3648,7 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/test — open the role-play harness; walk any flow as any staff\n"
         "/testmode on|off — enter/leave test mode (all routes to you, nothing real is touched)\n"
         "/testclock — set a pretend 'now' (+3d · tomorrow 08:00 · 2026-06-15 06:00 · off)\n"
+        "/testkhmer on|off — show the full Khmer+English in /test (to proof-read), or English-only\n"
         "/testrun <job> — fire a scheduled job now: checkin · ladder · noshow · booking · sickdeadline\n"
         "/teststatus — current test mode + how many test rows exist\n"
         "/testseed [name] — copy real ALs/paybacks into test so flows have realistic data\n"
@@ -4869,6 +4896,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testmode",   cmd_testmode))
     app.add_handler(CommandHandler("testclock",  cmd_testclock))
     app.add_handler(CommandHandler("testrun",    cmd_testrun))
+    app.add_handler(CommandHandler("testkhmer",  cmd_testkhmer))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))

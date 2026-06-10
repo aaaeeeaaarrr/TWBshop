@@ -1347,3 +1347,30 @@ def test_settle_claims_once_no_double_bank(monkeypatch):
     b2, _ = bot._settle_redefined_shift(staff, sd, now_pp)   # re-delivery / concurrent second path
     assert b1 == 60 and b2 == 0          # 540 worked − 480 normal = 60 OT, banked once only
     assert calls["bank"] == 1            # ot_bank_add hit exactly once, never twice
+
+
+def test_att_send_testkhmer_toggle(monkeypatch):
+    """In test mode /testkhmer ON keeps the bilingual body (owner proof-reads the Khmer); OFF (the
+    default) strips to English-only. The wall that stopped the owner at test 1.1."""
+    import gm_bot.bot as bot
+
+    sent = {}
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **k):
+            sent["text"] = text
+            return None
+
+    ctx = types.SimpleNamespace(bot=_Bot())
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    msg = "Approved.\nបានអនុម័ត។"
+
+    # OFF (default) → English only, Khmer stripped
+    monkeypatch.setattr(bot, "gm_get_state", lambda k: "false" if k == "att_test_khmer" else "")
+    asyncio.run(bot._att_send(ctx, None, "Staff", "Davy", msg))
+    assert "Approved." in sent["text"] and "បាន" not in sent["text"]
+
+    # ON → full bilingual kept
+    monkeypatch.setattr(bot, "gm_get_state", lambda k: "true" if k == "att_test_khmer" else "")
+    asyncio.run(bot._att_send(ctx, None, "Staff", "Davy", msg))
+    assert "បានអនុម័ត។" in sent["text"]
