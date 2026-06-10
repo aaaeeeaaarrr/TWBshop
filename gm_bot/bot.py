@@ -1229,8 +1229,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             from shared.database import att_last_ping, att_check_out
             if ci.can_auto_checkout(att_last_ping(staff["id"]), now_pp):
                 att_check_out(staff["id"], sd, now_pp.isoformat())
-                _settle_redefined_shift(staff, sd, now_pp)
+                banked, new_bal = _settle_redefined_shift(staff, sd, now_pp)
                 await _att_send(context, uid, "Staff", name, ui._CO_DONE)
+                if banked > 0:
+                    await _offer_buyback(context, staff, new_bal, uid, banked)
                 continue
         await _att_send(context, uid, "Staff", name, text)
         # arm check-out capture: next in-zone share while this is set = checked out (60-min window).
@@ -1365,8 +1367,10 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         sd = fs["data"].get("shift_date", shift_date)
         att_check_out(staff["id"], sd, now_pp.isoformat())
         flow_clear(user.id)
-        _settle_redefined_shift(staff, sd, now_pp)   # banks OT (net of payback) iff this day was redefined
+        banked, new_bal = _settle_redefined_shift(staff, sd, now_pp)   # OT net of payback, if redefined
         await msg.reply_text(ui._CO_DONE)
+        if banked > 0:                               # earned OT → offer to take it back as rest
+            await _offer_buyback(context, staff, new_bal, user.id, banked)
         return True
     if not in_zone:
         if not update.edited_message:
@@ -1549,11 +1553,12 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
 
 
-def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
+def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, int]:
     """At checkout for a day that had an APPROVED shift-redefine: OT = worked beyond the normal shift
     length; it clears outstanding payback FIRST, the rest banks (capped at the 14h bank). Marks the
     change done. NO-OP for a normal (un-redefined) day, or one already settled. Best-effort — never
-    blocks the checkout. Points are NOT touched here (reputation stays on its own track)."""
+    blocks the checkout. Points are NOT touched here (reputation stays on its own track).
+    Returns (banked_min, new_bank_balance) so the caller can offer buyback; (0, …) when nothing banked."""
     try:
         from shared.database import (shift_change_active, att_get_session, payback_open_debt,
                                      payback_credit, ot_bank_add, ot_bank_balance,
@@ -1561,11 +1566,11 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
         from gm_bot import ot as ot_mod
         sc = shift_change_active(staff["id"], shift_date)
         if not sc or sc.get("status") != "approved" or not sc.get("normal_len"):
-            return                       # not redefined, or already done
+            return 0, 0                  # not redefined, or already done
         sess = att_get_session(staff["id"], shift_date) or {}
         ci_dt = sess.get("checked_in_at")
         if not ci_dt:
-            return
+            return 0, 0
         # Worked = presence INSIDE the approved [start,end] only. Early arrival earns points, never
         # OT; lingering past the approved end banks nothing; late arrival still reduces (by design).
         from datetime import date as _date, timedelta as _td
@@ -1575,20 +1580,23 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> None:
         appr_end = base + _td(minutes=int(sc["end_min"]))
         worked = round((min(now_pp, appr_end) - max(ci_dt, appr_start)).total_seconds() / 60)
         if worked <= 0:
-            return
+            return 0, 0
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
         ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
         if pb_cleared and debt:
             payback_credit(debt["id"], pb_cleared)   # OT clears the debt first (uncapped)
+        new_bal = ot_bank_balance(staff["id"])
         banked = 0
         if ot_banked:
-            banked = min(ot_banked, ot_mod.cap_room(ot_bank_balance(staff["id"])))  # respect 14h bank
+            banked = min(ot_banked, ot_mod.cap_room(new_bal))   # respect 14h bank
             if banked > 0:
-                ot_bank_add(staff["id"], banked)
+                new_bal = ot_bank_add(staff["id"], banked)      # post-add balance (test: computed)
         shift_change_set_banked(sc["id"], banked)
+        return banked, new_bal
     except Exception as e:
         logger.error("OT settle at checkout failed: %s", e)
+        return 0, 0
 
 
 async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_added: int) -> None:
@@ -3652,8 +3660,7 @@ async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT
     if not persona:
         return
     from datetime import date as _date, timedelta as _td
-    from shared.database import (shift_change_active, att_check_in, att_check_out, shift_change_get,
-                                 payback_open_debt)
+    from shared.database import (shift_change_active, att_check_in, att_check_out, payback_open_debt)
     from gm_bot.attendance_ui import shift_len_min, _hm
     from gm_bot.attendance import to_min
     from gm_bot import attendance_ui as ui
@@ -3686,13 +3693,12 @@ async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT
     pb0 = max(0, debt0["balance"]) if debt0 else 0
     att_check_in(persona["id"], sd, ci_dt.isoformat(), True, 0, 0)
     att_check_out(persona["id"], sd, co_dt.isoformat())
-    _settle_redefined_shift(persona, sd, co_dt)
+    banked, new_bal = _settle_redefined_shift(persona, sd, co_dt)
     debt1 = payback_open_debt(persona["id"])
     pb1 = max(0, debt1["balance"]) if debt1 else 0
 
     worked = end_min - start_min
     earned = max(0, worked - normal_len)
-    banked = int((shift_change_get(sc["id"]) or {}).get("ot_banked") or 0) if sc else 0
     pb_cleared = max(0, pb0 - pb1)
     win = "%s–%s" % (_fmt_min(start_min), _fmt_min(end_min))
     summary = ("🧪 Simulated checkout — %s, %s %s.\n"
@@ -3706,6 +3712,8 @@ async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT
     except Exception:
         await _att_send(context, config.OWNER_TELEGRAM_ID, "Owner", "", summary)
     await _att_send(context, suid, "Staff", nm, ui._CO_DONE)
+    if banked > 0:                                   # close the loop: offer to take the OT back as rest
+        await _offer_buyback(context, persona, new_bal, suid, banked)
 
 
 async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

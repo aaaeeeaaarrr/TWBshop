@@ -238,9 +238,19 @@ in an elevated shell, then back to attendance.)
   worked · OT earned vs normal · payback cleared · OT banked + sends the `_CO_DONE` thank-you — so
   Give-OT → approve → checkout → banking is walkable with no live mode (test-isolated; real bank
   untouched). +1 test. Suite **434**.
-- ⏳ **Attendance NEXT:** `_offer_buyback` on settle (take banked OT as rest); then "simulate the
-  full real in /test" gaps (see below); then go-live prep (owner role-play → /testreset → flip).
-  attendance_live=OFF, attendance_test_mode=OFF.
+- **BUYBACK wired onto settle (OT bank→rest loop closed):** `_settle_redefined_shift` now returns
+  `(banked_min, new_bank_balance)`; all three checkout paths (manual share-to-checkout, scheduler
+  auto-checkout, `/test` simulate-checkout) call `_offer_buyback` when `banked > 0` — the staffer is
+  offered the safest (most-surplus) shift-edge times to take the earned OT back as rest (`att:otb:`
+  booking still live). So the full OT life-cycle — Give-OT → approve → work → checkout → bank → spend
+  as rest — is now end-to-end. Suite **434**.
+- ⏳ **Attendance NEXT — "simulate the full real in /test" (the big enabler):** time-driven jobs are
+  gated live-only (`_checkin_scheduler_job`, `_no_show_sweep_job`, `_callout_job`) so their autonomous
+  firing + the payback-ladder/shield/accrual/night-nudge *timing* can't be watched in test. Build:
+  (1) test job-triggers (fire any job now for a persona, bypassing the live gate) + a **test clock**
+  override (pretend "now" = +3 days / tomorrow 08:00) so every time-conditioned behavior is watchable
+  in seconds; (2) optional coverage-scenario seeding. Then go-live prep (owner role-play → /testreset
+  → flip). attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

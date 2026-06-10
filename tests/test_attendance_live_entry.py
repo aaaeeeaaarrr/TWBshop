@@ -902,10 +902,15 @@ def test_simcheckout_runs_settle_and_thanks(monkeypatch):
     monkeypatch.setattr(db, "att_check_in", lambda *a, **k: calls.__setitem__("checkin", 1) or True)
     monkeypatch.setattr(db, "att_check_out", lambda *a, **k: calls.__setitem__("checkout", 1))
     monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
-    monkeypatch.setattr(db, "shift_change_get", lambda cid: {"ot_banked": 240})   # +4h banked
+    # settle returns (banked_min, new_bank_balance); +4h banked → triggers the buyback offer
     monkeypatch.setattr(bot, "_settle_redefined_shift",
-                        lambda *a, **k: calls.__setitem__("settle", 1))
+                        lambda *a, **k: (calls.__setitem__("settle", 1), (240, 240))[1])
+    offered = []
 
+    async def _buy(ctx, staff, bank_min, uid, just_added):
+        offered.append((bank_min, just_added))
+
+    monkeypatch.setattr(bot, "_offer_buyback", _buy)
     sent = []
 
     async def _send(ctx, to_uid, role, to_name, text, **k):
@@ -919,6 +924,7 @@ def test_simcheckout_runs_settle_and_thanks(monkeypatch):
     edited = upd.callback_query.edited[-1]
     assert "OT earned 4h" in edited and "banked 4h OT" in edited     # banking reported
     assert any("nice day" in t for _r, t in sent)                    # thank-you sent to staff
+    assert offered == [(240, 240)]                                   # buyback offered for the banked OT
 
 
 def _dt_today_iso(bot):
