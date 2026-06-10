@@ -3053,6 +3053,29 @@ def shift_change_set_banked(change_id: int, ot_banked: int) -> None:
                         (ot_banked, change_id))
 
 
+def shift_changes_active_map(date_isos: list[str]) -> dict:
+    """{(staff_id, when_date_iso): (start_min, end_min)} for every approved/done redefine landing on
+    any of `date_isos`. Latest-wins per (staff, date). Test-isolated. Batch form of shift_change_active
+    for the check-in scheduler (which resolves a whole roster across yesterday/today/tomorrow per tick)."""
+    if not date_isos:
+        return {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT DISTINCT ON (staff_id, when_date)
+                          staff_id, when_date, start_min, end_min
+                   FROM shift_changes
+                   WHERE when_date = ANY(%s) AND status IN ('approved','done') AND is_test=%s
+                   ORDER BY staff_id, when_date, approved_at DESC NULLS LAST, id DESC""",
+                (list(date_isos), _ATT_TEST))
+            out = {}
+            for r in cur.fetchall():
+                if r["start_min"] is None or r["end_min"] is None:
+                    continue
+                out[(r["staff_id"], str(r["when_date"]))] = (int(r["start_min"]), int(r["end_min"]))
+            return out
+
+
 def dayoff_set_override(staff_id: int, the_date: str, kind: str, reason: str = "") -> None:
     with _db() as conn:
         with conn.cursor() as cur:

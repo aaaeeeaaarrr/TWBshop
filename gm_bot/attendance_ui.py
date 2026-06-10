@@ -136,12 +136,18 @@ def grid(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineK
 
 # ---------------------------------------------------------------- day dry-run (owner, session 28)
 
-def staff_day_events(p: dict) -> list[tuple[int, int, str]]:
+def staff_day_events(p: dict, ws_override: int | None = None,
+                     len_override: int | None = None) -> list[tuple[int, int, str]]:
     """The check-in message schedule for ONE shift: (day_offset_from_shift_START, minute, label).
     End-of-shift events on an overnight shift carry offset +1 (they land the NEXT calendar day);
-    a pre-reminder for a just-after-midnight start carries −1. Pure — the launch scheduler's brain."""
-    ws = to_min(p.get("work_start"))
-    ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
+    a pre-reminder for a just-after-midnight start carries −1. Pure — the launch scheduler's brain.
+    A redefined shift (session 31) passes ws_override (start minute-of-day) + len_override (worked
+    length) so the day's prompts fire at the REDEFINED times instead of the normal schedule."""
+    ws = ws_override if ws_override is not None else to_min(p.get("work_start"))
+    if len_override is not None:
+        ln = len_override
+    else:
+        ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
     if ws is None or ln is None:
         return []
     raw = [
@@ -175,7 +181,7 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
                 except Exception:
                     pass
 
-    from shared.database import dayoff_override_for
+    from shared.database import dayoff_override_for, shift_changes_active_map
 
     def works_on(p: dict, day: date) -> bool:
         # dated day-off override (a swap) wins over the normal weekday rule
@@ -188,26 +194,38 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
             return False
         return day.isoformat() not in al_days.get(p["id"], set())
 
+    # A shift's events can land on `target` only if its START date is target−1 (overnight tail),
+    # target (same day) or target+1 (a pre-midnight T−10). Resolve any redefine per (staff, start day):
+    # an APPROVED redefine fires the day's prompts at the REDEFINED [start,end] and makes the person
+    # "work" that day even if it's normally their day-off (a change-day moved the shift there).
+    cand_days = [target - timedelta(days=1), target, target + timedelta(days=1)]
+    redefines = shift_changes_active_map([d.isoformat() for d in cand_days])
+
     events = []
     for p in staff_all("active"):
         if p.get("org") != "TWB" or p.get("canonical_name") == "Tyty":
             continue
         name = p.get("call_name") or p["canonical_name"]
-        for day_offset, minute, label in staff_day_events(p):
-            shift_start_day = target - timedelta(days=day_offset)
-            if not works_on(p, shift_start_day):
+        for shift_start_day in cand_days:
+            ov = redefines.get((p["id"], shift_start_day.isoformat()))
+            if not works_on(p, shift_start_day) and ov is None:
                 continue
-            if label.startswith("T−10"):
-                text = _ci_msg_pre(p)
-            elif label.startswith("T0"):
-                text = _ci_msg_start()[0]
-            elif label.startswith("T+5"):
-                text = _CI_MSG_PLUS5
-            elif label.startswith("check-out"):
-                text = _CI_MSG_OUT
-            else:
-                text = _CI_MSG_OUT2
-            events.append((minute, name, label, text))
+            ws_ov = ov[0] if ov else None
+            len_ov = (ov[1] - ov[0]) if ov else None
+            for day_offset, minute, label in staff_day_events(p, ws_ov, len_ov):
+                if shift_start_day + timedelta(days=day_offset) != target:
+                    continue
+                if label.startswith("T−10"):
+                    text = _ci_msg_pre(p)
+                elif label.startswith("T0"):
+                    text = _ci_msg_start()[0]
+                elif label.startswith("T+5"):
+                    text = _CI_MSG_PLUS5
+                elif label.startswith("check-out"):
+                    text = _CI_MSG_OUT
+                else:
+                    text = _CI_MSG_OUT2
+                events.append((minute, name, label, text))
     events.sort(key=lambda e: (e[0], e[1]))
     return events
 

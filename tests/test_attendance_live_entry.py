@@ -589,6 +589,51 @@ def test_ot_now_end_times_latest_per_staff(monkeypatch):
     assert 7 not in out
 
 
+def test_staff_day_events_redefine_override():
+    """A redefined shift fires the day's prompts at the REDEFINED start/length, not the normal sched."""
+    p = {"work_start": "08:00", "work_end": "17:00"}    # normal ws=480, len=540
+    base = ui.staff_day_events(p)
+    assert any(m == 480 and lbl.startswith("T0") for _o, m, lbl in base)            # normal T0 = 8:00
+    red = ui.staff_day_events(p, ws_override=780, len_override=360)                 # 1pm start, 6h
+    assert any(m == 780 and lbl.startswith("T0") for _o, m, lbl in red)            # redefined T0 = 1pm
+    assert any(m == 770 and lbl.startswith("T−10") for _o, m, lbl in red)          # T−10 = 12:50
+    assert any(m == 1140 and lbl.startswith("check-out") for _o, m, lbl in red)    # checkout = 7pm
+
+
+def test_compute_day_events_uses_redefine(monkeypatch):
+    """compute_day_events shifts a staffer's whole prompt schedule to the approved redefine."""
+    from shared import database as db
+    import datetime as _dt
+    target = _dt.date(2026, 6, 15)   # a Monday
+    p = {"id": 7, "canonical_name": "X", "call_name": "X", "org": "TWB",
+         "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [p])
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return []          # no approved al_requests
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    monkeypatch.setattr(db, "dayoff_override_for", lambda sid, iso: None)
+
+    # no redefine → normal T0 at 8:00 (480)
+    monkeypatch.setattr(db, "shift_changes_active_map", lambda days: {})
+    t0 = [m for m, _n, lbl, _t in ui.compute_day_events(target) if lbl.startswith("T0")]
+    assert t0 == [480]
+
+    # redefine on target: 1pm–7pm → T0 at 780, checkout at 1140
+    monkeypatch.setattr(db, "shift_changes_active_map",
+                        lambda days: {(7, target.isoformat()): (780, 1140)})
+    ev = ui.compute_day_events(target)
+    assert [m for m, _n, lbl, _t in ev if lbl.startswith("T0")] == [780]
+    assert any(m == 1140 and lbl.startswith("check-out") for m, _n, lbl, _t in ev)
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

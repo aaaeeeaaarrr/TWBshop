@@ -1201,8 +1201,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error("checkin scheduler compute failed: %s", e)
         return
-    from shared.database import ot_now_end_times, flow_save
-    ot_ends = ot_now_end_times(today, finance.PP_TZ)   # {staff_id: latest OT-end DATETIME} — extends the shift
+    # Redefined shifts (session 31): compute_day_events already fires this roster's prompts at the
+    # REDEFINED [start,end] for any approved shift_change — incl. an extended/OT end — so the old
+    # ot_now_end_times "extend the shift" pass is gone; the redefined checkout rides the event stream.
+    from shared.database import flow_save
     for minute, name, label, text in events:
         if not ci.is_due(minute, now_min):
             continue
@@ -1219,35 +1221,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
-        # if a Now-OT extends past shift-end, the plain shift-end checkout/nudges are REPLACED by the
-        # OT-end ones below (don't pester "did you leave early?" while they're working OT).
-        if staff["id"] in ot_ends and (label.startswith("check-out") or label.startswith("leave-early")):
-            continue
         await _att_send(context, uid, "Staff", name, text)
         # arm check-out capture: next in-zone share while this is set = checked out (60-min window)
         if label.startswith("check-out"):
             flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
-
-    # Part 3 — end-of-OT checkout: fire the SAME checkout + nudges at the LATEST OT-end, overwriting
-    # the single checked_out_at (a 2nd OT just moves the end). OT-end is a tz-aware DATETIME, so this
-    # fires correctly even when the OT crosses midnight — the offset is real elapsed minutes, not a
-    # minute-of-day that wraps. Derive 'already out' from checked_out_at (a datetime compare).
-    for staff_id, end_dt in ot_ends.items():
-        staff = next((s for s in staff_all("active") if s["id"] == staff_id), None)
-        if not staff or not (staff.get("telegram_ids") or []):
-            continue
-        sess = att_get_session(staff_id, today)
-        co = sess.get("checked_out_at") if sess else None
-        if co is not None and co >= end_dt:
-            continue   # they've already checked out at/after the OT end
-        off = round((now_pp - end_dt).total_seconds() / 60)
-        if off in (0, 10, 20, 40):
-            uid = staff["telegram_ids"][0]
-            name = staff.get("call_name") or staff["canonical_name"]
-            await _att_send(context, uid, "Staff", name,
-                            ui._CI_MSG_OUT if off == 0 else ui._CI_MSG_OUT2)
-            if off == 0:
-                flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
@@ -1352,10 +1329,15 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     in_zone = att.in_work_zone(loc.latitude, loc.longitude)
     now_pp = datetime.now(finance.PP_TZ)
     # find today's (or last night's overnight) shift this check-in belongs to
+    shift_date = now_pp.date().isoformat()
     ws = att.to_min(staff.get("work_start"))
+    # a redefined shift (session 31) moves the start → lateness is judged vs the REDEFINED start
+    from shared.database import shift_change_active
+    _sc = shift_change_active(staff["id"], shift_date)
+    if _sc and _sc.get("start_min") is not None:
+        ws = int(_sc["start_min"]) % 1440
     if ws is None:
         return True
-    shift_date = now_pp.date().isoformat()
     try:
         att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone, now_pp.isoformat())
     except Exception:
