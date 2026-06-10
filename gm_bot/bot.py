@@ -1547,7 +1547,7 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
     body = ("🕒 Shift change — %s: %s%s\nWhy: %s\n"
             "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n\n"
             "🕒 ប្តូរវេន — %s៖ %s%s\nមូលហេតុ៖ %s\n"
-            "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកមុន → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានឹងអនុវត្ត។"
+            "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
             % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
@@ -4011,8 +4011,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             if amount > float(bal) + 1e-9:
                 over = ("⚠ You only have %g AL day(s) left, but this request needs %g.\n"
                         "Please choose a smaller amount — you can request up to %g.\n"
-                        "⚠ ប្អូននៅសល់ AL តែ %g ថ្ងៃប៉ុណ្ណោះ តែសំណើនេះត្រូវការ %g ថ្ងៃ។\n"
-                        "សូមជ្រើសរើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានរហូតដល់ %g ថ្ងៃ។"
+                        "⚠ ប្អូននៅសល់ AL តែ %g ថ្ងៃប៉ុណ្ណោះ ប៉ុន្តែសំណើនេះត្រូវប្រើ %g ថ្ងៃ។\n"
+                        "សូមជ្រើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានច្រើនបំផុត %g ថ្ងៃ។"
                         % (float(bal), amount, float(bal), float(bal), amount, float(bal)))
                 if update.message is not None:
                     await update.message.reply_text(over)
@@ -4517,18 +4517,18 @@ _concern_tracker: dict = defaultdict(list)                  # (chat_id, uid) →
 # variants (no API). The leading "—" makes "{name} — …" read naturally. KH drafts → docs/KH_REVIEW.md.
 _GROUP_REDIRECT_LINES = [
     "— AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, or it won't be "
-    "recorded 🙂\n— ច្បាប់ AL, ឈឺ និងថ្ងៃឈប់ រាប់បានលុះត្រាតែប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
-    "បើមិនដូច្នេះវានឹងមិនត្រូវបានកត់ត្រាទេ 🙂",
+    "recorded 🙂\n— AL, ឈឺ និងថ្ងៃឈប់ នឹងរាប់បានតែពេលប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
+    "បើមិនដូច្នេះ វានឹងមិនត្រូវបានកត់ត្រាទេ 🙂",
     "— quick reminder 🙏 time off has to come to me, not the group. Message @twb_gm_bot so it counts.\n"
-    "— រំលឹកបន្តិច 🙏 ការសុំឈប់ត្រូវប្រាប់ខ្ញុំផ្ទាល់ មិនមែននៅក្នុង group ទេ។ សូមផ្ញើសារទៅ @twb_gm_bot "
+    "— រំលឹកបន្តិច 🙏 រឿងសុំឈប់ត្រូវផ្ញើមកខ្ញុំផ្ទាល់ មិនមែនផ្ញើក្នុង group ទេ។ សូមផ្ញើសារទៅ @twb_gm_bot "
     "ដើម្បីឱ្យវារាប់។",
     "— I can only record this if it comes to me 🙂 Please tap @twb_gm_bot; group messages don't count.\n"
-    "— ខ្ញុំអាចកត់ត្រាបានលុះត្រាតែប្អូនប្រាប់ខ្ញុំ 🙂 សូមចុច @twb_gm_bot; សារនៅក្នុង group មិនរាប់ទេ។",
+    "— ខ្ញុំអាចកត់ត្រារឿងនេះបានតែបើប្អូនផ្ញើមកខ្ញុំផ្ទាល់ 🙂 សូមចុច @twb_gm_bot; សារក្នុង group មិនរាប់ទេ។",
     "— leave, sick and day-off only register when you tell me at @twb_gm_bot. The group chat doesn't "
-    "count 🙏\n— ច្បាប់ឈប់ ឈឺ និងថ្ងៃឈប់ ត្រូវបានកត់ត្រាលុះត្រាតែប្អូនប្រាប់ខ្ញុំនៅ @twb_gm_bot។ "
-    "ការនិយាយក្នុង group មិនរាប់ទេ 🙏",
+    "count 🙏\n— AL, ឈឺ និងថ្ងៃឈប់ នឹងត្រូវកត់ត្រាតែពេលប្អូនប្រាប់ខ្ញុំតាម @twb_gm_bot ប៉ុណ្ណោះ។ "
+    "សារក្នុង group មិនរាប់ទេ 🙏",
     "— this won't be counted from here 🙂 For AL, sick or time off, message me directly at "
-    "@twb_gm_bot.\n— រឿងនេះនឹងមិនរាប់ពី group នេះទេ 🙂 សម្រាប់ AL, ឈឺ ឬសុំឈប់ សូមផ្ញើសារមកខ្ញុំផ្ទាល់នៅ "
+    "@twb_gm_bot.\n— រឿងនេះមិនរាប់ពី group នេះទេ 🙂 សម្រាប់ AL, ឈឺ ឬសុំឈប់ សូមផ្ញើសារមកខ្ញុំផ្ទាល់តាម "
     "@twb_gm_bot។",
 ]
 _REDIRECT_COOLDOWN = 1800   # one nudge per sender per 30 min (never spam a burst of messages)
@@ -4610,10 +4610,9 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             logger.error("leave handling failed: %s", e)
 
-    # GROUP-REDIRECT (session 28, gated): attendance talk posted in an internal group → point the
-    # person to DM the GM (no processing here — forces the private channel). Keyword, zero-API.
-    if (_attendance_live() and text.strip()
-            and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID)):
+    # GROUP-REDIRECT (gated, SUPERVISORS group only): attendance talk → point the person to DM the
+    # GM (no processing here — forces the private channel). Keyword, zero-API.
+    if (_attendance_live() and text.strip() and chat_id == config.SUPERVISORS_CHAT_ID):
         try:
             kws = ("late", "មកយឺត", "off ", "day off", "ឈប់", "leave", "al ", "sick", "ឈឺ", "ច្បាប់")
             if any(k in text.lower() for k in kws) and msg.from_user:
