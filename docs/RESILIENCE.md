@@ -44,6 +44,11 @@
     (guard blocks Claude from `systemctl stop`).
 - **Hire bot as backup recorder** for Supervisors/Management (same message_id space →
   duplicate-free dual write) — gm's senior-room recording survives a gm outage.
+- **GM global error handler** (2026-06-11): any unhandled handler exception → full traceback in
+  the log + throttled ⚠ owner DM + the button gets answered. Before this, crashes were SILENT
+  ("No error handlers are registered") — that's how a missing import killed the live concern
+  recorder 69 times unseen. Guard tests: `test_no_shadow_import_bugs` (AST scan, all bot modules)
+  + the real-DB SQL-typing test.
 
 ## Layer 5 — humans don't cause the outage
 - **Deploy Discipline** (CLAUDE.md): quiet-window (05:30–07:00 · 14:00–15:30 · 20:30–21:30 PP),
