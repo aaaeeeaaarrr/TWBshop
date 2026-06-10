@@ -3240,7 +3240,7 @@ def shift_changes_active_map(date_isos: list[str]) -> dict:
                 """SELECT DISTINCT ON (staff_id, when_date)
                           staff_id, when_date, start_min, end_min
                    FROM shift_changes
-                   WHERE when_date = ANY(%s) AND status IN ('approved','done') AND is_test=%s
+                   WHERE when_date = ANY(%s::date[]) AND status IN ('approved','done') AND is_test=%s
                    ORDER BY staff_id, when_date, approved_at DESC NULLS LAST, id DESC""",
                 (list(date_isos), _ATT_TEST))
             out = {}

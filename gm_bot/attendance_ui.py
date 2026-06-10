@@ -1753,10 +1753,13 @@ def persona_picker(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
                                   callback_data="att:dr:go4")],
             [InlineKeyboardButton("🧪 Dry-run 5: Marriage · Death · Birth",
                                   callback_data="att:dr:go5")],
-            [InlineKeyboardButton("🧪 Dry-run 7: Day-off swap",
+            [InlineKeyboardButton("🧪 Dry-run 6: Day-off swap",
                                   callback_data="att:dr:go7")],
-            [InlineKeyboardButton("🧪 Dry-run 8: Acks · redirect · call-outs · welcome",
+            [InlineKeyboardButton("🧪 Dry-run 7: Acks · redirect · call-outs · welcome",
                                   callback_data="att:dr:go8")]] if page == 0 else []
+    # (labels renumbered 2026-06-11 — the old Dry-run 6 was the retired Now/Later OT model's
+    # walkthrough; the Give-OT/shift-redefine flow is walked INTERACTIVELY, not as a script.
+    # Callback ids stay go7/go8 — only the display numbers closed the gap.)
     rows += [[InlineKeyboardButton(staff_btn_label(r),
                                    callback_data="att:persona:%d" % r["id"])] for r in chunk]
     nav = []
@@ -1917,10 +1920,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 intro = "🧪 Dry-run 5 — MARRIAGE · FAMILY DEATH · WIFE BIRTH. %d steps:"
             elif data[2] == "go7":
                 events = build_catalogue7(sample)
-                intro = "🧪 Dry-run 7 — DAY-OFF SWAP (partner first, then seniors). %d steps:"
+                intro = "🧪 Dry-run 6 — DAY-OFF SWAP (partner first, then seniors). %d steps:"
             else:
                 events = build_catalogue8(sample)
-                intro = "🧪 Dry-run 8 — ACKS · GROUP REDIRECT · CALL-OUTS · WELCOME. %d steps:"
+                intro = "🧪 Dry-run 7 — ACKS · GROUP REDIRECT · CALL-OUTS · WELCOME. %d steps:"
             context.user_data["att_dr_events"] = events
             context.user_data["att_dr_i"] = 0
             await context.bot.send_message(update.effective_chat.id, intro % len(events))

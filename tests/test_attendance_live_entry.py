@@ -1459,6 +1459,22 @@ def test_owner_al_and_salary_views(monkeypatch):
     assert "Total: $360.00" in s2
 
 
+def test_shift_changes_active_map_real_sql_types():
+    """REGRESSION (the dry-run-1 crash): the batch redefine lookup passes ISO strings into a
+    DATE = ANY(...) — Postgres needs the ::date[] cast or every caller (dry-run 1's schedule
+    summary, the check-in scheduler) dies with 'operator does not exist: date = text'. Mocked
+    tests can't catch SQL typing, so this one touches the real DB (read-only; skips without one)."""
+    import pytest
+    from shared import database as db
+    try:
+        out = db.shift_changes_active_map(["2026-01-01", "2026-01-02"])
+    except Exception as e:
+        if "operator does not exist" in str(e):
+            raise                                  # the regression itself — never skip THAT
+        pytest.skip("no database available: %s" % e)
+    assert isinstance(out, dict)
+
+
 def test_prorate_join_month_owner_rule():
     """30-day basis always; missed = join_day−1; 1st = 80% of prorated rounded UP to next 5/0
     (never above prorated); 2nd base = remainder. Kimying (owner-worked example) is the anchor."""
