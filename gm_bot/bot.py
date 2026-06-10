@@ -3578,6 +3578,67 @@ async def cmd_teststatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                     % (mode, "ON" if _attendance_live() else "off", body))
 
 
+async def cmd_pb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/pb — owner: ONLY the staff who currently owe pay-back, each with how much is already
+    'booked' (covered by an approved upcoming OT that will clear it at checkout). Mode-aware: shows
+    test debts in test mode, real debts otherwise."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    from shared.database import payback_all_open, ot_pending_extension_min
+    from gm_bot.attendance_ui import _hm
+    today_iso = _today_pp().isoformat()
+    lines = []
+    for d in payback_all_open():
+        bal = d.get("balance") or 0
+        if bal <= 0:
+            continue
+        staff = next((s for s in staff_all("active") if s["id"] == d["staff_id"]), None)
+        if not staff:
+            continue
+        nm = staff.get("call_name") or staff["canonical_name"]
+        booked = min(ot_pending_extension_min(d["staff_id"], today_iso), bal)
+        lines.append("• %s: %s%s" % (nm, _hm(bal), (" (%s booked)" % _hm(booked)) if booked else ""))
+    if not lines:
+        await update.message.reply_text("📒 No open pay-back debts. ✓")
+        return
+    head = "📒 Pay-back debts — %d staff%s:" % (len(lines), " · 🧪 test" if _att_test_mode() else "")
+    await update.message.reply_text(head + "\n" + "\n".join(lines))
+
+
+async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/commands — owner: the full list of GM commands, grouped, with one-line descriptions."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    await update.message.reply_text(
+        "🤖 GM bot — your commands\n"
+        "\n— Attendance · test harness (safe, gated OFF) —\n"
+        "/test — open the role-play harness; walk any flow as any staff\n"
+        "/testmode on|off — enter/leave test mode (all routes to you, nothing real is touched)\n"
+        "/testclock — set a pretend 'now' (+3d · tomorrow 08:00 · 2026-06-15 06:00 · off)\n"
+        "/testrun <job> — fire a scheduled job now: checkin · ladder · noshow · booking · sickdeadline\n"
+        "/teststatus — current test mode + how many test rows exist\n"
+        "/testseed [name] — copy real ALs/paybacks into test so flows have realistic data\n"
+        "/testreset — wipe all test data\n"
+        "\n— Attendance · live overviews —\n"
+        "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
+        "/holiday — manage paid public holidays (cost no AL; AL spans bridge them)\n"
+        "/payroll [YYYY-MM] — payslip preview for a work-month (defaults to last month)\n"
+        "/rollcall — who has pressed Start with the GM bot\n"
+        "\n— GM intelligence (staff comms) —\n"
+        "/check — run analysis now → new concerns to review (tap a name)\n"
+        "/pending — send the analysed concerns\n"
+        "/review — concerns sent but not yet reviewed\n"
+        "/proposals — the GM's pending improvement proposals\n"
+        "/approved — approved proposals (the GM's current playbook)\n"
+        "/points — points summary, last 30 days\n"
+        "\n— Staff & admin —\n"
+        "/staff — staff registry (look up / list)\n"
+        "/exstaff <name> — mark a staff member as departed\n"
+        "/vendor — per-vendor receipt knowledge\n"
+        "/rules — the staff rules screen\n"
+        "/commands — this list")
+
+
 async def cmd_holiday(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/holiday — manage company-wide PAID free days (public holidays). These cost NO AL and NO
     points, and AL spans bridge across them automatically.
@@ -4703,6 +4764,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
     app.add_handler(CommandHandler("holiday",     cmd_holiday))
+    app.add_handler(CommandHandler("pb",          cmd_pb))
+    app.add_handler(CommandHandler("commands",    cmd_commands))
+    app.add_handler(CommandHandler("help",        cmd_commands))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(exstaff_callback, pattern=r"^exstaff:"))
     from gm_bot import rollcall
