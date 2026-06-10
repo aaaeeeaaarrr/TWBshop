@@ -399,7 +399,9 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Back at work: Saturday 27/06, 9pm.\nត្រឡប់មកធ្វើការ៖ Saturday 27/06, 9pm។", None),
         ("⑩ SUPERVISORS notice — HOURS-AL (return time that same day)",
          "Meng on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.\n"
-         "Back at work: 12am each of those nights (rest of shift as normal).  (KH pending review)", None),
+         "Meng ឈប់សម្រាក 9pm–12am នៅ Tue 23/06, Wed 24/06, Thu 25/06។\n"
+         "Back at work: 12am each of those nights (rest of shift as normal).\n"
+         "ត្រឡប់មកធ្វើការ 12am រាល់យប់នោះ (ម៉ោងនៅសល់នៃវេនធ្វើធម្មតា)។", None),
         ("⑪ cancelling an AL — refund confirmation",
          "Your AL for Tue 23/06 is cancelled ✓ — 1 day(s) returned.\n"
          "AL របស់អ្នកសម្រាប់ Tue 23/06 ត្រូវបានលុបចោលហើយ ✓ — 1 ថ្ងៃបានត្រឡប់ចូលវិញ។", None),

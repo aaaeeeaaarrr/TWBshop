@@ -67,14 +67,17 @@ You're paid for the time you work; come early → +10 points ⭐; normal late/no
 One implementation warning: for variant 4, I used AL, ឈឺ និងថ្ងៃឈប់ instead of translating “leave” as ច្បាប់ឈប់. ច្បាប់ឈប់ is understandable, but it feels less natural and can sound like “permission/rule” rather than the bot category.
 ---
 
-## Z. Remaining KH gap found during dry-run resync (session 32, Jun 11)
+## Z. Hours-AL Supervisors notice — RESOLVED (ChatGPT Khmer applied, session 32, Jun 11)
 
-**Hours-AL Supervisors notice (dry-run 3 ⑩)** — currently English-only, no Khmer drafted:
+**Hours-AL Supervisors notice (dry-run 3 ⑩)** — was English-only; ChatGPT Khmer now wired into the
+dry-run preview (`gm_bot/attendance_ui.py`, build_catalogue3 ⑩):
 
-> "{name} on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.
-> Back at work: 12am each of those nights (rest of shift as normal)."
+> {name} on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.
+> {name} ឈប់សម្រាក 9pm–12am នៅ Tue 23/06, Wed 24/06, Thu 25/06។
+> Back at work: 12am each of those nights (rest of shift as normal).
+> ត្រឡប់មកធ្វើការ 12am រាល់យប់នោះ (ម៉ោងនៅសល់នៃវេនធ្វើធម្មតា)។
 
-Please draft a native Khmer line. Reuse the already-approved fragments from the full-day notice
-(`ឈប់សម្រាក`, `ត្រឡប់មកធ្វើការ`). It mirrors the full-day Supervisors notice but for an
-hours-AL (the staffer is out only for the named window, then back the same night). Tone: neutral
-operational FYI to the Supervisors group.
+Verified faithful: reuses the approved fragments `ឈប់សម្រាក` / `ត្រឡប់មកធ្វើការ`, keeps the
+`{name}` slot and inline English dates/times. NOTE: this is a dry-run PREVIEW only — the live
+`_al_finalize` Supervisors notice sends the full-day span format for every AL kind, so there is no
+separate live hours-AL string to update.
