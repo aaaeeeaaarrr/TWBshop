@@ -1544,9 +1544,9 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
     win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
     tagtxt = (" (%s)" % tag) if tag else ""
     body = ("🕒 Shift change — %s: %s%s\nWhy: %s\n"
-            "You're paid for the time you work; come early → +10 points; normal late/no-show rules apply.\n\n"
+            "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n\n"
             "🕒 ប្តូរវេន — %s៖ %s%s\nមូលហេតុ៖ %s\n"
-            "អ្នកទទួលបានប្រាក់តាមពេលដែលអ្នកធ្វើ; មកមុន → +10 ពិន្ទុ; ច្បាប់យឺត/អវត្តមានធម្មតាអនុវត្ត។"
+            "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកមុន → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានឹងអនុវត្ត។"
             % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
@@ -3881,6 +3881,18 @@ async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await _att_dispatch(update, context, pend, live=live, reason="(confirmed)")
 
 
+def _al_requested_amount(persona: dict, kind: str, days: list, hours_start, hours_end) -> float:
+    """The AL days this request would deduct — mirrors _al_finalize (hours → fractional; day-offs and
+    other absences are never double-charged) so a staff-side balance check matches the real deduction."""
+    from gm_bot import al as alm
+    from gm_bot.attendance import to_min
+    nw = staff_absent_dates(persona["id"])
+    sl = (((to_min(persona.get("work_end")) or 0) - (to_min(persona.get("work_start")) or 0)) % 1440) or 1440
+    frac = (alm.fractional_al(to_min(hours_start), to_min(hours_end), sl)
+            if kind == "hours" and hours_start else 1.0)
+    return alm.al_day_count(days, kind, frac, day_off=persona.get("day_off"), non_working=nw)
+
+
 async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                         pend: dict | None, *, live: bool, reason: str | None = None) -> None:
     """Complete a reason/'go' terminal by firing the REAL submit_* — for a live staffer acting as
@@ -3922,6 +3934,24 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     flow = pend.get("flow")
     if flow == "al":
+        # Balance guard (owner, session 32): if the request needs more AL than they have, tell the
+        # STAFF to pick a smaller amount — don't bother the seniors with an impossible request.
+        # (Special leave — marriage/death/birth — has its own flows that MAY go negative; not here.)
+        bal = persona.get("al_left")
+        if bal is not None:
+            amount = _al_requested_amount(persona, pend["kind"], pend["days"],
+                                          pend.get("hours_start"), pend.get("hours_end"))
+            if amount > float(bal) + 1e-9:
+                over = ("⚠ You only have %g AL day(s) left, but this request needs %g.\n"
+                        "Please choose a smaller amount — you can request up to %g.\n"
+                        "⚠ ប្អូននៅសល់ AL តែ %g ថ្ងៃប៉ុណ្ណោះ តែសំណើនេះត្រូវការ %g ថ្ងៃ។\n"
+                        "សូមជ្រើសរើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានរហូតដល់ %g ថ្ងៃ។"
+                        % (float(bal), amount, float(bal), float(bal), amount, float(bal)))
+                if update.message is not None:
+                    await update.message.reply_text(over)
+                else:
+                    await context.bot.send_message(update.effective_chat.id, over)
+                return
         req_id = await submit_al_request(context, persona, pend["kind"], pend["days"],
                                          pend.get("hours_start"), pend.get("hours_end"), reason, req_uid)
         # the requester's OWN card: rich (carries the persistent 👁 Show-who's-working toggle), edited

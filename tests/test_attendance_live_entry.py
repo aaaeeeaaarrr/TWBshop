@@ -182,6 +182,53 @@ def test_dispatch_al_edits_prompt_into_awaiting_card(monkeypatch):
     assert any("who's working" in b for b in btns)              # persistent toggle
 
 
+def test_dispatch_al_blocks_over_balance(monkeypatch):
+    """Requesting more AL than the balance → the STAFF is told to pick a smaller amount; the request
+    is NOT submitted (seniors aren't bothered with an impossible request)."""
+    from gm_bot import bot
+    submitted = []
+
+    async def _submit(*a, **k):
+        submitted.append(1)
+        return 1
+
+    persona = dict(_PERSONA); persona["al_left"] = 1.0; persona["day_off"] = "Sun"
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: persona)
+    monkeypatch.setattr(bot, "submit_al_request", _submit)
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "_now_pp",
+                        lambda: __import__("datetime").datetime(2026, 6, 11, 12, 0, tzinfo=bot.finance.PP_TZ))
+    upd = _Update(uid=555, text="holiday")
+    pend = {"flow": "al", "kind": "days",
+            "days": ["2026-06-22", "2026-06-23", "2026-06-24"]}      # 3 working days > 1 AL
+    asyncio.run(bot._att_dispatch(upd, _Ctx(), pend, live=True))
+    assert submitted == []                                            # NOT submitted
+    assert upd.message.replies and "only have 1" in upd.message.replies[0]
+    assert "3" in upd.message.replies[0]                             # shows the requested amount
+
+
+def test_dispatch_al_within_balance_submits(monkeypatch):
+    """A request within balance goes through to submit (the guard only blocks over-balance)."""
+    from gm_bot import bot
+    submitted = []
+
+    async def _submit(*a, **k):
+        submitted.append(1)
+        return 1
+
+    persona = dict(_PERSONA); persona["al_left"] = 5.0; persona["day_off"] = "Sun"
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: persona)
+    monkeypatch.setattr(bot, "submit_al_request", _submit)
+    monkeypatch.setattr(bot, "al_get_request", lambda i: None)
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "_now_pp",
+                        lambda: __import__("datetime").datetime(2026, 6, 11, 12, 0, tzinfo=bot.finance.PP_TZ))
+    upd = _Update(uid=555, text="holiday")
+    pend = {"flow": "al", "kind": "days", "days": ["2026-06-22", "2026-06-23"]}   # 2 ≤ 5
+    asyncio.run(bot._att_dispatch(upd, _Ctx(), pend, live=True))
+    assert submitted == [1]                                           # submitted normally
+
+
 def test_dispatch_late_test_defers_to_simulate_arrival(monkeypatch):
     """TEST late: declare = heads-up only + a 'simulate arrival' button. NO auto-payback (it now
     mirrors live — the picker comes from the simulate-arrival tap)."""

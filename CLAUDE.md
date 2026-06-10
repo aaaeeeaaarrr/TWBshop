@@ -267,6 +267,17 @@ in an elevated shell, then back to attendance.)
   `payroll`/`salary`/`staff_registry` etc. — including a **git commit whose MESSAGE** mentions them.
   Worked around by rewording; a future guard-tuning pass should exempt commit-message bodies.
 
+**Session 32 (Jun 11) — owner fixes from the first ChatGPT KH pass (`docs/KH_REVIEW.md` now holds the
+polished output):**
+- **⭐ positive-points convention:** every positive-points mention carries the star (`+10 points ⭐`).
+  Fixed the one outlier — the shift-change approval card said `+10 points` / `+10 ពិន្ទុ` (no star);
+  now `+10 points ⭐` both languages, with ChatGPT's better KH body.
+- **AL over-balance → tell the STAFF, not seniors:** `_att_dispatch` flow=="al" now computes the
+  requested amount (`_al_requested_amount`, mirrors `_al_finalize`) vs `al_left`; if over, the staffer
+  gets "⚠ You only have X AL — pick a smaller amount (up to X)" and the request is NOT submitted.
+  Special-leave flows (marriage/death/birth, which may go negative) are untouched. The old §2.6 senior
+  insufficient-balance flag was only ever a dry-run preview — now retired. +2 tests. Suite **440**.
+
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help
   label). Hours-AL now shows the **actual AL amount** ("AL: Mon 23/06 · 9pm–12am = 0.3 AL") instead of
