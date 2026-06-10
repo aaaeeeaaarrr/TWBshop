@@ -23,8 +23,10 @@
    `frequency.detect` pattern flags — all deterministic, Brain never miscounts. Opus 4.8
    (`narrate_attendance_week`) then writes ONLY the narrative over the verbatim reasons (told never to
    recount). The pre-live AI digest stays as the fallback. The owner walks it via `/testrun` once seeded.
-2. ⏳ **Final Khmer proof-read in `/test`.** Test mode strips Khmer to English for the owner; a
-   `/testkhmer on` toggle (small build) would let the owner eyeball the real bilingual bodies.
+2. ✅ **Khmer proof-read tooling — DONE (`/testkhmer on|off`).** Test mode stripped Khmer→English on
+   the `_att_send`-routed bodies (approval cards, thank-yous, group notices); the dry-runs and nav
+   screens were always bilingual. `/testkhmer on` keeps the routed bodies bilingual too, so EVERYTHING
+   shows Khmer for proof-reading. The proof-read walk itself is part of B3.
 3. ⏳ **Owner role-play sign-off** — walk every flow as each persona + every `/testrun` job; tweak any
    wording. Then `/testreset`.
 4. ⏳ **Points activation** — values stay dormant until the owner finalizes them (catalogued, not blocking).
