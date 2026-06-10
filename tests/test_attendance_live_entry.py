@@ -478,6 +478,27 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert any("who's working" in b for b in tog)
 
 
+def test_al_prompt_coverage_toggle(monkeypatch):
+    """The AL reason PROMPT (before typing) carries a 👁 Show-who's-working toggle, computed live from
+    the in-progress selection and stashed so the toggle can re-render."""
+    monkeypatch.setattr(ui, "att_test_on", lambda: False)
+    from gm_bot import bot
+    p = {"id": 11, "canonical_name": "Visal", "call_name": "Visal",
+         "work_start": "08:00", "work_end": "17:00"}
+    ctx = _Ctx()
+    text, kb = ui._al_prompt(p, ctx, "AL: Sat 20/06 — 1 AL day(s).", ["2026-06-20"], None, None, False)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    assert any("Show who's working" in l for l in labels)
+    assert "Working those" not in text
+    assert ctx.user_data["att_al_cov"]["days"] == ["2026-06-20"]     # stashed for the toggle
+
+    monkeypatch.setattr(bot, "_al_availability_lines", lambda *a, **k: "Sat 20/06: Other")
+    text2, kb2 = ui._al_prompt(p, ctx, "AL: Sat 20/06 — 1 AL day(s).", ["2026-06-20"], None, None, True)
+    assert "Working those days" in text2 and "Other" in text2
+    labels2 = [b.text for row in kb2.inline_keyboard for b in row]
+    assert any("Hide who's working" in l for l in labels2)
+
+
 def test_swap_senior_card_states_and_both_days_toggle(monkeypatch):
     """The senior day-off-swap card: Approve+toggle while partner_ok; expanded shows BOTH affected
     days' coverage; once decided the verdict shows and the toggle STAYS (no Approve)."""
@@ -494,17 +515,17 @@ def test_swap_senior_card_states_and_both_days_toggle(monkeypatch):
     sw = {"id": 9, "requester_id": 1, "partner_id": 2, "req_off_date": "2026-06-21",   # Sun
           "partner_off_date": "2026-06-24", "reason": "x", "status": "partner_ok"}     # Wed
 
-    body, kb = bot._swap_senior_card(sw, req, partner, show_cov=False)
+    body, kb = bot._swap_card(sw, req, partner, audience="senior", show_cov=False)
     labels = [b.text for row in kb.inline_keyboard for b in row]
     assert any("Approve" in l for l in labels) and any("Show who's working" in l for l in labels)
     assert "Working those days" not in body
 
-    body2, _ = bot._swap_senior_card(sw, req, partner, show_cov=True)
+    body2, _ = bot._swap_card(sw, req, partner, audience="senior", show_cov=True)
     assert "Working those days" in body2
     assert "Sun 21/06" in body2 and "Wed 24/06" in body2     # BOTH affected days
 
     sw["status"] = "approved"
-    body3, kb3 = bot._swap_senior_card(sw, req, partner, show_cov=False)
+    body3, kb3 = bot._swap_card(sw, req, partner, audience="senior", show_cov=False)
     assert "✅ Approved" in body3
     labels3 = [b.text for row in kb3.inline_keyboard for b in row]
     assert not any("Approve" in l for l in labels3)          # decided → no Approve

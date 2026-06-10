@@ -676,13 +676,36 @@ def _arm_pending(context, update, pend: dict) -> None:
         flow_save(uid, "att_pending", "reason", pend, ttl_min=15)
 
 
-def _arm_prompt(p: dict, context, base: str, back: str):
+def _arm_prompt(p: dict, context, base: str, back: str, extra_rows=None):
     """Unified prompt for an armed terminal. Neutral copy works for BOTH live (routes to the real
-    seniors/Supervisors) and test; test adds an owner coaching suffix. (KH pending for new lines.)"""
+    seniors/Supervisors) and test; test adds an owner coaching suffix. (KH pending for new lines.)
+    `extra_rows`: button rows placed ABOVE the back row (e.g. a Show-who's-working toggle)."""
     line = base
     if att_test_on():
         line += "\n🧪 (test — every reply/card routes to you; /testreset to wipe when done.)"
-    return _hdr(p, line), InlineKeyboardMarkup([_back_row(back)])
+    rows = list(extra_rows or [])
+    rows.append(_back_row(back))
+    return _hdr(p, line), InlineKeyboardMarkup(rows)
+
+
+def _al_prompt(p: dict, context, detail: str, days: list, hs, he, show_cov: bool):
+    """The AL reason prompt carrying a persistent 👁/🙈 Show-who's-working toggle, computed LIVE from
+    the in-progress selection (no request exists yet). The stash drives the toggle re-render."""
+    context.user_data["att_al_cov"] = {"detail": detail, "days": list(days), "hs": hs, "he": he}
+    line = detail
+    if show_cov:
+        try:
+            from gm_bot.bot import _al_availability_lines
+            cov = _al_availability_lines(p, days, hs, he)
+        except Exception:
+            cov = ""
+        if cov:
+            line += "\n\n👥 Working those %s:\n%s" % ("hours" if hs else "days", cov)
+    line += ("\n\n📝 Type the reason — your next message submits the AL request for senior approval.\n"
+             "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។")
+    lbl, flag = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    extra = [[InlineKeyboardButton(lbl, callback_data="att:al:cov:%d" % flag)]]
+    return _arm_prompt(p, context, line, "att:al", extra_rows=extra)
 
 
 def _confirm_prompt(p: dict, context, base: str, back: str):
@@ -2118,6 +2141,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         picked = context.user_data.setdefault("att_al_picked", set())
         if len(data) > 2:
             sub = data[2]
+            if sub == "cov":   # toggle who's-working on the reason prompt (from the stashed selection)
+                st = context.user_data.get("att_al_cov") or {}
+                flag = bool(int(data[3])) if len(data) > 3 else False
+                return await show(_al_prompt(p, context, st.get("detail", ""), st.get("days", []),
+                                             st.get("hs"), st.get("he"), flag))
             if sub == "d":
                 iso = data[3]
                 picked.symmetric_difference_update({iso})
@@ -2149,9 +2177,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         {"flow": "al", "persona_id": p["id"], "kind": "days",
                          "days": sorted(picked), "hours_start": None, "hours_end": None,
                          "_summary": detail})
-                    return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
-                        "next message submits the AL request for senior approval.\n"
-                        "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
+                    return await show(_al_prompt(p, context, detail, sorted(picked), None, None, False))
                 return await show(al_stub(p, detail))
             if sub == "time":
                 return await show(al_time_grid(p, "from", picked=picked))
@@ -2186,9 +2212,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                          "hours_start": "%02d:%02d" % (f // 60, f % 60),
                          "hours_end": "%02d:%02d" % (t // 60, t % 60),
                          "_summary": detail})
-                    return await show(_arm_prompt(p, context, detail + "\n\n📝 Type the reason — your "
-                        "next message submits the AL request for senior approval.\n"
-                        "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។", "att:al"))
+                    return await show(_al_prompt(p, context, detail, sorted(picked),
+                        "%02d:%02d" % (f // 60, f % 60), "%02d:%02d" % (t // 60, t % 60), False))
                 return await show(al_stub(p, detail))
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))

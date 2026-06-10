@@ -187,10 +187,13 @@ type it = self-approval; catastrophic actions will switch to block-and-owner-run
   THEIR own AL card (toggle + "⏳ Awaiting approval"), registered in `al_staff_cards` so `_al_finalize`
   flips it to the verdict; senior cards KEEP the toggle after the decision (was: buttons vanished).
   `_al_coverage_toggle` is audience-aware + works in any status. **Day-off swap** got the same:
-  `_swap_senior_card` + `_swap_coverage_html` (BOTH affected days' coverage) + `att:swcov:` toggle,
-  persisting through partner_ok → approved/rejected. Suite **421**. NOT yet wired (reported to owner):
-  the toggle on the pre-reason PICKER prompt, and the requester/partner swap cards (only senior swap
-  cards carry it).
+  `_swap_card(audience=partner|senior|requester)` + `_swap_coverage_html` (BOTH affected days'
+  coverage) + `att:swcov:{id}:{audience}:` toggle, persisting through pending → partner_ok →
+  approved/rejected on ALL THREE swap cards (partner card, senior cards, requester's own card — the
+  latter two registered in `swap_partner_cards`/`swap_req_cards` so `_swap_apply` flips them).
+  **Pre-reason PICKER prompt** also got the toggle: `_al_prompt` (attendance_ui) computes coverage
+  LIVE from the in-progress day/hours selection (`att:al:cov:` + a stash), so staff can check who's
+  working BEFORE typing the reason. Suite **422**.
 
 **⏳ IN PROGRESS (session 31) — OT / shift-redefine rebuild → full settled design in `docs/OT_DESIGN.md`.**
 Owner redesigned OT into a UNIFIED **"redefine-a-shift"** model: a senior retimes / moves / extends a
