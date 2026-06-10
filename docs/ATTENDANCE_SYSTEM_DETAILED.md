@@ -852,6 +852,14 @@ watchdogs · data backfill.
   other times; ≥3 every night, Fri+Sat target 4 (fallback: borrow 1 kitchen hand when 3).
   Roster note: exactly 4 bakers whose day-offs never collide and all 4 align Fri+Sat — preserve this
   pattern when changing baker day-offs.
+  **HARD RULE (owner FINAL, Jun 10): NEVER two bakers absent on the SAME DAY — day-off, AL, sick,
+  swap-away, or any absence ALL count, together.** Only ONE baker out per day, ever. Applies to the 4
+  core night bakers (Davy, Samphass, Long, Tra; Thyda is the cake-primary partial 5th, 9pm–12am only —
+  she does NOT count toward the ≥3 floor and may overlap a core baker's day-off). Consequence: a
+  baker's AL is REJECTED on any day another core baker is already absent (≈ every normal day — one core
+  baker is always on their day-off, so 3 present; a 2nd out → 2 < 3). The ONLY path to approve: the
+  **day-off baker comes IN** that day (cancels/moves their day-off) so the count is restored to 3. Net:
+  bakers can't stack same-day leave — they coordinate strictly one-out-at-a-time.
 - **BAR: ≥1 bar-skilled present AT ALL TIMES** (drinkers = profit boost, serve fast).
 - **PREP (daytime cake preparations — crusts etc., feeds the Cake makers): ≥2 prep-capable 10:00–19:00.**
   Prep-capable = explicit 'prep' skill + ALL daytime service people EXCEPT late-night service, Por and
