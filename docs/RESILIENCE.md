@@ -51,6 +51,9 @@
   a missing import killed the live concern recorder 69 times unseen. Guard tests:
   `test_global_error_handler`, `test_no_shadow_import_bugs` (AST scan, all bot modules), and the
   real-DB SQL-typing test.
+- **Listener error-burst alert** (2026-06-11): the Telethon listener can't use the PTB handler;
+  its per-message errors were log-only. Now 3+ processing errors within 10 min (collection
+  degrading) → throttled owner DM via the GM token. One transient hiccup stays quiet.
 
 ## Layer 5 — humans don't cause the outage
 - **Deploy Discipline** (CLAUDE.md): quiet-window (05:30–07:00 · 14:00–15:30 · 20:30–21:30 PP),
