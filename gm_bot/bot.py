@@ -1810,7 +1810,7 @@ def _swap_coverage_html(req: dict, partner: dict, sw: dict) -> str:
         ("<b>%s</b>:%s" % (html.escape(l.split(":", 1)[0]), html.escape(l.split(":", 1)[1]))
          if ":" in l else html.escape(l))
         for l in "\n".join(parts).split("\n"))
-    return "\n\n👥 Working those days:\n%s" % avail
+    return "\n\n👥 Working those days · អ្នកធ្វើការថ្ងៃនោះ:\n%s" % avail
 
 
 def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
@@ -1853,7 +1853,8 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
         body += "\n\n" + status_line
     if show_cov:
         body += _swap_coverage_html(req, partner, sw)
-    cov = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    cov = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+           else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
     rows = []
     if audience == "partner" and st == "pending":
         rows.append([InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម",
@@ -2091,7 +2092,9 @@ def _al_coverage_html(requester: dict, days: list[str],
         ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
          if ":" in ln else html.escape(ln))
         for ln in avail.split("\n"))
-    return "\n\n👥 Working those hours:\n%s" % avail_html
+    label = ("Working those hours · អ្នកធ្វើការម៉ោងនោះ" if hours_start
+             else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
+    return "\n\n👥 %s:\n%s" % (label, avail_html)
 
 
 def _al_card(req: dict, requester: dict, *, audience: str, sen_id: int = 0,
@@ -2115,7 +2118,8 @@ def _al_card(req: dict, requester: dict, *, audience: str, sen_id: int = 0,
         body += "\n\n⏳ Awaiting approval · កំពុងរង់ចាំការអនុម័ត"
     if show_cov:
         body += _al_coverage_html(requester, req["days"], req.get("hours_start"), req.get("hours_end"))
-    cov = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    cov = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+           else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
     rows = []
     if audience == "senior" and st == "pending":
         rows.append([InlineKeyboardButton("✅ Approve",

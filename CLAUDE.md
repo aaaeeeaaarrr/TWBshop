@@ -193,7 +193,11 @@ type it = self-approval; catastrophic actions will switch to block-and-owner-run
   latter two registered in `swap_partner_cards`/`swap_req_cards` so `_swap_apply` flips them).
   **Pre-reason PICKER prompt** also got the toggle: `_al_prompt` (attendance_ui) computes coverage
   LIVE from the in-progress day/hours selection (`att:al:cov:` + a stash), so staff can check who's
-  working BEFORE typing the reason. Suite **422**.
+  working BEFORE typing the reason. The **day-off-swap pre-reason prompt** now has it too
+  (`_swap_prompt` + `att:do:cov:` + `_swap_both_days_lines`). Coverage header + toggle button are now
+  **bilingual** everywhere ("Working those hours/days · អ្នកធ្វើការម៉ោងនោះ/ថ្ងៃនោះ"; "Show/Hide who's
+  working · បង្ហាញ/លាក់អ្នកធ្វើការ"). **All today's new/changed bilingual strings gathered for native
+  review → `docs/KH_REVIEW.md`** (KH is my draft, needs a ChatGPT pass). Suite **423**.
 
 **⏳ IN PROGRESS (session 31) — OT / shift-redefine rebuild → full settled design in `docs/OT_DESIGN.md`.**
 Owner redesigned OT into a UNIFIED **"redefine-a-shift"** model: a senior retimes / moves / extends a

@@ -499,6 +499,30 @@ def test_al_prompt_coverage_toggle(monkeypatch):
     assert any("Hide who's working" in l for l in labels2)
 
 
+def test_swap_prompt_coverage_toggle(monkeypatch):
+    """The day-off-swap reason PROMPT (before typing) also carries a both-days Show-who's-working
+    toggle, computed live from the picked dates and stashed for re-render."""
+    monkeypatch.setattr(ui, "att_test_on", lambda: False)
+    from gm_bot import bot
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [
+        {"id": 2, "canonical_name": "Par", "call_name": "Par", "work_start": "08:00",
+         "work_end": "17:00", "org": "TWB", "day_off": "Wed"}])
+    p = {"id": 1, "canonical_name": "Req", "call_name": "Req", "work_start": "08:00", "work_end": "17:00"}
+    ctx = _Ctx()
+    text, kb = ui._swap_prompt(p, ctx, "Day-off swap — your off Sun ↔ partner off Wed.",
+                               2, "2026-06-21", "2026-06-24", False)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    assert any("Show who's working" in l for l in labels)
+    assert "Working those" not in text
+    assert ctx.user_data["att_do_cov"]["partner_id"] == 2
+
+    monkeypatch.setattr(bot, "_al_availability_lines", lambda req, days, *a, **k: "%s: X" % days[0])
+    text2, kb2 = ui._swap_prompt(p, ctx, "base", 2, "2026-06-21", "2026-06-24", True)
+    assert "Working those days" in text2 and "2026-06-21" in text2 and "2026-06-24" in text2
+    labels2 = [b.text for row in kb2.inline_keyboard for b in row]
+    assert any("Hide who's working" in l for l in labels2)
+
+
 def test_swap_senior_card_states_and_both_days_toggle(monkeypatch):
     """The senior day-off-swap card: Approve+toggle while partner_ok; expanded shows BOTH affected
     days' coverage; once decided the verdict shows and the toggle STAYS (no Approve)."""

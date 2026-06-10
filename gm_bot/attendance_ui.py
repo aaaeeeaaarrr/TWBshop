@@ -700,12 +700,53 @@ def _al_prompt(p: dict, context, detail: str, days: list, hs, he, show_cov: bool
         except Exception:
             cov = ""
         if cov:
-            line += "\n\n👥 Working those %s:\n%s" % ("hours" if hs else "days", cov)
+            _lab = ("Working those hours · អ្នកធ្វើការម៉ោងនោះ" if hs
+                    else "Working those days · អ្នកធ្វើការថ្ងៃនោះ")
+            line += "\n\n👥 %s:\n%s" % (_lab, cov)
     line += ("\n\n📝 Type the reason — your next message submits the AL request for senior approval.\n"
              "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។")
-    lbl, flag = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    lbl, flag = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+                 else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
     extra = [[InlineKeyboardButton(lbl, callback_data="att:al:cov:%d" % flag)]]
     return _arm_prompt(p, context, line, "att:al", extra_rows=extra)
+
+
+def _swap_both_days_lines(p: dict, partner_id, req_off: str, partner_off: str) -> str:
+    """BOTH affected days for a day-off swap: who works the requester's off date (requester away)
+    and the partner's off date (partner away). Plain text (the prompt isn't HTML)."""
+    try:
+        from gm_bot.bot import _al_availability_lines
+        partner = next((s for s in staff_all("active") if s["id"] == partner_id), None)
+        parts = []
+        l1 = _al_availability_lines(p, [req_off])                 # requester off → who covers
+        if l1:
+            parts.append(l1)
+        if partner:
+            l2 = _al_availability_lines(partner, [partner_off])   # partner off → who covers
+            if l2:
+                parts.append(l2)
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+def _swap_prompt(p: dict, context, base: str, partner_id, req_off: str, partner_off: str,
+                 show_cov: bool):
+    """The day-off-swap reason prompt with a persistent both-days Show-who's-working toggle, computed
+    LIVE from the picked dates (no swap record yet). The stash drives the toggle re-render."""
+    context.user_data["att_do_cov"] = {"base": base, "partner_id": partner_id,
+                                       "req_off": req_off, "partner_off": partner_off}
+    line = base
+    if show_cov:
+        cov = _swap_both_days_lines(p, partner_id, req_off, partner_off)
+        if cov:
+            line += "\n\n👥 Working those days · អ្នកធ្វើការថ្ងៃនោះ:\n%s" % cov
+    line += ("\n\n📝 Type the reason — your partner agrees first, then the seniors approve.\n"
+             "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។")
+    lbl, flag = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+                 else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
+    extra = [[InlineKeyboardButton(lbl, callback_data="att:do:cov:%d" % flag)]]
+    return _arm_prompt(p, context, line, "att:do", extra_rows=extra)
 
 
 def _confirm_prompt(p: dict, context, base: str, back: str):
@@ -2218,6 +2259,11 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data["att_al_page"] = 0
         return await show(al_screen(p, picked, 0))
     if action == "do":
+        if len(data) > 2 and data[2] == "cov":   # toggle both-days who's-working on the swap prompt
+            st = context.user_data.get("att_do_cov") or {}
+            flag = bool(int(data[3])) if len(data) > 3 else False
+            return await show(_swap_prompt(p, context, st.get("base", ""), st.get("partner_id"),
+                                           st.get("req_off"), st.get("partner_off"), flag))
         if len(data) > 2 and data[2] == "d":
             context.user_data["att_do_day"] = data[3]   # remember the chosen new day-off date
             return await show(dayoff_partners(p, data[3]))
@@ -2234,10 +2280,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
                      "req_off_date": req_off, "partner_off_date": partner_off,
                      "_summary": _swap_sum})
-                return await show(_arm_prompt(p, context,
-                    "%s · ប្តូរថ្ងៃឈប់។\n\n"
-                    "📝 Type the reason — your partner agrees first, then the seniors approve.\n"
-                    "📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។" % _swap_sum, "att:do"))
+                return await show(_swap_prompt(p, context, "%s · ប្តូរថ្ងៃឈប់។" % _swap_sum,
+                                               int(data[3]), req_off, partner_off, False))
             return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
                                          "then 2 seniors — same week rule.)\n"
                                          "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
