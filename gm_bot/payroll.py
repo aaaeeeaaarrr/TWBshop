@@ -6,7 +6,10 @@ Owner reviews ONE table, edits, approves & sends. (This module = the math; UI in
 """
 from __future__ import annotations
 
-DAYS_IN_MONTH = 30   # day-pay basis (owner can override per case)
+DAYS_IN_MONTH = 30   # day-pay basis — OWNER RULE (Jun 2026): ALWAYS 30, even in 31-day months.
+                     # Proration for a mid-month joiner = salary × (30 − days missed)/30, missed
+                     # days counted from the 1st. 1st pay = 80% of (prorated) salary rounded UP
+                     # to the next 5/0; 2nd = remainder; bonus rides the 2nd, not prorated.
 
 
 def day_pay(salary: float) -> float:
