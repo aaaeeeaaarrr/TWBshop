@@ -200,11 +200,20 @@ in an elevated shell, then back to attendance.)
   nonexistent today-session, silently never banked); (2) the suppression lookup — `att_get_session(sd)`
   so a checked-out overnighter isn't re-nudged at 6:10/6:20/6:40am. + overnight regression test
   (`test_compute_day_events_overnight_carries_shift_date`). Suite **421**.
-- ⏳ **Attendance NEXT (owner-agreed order):** (a) **mid-shift extension** — today's picker can't select
-  an already-started start; give "extend the end" a fixed real-start button (problem 4); (b) **settle
-  over-pay cap** — clamp worked at the approved window length so early arrival/lingering can't inflate
-  banked OT (problem 3); then the shield (approved OT pauses the PB ladder), `_offer_buyback` on
-  settle, `/test` simulate-checkout, go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
+- **MID-SHIFT EXTENSION built (problem 4, owner picked "future-proof"):** `_sc_running(sid)` resolves
+  the shift RUNNING now — overnight-aware (a 2am baker returns tdidx **−1** + yesterday's date, which
+  the work-day list can't express) and redefine-aware (approved shift_change supplies effective times,
+  incl. on a day-off). Mid-shift today: `sc_mode` swaps "Change time" for **"⏱ Extend the end (started
+  X)"** — start LOCKED to the real start, straight to the end ladder; "Change day" stays (the owner's
+  future-proof choice). `sc_day_pick` grows a "⚡ Extend the shift running NOW" top button (the ONLY
+  route to yesterday's overnight date). Leak-guards: `sc_start` bounces to the locked mode screen if
+  the shift is running today (covers Back-nav); `sc_end`'s Back for tdidx<0 goes to the day list, never
+  a start ladder for a date whose start happened. +7 tests (running detection day/overnight/redefine/
+  day-off; the 3 screens; both leak guards). New KH drafts → docs/KH_REVIEW.md §5b. Suite **428**.
+- ⏳ **Attendance NEXT (owner-agreed order):** (a) **settle over-pay cap** (problem 3) — clamp worked
+  at the approved window length in `_settle_redefined_shift` so early arrival/lingering can't inflate
+  banked OT; then the shield (approved OT pauses the PB ladder), `_offer_buyback` on settle, `/test`
+  simulate-checkout, go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

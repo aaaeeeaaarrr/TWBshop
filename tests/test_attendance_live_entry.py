@@ -675,6 +675,111 @@ def test_compute_day_events_overnight_carries_shift_date(monkeypatch):
     assert outs2 == [(480, "2026-06-15")]
 
 
+_BAKER = {"id": 11, "canonical_name": "Davy", "call_name": "Davy", "org": "TWB",
+          "work_start": "21:00", "work_end": "06:00", "day_off": "Sun"}
+_DAYREC = {"id": 11, "canonical_name": "Visal", "call_name": "Visal", "org": "TWB",
+           "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}
+
+
+def _sc_env(monkeypatch, rec, today, redefines=None):
+    import datetime as _dt
+    from shared import database as db
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [rec])
+    monkeypatch.setattr(ui, "_today", lambda: _dt.date.fromisoformat(today))
+    monkeypatch.setattr(ui, "al_leave_days_set", lambda sid: set())
+    monkeypatch.setattr(db, "shift_change_active",
+                        lambda sid, iso: (redefines or {}).get(iso))
+
+
+def test_sc_running_day_shift(monkeypatch):
+    _sc_env(monkeypatch, _DAYREC, "2026-06-16")          # Tuesday
+    monkeypatch.setattr(ui, "_now_min", lambda: 600)     # 10:00 — mid-shift
+    assert ui._sc_running(11) == (0, 480, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 400)     # 6:40 — before
+    assert ui._sc_running(11) is None
+    monkeypatch.setattr(ui, "_now_min", lambda: 1030)    # 17:10 — after
+    assert ui._sc_running(11) is None
+
+
+def test_sc_running_overnight_yesterday(monkeypatch):
+    """A 9pm–6am baker at 2am is running YESTERDAY's shift → tdidx −1 with yesterday's date."""
+    _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 120)     # 2am — yesterday's overnight tail
+    assert ui._sc_running(11) == (-1, 1260, "2026-06-15")
+    monkeypatch.setattr(ui, "_now_min", lambda: 1380)    # 11pm — today's own shift
+    assert ui._sc_running(11) == (0, 1260, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 600)     # 10am — between shifts
+    assert ui._sc_running(11) is None
+
+
+def test_sc_running_redefine_aware(monkeypatch):
+    """An approved redefine supplies the effective [start,len] — incl. making a day-off day count."""
+    _sc_env(monkeypatch, _DAYREC, "2026-06-16",
+            redefines={"2026-06-16": {"start_min": 780, "end_min": 1140}})   # 1pm–7pm
+    monkeypatch.setattr(ui, "_now_min", lambda: 800)     # 1:20pm — inside the REDEFINED window
+    assert ui._sc_running(11) == (0, 780, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 700)     # 11:40am — before redefined start
+    assert ui._sc_running(11) is None
+    # day-off Tuesday: nothing without a redefine, running WITH one (change-day moved a shift here)
+    off = dict(_DAYREC, day_off="Tue")
+    _sc_env(monkeypatch, off, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 600)
+    assert ui._sc_running(11) is None
+    _sc_env(monkeypatch, off, "2026-06-16",
+            redefines={"2026-06-16": {"start_min": 480, "end_min": 1020}})
+    assert ui._sc_running(11) == (0, 480, "2026-06-16")
+
+
+def test_sc_day_pick_offers_running_extension(monkeypatch):
+    """Mid-shift: the day list grows an 'extend the running shift' button straight to the END ladder
+    with the LOCKED start — the only way to reach yesterday's overnight date (tdidx −1)."""
+    _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(ui, "_sc_running", lambda sid: (-1, 1260, "2026-06-15"))
+    _, kb = ui.sc_day_pick(_BAKER, 11)
+    cds = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "att:scp:st:11:-1:1260" in cds
+    monkeypatch.setattr(ui, "_sc_running", lambda sid: None)
+    _, kb2 = ui.sc_day_pick(_BAKER, 11)
+    assert not any(cd.startswith("att:scp:st:") for cd in
+                   (b.callback_data for row in kb2.inline_keyboard for b in row))
+
+
+def test_sc_mode_midshift_locks_start(monkeypatch):
+    """Mid-shift today: 'Change time' is replaced by 'Extend the end' (start LOCKED to the real
+    start, straight to the end ladder); 'Change day' stays for future re-planning."""
+    _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(ui, "_sc_running", lambda sid: (0, 1260, "2026-06-16"))
+    text, kb = ui.sc_mode(_BAKER, 11, 0)
+    cds = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "MID-SHIFT" in text
+    assert "att:scp:st:11:0:1260" in cds                      # extend-the-end, locked start
+    assert not any(cd.startswith("att:scp:ss:") for cd in cds)  # no start ladder
+    assert "att:scp:cd:11:0" in cds                            # Change day kept
+    # a future day keeps the normal Change time / Change day pair
+    _, kb2 = ui.sc_mode(_BAKER, 11, 2)
+    cds2 = [b.callback_data for row in kb2.inline_keyboard for b in row]
+    assert "att:scp:ss:11:2" in cds2 and "att:scp:cd:11:2" in cds2
+
+
+def test_sc_start_bounces_to_locked_mode_when_running(monkeypatch):
+    """Any route into today's START ladder while mid-shift (e.g. Back from the end ladder) bounces
+    to the locked mode screen — a start that happened can never be re-picked."""
+    _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(ui, "_sc_running", lambda sid: (0, 1260, "2026-06-16"))
+    text, _ = ui.sc_start(_BAKER, 11, 0)
+    assert "MID-SHIFT" in text
+
+
+def test_sc_end_back_skips_start_ladder_for_yesterday(monkeypatch):
+    """END ladder for yesterday's running overnight (tdidx −1): Back goes to the day list, never to
+    a start ladder for a date whose start already happened."""
+    from shared import database as db
+    _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    _, kb = ui.sc_end(_BAKER, 11, -1, 1260)
+    assert kb.inline_keyboard[0][0].callback_data == "att:scp:d:11"
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

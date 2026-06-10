@@ -1415,10 +1415,61 @@ def _sc_workdays(sid: int, n: int = 7) -> list[tuple[int, date]]:
     return out
 
 
+def _sc_running(sid: int):
+    """If the staffer is MID-SHIFT right now → (tdidx, eff_start_min, shift_date_iso) of the RUNNING
+    shift, else None. Overnight-aware: tdidx may be -1 (a 9pm–6am baker at 2am is running YESTERDAY's
+    shift — a date today's work-day list can't express). Redefine-aware: an approved shift_change for
+    the date supplies the effective [start,len] (and makes a day-off day count as working).
+    Powers the 'extend the running shift' entry — spec 'today edges': a start that already happened
+    is LOCKED; the only time action on a running shift is extending its end."""
+    from shared.database import shift_change_active
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    if not rec:
+        return None
+    now = _now_min()
+    off = _DOW_NAME.get((rec.get("day_off") or "")[:3].title())
+    for tdidx in (0, -1):
+        d = _today() + timedelta(days=tdidx)
+        sc = None
+        try:
+            sc = shift_change_active(sid, d.isoformat())
+        except Exception:
+            pass
+        if sc and sc.get("start_min") is not None and sc.get("end_min") is not None:
+            ws, ln = int(sc["start_min"]) % 1440, int(sc["end_min"]) - int(sc["start_min"])
+        else:
+            if off is not None and d.weekday() == off:
+                continue
+            try:
+                if d.isoformat() in al_leave_days_set(sid):
+                    continue
+            except Exception:
+                pass
+            ws = to_min(rec.get("work_start"))
+            ln = shift_len_min(rec.get("work_start"), rec.get("work_end"))
+        if ws is None or not ln:
+            continue
+        if tdidx == 0:
+            running = ws <= now < ws + ln          # started today, not yet past the end
+        else:
+            running = (1440 - ws) + now < ln       # overnight tail: started yesterday, still inside
+        if running:
+            return tdidx, ws, d.isoformat()
+    return None
+
+
 def sc_day_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
     rows = [_back_row("att:scp:staff")]
+    run = _sc_running(sid)
+    if run:
+        # the running shift may have started YESTERDAY (overnight) — this button is the only way to
+        # reach that date; start is locked → straight to the END ladder (att:scp:st routes to sc_end)
+        tdidx, ws_eff, _iso = run
+        rows.append([InlineKeyboardButton(
+            "⚡ Extend the shift running NOW (started %s) · បន្ថែមវេនកំពុងដំណើរការ" % fmt12(ws_eff),
+            callback_data="att:scp:st:%d:%d:%d" % (sid, tdidx, ws_eff))])
     rows += grid([InlineKeyboardButton(day_label(d), callback_data="att:scp:m:%d:%d" % (sid, i))
                   for i, d in _sc_workdays(sid)], 2)
     return _hdr(p, "Change %s's shift — which work day?\nប្តូរវេនរបស់ %s — ថ្ងៃធ្វើការណា?" % (nm, nm)), \
@@ -1427,10 +1478,24 @@ def sc_day_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
 
 def sc_mode(p: dict, sid: int, didx: int) -> tuple[str, InlineKeyboardMarkup]:
     """Retime/extend THIS day (Change time → straight to the start ladder), or move it to a day off
-    (Change day → pick a day off, then the start ladder)."""
+    (Change day → pick a day off, then the start ladder). MID-SHIFT today (spec 'today edges'): the
+    start already happened → it is LOCKED to the real start and the only time action is extending the
+    end (straight to the end ladder); Change day stays available for future re-planning."""
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
     nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
     d = _today() + timedelta(days=didx)
+    run = _sc_running(sid) if didx == 0 else None
+    if run and run[0] == 0:
+        rows = [
+            _back_row("att:scp:d:%d" % sid),
+            [InlineKeyboardButton("⏱ Extend the end (started %s) · បន្ថែមម៉ោងបញ្ចប់" % fmt12(run[1]),
+                                  callback_data="att:scp:st:%d:0:%d" % (sid, run[1]))],
+            [InlineKeyboardButton("📅 Change day · ប្តូរថ្ងៃ", callback_data="att:scp:cd:%d:%d" % (sid, didx))],
+        ]
+        return _hdr(p, "%s is MID-SHIFT (started %s) — the start is locked. Extend the end, "
+                       "or move a day?\n%s កំពុងធ្វើការ (ចាប់ផ្តើម %s) — ម៉ោងចាប់ផ្តើមផ្លាស់ប្តូរមិនបានទេ។ "
+                       "បន្ថែមម៉ោងបញ្ចប់ ឬប្តូរថ្ងៃ?"
+                    % (nm, fmt12(run[1]), nm, fmt12(run[1]))), InlineKeyboardMarkup(rows)
     rows = [
         _back_row("att:scp:d:%d" % sid),
         [InlineKeyboardButton("⏱ Change time · ប្តូរម៉ោង", callback_data="att:scp:ss:%d:%d" % (sid, didx))],
@@ -1457,8 +1522,14 @@ def sc_dayoff_pick(p: dict, sid: int, didx: int) -> tuple[str, InlineKeyboardMar
 
 
 def sc_start(p: dict, sid: int, tdidx: int) -> tuple[str, InlineKeyboardMarkup]:
-    """START ladder for the target day (tdidx = days from today). Today drops past times."""
+    """START ladder for the target day (tdidx = days from today). Today drops past times.
+    A shift RUNNING today never reaches this ladder — its start is locked (spec 'today edges'),
+    so any route here (incl. Back from the end ladder) bounces to the locked mode screen."""
     from gm_bot import ot as ot_mod
+    if tdidx == 0:
+        run = _sc_running(sid)
+        if run and run[0] == 0:
+            return sc_mode(p, sid, 0)
     rec, d, ws, we, is_off, nm = _ot_receiver(sid, tdidx)
     earliest = _now_min() if tdidx == 0 else 0
     rows = [_back_row("att:scp:d:%d" % sid)]
@@ -1485,7 +1556,10 @@ def sc_end(p: dict, sid: int, tdidx: int, start: int) -> tuple[str, InlineKeyboa
         label = fmt12(end_abs % 1440) + ((" " + tag) if tag else "")
         btns.append(InlineKeyboardButton(label,
                     callback_data="att:scp:cf:%d:%d:%d:%d" % (sid, tdidx, start, end_abs)))
-    rows = [_back_row("att:scp:ss:%d:%d" % (sid, tdidx))] + grid(btns, 2)
+    # a locked/running start (extend-the-end, incl. yesterday's overnight tdidx=-1) must NOT offer
+    # the start ladder on Back — a start that happened can't be re-picked (spec 'today edges')
+    back_cb = ("att:scp:d:%d" % sid) if tdidx < 0 else ("att:scp:ss:%d:%d" % (sid, tdidx))
+    rows = [_back_row(back_cb)] + grid(btns, 2)
     return _hdr(p, "%s — END time? (start %s)\n%s — ម៉ោងបញ្ចប់?" % (day_label(d), fmt12(start), day_label(d))), \
         InlineKeyboardMarkup(rows)
 

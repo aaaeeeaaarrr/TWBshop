@@ -37,6 +37,11 @@ Format per item: **English** — `Khmer draft` — *(where it shows)*.
 - `Shift change — {day} {start}-{end}{ (+Nh OT)} for {name}.` — *(English only — flag if KH wanted)*
 - `📝 Type the reason — your next message sends it to them for approval.` — `📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅសុំការអនុម័ត។` — *(shift prompt)*
 
+## 5b. Mid-shift extension (NEW session 32 — extend a RUNNING shift)
+- `⚡ Extend the shift running NOW (started {time})` — `បន្ថែមវេនកំពុងដំណើរការ` — *(day-pick top button when the staffer is mid-shift; only way to reach yesterday's overnight shift)*
+- `⏱ Extend the end (started {time})` — `បន្ថែមម៉ោងបញ្ចប់` — *(mode screen, mid-shift today — replaces Change time)*
+- `{name} is MID-SHIFT (started {time}) — the start is locked. Extend the end, or move a day?` — `{name} កំពុងធ្វើការ (ចាប់ផ្តើម {time}) — ម៉ោងចាប់ផ្តើមផ្លាស់ប្តូរមិនបានទេ។ បន្ថែមម៉ោងបញ្ចប់ ឬប្តូរថ្ងៃ?` — *(mode screen header, mid-shift today)*
+
 ## 6. AL reason prompts (typed-reason flows)
 - `📝 Type the reason — your next message submits the AL request for senior approval.` — `📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងបញ្ជូនសំណើ AL ទៅបងៗដើម្បីអនុម័ត។`
 - `📝 Type the reason — your partner agrees first, then the seniors approve.` — `📝 សរសេរមូលហេតុ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។`
