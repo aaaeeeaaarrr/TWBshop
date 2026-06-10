@@ -139,34 +139,45 @@ def test_dispatch_late_live_declares_only(monkeypatch):
 
 
 def test_dispatch_al_edits_prompt_into_awaiting_card(monkeypatch):
-    """When a flow captured its reason-PROMPT (pend has _summary + coords), typing the reason edits
-    that message in place into an 'awaiting approval' card carrying the same info + the reason."""
+    """Typing the reason edits the reason-prompt in place into the requester's OWN AL card: request
+    line + reason + '⏳ Awaiting approval', carrying the persistent Show-who's-working toggle, and
+    registered in al_staff_cards so _al_finalize can flip it to 'decided'."""
     from gm_bot import bot
     edited = []
 
     class _Bot:
-        async def edit_message_text(self, t, **k):
-            edited.append((t, k.get("chat_id"), k.get("message_id")))
+        async def edit_message_text(self, t, chat_id=None, message_id=None,
+                                    reply_markup=None, parse_mode=None):
+            edited.append((t, chat_id, message_id, reply_markup))
 
     async def _submit(*a, **k):
-        pass
+        return 77
 
-    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: dict(_PERSONA))
+    persona = dict(_PERSONA)
+    req = {"id": 77, "staff_id": 11, "days": ["2026-06-20"], "reason": "dentist", "kind": "days",
+           "status": "pending", "hours_start": None, "hours_end": None}
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: persona)
     monkeypatch.setattr(bot, "submit_al_request", _submit)
+    monkeypatch.setattr(bot, "al_get_request", lambda i: req)
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [persona])
 
     upd = _Update(uid=555, text="dentist")
-    ctx = _Ctx(); ctx.bot = _Bot()
+    ctx = _Ctx(); ctx.bot = _Bot(); ctx.bot_data = {}
     pend = {"flow": "al", "kind": "days", "days": ["2026-06-20"],
             "hours_start": None, "hours_end": None,
             "_summary": "AL: Sat 20/06 — 1 AL day(s).", "_prompt_chat": 555, "_prompt_msg": 42}
     asyncio.run(bot._att_dispatch(upd, ctx, pend, live=True))
 
-    assert edited, "prompt was not edited"
-    card, chat_id, msg_id = edited[-1]
+    assert edited, "staff card not rendered"
+    card, chat_id, msg_id, kb = edited[-1]
     assert chat_id == 555 and msg_id == 42
-    assert "AL: Sat 20/06" in card          # same info
+    assert "requests AL" in card            # the request line
     assert "dentist" in card                # the typed reason
     assert "Awaiting approval" in card      # the new state
+    assert ctx.bot_data["al_staff_cards"][77] == (555, 42)       # registered for finalize
+    btns = [b.text for row in kb.inline_keyboard for b in row]
+    assert any("who's working" in b for b in btns)              # persistent toggle
 
 
 def test_dispatch_late_test_defers_to_simulate_arrival(monkeypatch):
@@ -382,7 +393,8 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
     g = {"id": 50, "staff_id": 2, "days": ["2026-06-21"], "reason": "r", "kind": "days",
          "status": "pending", "hours_start": None, "hours_end": None}
     monkeypatch.setattr(bot, "al_get_request", lambda i: g)
-    monkeypatch.setattr(bot, "al_set_status", lambda *a, **k: None)
+    monkeypatch.setattr(bot, "al_set_status", lambda i, st: g.__setitem__("status", st))
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid: set())
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
         {"id": 2, "canonical_name": "Pisey", "call_name": "Pisey", "telegram_ids": [222],
          "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}])
@@ -398,8 +410,9 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
     monkeypatch.setattr(bot, "_att_send", _send)
 
     class _Bot:
-        async def edit_message_text(self, text, chat_id=None, message_id=None, parse_mode=None):
-            edits.append((chat_id, message_id, text))
+        async def edit_message_text(self, text, chat_id=None, message_id=None,
+                                    parse_mode=None, reply_markup=None):
+            edits.append((chat_id, message_id, text, reply_markup))
 
     ctx = _Ctx()
     ctx.bot = _Bot()
@@ -409,6 +422,9 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
     assert "Approved by A and B" in edits[0][2]
     assert "Senior" not in roles                             # NO new per-senior message
     assert "Requester" in roles and "Supervisors group" in roles
+    # the decided senior card KEEPS the Show-who's-working toggle
+    tog = [b.text for row in edits[0][3].inline_keyboard for b in row]
+    assert any("who's working" in b for b in tog)
 
 
 def test_al_availability_excludes_delis(monkeypatch):

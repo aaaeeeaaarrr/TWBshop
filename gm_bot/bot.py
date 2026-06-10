@@ -1985,37 +1985,56 @@ def _al_coverage_html(requester: dict, days: list[str],
     return "\n\n👥 Working those hours:\n%s" % avail_html
 
 
-def _al_card_kb(req_id: int, sen_id: int, show_cov: bool) -> InlineKeyboardMarkup:
-    """Approve / Not approve + a 3rd Show/Hide-who's-working toggle (keeps the card short for long ALs)."""
+def _al_card(req: dict, requester: dict, *, audience: str, sen_id: int = 0,
+             show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    """The ONE AL card — used for the senior's approval card AND the requester's own card, in EVERY
+    state (pending / approved / rejected). Carries a persistent 👁/🙈 Show-who's-working toggle that
+    survives all transitions. `audience`: 'senior' (gets Approve/Not-approve while pending) or 'staff'
+    (the requester's own card — toggle only, shows '⏳ Awaiting approval' while pending)."""
+    import html
+    name = requester.get("call_name") or requester["canonical_name"]
+    body = _al_summary(name, req["days"], req.get("reason"), requester.get("day_off"),
+                       staff_absent_dates(req["staff_id"]), req.get("hours_start"), req.get("hours_end"))
+    st = req.get("status")
+    if st in ("approved", "rejected"):
+        voters = [a for a in al_get_approvals(req["id"])
+                  if a["decision"] == ("approve" if st == "approved" else "not_approve")]
+        vnames = " and ".join(v.get("call_name") or v["canonical_name"] for v in voters[:2]) or "—"
+        body += "\n\n" + (("✅ Approved by %s." if st == "approved"
+                           else "❌ Not approved by %s.") % html.escape(vnames))
+    elif audience == "staff":
+        body += "\n\n⏳ Awaiting approval · កំពុងរង់ចាំការអនុម័ត"
+    if show_cov:
+        body += _al_coverage_html(requester, req["days"], req.get("hours_start"), req.get("hours_end"))
     cov = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve", callback_data="att:alapp:%d:approve:%d" % (req_id, sen_id))],
-        [InlineKeyboardButton("❌ Not approve", callback_data="att:alapp:%d:not_approve:%d" % (req_id, sen_id))],
-        [InlineKeyboardButton(cov[0], callback_data="att:alcov:%d:%d:%d" % (req_id, sen_id, cov[1]))],
-    ])
+    rows = []
+    if audience == "senior" and st == "pending":
+        rows.append([InlineKeyboardButton("✅ Approve",
+                     callback_data="att:alapp:%d:approve:%d" % (req["id"], sen_id))])
+        rows.append([InlineKeyboardButton("❌ Not approve",
+                     callback_data="att:alapp:%d:not_approve:%d" % (req["id"], sen_id))])
+    rows.append([InlineKeyboardButton(cov[0],
+                 callback_data="att:alcov:%d:%s:%d:%d" % (req["id"], audience, sen_id, cov[1]))])
+    return body, InlineKeyboardMarkup(rows)
 
 
 async def _al_coverage_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:alcov:{req}:{sid}:{flag} — show/hide the hours-coverage on this senior's AL card (edits in
-    place; Approve/Not-approve stay). Collapsed by default so a long AL doesn't bury the buttons."""
+    """att:alcov:{req}:{audience}:{sid}:{flag} — show/hide who's-working on a card. Works for the
+    senior card AND the requester's own card, in ANY state (pending/approved/rejected) — the toggle
+    persists across every transition. Rebuilds the whole card from the request so other buttons stay."""
     query = update.callback_query
     await query.answer()
     parts = query.data.split(":")
-    req_id, sen_id, flag = int(parts[2]), int(parts[3]), int(parts[4])
+    req_id, audience, sid, flag = int(parts[2]), parts[3], int(parts[4]), int(parts[5])
     req = al_get_request(req_id)
-    if not req or req["status"] != "pending":
+    if not req:
         return
     requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
     if not requester:
         return
-    show = bool(flag)
-    name = requester.get("call_name") or requester["canonical_name"]
-    body = _al_summary(name, req["days"], req.get("reason"), requester.get("day_off"),
-                       staff_absent_dates(req["staff_id"]), req.get("hours_start"), req.get("hours_end"))
-    if show:
-        body += _al_coverage_html(requester, req["days"], req.get("hours_start"), req.get("hours_end"))
+    body, kb = _al_card(req, requester, audience=audience, sen_id=sid, show_cov=bool(flag))
     try:
-        await query.edit_message_text(body, reply_markup=_al_card_kb(req_id, sen_id, show), parse_mode="HTML")
+        await query.edit_message_text(body, reply_markup=kb, parse_mode="HTML")
     except Exception:
         pass
 
@@ -2027,17 +2046,16 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     import html
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
                                reason, requested_by_uid)
-    name = requester.get("call_name") or requester["canonical_name"]
     # AL cards are English-only (owner request); COMPACT by default — request + BOLD from→to dates +
     # the hours window for an hours-AL. Coverage ("Working those hours") opens via the Show toggle.
-    body = _al_summary(name, days, reason, requester.get("day_off"),
-                       staff_absent_dates(requester["id"]), hours_start, hours_end)
+    req = al_get_request(req_id)
     cards = context.bot_data.setdefault("al_cards", {}).setdefault(req_id, [])
     for sen in _seniors(exclude_staff_id=requester["id"]):
         # senior id encoded so a test-mode tap (by the owner) is attributed to THIS senior
         uid = (sen.get("telegram_ids") or [None])[0]
+        body, kb = _al_card(req, requester, audience="senior", sen_id=sen["id"], show_cov=False)
         msg = await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
-                              body, kb=_al_card_kb(req_id, sen["id"], False), parse_mode="HTML")
+                              body, kb=kb, parse_mode="HTML")
         if msg is not None:
             cards.append((msg.chat_id, msg.message_id))
     return req_id
@@ -2110,27 +2128,33 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
     days = req["days"]
     nw = staff_absent_dates(req["staff_id"])                        # other AL / special leave / swaps
     days_txt = alm.al_span_label(days, requester.get("day_off"), nw)   # from→to, bridging any absence
-    voters = [a for a in al_get_approvals(req["id"])
-              if a["decision"] == ("approve" if approved else "not_approve")]
-    vnames = " and ".join(v.get("call_name") or v["canonical_name"] for v in voters[:2])
     runc = requester.get("telegram_ids") or []
-    # EDIT the senior cards in place — the request text stays intact, the decision is appended
-    # (instead of spawning new undescriptive "Approved by X" messages).
-    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason"), requester.get("day_off"), nw,
-                                      req.get("hours_start"), req.get("hours_end")),
-                          ("✅ Approved by %s." if approved else "❌ Not approved by %s.")
-                          % html.escape(vnames))
+    # EDIT the senior cards in place — request text stays intact, the decision is appended, and the
+    # 👁 Show-who's-working toggle STAYS (seniors can still check coverage after the decision).
+    req2 = al_get_request(req["id"])   # status now approved/rejected
+    sbody, skb = _al_card(req2, requester, audience="senior", sen_id=0, show_cov=False)
     edited = 0
     for cid, mid in context.bot_data.get("al_cards", {}).pop(req["id"], []):
         try:
-            await context.bot.edit_message_text(final, chat_id=cid, message_id=mid, parse_mode="HTML")
+            await context.bot.edit_message_text(sbody, chat_id=cid, message_id=mid,
+                                                reply_markup=skb, parse_mode="HTML")
             edited += 1
         except Exception:
             pass
     if not edited:   # card refs lost (e.g. a restart) → one recap so seniors still see the outcome
         for sen in _seniors(exclude_staff_id=req["staff_id"]):
+            b, k = _al_card(req2, requester, audience="senior", sen_id=sen["id"], show_cov=False)
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                            sen.get("call_name") or sen["canonical_name"], final, parse_mode="HTML")
+                            sen.get("call_name") or sen["canonical_name"], b, kb=k, parse_mode="HTML")
+    # flip the REQUESTER's own awaiting card → decided too (keeps its toggle).
+    sc = context.bot_data.get("al_staff_cards", {}).pop(req["id"], None)
+    if sc:
+        rbody, rkb = _al_card(req2, requester, audience="staff", show_cov=False)
+        try:
+            await context.bot.edit_message_text(rbody, chat_id=sc[0], message_id=sc[1],
+                                                reply_markup=rkb, parse_mode="HTML")
+        except Exception:
+            pass
     # the requester + Supervisors notices stay bilingual (the owner sees English via strip_khmer)
     if approved:
         from gm_bot.attendance import to_min
@@ -3705,8 +3729,21 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     flow = pend.get("flow")
     if flow == "al":
-        await submit_al_request(context, persona, pend["kind"], pend["days"],
-                                pend.get("hours_start"), pend.get("hours_end"), reason, req_uid)
+        req_id = await submit_al_request(context, persona, pend["kind"], pend["days"],
+                                         pend.get("hours_start"), pend.get("hours_end"), reason, req_uid)
+        # the requester's OWN card: rich (carries the persistent 👁 Show-who's-working toggle), edited
+        # in place over the reason prompt + registered so _al_finalize can flip it to 'decided'.
+        pc, pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")
+        req_obj = al_get_request(req_id)
+        if req_obj and pc and pm:
+            rbody, rkb = _al_card(req_obj, persona, audience="staff", show_cov=False)
+            try:
+                await context.bot.edit_message_text(rbody, chat_id=pc, message_id=pm,
+                                                    reply_markup=rkb, parse_mode="HTML")
+                context.bot_data.setdefault("al_staff_cards", {})[req_id] = (pc, pm)
+            except Exception:
+                pass
+        pend.pop("_summary", None)   # AL renders its own rich card — skip the generic prompt edit
         await confirm(
             "✅ AL request sent — your seniors will review it. I'll message you when it's decided.\n"
             "✅ បានផ្ញើសំណើ AL — បងៗនឹងពិនិត្យ ហើយខ្ញុំនឹងប្រាប់ពេលមានការសម្រេច។",
