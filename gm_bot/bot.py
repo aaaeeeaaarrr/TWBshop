@@ -1940,11 +1940,17 @@ def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
             and (s.get("telegram_ids") or [])]   # TWB seniors only — attendance never mixes locations
 
 
-def _al_availability_lines(requester: dict, days: list[str]) -> str:
-    """Per AL day: who works the requester's hours that day (excl day-off + on-AL)."""
+def _al_availability_lines(requester: dict, days: list[str],
+                           hours_start: str | None = None, hours_end: str | None = None) -> str:
+    """Per AL day: who works the AL HOURS that day — the requester's full shift, or for an hours-AL
+    the chosen hours (so the senior sees exactly who covers the few hours she's off). Excl day-off."""
     from gm_bot.attendance import available_staff, to_min
     from datetime import date as _date
     ws, we = to_min(requester.get("work_start")), to_min(requester.get("work_end"))
+    if hours_start and hours_end:
+        hs, he = to_min(hours_start), to_min(hours_end)
+        if hs is not None and he is not None:
+            ws, we = hs, he
     if ws is None or we is None:
         return ""
     scheds = [{"name": s.get("call_name") or s["canonical_name"],
@@ -1965,6 +1971,55 @@ def _al_availability_lines(requester: dict, days: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _al_coverage_html(requester: dict, days: list[str],
+                      hours_start: str | None, hours_end: str | None) -> str:
+    """The '👥 Working those hours' block (HTML) for the senior card's expanded view."""
+    import html
+    avail = _al_availability_lines(requester, days, hours_start, hours_end)
+    if not avail:
+        return ""
+    avail_html = "\n".join(
+        ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
+         if ":" in ln else html.escape(ln))
+        for ln in avail.split("\n"))
+    return "\n\n👥 Working those hours:\n%s" % avail_html
+
+
+def _al_card_kb(req_id: int, sen_id: int, show_cov: bool) -> InlineKeyboardMarkup:
+    """Approve / Not approve + a 3rd Show/Hide-who's-working toggle (keeps the card short for long ALs)."""
+    cov = ("🙈 Hide who's working", 0) if show_cov else ("👁 Show who's working", 1)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Approve", callback_data="att:alapp:%d:approve:%d" % (req_id, sen_id))],
+        [InlineKeyboardButton("❌ Not approve", callback_data="att:alapp:%d:not_approve:%d" % (req_id, sen_id))],
+        [InlineKeyboardButton(cov[0], callback_data="att:alcov:%d:%d:%d" % (req_id, sen_id, cov[1]))],
+    ])
+
+
+async def _al_coverage_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:alcov:{req}:{sid}:{flag} — show/hide the hours-coverage on this senior's AL card (edits in
+    place; Approve/Not-approve stay). Collapsed by default so a long AL doesn't bury the buttons."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    req_id, sen_id, flag = int(parts[2]), int(parts[3]), int(parts[4])
+    req = al_get_request(req_id)
+    if not req or req["status"] != "pending":
+        return
+    requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
+    if not requester:
+        return
+    show = bool(flag)
+    name = requester.get("call_name") or requester["canonical_name"]
+    body = _al_summary(name, req["days"], req.get("reason"), requester.get("day_off"),
+                       staff_absent_dates(req["staff_id"]), req.get("hours_start"), req.get("hours_end"))
+    if show:
+        body += _al_coverage_html(requester, req["days"], req.get("hours_start"), req.get("hours_end"))
+    try:
+        await query.edit_message_text(body, reply_markup=_al_card_kb(req_id, sen_id, show), parse_mode="HTML")
+    except Exception:
+        pass
+
+
 async def submit_al_request(context, requester: dict, kind: str, days: list[str],
                             hours_start: str | None, hours_end: str | None, reason: str,
                             requested_by_uid: int) -> int:
@@ -1973,42 +2028,37 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
                                reason, requested_by_uid)
     name = requester.get("call_name") or requester["canonical_name"]
-    # AL cards are English-only (owner request), with BOLD from→to dates (bridging any absence).
-    summary = _al_summary(name, days, reason, requester.get("day_off"),
-                          staff_absent_dates(requester["id"]))
-    avail = _al_availability_lines(requester, days)
-    avail_html = "\n".join(
-        ("<b>%s</b>:%s" % (html.escape(ln.split(":", 1)[0]), html.escape(ln.split(":", 1)[1]))
-         if ":" in ln else html.escape(ln))
-        for ln in avail.split("\n"))
-    body = "%s\n\nWorking those days:\n%s" % (summary, avail_html)
+    # AL cards are English-only (owner request); COMPACT by default — request + BOLD from→to dates +
+    # the hours window for an hours-AL. Coverage ("Working those hours") opens via the Show toggle.
+    body = _al_summary(name, days, reason, requester.get("day_off"),
+                       staff_absent_dates(requester["id"]), hours_start, hours_end)
     cards = context.bot_data.setdefault("al_cards", {}).setdefault(req_id, [])
     for sen in _seniors(exclude_staff_id=requester["id"]):
         # senior id encoded so a test-mode tap (by the owner) is attributed to THIS senior
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Approve",
-                                  callback_data="att:alapp:%d:approve:%d" % (req_id, sen["id"]))],
-            [InlineKeyboardButton("❌ Not approve",
-                                  callback_data="att:alapp:%d:not_approve:%d" % (req_id, sen["id"]))],
-        ])
         uid = (sen.get("telegram_ids") or [None])[0]
         msg = await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
-                              body, kb=kb, parse_mode="HTML")
+                              body, kb=_al_card_kb(req_id, sen["id"], False), parse_mode="HTML")
         if msg is not None:
             cards.append((msg.chat_id, msg.message_id))
     return req_id
 
 
 def _al_summary(name: str, days: list[str], reason: str, day_off: str | None = None,
-                non_working: set | None = None) -> str:
+                non_working: set | None = None, hours_start: str | None = None,
+                hours_end: str | None = None) -> str:
     """The AL request one-liner, English, with BOLD from→to dates (HTML) that BRIDGE any absence
-    (day-off, other approved AL, swap day-off …). Reused for the senior card and the final
-    edited-in-place result so the request text stays intact."""
+    (day-off, other approved AL, swap day-off …). For an HOURS-AL also shows the BOLD time window.
+    Reused for the senior card and the final edited-in-place result so the request text stays intact."""
     import html
     from gm_bot import al as alm
+    from gm_bot.attendance import to_min
     span = alm.al_span_label(days, day_off, non_working)
     span_html = "   ".join("<b>%s</b>" % html.escape(seg.strip()) for seg in span.split(",") if seg.strip())
-    return "%s requests AL: %s\nReason: %s" % (html.escape(name), span_html, html.escape(reason or "—"))
+    htxt = ""
+    if hours_start and hours_end:
+        htxt = "  <b>%s–%s</b>" % (html.escape(_fmt_min(to_min(hours_start))),
+                                   html.escape(_fmt_min(to_min(hours_end))))
+    return "%s requests AL: %s%s\nReason: %s" % (html.escape(name), span_html, htxt, html.escape(reason or "—"))
 
 
 async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2066,7 +2116,8 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
     runc = requester.get("telegram_ids") or []
     # EDIT the senior cards in place — the request text stays intact, the decision is appended
     # (instead of spawning new undescriptive "Approved by X" messages).
-    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason"), requester.get("day_off"), nw),
+    final = "%s\n\n%s" % (_al_summary(name, days, req.get("reason"), requester.get("day_off"), nw,
+                                      req.get("hours_start"), req.get("hours_end")),
                           ("✅ Approved by %s." if approved else "❌ Not approved by %s.")
                           % html.escape(vnames))
     edited = 0
@@ -4385,6 +4436,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(_payback_callback, pattern=r"^att:pb:"))
     app.add_handler(CallbackQueryHandler(_al_approval_callback, pattern=r"^att:alapp:"))
+    app.add_handler(CallbackQueryHandler(_al_coverage_toggle, pattern=r"^att:alcov:"))
     app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))
     app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
     app.add_handler(CallbackQueryHandler(_ot_owner_callback, pattern=r"^att:ot:(ok|no):"))
