@@ -163,10 +163,21 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-10 (session 31 — HIGH-RISK guard PROVEN LIVE + HARDENED + made UNIVERSAL +
-named **Bedrock** (Standards+Guards+Ratchet) and converged via 3 advisor passes → `docs/BEDROCK.md`.
-Architecture review CLOSED; 5 deltas queued. ⚠ The `#HIGHRISK-OK` marker is DEPRECATED — Claude can
-type it = self-approval; catastrophic actions will switch to block-and-owner-runs-manually next session)
+**Last updated:** 2026-06-10 (session 32 — Bedrock deltas 1+3+5 SHIPPED + wiring-tested 12/12. The
+`#HIGHRISK-OK` self-approval marker is GONE: catastrophic actions now hard-block with NO override and a
+`🛑 NEEDS YOU — run: ! <cmd>` owner-paste message. Guard split command-checks from path-checks (fixes
+read-only false-positives). secret_guard now scans staged/unpushed diffs before commit+push. Ratchet
+removal trigger written. → `docs/BEDROCK.md`. REMAINING: delta 2 = OWNER OS-locks the global guard files
+in an elevated shell, then back to attendance.)
+
+**Session 32 (Jun 10) — Bedrock guards hardened + proven (deltas 1/3/5):**
+- Rewrote `highrisk_guard.py` + `secret_guard.py` in repo `.claude/hooks/` AND live global
+  `~/.claude/hooks/`. Smoke harness: 12/12 (destructive SQL · rm -rf · force-push · secrets.py path ·
+  guard-hook path · live API key → BLOCK; git status · cat/edit normal file · key→secrets.py → PASS).
+  Delta-1 no-override confirmed live (a DROP-bearing test command hard-blocked mid-session, no bypass).
+- ⏳ **NEXT (owner):** delta 2 — elevated shell, `icacls`/`Set-Acl` the global enforcing files to
+  admin-owned + Papa ReadAndExecute, read ACL back to prove. Then resume attendance (redefined-shift
+  times + OT bank-on-completion). Optional: grep for a psycopg2 DDL path that dodges the CMD patterns.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

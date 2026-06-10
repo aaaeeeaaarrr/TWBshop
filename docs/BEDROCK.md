@@ -24,13 +24,38 @@ This single idea drives deltas 1, 2, and 4 below — see them as one principle, 
    `.claude/hooks/`; installed globally + synced to every machine by
    `bootstrap.py::_ensure_global_guards()`.
 3. **Ratchet** — turn recurring failure classes into permanent protection; periodically COMPRESS.
-   Bidirectional (delta 5) or it is just a one-way accumulator.
+   Bidirectional (delta 5, now LIVE — see "Ratchet removal trigger" below) or it is just a one-way
+   accumulator.
 
-## Current state (session 31)
-- **BUILT + verified:** `highrisk_guard.py` (hard-block exit 2 in all modes), `secret_guard.py`
-  (write-time secret scan), global install + bootstrap sync, marker protocol documented. Hard-block
-  live-proven for the Bash tool this session.
-- **PENDING:** the 5 deltas below, then the fresh-session wiring test (the only real proof).
+## Ratchet removal trigger (delta 5 — the bidirectional rule, now standing policy)
+Addition has a concrete trigger (a real incident or failed drill → add a guard/rule). Removal now has
+one too, so Bedrock stays lean by design, not by cleanup panic. A guard pattern or standing rule is a
+**compress-or-delete candidate** at the next review when ANY of these holds:
+- it has **never once been the thing that caught a real problem** (not a drill) since it was added, AND
+  has existed for **≥ 3 months**; or
+- it is **redundant** — another guard already blocks the same action class (keep the broader one); or
+- it produces **repeat false-positives** on legitimate work (≥ 2 distinct real tasks tripped wrongly) —
+  fix the pattern or drop it; a guard that cries wolf trains the owner to ignore blocks.
+How to act on a candidate: don't silently delete — at the review, state the candidate + which criterion
+it meets + propose compress (tighten the regex) OR delete, and let the owner confirm. Record the removal
+in this file's changelog so the Ratchet's *down* moves are as auditable as its *up* moves.
+Each PROTECTED/SECRET pattern should be cheap to attribute: when a guard fires on a genuine catastrophe,
+note it (date + what it caught) so "never once caught anything" is a checkable claim, not a guess.
+
+## Current state (session 32, 2026-06-10)
+- **BUILT + verified:** `highrisk_guard.py` and `secret_guard.py` rewritten — **deltas 1, 3, 5 SHIPPED**
+  to both the repo copy and the live global `~/.claude/hooks/`. Global install + bootstrap sync intact.
+- **Delta 1 LIVE:** the self-typed `#HIGHRISK-OK` marker is GONE. Every catastrophic match hard-blocks
+  with no override; the block message leads with `🛑 NEEDS YOU — run in your terminal: ! <cmd>` so the
+  owner (who reads only results) sees the one-paste fix. Guard now separates command-string checks from
+  file-path checks → read-only `cat`/`Edit` on normal files no longer false-positive.
+- **Delta 3 LIVE:** `secret_guard.py` scans staged changes before `git commit` and unpushed commits
+  before `git push` (added-lines only; never blocks secret removal), on top of the write-time scan.
+- **Delta 5 LIVE:** bidirectional Ratchet removal trigger written above (standing policy).
+- **Wiring test PASSED (session 32):** 12/12 cases — destructive SQL / rm -rf / force-push / secrets.py
+  path / guard-hook path / live API key all BLOCK (exit 2); git status / cat bot.py / edit normal file /
+  key-into-secrets.py all PASS. Delta-1 no-override confirmed (a test cmd hard-blocked with no bypass).
+- **PENDING:** delta 2 (OWNER OS-lock, elevated shell) + delta 4 (direction only, no build).
 
 ## Work queue — the 5 deltas (apply to the real files, then prove)
 1. **Kill the self-typed `#HIGHRISK-OK` marker.** Claude can type it → it is self-approval, the exact
@@ -87,16 +112,17 @@ unverified admin commands blind.
   — its writes are already best-effort/swallowed), and updating a guard becomes a deliberate elevated
   step. That friction is the point.
 
-## Implementation order (next session) — CORRECTED after the feasibility check
-The OS boundary moves to LAST: locking the guards first would make every delta edit need an elevated
-step. Finalize the code, prove it, THEN lock it.
-1. **Claude** applies deltas 1, 3, 5 to the real files. The final guard write also REMOVES the
-   `#HIGHRISK-OK` marker — a clean cutover: after it, guard edits hard-block with no override (soft
-   self-protection even before the OS lock).
-2. **Fresh-session wiring test — the only real proof.** In bypass mode: a catastrophic action must die
-   on exit 2 with NO override available; verify the owner-run-manually path; grep for a DB write path
-   that dodges the guard. Three advisors agreeing is still zero proof the hook fires.
-3. **Owner LOCKS** the global enforcing files (delta 2, elevated shell) — upgrades soft self-protection
-   to a hard OS boundary. Verify the resulting ACL together (real-path: read it back, don't assume).
+## Implementation order — STATUS (session 32)
+1. ✅ **DONE (session 32).** Deltas 1, 3, 5 applied to repo + global guards; `#HIGHRISK-OK` marker
+   removed (clean cutover — guard edits now hard-block with no override even before the OS lock).
+2. ✅ **DONE (session 32).** Wiring test ran — 12/12, including delta-1 no-override confirmation. The
+   guards are syntactically valid and live in this session (a real DROP-TABLE-bearing command was
+   hard-blocked mid-session). Still TODO when convenient: grep for any DB write path that dodges the
+   guard entirely (e.g. a script that imports psycopg2 and runs DDL without matching a CMD pattern).
+3. ⏳ **OWNER, NOT DONE — delta 2, elevated shell.** Lock the global enforcing files
+   (`~/.claude/hooks/*.py` + `~/.claude/settings.json`) to admin-owned / Papa-ReadAndExecute. Feasibility
+   verified session 31 (UAC gate is real). Verify the resulting ACL by reading it back. This is the only
+   step that turns soft self-protection into a hard OS boundary — until then a future session could still
+   rewrite the guards (as session 31→32 did, legitimately).
 4. Back to attendance flows. **No universal tests gate** — project-opt-in, push/deploy-time only, and
    only where a real test suite exists.

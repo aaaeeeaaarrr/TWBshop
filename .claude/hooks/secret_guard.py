@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""PreToolUse SECRET-LEAK guard (Hook 2) -- universal, every project.
+"""PreToolUse SECRET-LEAK guard (Hook 2) — universal, every project.
 
-Blocks a LIVE secret (API key, token, private key, DB URL with inline password) from being written
-into a tracked file or hardcoded into a command -- i.e. anywhere other than the sanctioned secret
-stores (secrets.py / .env / .bootstrap_token). Hard-blocks (exit 2) so it works even in bypass mode;
-deliberate override via the same `#HIGHRISK-OK` marker. Scans only the text being WRITTEN
-(new_string / content / command), never removed text, so deleting a secret is never blocked.
+Blocks a live secret (API key, token, private key, DB URL with password) from being written
+into a tracked file or hardcoded into a command. Also scans staged changes before git commit
+and unpushed commits before git push (Bedrock delta 3, 2026-06-10).
 
-This complements highrisk_guard.py (which path-matches secret FILES). This one looks at CONTENT, so it
-catches a key pasted into a normal source file or echoed into a command. Backstop only -- the real
-rule (secrets live only in secrets.py, in the -secrets repo) still applies. Honest limit: a denylist
-of key shapes is never complete; novel formats slip past.
+No override — Bedrock delta 1 removed the self-approval marker. Every block is unconditional.
+
+Scans only text being WRITTEN (new_string / content / command), never removed text, so
+deleting a secret is never blocked.
+
+Honest limit: a denylist of key shapes is never complete; novel formats slip past. The real
+rule — secrets live only in secrets.py / .env, in the -secrets repo — still applies.
 """
 import sys
 import json
 import re
 import os
+import subprocess
 
-OVERRIDE = "#HIGHRISK" + "-OK"
-
-# Sanctioned secret stores: writing a secret HERE is legitimate -> never block.
+# Sanctioned secret stores — writing a known-shaped secret here is legitimate; never block.
 ALLOWED_BASENAMES = re.compile(r"^(secrets\.py|\.env|\.env\.[\w.-]+|\.bootstrap_token)$", re.I)
 
 SECRET_PATTERNS = [
@@ -43,16 +43,17 @@ def find_secret(text):
 
 
 def hard_block(reason):
-    sys.stderr.write("SECRET-LEAK BLOCKED -- %s\n"
-                     "A live secret looks like it is about to be written into a tracked file or "
-                     "hardcoded into a command. Secrets belong ONLY in secrets.py / .env. This action "
-                     "did NOT run. If it is a placeholder/example or genuinely intended, STOP, say why, "
-                     "then re-issue the SAME action with `%s` appended.\n" % (reason, OVERRIDE))
+    sys.stderr.write(
+        "\U0001f6d1 SECRET-LEAK BLOCKED — %s\n"
+        "A live secret looks like it is about to be written into a tracked file or command.\n"
+        "Secrets belong ONLY in secrets.py / .env. This action did NOT run. No override exists.\n"
+        % reason
+    )
     sys.exit(2)
 
 
 def written_text(tool, ti):
-    """Only the text being WRITTEN (never removed text), so deleting a secret is never blocked."""
+    """Only text being WRITTEN (never removed text) — deleting a secret is never blocked."""
     if tool in ("Bash", "PowerShell"):
         return ti.get("command", "") or ""
     if tool == "Write":
@@ -64,18 +65,52 @@ def written_text(tool, ti):
     return ""
 
 
+def scan_git_diff(git_args, timeout=15):
+    """Run a git diff command and scan added lines for secrets. Returns label or None."""
+    try:
+        result = subprocess.run(
+            git_args, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=timeout,
+        )
+        if result.returncode != 0:
+            return None
+        added = "\n".join(
+            line[1:] for line in result.stdout.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        )
+        return find_secret(added) if added else None
+    except Exception:
+        return None
+
+
 def main(raw):
     data = json.loads(raw)
     tool = data.get("tool_name")
     ti = data.get("tool_input")
     if not tool or ti is None:
-        raise ValueError("missing tool_name/tool_input")
-    if OVERRIDE in raw:
-        sys.exit(0)  # deliberate, per-action consent
+        raise ValueError("missing tool_name / tool_input")
+
+    # Before git commit: scan staged changes for secrets.
+    # Before git push: scan unpushed commits for secrets.
+    if tool in ("Bash", "PowerShell"):
+        cmd = ti.get("command", "") or ""
+        if re.search(r"\bgit\s+commit\b", cmd, re.IGNORECASE):
+            label = scan_git_diff(["git", "diff", "--cached", "--unified=0"])
+            if label:
+                hard_block("staged changes contain a %s — commit blocked" % label)
+        elif re.search(r"\bgit\s+push\b", cmd, re.IGNORECASE):
+            label = scan_git_diff(
+                ["git", "log", "--all", "--not", "--remotes", "-p", "--unified=0"],
+                timeout=20,
+            )
+            if label:
+                hard_block("unpushed commits contain a %s — push blocked" % label)
+
     # Writes into the sanctioned secret store are legitimate.
     if tool in ("Write", "Edit", "MultiEdit"):
         if ALLOWED_BASENAMES.match(os.path.basename(ti.get("file_path") or "")):
             sys.exit(0)
+
     label = find_secret(written_text(tool, ti))
     if label:
         hard_block(label)
@@ -83,11 +118,13 @@ def main(raw):
 
 
 if __name__ == "__main__":
-    raw = sys.stdin.read()
+    try:
+        raw = sys.stdin.buffer.read().decode("utf-8", "replace")
+    except Exception:
+        raw = sys.stdin.read()
     try:
         main(raw)
     except Exception:
-        # FAIL CLOSED only if a secret is visibly present and no deliberate override.
-        if OVERRIDE not in (raw or "") and find_secret(raw or ""):
+        if find_secret(raw or ""):
             hard_block("unparseable request containing a secret (fail-closed)")
         sys.exit(0)
