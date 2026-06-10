@@ -500,7 +500,7 @@ def draft_rubric_scores(attempt_id: int) -> dict:
 
             try:
                 response = client.messages.create(
-                    model="claude-opus-4-7",
+                    model="claude-opus-4-8",
                     max_tokens=300,
                     messages=[{"role": "user", "content": prompt}],
                 )

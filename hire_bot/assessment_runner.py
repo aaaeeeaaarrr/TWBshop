@@ -18,7 +18,7 @@ import config
 logger = logging.getLogger(__name__)
 
 # ── Config defaults (override in config.py) ────────────────────────────────────
-ASSESSMENT_MODEL          = getattr(config, "ASSESSMENT_MODEL",   "claude-opus-4-7")
+ASSESSMENT_MODEL          = getattr(config, "ASSESSMENT_MODEL",   "claude-opus-4-8")
 ASSESSMENT_PROVIDER       = getattr(config, "ASSESSMENT_PROVIDER", "anthropic")
 ASSESSMENT_PROMPT_VERSION = getattr(config, "ASSESSMENT_PROMPT_VERSION", "hiring_applicant_v1")
 RUBRIC_VERSION            = getattr(config, "RUBRIC_VERSION", "twb_2026_v1")

@@ -1982,7 +1982,7 @@ def gm_get_stale_draft_proposals(hours: int = 24) -> list[dict]:
 _MODEL_RANK = {
     "claude-haiku-4-5-20251001": 1,
     "claude-sonnet-4-6":         2,
-    "claude-opus-4-7":           3,
+    "claude-opus-4-8":           3,
 }
 
 

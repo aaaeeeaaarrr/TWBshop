@@ -369,7 +369,7 @@ async def extract_price_list_pdf(pdf_bytes: bytes) -> dict:
         return {"valid_date": None, "currency": "USD", "items": [], "error": str(exc)}
 
 
-GM_PROPOSALS_MODEL = "claude-opus-4-7"
+GM_PROPOSALS_MODEL = "claude-opus-4-8"
 GM_REPLY_MODEL     = "claude-haiku-4-5-20251001"
 
 _GM_PROPOSALS_SYSTEM = (
@@ -791,7 +791,7 @@ async def extract_daily_report_ai(text: str) -> dict:
 
 
 # Weekly attendance/AL digest — Opus (cross-week reasoning), owner-facing, scheduled.
-GM_ATTENDANCE_DIGEST_MODEL = GM_PROPOSALS_MODEL  # claude-opus-4-7
+GM_ATTENDANCE_DIGEST_MODEL = GM_PROPOSALS_MODEL  # claude-opus-4-8
 
 _GM_ATTENDANCE_DIGEST_SYSTEM = (
     "You are the GM of a bakery in Phnom Penh. Write a SHORT weekly attendance digest "
