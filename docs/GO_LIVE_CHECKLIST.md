@@ -17,13 +17,12 @@
 - ✅ **Guard tuning** (dev-machine only): allow our own app-bot restarts; don't scan commit-message text.
 
 ## B. To wire/finish before the flip (⏳)
-1. ⏳ **Summary/digest SOURCE switch (owner request, this is the active item).** When `attendance_live`,
-   the weekly digest (`_weekly_attendance_digest_job`) must read the **structured attendance tables**
-   (lateness_records · al_requests/approvals · no_show_records · payback_debts · ot_bank · special_leaves)
-   — the real button-press data — instead of the AI-read-from-group lateness cases + staffing concerns
-   it uses now. Include the spec's **time-ledger line** ("staff owe shop Xh · shop owes staff Yh") + open
-   debts + the week's lateness/AL/no-show. Keep the AI digest as the pre-live/fallback. *(Design pending
-   owner confirmation — see the open question below.)*
+1. ✅ **Summary/digest SOURCE switch — DONE (split digest).** When `attendance_live`, the weekly digest
+   is now Brain-computed from the button tables (`gm_weekly_attendance_facts`): exact time-ledger
+   ("staff owe Xh · shop owes Yh"), this week's late/no-show/AL/special counts, open-debt list, and
+   `frequency.detect` pattern flags — all deterministic, Brain never miscounts. Opus 4.8
+   (`narrate_attendance_week`) then writes ONLY the narrative over the verbatim reasons (told never to
+   recount). The pre-live AI digest stays as the fallback. The owner walks it via `/testrun` once seeded.
 2. ⏳ **Final Khmer proof-read in `/test`.** Test mode strips Khmer to English for the owner; a
    `/testkhmer on` toggle (small build) would let the owner eyeball the real bilingual bodies.
 3. ⏳ **Owner role-play sign-off** — walk every flow as each persona + every `/testrun` job; tweak any

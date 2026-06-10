@@ -63,7 +63,7 @@ from shared.ai_client import (
     generate_proposals, refine_proposal_with_ai, refine_proposal_resolve_conflict,
     GM_PROPOSALS_MODEL, assess_receipt_photo, judge_clarification_answer,
     gm_compose_reply, detect_lateness_report, extract_payback_day,
-    extract_daily_report_ai, generate_attendance_digest, detect_leave_request,
+    extract_daily_report_ai, generate_attendance_digest, narrate_attendance_week, detect_leave_request,
     classify_stock_photo, read_stock_sheet, read_medical_paper, generate_callout,
 )
 from gm_bot.analyzer import run_analysis, analyze_live_message
@@ -4267,6 +4267,43 @@ async def _left_member_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                          why="%s just left the %s group." % (staff["canonical_name"], label))
 
 
+def _weekly_brain_block(facts: dict, today):
+    """BRAIN: render the exact weekly facts the owner sees (time-ledger, counts, open debts) + the
+    frequency pattern flags (deterministic, never miscounts). Returns (owner_text, facts_summary for
+    Opus, reasons_block for Opus, flags). frequency.detect does the pattern math — Opus never counts."""
+    from gm_bot.attendance_ui import _hm
+    from gm_bot import frequency as fq
+    flags = []
+    for staff, dates in sorted((facts.get("late_dates_by_staff") or {}).items()):
+        f = fq.detect(dates, today)
+        if f:
+            flags.append((staff, f["detail"]))
+    lines = [
+        "📊 This week (from button check-ins):",
+        "Time ledger: staff owe %s (%d debts) · shop owes %s (%d banks)"
+        % (_hm(facts["owe_min"]), len(facts["open_debts"]), _hm(facts["bank_min"]), facts["bank_count"]),
+        "Late: %d · No-show: %d · AL approved: %d · Special leave: %d"
+        % (len(facts["lates"]), len(facts["no_shows"]), len(facts["als"]), len(facts["specials"])),
+    ]
+    if flags:
+        lines.append("Patterns: " + " · ".join("%s — %s" % (s, d) for s, d in flags))
+    if facts["open_debts"]:
+        top = sorted(facts["open_debts"], key=lambda x: -x["min"])[:8]
+        lines.append("Open debts: " + ", ".join("%s %s" % (d["staff"], _hm(d["min"])) for d in top))
+    owner_text = "\n".join(lines)
+    facts_summary = "\n".join(lines[1:])  # the figures, minus the header (Opus must not recount these)
+    reasons = []
+    for l in facts["lates"]:
+        if l["reason"]:
+            reasons.append("%s (late %dm on %s%s): %s"
+                           % (l["staff"], l["min"], l["date"],
+                              "" if l["informed"] else ", uninformed", l["reason"]))
+    for a in facts["als"]:
+        if a.get("reason"):
+            reasons.append("%s (AL): %s" % (a["staff"], a["reason"]))
+    return owner_text, facts_summary, "\n".join(reasons), flags
+
+
 async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Once a week (Monday, Phnom Penh): Opus digests the week's lateness + attendance
     notes and DMs the owner. Skips quietly when there's nothing to report."""
@@ -4274,6 +4311,25 @@ async def _weekly_attendance_digest_job(context: ContextTypes.DEFAULT_TYPE) -> N
     if now_pp.weekday() != 0:  # 0 = Monday
         return
     try:
+        if _attendance_live():
+            # SPLIT DIGEST: Brain computes ALL the numbers + pattern flags (exact, never miscounts);
+            # Opus 4.8 only narrates over the verbatim REASONS. Best of both — facts free + insight.
+            from shared.database import gm_weekly_attendance_facts
+            facts = gm_weekly_attendance_facts(now_pp.date().isoformat())
+            has = any(facts[k] for k in ("lates", "no_shows", "als", "specials", "open_debts")) \
+                or facts["bank_min"]
+            if not has:
+                logger.info("Weekly digest (live): no data, skipping")
+                return
+            brain_text, facts_summary, reasons_block, _flags = _weekly_brain_block(facts, now_pp.date())
+            narrative = await narrate_attendance_week(facts_summary, reasons_block)
+            header = "🗓️ Weekly attendance digest (%s)\n\n" % now_pp.strftime("%d %b %Y")
+            body = brain_text + (("\n\n📝 " + narrative) if narrative else "")
+            await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=header + body)
+            logger.info("Weekly split digest sent (%d late, %d no-show, %d debts)",
+                        len(facts["lates"]), len(facts["no_shows"]), len(facts["open_debts"]))
+            return
+        # PRE-LIVE fallback: the AI digest read from group-chat cases (no button data yet)
         cases = gm_get_lateness_cases_since(7)
         concerns = gm_get_concerns_since("staffing", 7)
         if not cases and not concerns:

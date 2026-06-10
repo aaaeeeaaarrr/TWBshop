@@ -3095,6 +3095,78 @@ def ot_pending_extension_min(staff_id: int, today_iso: str) -> int:
             return total
 
 
+def gm_weekly_attendance_facts(today_iso: str) -> dict:
+    """BRAIN-computed weekly attendance facts from the button data (mode-scoped). Deterministic —
+    exact counts, the time-ledger, open debts, plus the verbatim REASONS and per-staff 30-day
+    lateness dates, so the caller can run frequency.detect (Brain pattern flags) and Opus can narrate
+    over the reasons WITHOUT ever recounting. The split-digest data layer."""
+    import json as _json
+    from datetime import date as _date, timedelta as _td
+    today = _date.fromisoformat(today_iso)
+    wk = (today - _td(days=7)).isoformat()
+    mo = (today - _td(days=30)).isoformat()
+    out = {"lates": [], "no_shows": [], "als": [], "specials": [], "open_debts": [],
+           "owe_min": 0, "bank_min": 0, "bank_count": 0, "late_dates_by_staff": {}}
+
+    def _nm(r):
+        return r.get("call_name") or r.get("canonical_name") or "?"
+
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT l.for_shift, l.minutes_late, l.reason, l.informed_before,
+                                  s.call_name, s.canonical_name
+                           FROM lateness_records l JOIN staff_registry s ON s.id=l.staff_id
+                           WHERE l.for_shift >= %s AND l.is_test=%s ORDER BY l.for_shift""",
+                        (wk, _ATT_TEST))
+            for r in cur.fetchall():
+                out["lates"].append({"staff": _nm(r), "date": str(r["for_shift"]),
+                                     "min": int(r["minutes_late"] or 0), "reason": (r.get("reason") or "").strip(),
+                                     "informed": bool(r.get("informed_before"))})
+            cur.execute("""SELECT l.for_shift, s.call_name, s.canonical_name
+                           FROM lateness_records l JOIN staff_registry s ON s.id=l.staff_id
+                           WHERE l.for_shift >= %s AND l.is_test=%s""", (mo, _ATT_TEST))
+            for r in cur.fetchall():
+                out["late_dates_by_staff"].setdefault(_nm(r), []).append(str(r["for_shift"]))
+            cur.execute("""SELECT n.shift_date, s.call_name, s.canonical_name
+                           FROM no_show_records n JOIN staff_registry s ON s.id=n.staff_id
+                           WHERE n.shift_date >= %s AND n.is_test=%s ORDER BY n.shift_date""",
+                        (wk, _ATT_TEST))
+            for r in cur.fetchall():
+                out["no_shows"].append({"staff": _nm(r), "date": str(r["shift_date"])})
+            cur.execute("""SELECT a.days, a.reason, s.call_name, s.canonical_name
+                           FROM al_requests a JOIN staff_registry s ON s.id=a.staff_id
+                           WHERE a.status='approved' AND a.is_test=%s""", (_ATT_TEST,))
+            for r in cur.fetchall():
+                try:
+                    days = _json.loads(r["days"] or "[]")
+                except Exception:
+                    days = []
+                if any(wk <= d <= today_iso for d in days):
+                    out["als"].append({"staff": _nm(r), "days": days, "reason": (r.get("reason") or "").strip()})
+            cur.execute("""SELECT sl.kind, sl.who, sl.days, s.call_name, s.canonical_name
+                           FROM special_leaves sl JOIN staff_registry s ON s.id=sl.staff_id
+                           WHERE sl.start_date >= %s AND sl.is_test=%s""", (wk, _ATT_TEST))
+            for r in cur.fetchall():
+                out["specials"].append({"staff": _nm(r), "kind": r.get("kind") or "",
+                                        "who": r.get("who") or "", "days": int(r.get("days") or 0)})
+            cur.execute("""SELECT (d.minutes_owed - d.minutes_paid) AS bal, s.call_name, s.canonical_name
+                           FROM payback_debts d JOIN staff_registry s ON s.id=d.staff_id
+                           WHERE d.status='open' AND d.is_test=%s""", (_ATT_TEST,))
+            for r in cur.fetchall():
+                b = int(r["bal"] or 0)
+                if b > 0:
+                    out["open_debts"].append({"staff": _nm(r), "min": b})
+                    out["owe_min"] += b
+            try:   # ot_bank is real-only (no is_test); in test the bank shows real balances
+                cur.execute("SELECT COALESCE(SUM(balance_min),0) AS s, COUNT(*) AS n "
+                            "FROM ot_bank WHERE balance_min > 0")
+                row = cur.fetchone()
+                out["bank_min"], out["bank_count"] = int(row["s"] or 0), int(row["n"] or 0)
+            except Exception:
+                pass
+    return out
+
+
 def shift_changes_active_map(date_isos: list[str]) -> dict:
     """{(staff_id, when_date_iso): (start_min, end_min)} for every approved/done redefine landing on
     any of `date_isos`. Latest-wins per (staff, date). Test-isolated. Batch form of shift_change_active

@@ -1180,6 +1180,39 @@ def test_my_schedule_booked_vs_upcoming_no_double_count(monkeypatch):
     assert "(1h upcoming" in t and "(4h upcoming" not in t
 
 
+def test_weekly_brain_block(monkeypatch):
+    """The split digest's BRAIN half: exact time-ledger + counts + frequency flags + open-debt list,
+    and a reasons block for Opus. Deterministic — no model involved."""
+    from gm_bot import bot
+    import datetime as _dt
+    today = _dt.date(2026, 6, 15)   # a Monday
+    facts = {
+        "lates": [
+            {"staff": "Davy", "date": "2026-06-08", "min": 20, "reason": "moto broke", "informed": False},
+            {"staff": "Davy", "date": "2026-06-01", "min": 15, "reason": "traffic", "informed": True},
+            {"staff": "Seth", "date": "2026-06-10", "min": 10, "reason": "", "informed": True},
+        ],
+        "no_shows": [{"staff": "Tra", "date": "2026-06-12"}],
+        "als": [{"staff": "Meng", "days": ["2026-06-13"], "reason": "dentist"}],
+        "specials": [],
+        "open_debts": [{"staff": "Seth", "min": 300}, {"staff": "Davy", "min": 90}],
+        "owe_min": 390, "bank_min": 120, "bank_count": 1,
+        # Davy: 4 lates with 3 on Monday → same_weekday flag
+        "late_dates_by_staff": {"Davy": ["2026-06-01", "2026-06-08", "2026-05-25", "2026-05-18"],
+                                "Seth": ["2026-06-10"]},
+    }
+    owner, summary, reasons, flags = bot._weekly_brain_block(facts, today)
+    assert "staff owe 6h 30m (2 debts) · shop owes 2h (1 banks)" in owner   # exact time-ledger
+    assert "Late: 3 · No-show: 1 · AL approved: 1 · Special leave: 0" in owner
+    assert "Open debts: Seth 5h, Davy 1h 30m" in owner                  # sorted, biggest first
+    assert any("Davy" in s and "Monday" in d for s, d in flags)         # Brain frequency flag
+    assert "Davy" in owner and "Monday" in owner
+    # reasons block (for Opus) carries verbatim reasons incl. the AL reason + uninformed tag
+    assert "moto broke" in reasons and "uninformed" in reasons and "Meng (AL): dentist" in reasons
+    # the figures are NOT repeated in the summary header line (Opus must not recount)
+    assert "📊 This week" not in summary
+
+
 def test_takeback_windows_are_shift_edges():
     """Take-back of earned OT = rest at the shift's START (come in late) or END (leave early),
     INSIDE the shift — not the before/after-shift windows used for payback."""

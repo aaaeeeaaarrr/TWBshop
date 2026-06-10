@@ -838,6 +838,39 @@ async def generate_attendance_digest(lateness_cases: list[dict],
         return ""
 
 
+_GM_WEEK_NARRATE_SYSTEM = (
+    "You are the GM of a bakery in Phnom Penh writing to the OWNER (English). You are given EXACT "
+    "figures and pattern flags that were already computed by code — treat every number as final: do "
+    "NOT recount, re-derive, or change any figure, and never invent one. Your only job is JUDGMENT "
+    "over the staff's verbatim reasons and the flagged patterns: in 2-4 short sentences, say what the "
+    "week's reasons suggest, which flagged patterns actually matter, and at most TWO concrete, kind "
+    "suggestions. No bullet lists, no restating the numbers back, no shaming. If the reasons are thin, "
+    "say so in one line."
+)
+
+
+async def narrate_attendance_week(facts_summary: str, reasons_block: str) -> str:
+    """Opus 4.8 narrative for the split weekly digest: the Brain already computed the exact facts +
+    pattern flags (passed in `facts_summary`); Opus only reads the verbatim REASONS and writes the
+    human insight. Returns '' on no key/error (the digest still sends the Brain facts)."""
+    if not config.ANTHROPIC_API_KEY:
+        return ""
+    user = ("Computed facts + flags (final — do not recount):\n%s\n\n"
+            "Staff's verbatim reasons this week:\n%s" % (facts_summary, reasons_block or "(none)"))
+    try:
+        resp = await _get_client().messages.create(
+            model=GM_ATTENDANCE_DIGEST_MODEL,
+            max_tokens=400,
+            system=[{"type": "text", "text": _GM_WEEK_NARRATE_SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("narrate_attendance_week failed: %s", exc)
+        return ""
+
+
 # Stock-sheet reading — Haiku classifies (cheap pre-filter), Sonnet extracts counts.
 GM_STOCK_CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
 
