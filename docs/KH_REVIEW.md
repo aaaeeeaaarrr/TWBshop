@@ -251,3 +251,20 @@ the request is NOT sent to seniors. `{X}` = AL days left, `{Y}` = days requested
 
 (The old §2.6 "Note: {name} only has … — your call" senior card is now obsolete for normal AL — it was
 only ever a dry-run preview and is being retired by this change.)
+
+### C. Group-redirect — 5 rotating variants (zero-API, fires when LIVE)
+When someone chats about leave/AL/sick in the Supervisors/Management group, the GM replies to that
+message, tags the **sender** (`{name}` = their call-name, uid-safe), and warns it won't count unless
+they DM the bot. A random variant each time so it's not robotic. Each starts with "—" so it reads
+"{name} — …". Warm-but-firm; the stick is "or it won't count". **Please polish the Khmer.**
+
+1. EN: `— AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, or it won't be recorded 🙂`
+   KH draft: `— ច្បាប់ AL, ឈឺ និងថ្ងៃឈប់ រាប់បានលុះត្រាតែប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot បើមិនដូច្នេះវានឹងមិនត្រូវបានកត់ត្រាទេ 🙂`
+2. EN: `— quick reminder 🙏 time off has to come to me, not the group. Message @twb_gm_bot so it counts.`
+   KH draft: `— រំលឹកបន្តិច 🙏 ការសុំឈប់ត្រូវប្រាប់ខ្ញុំផ្ទាល់ មិនមែននៅក្នុង group ទេ។ សូមផ្ញើសារទៅ @twb_gm_bot ដើម្បីឱ្យវារាប់។`
+3. EN: `— I can only record this if it comes to me 🙂 Please tap @twb_gm_bot; group messages don't count.`
+   KH draft: `— ខ្ញុំអាចកត់ត្រាបានលុះត្រាតែប្អូនប្រាប់ខ្ញុំ 🙂 សូមចុច @twb_gm_bot; សារនៅក្នុង group មិនរាប់ទេ។`
+4. EN: `— leave, sick and day-off only register when you tell me at @twb_gm_bot. The group chat doesn't count 🙏`
+   KH draft: `— ច្បាប់ឈប់ ឈឺ និងថ្ងៃឈប់ ត្រូវបានកត់ត្រាលុះត្រាតែប្អូនប្រាប់ខ្ញុំនៅ @twb_gm_bot។ ការនិយាយក្នុង group មិនរាប់ទេ 🙏`
+5. EN: `— this won't be counted from here 🙂 For AL, sick or time off, message me directly at @twb_gm_bot.`
+   KH draft: `— រឿងនេះនឹងមិនរាប់ពី group នេះទេ 🙂 សម្រាប់ AL, ឈឺ ឬសុំឈប់ សូមផ្ញើសារមកខ្ញុំផ្ទាល់នៅ @twb_gm_bot។`

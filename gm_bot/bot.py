@@ -5,6 +5,7 @@ Does NOT post to any staff group. Owner-only, private chat.
 """
 import asyncio
 import logging
+import random
 import time
 from collections import defaultdict, deque
 
@@ -4510,6 +4511,29 @@ _PHOTO_WINDOW = 600  # seconds — how long to look back/forward for related pho
 _msg_buffer: dict = defaultdict(lambda: deque(maxlen=30))   # (chat_id, uid) → recent messages
 _concern_tracker: dict = defaultdict(list)                  # (chat_id, uid) → [(concern_id, ts)]
 
+# GROUP-REDIRECT (zero-API): leave/AL/sick chatter in an internal group → the GM replies to that
+# message, tags the SENDER (uid-safe — never parses the named person, so misspellings can't break it),
+# and warns it won't count unless they DM the GM. Worded differently each time by rotating these
+# variants (no API). The leading "—" makes "{name} — …" read naturally. KH drafts → docs/KH_REVIEW.md.
+_GROUP_REDIRECT_LINES = [
+    "— AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, or it won't be "
+    "recorded 🙂\n— ច្បាប់ AL, ឈឺ និងថ្ងៃឈប់ រាប់បានលុះត្រាតែប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
+    "បើមិនដូច្នេះវានឹងមិនត្រូវបានកត់ត្រាទេ 🙂",
+    "— quick reminder 🙏 time off has to come to me, not the group. Message @twb_gm_bot so it counts.\n"
+    "— រំលឹកបន្តិច 🙏 ការសុំឈប់ត្រូវប្រាប់ខ្ញុំផ្ទាល់ មិនមែននៅក្នុង group ទេ។ សូមផ្ញើសារទៅ @twb_gm_bot "
+    "ដើម្បីឱ្យវារាប់។",
+    "— I can only record this if it comes to me 🙂 Please tap @twb_gm_bot; group messages don't count.\n"
+    "— ខ្ញុំអាចកត់ត្រាបានលុះត្រាតែប្អូនប្រាប់ខ្ញុំ 🙂 សូមចុច @twb_gm_bot; សារនៅក្នុង group មិនរាប់ទេ។",
+    "— leave, sick and day-off only register when you tell me at @twb_gm_bot. The group chat doesn't "
+    "count 🙏\n— ច្បាប់ឈប់ ឈឺ និងថ្ងៃឈប់ ត្រូវបានកត់ត្រាលុះត្រាតែប្អូនប្រាប់ខ្ញុំនៅ @twb_gm_bot។ "
+    "ការនិយាយក្នុង group មិនរាប់ទេ 🙏",
+    "— this won't be counted from here 🙂 For AL, sick or time off, message me directly at "
+    "@twb_gm_bot.\n— រឿងនេះនឹងមិនរាប់ពី group នេះទេ 🙂 សម្រាប់ AL, ឈឺ ឬសុំឈប់ សូមផ្ញើសារមកខ្ញុំផ្ទាល់នៅ "
+    "@twb_gm_bot។",
+]
+_REDIRECT_COOLDOWN = 1800   # one nudge per sender per 30 min (never spam a burst of messages)
+_redirect_last: dict = {}   # (chat_id, uid) → last-nudged ts
+
 
 def _sender_key(msg):
     uid = msg.from_user.id if msg.from_user else 0
@@ -4592,14 +4616,20 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             and chat_id in (config.SUPERVISORS_CHAT_ID, config.MANAGEMENT_CHAT_ID)):
         try:
             kws = ("late", "មកយឺត", "off ", "day off", "ឈប់", "leave", "al ", "sick", "ឈឺ", "ច្បាប់")
-            if any(k in text.lower() for k in kws):
-                sender_staff = staff_get_by_uid(msg.from_user.id) if msg.from_user else None
-                if sender_staff and sender_staff.get("status") == "active":
+            if any(k in text.lower() for k in kws) and msg.from_user:
+                sender_staff = staff_get_by_uid(msg.from_user.id)
+                key = (chat_id, msg.from_user.id)
+                if (sender_staff and sender_staff.get("status") == "active"
+                        and now - _redirect_last.get(key, 0) >= _REDIRECT_COOLDOWN):
+                    _redirect_last[key] = now
+                    call = sender_staff.get("call_name") or sender_staff["canonical_name"]
+                    # reply to THEIR message + tag the SENDER by uid (never the named person → no
+                    # misspelling risk), with a different wording each time (zero-API rotation).
                     await context.bot.send_message(
                         chat_id,
-                        "Please message @twb_gm_bot directly about this.\n"
-                        "សូមផ្ញើសារទៅ @twb_gm_bot ដោយផ្ទាល់អំពីរឿងនេះ។",
-                        reply_to_message_id=msg.message_id)
+                        "%s %s" % (_staff_mention(call, msg.from_user.id),
+                                   random.choice(_GROUP_REDIRECT_LINES)),
+                        reply_to_message_id=msg.message_id, parse_mode="HTML")
         except Exception as e:
             logger.error("group redirect failed: %s", e)
 
