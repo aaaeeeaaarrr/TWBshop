@@ -1374,3 +1374,11 @@ def test_att_send_testkhmer_toggle(monkeypatch):
     monkeypatch.setattr(bot, "gm_get_state", lambda k: "true" if k == "att_test_khmer" else "")
     asyncio.run(bot._att_send(ctx, None, "Staff", "Davy", msg))
     assert "បានអនុម័ត។" in sent["text"]
+
+
+def test_dryrun_checkout_uses_live_constant():
+    """Dry-run 1's checkout preview must BE the live _CO_DONE thank-you, not a hardcoded copy that
+    drifts when the live wording changes (it had: 'rest well' while live said 'have a nice day')."""
+    from gm_bot import attendance_ui as ui
+    texts = [t for _, t, _ in ui.build_catalogue(_PERSONA)]
+    assert ui._CO_DONE in texts            # the dry-run shows exactly what staff get

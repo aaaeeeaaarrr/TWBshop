@@ -247,9 +247,7 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
         ("⑧ static pin sent instead", _PIN_RESPONSE, None),
         ("⑨ shift-end check-out request", _CI_MSG_OUT, None),
         ("⑩ +10min leave-early ask (only if no check-out)", _CI_MSG_OUT2, None),
-        ("⑪ checked out ✓ — shift closed",
-         "Checked out ✓ — thank you, rest well 🤍\n"
-         "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍", None),
+        ("⑪ checked out ✓ — shift closed", _CO_DONE, None),   # the LIVE constant — can't drift
         # (former ⑫⑬ — "left zone mid-shift" + "outside too long / 30-min allowance" — DELETED
         # session 32: both belong to the DROPPED whole-shift-tracking model. v2 is check-in-only:
         # stopping a share mid-shift gets SILENCE; the leave-early ask fires only at checkout.)
