@@ -51,9 +51,24 @@ def _alert(text: str) -> None:
         "chat_id": config.OWNER_TELEGRAM_ID,
         "text": "🚨 COLLECTION WATCHDOG\n" + text,
     }).encode()
-    url = "https://api.telegram.org/bot%s/sendMessage" % config.BOT_TOKEN
-    with urllib.request.urlopen(url, data=data, timeout=20) as resp:
-        json.load(resp)
+    # Send via the GM bot — the bot the owner actually has a DM open with (the retail token got
+    # 400 "chat not found": the owner never started that bot). A bot token sends fine even while
+    # its polling process is DOWN, so alerts still deliver mid-outage. Retail token = fallback.
+    sent = False
+    for token in (getattr(config, "GM_BOT_TOKEN", "") or "", config.BOT_TOKEN):
+        if not token:
+            continue
+        try:
+            url = "https://api.telegram.org/bot%s/sendMessage" % token
+            with urllib.request.urlopen(url, data=data, timeout=20) as resp:
+                json.load(resp)
+            sent = True
+            break
+        except Exception as e:
+            print("alert send failed via %s…: %s" % (token[:8], e))
+    if not sent:
+        print("ALERT DELIVERY FAILED on all tokens:", text)
+        return
     with open(STATE_FILE, "w") as f:
         f.write(datetime.utcnow().isoformat())
     print("alert sent:", text)
