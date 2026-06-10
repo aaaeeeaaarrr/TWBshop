@@ -250,13 +250,9 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
         ("⑪ checked out ✓ — shift closed",
          "Checked out ✓ — thank you, rest well 🤍\n"
          "ចុះវត្តមានចេញរួច ✓ — អរគុណ សម្រាកឱ្យបានល្អ 🤍", None),
-        ("⑫ left the zone mid-shift (location went off / wandered)",
-         "Did you leave work early? If not, please share your live location again.\n"
-         "តើអ្នកចេញពីកន្លែងធ្វើការមុនពេលឬ? បើអត់ទេ សូមចែករំលែកទីតាំងបន្តផ្ទាល់ម្តងទៀត។", None),
-        ("⑬ outside the shop too long (30-min allowance used up)",
-         "You've been outside the shop a while — what are you doing out? (30 min/shift allowance)\n"
-         "អ្នកនៅក្រៅហាងបន្តិចយូរហើយ — តើអ្នកកំពុងធ្វើអ្វីនៅក្រៅ? (អនុញ្ញាត 30 នាទី/វេន)  (KH pending review)",
-         None),
+        # (former ⑫⑬ — "left zone mid-shift" + "outside too long / 30-min allowance" — DELETED
+        # session 32: both belong to the DROPPED whole-shift-tracking model. v2 is check-in-only:
+        # stopping a share mid-shift gets SILENCE; the leave-early ask fires only at checkout.)
     ]
 
 
