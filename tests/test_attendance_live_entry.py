@@ -623,15 +623,56 @@ def test_compute_day_events_uses_redefine(monkeypatch):
 
     # no redefine → normal T0 at 8:00 (480)
     monkeypatch.setattr(db, "shift_changes_active_map", lambda days: {})
-    t0 = [m for m, _n, lbl, _t in ui.compute_day_events(target) if lbl.startswith("T0")]
+    t0 = [m for m, _n, lbl, _t, _sd in ui.compute_day_events(target) if lbl.startswith("T0")]
     assert t0 == [480]
 
     # redefine on target: 1pm–7pm → T0 at 780, checkout at 1140
     monkeypatch.setattr(db, "shift_changes_active_map",
                         lambda days: {(7, target.isoformat()): (780, 1140)})
     ev = ui.compute_day_events(target)
-    assert [m for m, _n, lbl, _t in ev if lbl.startswith("T0")] == [780]
-    assert any(m == 1140 and lbl.startswith("check-out") for m, _n, lbl, _t in ev)
+    assert [m for m, _n, lbl, _t, _sd in ev if lbl.startswith("T0")] == [780]
+    assert any(m == 1140 and lbl.startswith("check-out") for m, _n, lbl, _t, _sd in ev)
+
+
+def test_compute_day_events_overnight_carries_shift_date(monkeypatch):
+    """OVERNIGHT (the bakers, 9pm–6am): the 6am checkout fires today but belongs to YESTERDAY's
+    shift — the event must carry the START date so the checkout write + OT settle bind to the
+    right attendance session (was: armed with today → wrote to a nonexistent session, never banked)."""
+    from shared import database as db
+    import datetime as _dt
+    target = _dt.date(2026, 6, 16)   # a Tuesday
+    p = {"id": 7, "canonical_name": "Davy", "call_name": "Davy", "org": "TWB",
+         "work_start": "21:00", "work_end": "06:00", "day_off": "Sun"}
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [p])
+
+    class _Cur:
+        def execute(self, *a, **k): pass
+        def fetchall(self): return []          # no approved al_requests
+    class _CM:
+        def __init__(self, o): self.o = o
+        def __enter__(self): return self.o
+        def __exit__(self, *a): return False
+    class _Conn:
+        def cursor(self): return _CM(_Cur())
+    monkeypatch.setattr(db, "_db", lambda: _CM(_Conn()))
+    monkeypatch.setattr(db, "dayoff_override_for", lambda sid, iso: None)
+    monkeypatch.setattr(db, "shift_changes_active_map", lambda days: {})
+
+    ev = ui.compute_day_events(target)
+    # Tuesday 6am checkout = MONDAY's shift; Tuesday's own T0 at 9pm = Tuesday
+    outs = [(m, sd) for m, _n, lbl, _t, sd in ev if lbl.startswith("check-out")]
+    assert outs == [(360, "2026-06-15")]
+    assert [(m, sd) for m, _n, lbl, _t, sd in ev if lbl.startswith("T0")] == [(1260, "2026-06-16")]
+    # the leave-early nudges after the overnight checkout carry yesterday too
+    nudges = {sd for _m, _n, lbl, _t, sd in ev if lbl.startswith("leave-early")}
+    assert nudges == {"2026-06-15"}
+
+    # an overnight REDEFINE extending Monday's shift to 8am moves the checkout AND keeps Monday's date
+    monkeypatch.setattr(db, "shift_changes_active_map",
+                        lambda days: {(7, "2026-06-15"): (1260, 1260 + 660)})   # 9pm +11h = 8am
+    ev2 = ui.compute_day_events(target)
+    outs2 = [(m, sd) for m, _n, lbl, _t, sd in ev2 if lbl.startswith("check-out")]
+    assert outs2 == [(480, "2026-06-15")]
 
 
 def test_takeback_windows_are_shift_edges():

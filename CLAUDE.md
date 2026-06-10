@@ -193,11 +193,18 @@ in an elevated shell, then back to attendance.)
   `_present_now`, `ot_screen` (personal bank view), `_offer_buyback`/`_ot_buyback_callback`/
   `takeback_windows` (spend-the-bank side the redefine model still needs), DB `ot_grant_*` dormant.
   Suite **420** green; both modules import clean. (part 2/2)
-- ⏳ **Attendance NEXT:** (a) **the shield** — an approved OT pauses the PB ignore-ladder before its
-  deadline; (b) wire `_offer_buyback` onto `_settle_redefined_shift` (take banked OT as rest);
-  (c) **overnight checkout-date fix** — checkout arms `shift_date=today`, so an overnight redefine
-  (bakers are 9pm–6am) banks under the wrong date — fix before go-live; (d) `/test` simulate-checkout
-  that shows the banking; then go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
+- **OVERNIGHT date-binding FIXED (owner asked "does past-midnight hide a problem?" — yes, 2):**
+  `compute_day_events` events now carry their **shift-START date** (5-tuple) and the scheduler uses it
+  for (1) the checkout arm — `flow_save shift_date=sd` so an overnight checkout writes to YESTERDAY's
+  session and `_settle_redefined_shift` finds the redefine → **OT actually banks** (was: wrote to a
+  nonexistent today-session, silently never banked); (2) the suppression lookup — `att_get_session(sd)`
+  so a checked-out overnighter isn't re-nudged at 6:10/6:20/6:40am. + overnight regression test
+  (`test_compute_day_events_overnight_carries_shift_date`). Suite **421**.
+- ⏳ **Attendance NEXT (owner-agreed order):** (a) **mid-shift extension** — today's picker can't select
+  an already-started start; give "extend the end" a fixed real-start button (problem 4); (b) **settle
+  over-pay cap** — clamp worked at the approved window length so early arrival/lingering can't inflate
+  banked OT (problem 3); then the shield (approved OT pauses the PB ladder), `_offer_buyback` on
+  settle, `/test` simulate-checkout, go-live prep. attendance_live=OFF, attendance_test_mode=OFF.
 
 **Session 31 (Jun 10) — AL hours-display + reason-prompt becomes an "awaiting approval" card (owner):**
 - **"Fractional deduction" wording removed** everywhere (the hours-AL detail + the ③ HOURS-AL help

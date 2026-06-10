@@ -1194,7 +1194,6 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     from gm_bot import attendance_ui as ui, checkin as ci
     now_pp = datetime.now(finance.PP_TZ)
-    today = now_pp.date().isoformat()
     now_min = now_pp.hour * 60 + now_pp.minute
     try:
         events = ui.compute_day_events(now_pp.date())   # schedule-driven, skips day-off/AL/Tyty/Delis
@@ -1204,8 +1203,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     # Redefined shifts (session 31): compute_day_events already fires this roster's prompts at the
     # REDEFINED [start,end] for any approved shift_change — incl. an extended/OT end — so the old
     # ot_now_end_times "extend the shift" pass is gone; the redefined checkout rides the event stream.
+    # Every event carries its SHIFT-START date (sd): an overnight checkout fires today but its
+    # session + redefine live under YESTERDAY — lookups and the checkout arm must use sd, not today.
     from shared.database import flow_save
-    for minute, name, label, text in events:
+    for minute, name, label, text, sd in events:
         if not ci.is_due(minute, now_min):
             continue
         staff = next((s for s in staff_all("active")
@@ -1213,7 +1214,7 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if not staff or not (staff.get("telegram_ids") or []):
             continue
         uid = staff["telegram_ids"][0]
-        sess = att_get_session(staff["id"], today)
+        sess = att_get_session(staff["id"], sd)
         checked_in = bool(sess and sess.get("checked_in_at"))
         checked_out = bool(sess and sess.get("checked_out_at"))
         # suppression: once checked in, drop T0/T+5 prompts; once checked out, drop the close prompts
@@ -1222,9 +1223,10 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         if checked_out and (label.startswith("check-out") or label.startswith("leave-early")):
             continue
         await _att_send(context, uid, "Staff", name, text)
-        # arm check-out capture: next in-zone share while this is set = checked out (60-min window)
+        # arm check-out capture: next in-zone share while this is set = checked out (60-min window).
+        # sd (not today) → the checkout write + the OT settle bind to the shift's real session.
         if label.startswith("check-out"):
-            flow_save(uid, "checkout", "await", {"shift_date": today}, ttl_min=60)
+            flow_save(uid, "checkout", "await", {"shift_date": sd}, ttl_min=60)
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
@@ -2478,7 +2480,7 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             ev = ui.compute_day_events(yday)
         except Exception:
             ev = []
-        names = {n for _m, n, _l, _t in ev}
+        names = {n for _m, n, _l, _t, _sd in ev}
         nm = p.get("call_name") or p["canonical_name"]
         if nm not in names:
             continue   # not scheduled (day-off/AL/PH) — not a no-show

@@ -162,12 +162,14 @@ def staff_day_events(p: dict, ws_override: int | None = None,
     return [(m // 1440, m % 1440, label) for m, label in raw]
 
 
-def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
+def compute_day_events(target: date) -> list[tuple[int, str, str, str, str]]:
     """All would-be check-in messages for one date, whole active TWB roster, chronological.
     Each event is anchored to its SHIFT-START date: it appears on `target` only if the person
     actually worked that shift (start date not their day-off, not on approved AL) — so an
     overnight 6am check-out exists only when YESTERDAY was a working day.
-    Returns (minute_of_day, staff_name, label, message_text)."""
+    Returns (minute_of_day, staff_name, label, message_text, shift_start_iso) — the last is the
+    date the shift STARTED, which is the attendance_sessions / shift_changes key: an overnight
+    checkout fires today but must be written under yesterday's session (bakers are 9pm–6am)."""
     import json as _json
 
     from shared.database import _db
@@ -225,7 +227,7 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str]]:
                     text = _CI_MSG_OUT
                 else:
                     text = _CI_MSG_OUT2
-                events.append((minute, name, label, text))
+                events.append((minute, name, label, text, shift_start_day.isoformat()))
     events.sort(key=lambda e: (e[0], e[1]))
     return events
 
@@ -570,7 +572,7 @@ def schedule_summary(target: date) -> str:
     from collections import defaultdict
     ev = compute_day_events(target)
     by: dict = defaultdict(list)
-    for minute, name, label, _ in ev:
+    for minute, name, label, _text, _sd in ev:
         by[(minute, label.split(" ")[0])].append(name)
     lines = ["📅 Today's actual schedule (%s) — %d sends, same texts as above:"
              % (day_label(target), len(ev))]
