@@ -2747,15 +2747,22 @@ async def _callout_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             priv = await generate_callout(dossier, call, "private")
             if priv and uids:
                 await context.bot.send_message(uids[0], priv)
-            grp = await generate_callout(dossier, call, "group")
-            if grp:
-                await context.bot.send_message(config.SUPERVISORS_CHAT_ID, grp)
+            # the anonymous GROUP line fires at most ONCE per week, no matter how many staff
+            # pattern-matched that Monday ("says it once and goes quiet" — owner, Jun 11)
+            grp = None
+            gstamp = "callout_group_done:%s" % wkstamp
+            if gm_get_state(gstamp) != "true":
+                grp = await generate_callout(dossier, call, "group")
+                if grp:
+                    gm_set_state(gstamp, "true")
+                    await context.bot.send_message(config.SUPERVISORS_CHAT_ID, grp)
             # CC both owners
             for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
                 if oid:
                     await context.bot.send_message(oid,
                         "📣 Call-out sent — %s (%s).\nPrivate: %s\nGroup: %s"
-                        % (call, pat["detail"], priv[:120], grp[:120]))
+                        % (call, pat["detail"], priv[:120],
+                           grp[:120] if grp else "(already said this week)"))
         except Exception as e:
             logger.error("callout for %s failed: %s", call, e)
 
