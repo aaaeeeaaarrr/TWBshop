@@ -1,0 +1,782 @@
+# Coverage / AL pre-approval — full study (roster snapshot 2026-06-10)
+
+Per-station minimums (§8a). Peak (Sat+Sun lunch, Fri+Sat dinner)=high end. >=1 bar every window.
+**Bakery: >=3 REAL bakers hard floor (Thyda excluded, partial 5th); the Fri+Sat 4th may be a BORROWED kitchen hand. One-out-max below 3.**
+**Prep: only Kimying+Renaud carry the prep tag — prep rejects are TAGGING false-positives until the half-preppers are tagged.**
+
+Per row: each window -> `STATION have/need: names` (b=can bar; ⚠=short).
+
+
+## Pisey  ·  [kitchen]  ·  06:00-16:00  ·  off Mon
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Chomreun, Vannary, Kheak, Rath, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 5/3: Chomreun, Vannary, Kheak, Rath, Sony  |  front 6/3: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 5/2: Chomreun, Vannary, Kheak, Rath, Sony  |  front 6/2: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Vannary, Kheak, Rath, Visal  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 6/3: Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Chomreun, Vannary, Kheak, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Chomreun, Vannary, Rath, Visal, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 8/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Chomreun  ·  [kitchen]  ·  06:00-18:00  ·  off Thu
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Kheak, Rath, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 5/3: Pisey, Vannary, Kheak, Rath, Sony  |  front 6/3: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 5/2: Pisey, Vannary, Kheak, Rath, Sony  |  front 6/2: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Vannary, Chenda, Rath, Heng  |  front 6/3: Samphass, Chenda, Rathb, Seth, Porb, Hengb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — OFF** (own day off)
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Kheak, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/4: Vannary, Chenda, Norin, Heng, Failin  |  front 6/4: Samphass, Chenda, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Vannary, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 8/4: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Vannary, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 8/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Kheak, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 6/3: Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chenda, Norin, Rath, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Failinb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Rath, Visal, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 8/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Vannary, Norin, Rath, Heng, Failin  |  front 6/3: Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Vannary  ·  [kitchen]  ·  06:00-20:00  ·  off Mon
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Kheak, Rath, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 5/3: Pisey, Chomreun, Kheak, Rath, Sony  |  front 6/3: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 5/2: Pisey, Chomreun, Kheak, Rath, Sony  |  front 6/2: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chomreun, Chenda, Rath, Heng  |  front 6/3: Samphass, Chenda, Rathb, Seth, Porb, Hengb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Pisey, Kheak, Rath, Visal  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 6/3: Pisey, Norin, Kheak, Rath, Visal, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Norin, Kheak, Rath, Visal, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - dinner 5-9 — kitchen 5/3: Chenda, Norin, Rath, Heng, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Kheak, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Norin, Kheak, Visal, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Norin, Kheak, Visal, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/4: Chomreun, Chenda, Norin, Heng, Failin  |  front 6/4: Samphass, Chenda, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Chenda, Norin, Rath, Heng, Failin  |  front 8/4: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Kheak, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Chenda, Norin, Rath, Heng, Failin  |  front 8/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Rath, Visal, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Norin, Rath, Visal, Failin, Sony  |  front 8/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Norin, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Norin, Rath, Heng, Failin  |  front 6/3: Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Kheak  ·  [kitchen]  ·  06:00-16:00  ·  off Tue
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Rath, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 5/3: Pisey, Chomreun, Vannary, Rath, Sony  |  front 6/3: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 5/2: Pisey, Chomreun, Vannary, Rath, Sony  |  front 6/2: Ananb, Rathb, Seth, Renaud, Porb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Pisey, Vannary, Rath, Visal  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 6/3: Pisey, Vannary, Norin, Rath, Visal, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Vannary, Norin, Rath, Visal, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Visal, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Visal, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Rath, Visal, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Chomreun, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 6/3: Chomreun, Norin, Rath, Visal, Failin, Sony  |  front 8/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Norin, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — OFF** (own day off)
+
+## Rath  ·  [bar,cashier,kitchen,service]  ·  06:00-18:00  ·  off Fri
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Sony  |  front 3/2: Ananb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 5/3: Pisey, Chomreun, Vannary, Kheak, Sony  |  front 5/3: Ananb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Sony  |  front 5/2: Ananb, Seth, Renaud, Porb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chomreun, Vannary, Chenda, Heng  |  front 5/3: Samphass, Chenda, Seth, Porb, Hengb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Pisey, Vannary, Kheak, Visal  |  front 3/2: Ananb, Renaud, Kimying
+    - lunch 11-2 — kitchen 6/3: Pisey, Vannary, Norin, Kheak, Visal, Failin  |  front 6/3: Ananb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Vannary, Norin, Kheak, Visal, Failin  |  front 6/2: Ananb, Seth, Thyda, Renaud, Kimying, Failinb
+    - dinner 5-9 — kitchen 5/3: Vannary, Chenda, Norin, Heng, Failin  |  front 6/3: Samphass, Chenda, Seth, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — OFF** (own day off)
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 8/4: Ananb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 8/2: Ananb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Heng, Failin  |  front 7/4: Samphass, Chenda, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Visal, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 8/4: Ananb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 8/2: Ananb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Chenda, Norin, Heng, Failin  |  front 7/3: Samphass, Chenda, Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Chomreun, Kheak, Visal, Sony  |  front 3/2: Ananb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 6/3: Chomreun, Norin, Kheak, Visal, Failin, Sony  |  front 7/3: Ananb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Norin, Kheak, Visal, Failin, Sony  |  front 7/2: Ananb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chomreun, Chenda, Norin, Failin  |  front 6/3: Samphass, Chenda, Seth, Thyda, Porb, Failinb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Visal, Sony  |  front 3/2: Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Visal, Failin, Sony  |  front 7/3: Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Visal, Failin, Sony  |  front 7/2: Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Norin, Heng, Failin  |  front 5/3: Seth, Thyda, Porb, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Visal  ·  [kitchen]  ·  06:00-15:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Pisey, Vannary, Kheak, Rath  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 6/3: Pisey, Vannary, Norin, Kheak, Rath, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Vannary, Norin, Kheak, Rath, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Sony  |  front 4/2: Ananb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Kheak, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Kheak, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Ananb, Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Chomreun, Kheak, Rath, Sony  |  front 4/2: Ananb, Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 6/3: Chomreun, Norin, Kheak, Rath, Failin, Sony  |  front 8/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Norin, Kheak, Rath, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Rath, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Rath, Failin, Sony  |  front 8/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Rath, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Kimying  ·  [prep,service]  ·  06:00-15:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Kheak, Rath, Visal  |  front 3/2: Ananb, Rathb, Renaud
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/3: Ananb, Rathb, Seth, Thyda, Renaud, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/2: Ananb, Rathb, Seth, Thyda, Renaud, Failinb
+    - prep 10-7 — prep 1/1: Renaud
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Visal, Sony  |  front 3/2: Ananb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/3: Ananb, Thyda, Renaud, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/2: Ananb, Thyda, Renaud, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Mon 15/06 — REJECT**
+    - morning 6-11 — kitchen 5/2: Chomreun, Kheak, Rath, Visal, Sony  |  front 3/2: Ananb, Rathb, Sonyb
+    - lunch 11-2 — kitchen 7/3: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/3: Ananb, Rathb, Seth, Thyda, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/2: Ananb, Rathb, Seth, Thyda, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 0/1 ⚠: —
+    - **REASON:** prep only 0/1 (none)
+    - *Fix 1:* swap-in **Renaud** (cashier,prep,service, off Mon) → works Mon, parks day-off Sat/Sun; prep 0→1
+    - *Fix 2:* move the AL to **Sun 14/06 or Tue 16/06** (clear there)
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Rath, Visal, Sony  |  front 3/2: Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Seth, Thyda, Renaud, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+
+## Sony  ·  [bar,cashier,kitchen,service]  ·  06:00-15:00  ·  off Thu
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Rath  |  front 3/2: Ananb, Rathb, Renaud
+    - lunch 11-2 — kitchen 5/3: Pisey, Chomreun, Vannary, Kheak, Rath  |  front 5/3: Ananb, Rathb, Seth, Renaud, Porb
+    - afternoon 2-5 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Rath  |  front 5/2: Ananb, Rathb, Seth, Renaud, Porb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — OFF** (own day off)
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Kheak, Visal  |  front 3/2: Ananb, Renaud, Kimying
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin  |  front 6/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin  |  front 6/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal  |  front 4/2: Ananb, Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 4/2: Chomreun, Kheak, Rath, Visal  |  front 3/2: Ananb, Rathb, Kimying
+    - lunch 11-2 — kitchen 6/3: Chomreun, Norin, Kheak, Rath, Visal, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Norin, Kheak, Rath, Visal, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Chomreun, Vannary, Rath, Visal  |  front 3/2: Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin  |  front 7/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin  |  front 7/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Anan  ·  [bar,cashier,service]  ·  07:00-17:00  ·  off Tue
+- **Wed 10/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 3/2: Rathb, Renaud, Sonyb
+    - lunch 11-2 — kitchen 6/3: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/3: Rathb, Seth, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Rathb, Seth, Renaud, Porb, Sonyb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Kheak, Rath, Visal  |  front 3/2: Rathb, Renaud, Kimying
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/3: Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/2: Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Visal, Sony  |  front 3/2: Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/3: Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/2: Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Rathb, Renaud, Kimying, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Chomreun, Kheak, Rath, Visal, Sony  |  front 3/2: Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 7/3: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — OFF** (own day off)
+
+## Renaud  ·  [cashier,prep,service]  ·  07:00-16:00  ·  off Mon
+- **Wed 10/06 — REJECT**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 3/2: Ananb, Rathb, Sonyb
+    - lunch 11-2 — kitchen 6/3: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/3: Ananb, Rathb, Seth, Porb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Ananb, Rathb, Seth, Porb, Sonyb
+    - prep 10-7 — prep 0/1 ⚠: —
+    - **REASON:** prep only 0/1 (none)
+    - *Fix 1:* swap-in **Kimying** (prep,service, off Wed) → works Wed, parks day-off Sat/Sun; prep 0→1
+    - *Fix 2:* move the AL to **Thu 11/06 or Fri 12/06** (clear there)
+- **Thu 11/06 — APPROVE**
+    - morning 6-11 — kitchen 5/2: Pisey, Vannary, Kheak, Rath, Visal  |  front 3/2: Ananb, Rathb, Kimying
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/3: Ananb, Rathb, Seth, Thyda, Kimying, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/2: Ananb, Rathb, Seth, Thyda, Kimying, Failinb
+    - prep 10-7 — prep 1/1: Kimying
+- **Fri 12/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Visal, Sony  |  front 3/2: Ananb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/3: Ananb, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/2: Ananb, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Sat 13/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Sun 14/06 — APPROVE**
+    - morning 6-11 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Sony  |  front 4/2: Ananb, Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — APPROVE**
+    - morning 6-11 — kitchen 6/2: Pisey, Chomreun, Vannary, Rath, Visal, Sony  |  front 3/2: Rathb, Kimying, Sonyb
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - prep 10-7 — prep 1/1: Kimying
+
+## Failin  ·  [bar,cashier,kitchen,service]  ·  11:00-21:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Pisey, Vannary, Norin, Kheak, Rath, Visal  |  front 6/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying
+    - afternoon 2-5 — kitchen 6/2: Pisey, Vannary, Norin, Kheak, Rath, Visal  |  front 6/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying
+    - dinner 5-9 — kitchen 5/3: Vannary, Chenda, Norin, Rath, Heng  |  front 6/3: Samphass, Chenda, Rathb, Seth, Thyda, Hengb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Sony  |  front 6/3: Ananb, Thyda, Renaud, Kimying, Porb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Sony  |  front 6/2: Ananb, Thyda, Renaud, Kimying, Porb, Sonyb
+    - dinner 5-9 — kitchen 5/4: Chomreun, Vannary, Chenda, Norin, Heng  |  front 5/4: Samphass, Chenda, Thyda, Porb, Hengb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Rath, Heng  |  front 7/4: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Chenda, Norin, Rath, Heng  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Chomreun, Norin, Kheak, Rath, Visal, Sony  |  front 7/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Norin, Kheak, Rath, Visal, Sony  |  front 7/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chomreun, Chenda, Norin, Rath  |  front 6/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Sony  |  front 7/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Sony  |  front 7/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Norin, Rath, Heng  |  front 5/3: Rathb, Seth, Thyda, Porb, Hengb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Thyda  ·  [bakery,cake,cashier]  ·  12:00-00:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/3: Ananb, Rathb, Seth, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/2: Ananb, Rathb, Seth, Renaud, Kimying, Failinb
+    - dinner 5-9 — kitchen 6/3: Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 6/3: Samphass, Chenda, Rathb, Seth, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/3: Ananb, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/2: Ananb, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Heng, Failin  |  front 5/4: Samphass, Chenda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 7/2: Davy, Samphass, Nak, Seyb, Chenda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/4: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/4: Samphass, Chenda, Rathb, Seth, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/3: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/3: Ananb, Rathb, Seth, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/2: Ananb, Rathb, Seth, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Chenda, Norin, Rath, Failin  |  front 6/3: Samphass, Chenda, Rathb, Seth, Porb, Failinb
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Seth, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Norin, Rath, Heng, Failin  |  front 5/3: Rathb, Seth, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 6/2: Davy, Meng, Nak, Seyb, Seth, Hengb  |  bakery 3/3: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Por  ·  [bar,cashier,service]  ·  12:00-21:00  ·  off Thu
+- **Wed 10/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/3: Ananb, Rathb, Seth, Renaud, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Ananb, Rathb, Seth, Renaud, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Chenda, Rath, Heng  |  front 5/3: Samphass, Chenda, Rathb, Seth, Hengb
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — OFF** (own day off)
+- **Fri 12/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/3: Ananb, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Kheak, Visal, Failin, Sony  |  front 6/2: Ananb, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Heng, Failin  |  front 5/4: Samphass, Chenda, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/4: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/4: Samphass, Chenda, Rathb, Seth, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/3: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/3: Ananb, Rathb, Seth, Thyda, Kimying, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/2: Ananb, Rathb, Seth, Thyda, Kimying, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Chenda, Norin, Rath, Failin  |  front 6/3: Samphass, Chenda, Rathb, Seth, Thyda, Failinb
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Seth, Thyda, Renaud, Kimying, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Norin, Rath, Heng, Failin  |  front 5/3: Rathb, Seth, Thyda, Hengb, Failinb
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Norin  ·  [kitchen]  ·  13:00-23:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Pisey, Vannary, Kheak, Rath, Visal, Failin  |  front 7/3: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Vannary, Kheak, Rath, Visal, Failin  |  front 7/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Failinb
+    - dinner 5-9 — kitchen 5/3: Vannary, Chenda, Rath, Heng, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Kheak, Visal, Failin, Sony  |  front 7/3: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Kheak, Visal, Failin, Sony  |  front 7/2: Ananb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/4: Chomreun, Vannary, Chenda, Heng, Failin  |  front 6/4: Samphass, Chenda, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 4/2: Nak, Chantrea, Chenda, Heng  |  front 8/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Rath, Heng, Failin  |  front 8/4: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/4: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Failin, Sony  |  front 9/4: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Kheak, Rath, Visal, Failin, Sony  |  front 9/2: Ananb, Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Chenda, Rath, Heng, Failin  |  front 8/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Chomreun, Kheak, Rath, Visal, Failin, Sony  |  front 8/3: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Chomreun, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Seth, Thyda, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 4/3: Chomreun, Chenda, Rath, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 3/2: Meng, Chantrea, Chenda  |  front 8/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Chomreun, Vannary, Rath, Visal, Failin, Sony  |  front 8/3: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Chomreun, Vannary, Rath, Visal, Failin, Sony  |  front 8/2: Rathb, Seth, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Rath, Heng, Failin  |  front 6/3: Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chantrea, Heng  |  front 7/2: Davy, Meng, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Seth  ·  [service]  ·  13:00-22:00  ·  off Fri
+- **Wed 10/06 — APPROVE**
+    - lunch 11-2 — kitchen 6/3: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/3: Ananb, Rathb, Renaud, Porb, Sonyb
+    - afternoon 2-5 — kitchen 6/2: Pisey, Chomreun, Vannary, Kheak, Rath, Sony  |  front 5/2: Ananb, Rathb, Renaud, Porb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Chenda, Rath, Heng  |  front 5/3: Samphass, Chenda, Rathb, Porb, Hengb
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 7/2: Meng, Samphass, Nak, Seyb, Chenda, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/3: Ananb, Rathb, Thyda, Renaud, Kimying, Failinb
+    - afternoon 2-5 — kitchen 7/2: Pisey, Vannary, Norin, Kheak, Rath, Visal, Failin  |  front 6/2: Ananb, Rathb, Thyda, Renaud, Kimying, Failinb
+    - dinner 5-9 — kitchen 6/3: Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 6/3: Samphass, Chenda, Rathb, Thyda, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Meng, Samphass, Nak, Chenda, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — OFF** (own day off)
+- **Sat 13/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/4: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/4: Samphass, Chenda, Rathb, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - lunch 11-2 — kitchen 9/4: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/4: Ananb, Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 9/2: Pisey, Chomreun, Vannary, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 8/2: Ananb, Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 7/3: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/3: Samphass, Chenda, Rathb, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - lunch 11-2 — kitchen 7/3: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/3: Ananb, Rathb, Thyda, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 7/2: Chomreun, Norin, Kheak, Rath, Visal, Failin, Sony  |  front 7/2: Ananb, Rathb, Thyda, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 5/3: Chomreun, Chenda, Norin, Rath, Failin  |  front 6/3: Samphass, Chenda, Rathb, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Davy, Meng, Samphass, Seyb, Chenda, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — APPROVE**
+    - lunch 11-2 — kitchen 8/3: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/3: Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - afternoon 2-5 — kitchen 8/2: Pisey, Chomreun, Vannary, Norin, Rath, Visal, Failin, Sony  |  front 7/2: Rathb, Thyda, Renaud, Kimying, Porb, Failinb, Sonyb
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Norin, Rath, Heng, Failin  |  front 5/3: Rathb, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 6/2: Davy, Meng, Nak, Seyb, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+
+## Samphass  ·  [bakery,cashier]  ·  18:00-06:00  ·  off Tue
+- **Wed 10/06 — REJECT**
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Chenda, Rath, Heng  |  front 5/3: Chenda, Rathb, Seth, Porb, Hengb
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 7/2: Meng, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 2/3 ⚠: Long, Tra
+    - prep 10-7 — prep 1/1: Renaud
+    - **REASON:** bakery only 2/3 (Long, Tra)
+    - *Fix 1:* swap-in **Davy** (bakery,cashier, off Wed) → works Wed, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Thu 11/06 — REJECT**
+    - dinner 5-9 — kitchen 6/3: Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 6/3: Chenda, Rathb, Seth, Thyda, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Meng, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 2/3 ⚠: Davy, Long
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+    - **REASON:** bakery only 2/3 (Davy, Long)
+    - *Fix 1:* swap-in **Tra** (bakery, off Thu) → works Thu, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Fri 12/06 — APPROVE**
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Heng, Failin  |  front 5/4: Chenda, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 7/2: Davy, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - dinner 5-9 — kitchen 7/4: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/4: Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - dinner 5-9 — kitchen 7/3: Chomreun, Vannary, Chenda, Norin, Rath, Heng, Failin  |  front 7/3: Chenda, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — REJECT**
+    - dinner 5-9 — kitchen 5/3: Chomreun, Chenda, Norin, Rath, Failin  |  front 6/3: Chenda, Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Davy, Meng, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 2/3 ⚠: Davy, Tra
+    - prep 10-7 — prep 1/1: Kimying
+    - **REASON:** bakery only 2/3 (Davy, Tra)
+    - *Fix 1:* swap-in **Long** (bakery, off Mon) → works Mon, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+- **Tue 16/06 — OFF** (own day off)
+
+## Chenda  ·  [cashier,kitchen]  ·  18:00-06:00  ·  off Tue
+- **Wed 10/06 — APPROVE**
+    - dinner 5-9 — kitchen 4/3: Chomreun, Vannary, Rath, Heng  |  front 5/3: Samphass, Rathb, Seth, Porb, Hengb
+    - night 9-6 — kitchen 3/2: Meng, Nak, Heng  |  front 7/2: Meng, Samphass, Nak, Seyb, Seth, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+    - prep 10-7 — prep 1/1: Renaud
+- **Thu 11/06 — APPROVE**
+    - dinner 5-9 — kitchen 5/3: Vannary, Norin, Rath, Heng, Failin  |  front 6/3: Samphass, Rathb, Seth, Thyda, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 8/2: Davy, Meng, Samphass, Nak, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Fri 12/06 — APPROVE**
+    - dinner 5-9 — kitchen 5/4: Chomreun, Vannary, Norin, Heng, Failin  |  front 5/4: Samphass, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 4/2: Nak, Chantrea, Norin, Heng  |  front 7/2: Davy, Samphass, Nak, Seyb, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sat 13/06 — APPROVE**
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Norin, Rath, Heng, Failin  |  front 7/4: Samphass, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Sun 14/06 — APPROVE**
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Norin, Rath, Heng, Failin  |  front 7/3: Samphass, Rathb, Seth, Thyda, Porb, Hengb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+    - prep 10-7 — prep 2/1: Renaud, Kimying
+- **Mon 15/06 — APPROVE**
+    - dinner 5-9 — kitchen 4/3: Chomreun, Norin, Rath, Failin  |  front 6/3: Samphass, Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 3/2: Meng, Chantrea, Norin  |  front 7/2: Davy, Meng, Samphass, Seyb, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+    - prep 10-7 — prep 1/1: Kimying
+- **Tue 16/06 — OFF** (own day off)
+
+## Heng  ·  [bar,cashier,kitchen,service]  ·  19:00-06:00  ·  off Mon
+- **Wed 10/06 — APPROVE**
+    - dinner 5-9 — kitchen 4/3: Chomreun, Vannary, Chenda, Rath  |  front 5/3: Samphass, Chenda, Rathb, Seth, Porb
+    - night 9-6 — kitchen 3/2: Meng, Nak, Chenda  |  front 7/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Piseth  |  bakery 3/3: Samphass, Long, Tra
+- **Thu 11/06 — REJECT**
+    - dinner 5-9 — kitchen 5/3: Vannary, Chenda, Norin, Rath, Failin  |  front 6/3: Samphass, Chenda, Rathb, Seth, Thyda, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Norin  |  front 8/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Long
+    - **REASON:** bar only 0/1 (none)
+    - *Fix 1:* swap-in **Sey** (bar,cashier,service, off Thu) → works Thu, parks day-off Sat/Sun; bar 0→1
+    - *Fix 2:* move the AL to **Fri 12/06 or Wed 10/06** (clear there)
+- **Fri 12/06 — APPROVE**
+    - dinner 5-9 — kitchen 5/4: Chomreun, Vannary, Chenda, Norin, Failin  |  front 5/4: Samphass, Chenda, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 4/2: Nak, Chantrea, Chenda, Norin  |  front 7/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - dinner 5-9 — kitchen 6/4: Chomreun, Vannary, Chenda, Norin, Rath, Failin  |  front 7/4: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Norin  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - dinner 5-9 — kitchen 6/3: Chomreun, Vannary, Chenda, Norin, Rath, Failin  |  front 7/3: Samphass, Chenda, Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Chenda, Norin  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — APPROVE**
+    - dinner 5-9 — kitchen 5/3: Chomreun, Vannary, Norin, Rath, Failin  |  front 5/3: Rathb, Seth, Thyda, Porb, Failinb
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chantrea, Norin  |  front 6/2: Davy, Meng, Nak, Seyb, Seth, Thyda  |  bakery 3/3: Davy, Long, Tra
+
+## Davy  ·  [bakery,cashier]  ·  21:00-06:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — REJECT**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 2/3 ⚠: Samphass, Long
+    - **REASON:** bakery only 2/3 (Samphass, Long)
+    - *Fix 1:* swap-in **Tra** (bakery, off Thu) → works Thu, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 7/2: Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 3/4: Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/4: Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+- **Mon 15/06 — REJECT**
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Meng, Samphass, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 2/3 ⚠: Samphass, Tra
+    - **REASON:** bakery only 2/3 (Samphass, Tra)
+    - *Fix 1:* swap-in **Long** (bakery, off Mon) → works Mon, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+- **Tue 16/06 — REJECT**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 6/2: Meng, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 2/3 ⚠: Long, Tra
+    - **REASON:** bakery only 2/3 (Long, Tra)
+    - *Fix 1:* swap-in **Samphass** (bakery,cashier, off Tue) → works Tue, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+
+## Meng  ·  [cashier,kitchen]  ·  21:00-06:00  ·  off Fri
+- **Wed 10/06 — APPROVE**
+    - night 9-6 — kitchen 3/2: Nak, Chenda, Heng  |  front 7/2: Samphass, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+- **Thu 11/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+- **Fri 12/06 — OFF** (own day off)
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — APPROVE**
+    - night 9-6 — kitchen 3/2: Chantrea, Chenda, Norin  |  front 7/2: Davy, Samphass, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+- **Tue 16/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Nak, Chantrea, Norin, Heng  |  front 6/2: Davy, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+
+## Nak  ·  [cashier,kitchen]  ·  21:00-06:00  ·  off Mon
+- **Wed 10/06 — APPROVE**
+    - night 9-6 — kitchen 3/2: Meng, Chenda, Heng  |  front 7/2: Meng, Samphass, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+- **Thu 11/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Meng, Samphass, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Chantrea, Chenda, Norin, Heng  |  front 7/2: Davy, Samphass, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Norin, Heng  |  front 6/2: Davy, Meng, Seyb, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+
+## Sey  ·  [bar,cashier,service]  ·  21:00-06:00  ·  off Thu
+- **Wed 10/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 7/2: Meng, Samphass, Nak, Chenda, Seth, Hengb, Piseth  |  bakery 3/3: Samphass, Long, Tra
+- **Thu 11/06 — OFF** (own day off)
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 7/2: Davy, Samphass, Nak, Chenda, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — REJECT**
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Davy, Meng, Samphass, Chenda, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+    - **REASON:** bar only 0/1 (none)
+    - *Fix 1:* swap-in **Heng** (bar,cashier,kitchen,service, off Mon) → works Mon, parks day-off Sat/Sun; bar 0→1
+    - *Fix 2:* move the AL to **Sun 14/06 or Tue 16/06** (clear there)
+- **Tue 16/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 6/2: Davy, Meng, Nak, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+
+## Chantrea  ·  [kitchen]  ·  21:00-06:00  ·  off Wed
+- **Wed 10/06 — OFF** (own day off)
+- **Thu 11/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Nak, Chenda, Norin, Heng  |  front 8/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — APPROVE**
+    - night 9-6 — kitchen 3/2: Meng, Chenda, Norin  |  front 8/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+- **Tue 16/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Meng, Nak, Norin, Heng  |  front 7/2: Davy, Meng, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Long, Tra
+
+## Long  ·  [bakery]  ·  21:00-06:00  ·  off Mon
+- **Wed 10/06 — REJECT**
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 8/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 2/3 ⚠: Samphass, Tra
+    - **REASON:** bakery only 2/3 (Samphass, Tra)
+    - *Fix 1:* swap-in **Davy** (bakery,cashier, off Wed) → works Wed, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Thu 11/06 — REJECT**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 2/3 ⚠: Davy, Samphass
+    - **REASON:** bakery only 2/3 (Davy, Samphass)
+    - *Fix 1:* swap-in **Tra** (bakery, off Thu) → works Thu, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Samphass, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Samphass, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Tra
+- **Mon 15/06 — OFF** (own day off)
+- **Tue 16/06 — REJECT**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 7/2: Davy, Meng, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 2/3 ⚠: Davy, Tra
+    - **REASON:** bakery only 2/3 (Davy, Tra)
+    - *Fix 1:* swap-in **Samphass** (bakery,cashier, off Tue) → works Tue, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+
+## Tra  ·  [bakery]  ·  21:00-06:00  ·  off Thu
+- **Wed 10/06 — REJECT**
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 8/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Hengb, Piseth  |  bakery 2/3 ⚠: Samphass, Long
+    - **REASON:** bakery only 2/3 (Samphass, Long)
+    - *Fix 1:* swap-in **Davy** (bakery,cashier, off Wed) → works Wed, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Fri 12/06 or Sat 13/06** (clear there)
+- **Thu 11/06 — OFF** (own day off)
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Samphass, Long
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/4: Davy, Samphass, Long
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 10/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb, Piseth  |  bakery 3/3: Davy, Samphass, Long
+- **Mon 15/06 — REJECT**
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 8/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda, Piseth  |  bakery 2/3 ⚠: Davy, Samphass
+    - **REASON:** bakery only 2/3 (Davy, Samphass)
+    - *Fix 1:* swap-in **Long** (bakery, off Mon) → works Mon, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+- **Tue 16/06 — REJECT**
+    - night 9-6 — kitchen 5/2: Meng, Nak, Chantrea, Norin, Heng  |  front 7/2: Davy, Meng, Nak, Seyb, Seth, Thyda, Hengb  |  bakery 2/3 ⚠: Davy, Long
+    - **REASON:** bakery only 2/3 (Davy, Long)
+    - *Fix 1:* swap-in **Samphass** (bakery,cashier, off Tue) → works Tue, parks day-off Sat/Sun; bakery 2→3
+    - *Fix 2:* move the AL to **Sun 14/06 or Sat 13/06** (clear there)
+
+## Piseth  ·  [cashier,service]  ·  21:00-06:00  ·  off Tue
+- **Wed 10/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Meng, Nak, Chenda, Heng  |  front 7/2: Meng, Samphass, Nak, Seyb, Chenda, Seth, Hengb  |  bakery 3/3: Samphass, Long, Tra
+- **Thu 11/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 8/2: Davy, Meng, Samphass, Nak, Chenda, Seth, Thyda, Hengb  |  bakery 3/3: Davy, Samphass, Long
+- **Fri 12/06 — APPROVE**
+    - night 9-6 — kitchen 5/2: Nak, Chantrea, Chenda, Norin, Heng  |  front 7/2: Davy, Samphass, Nak, Seyb, Chenda, Thyda, Hengb  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sat 13/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb  |  bakery 4/4: Davy, Samphass, Long, Tra
+- **Sun 14/06 — APPROVE**
+    - night 9-6 — kitchen 6/2: Meng, Nak, Chantrea, Chenda, Norin, Heng  |  front 9/2: Davy, Meng, Samphass, Nak, Seyb, Chenda, Seth, Thyda, Hengb  |  bakery 4/3: Davy, Samphass, Long, Tra
+- **Mon 15/06 — APPROVE**
+    - night 9-6 — kitchen 4/2: Meng, Chantrea, Chenda, Norin  |  front 7/2: Davy, Meng, Samphass, Seyb, Chenda, Seth, Thyda  |  bakery 3/3: Davy, Samphass, Tra
+- **Tue 16/06 — OFF** (own day off)

@@ -9,10 +9,10 @@
 
 ## Open (not yet done)
 
-- **⏰ Jul 1 (AUTOMATED — verify it fired): Kimying full-split restore.** `_pay_restore_job`
-  (daily 07:05 PP, in the gm bot) restores 145/30 from her seeded `pay_restore:42` record once
-  June passes, and DMs the owner. New hires get this automatically via /joined now. VERIFY after
-  Jul 1: owner got the DM + her stored split reads 145/30. (Automated 2026-06-11, `42adf31`.)
+- **⏰ Jul 1 (AUTOMATED · MUTED — owner: "drop it for now"): Kimying full-split restore.**
+  `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42` record once
+  June passes, and DMs the owner. Do NOT mention in open-loops reports; check ONLY if no DM arrived
+  by Jul 2 or the owner asks. (Automated 2026-06-11, `42adf31`.)
 
 ## Done (with proof)
 
