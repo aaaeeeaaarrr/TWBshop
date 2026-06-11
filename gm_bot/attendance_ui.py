@@ -515,7 +515,7 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑪ FAMILY-sick night nudge — coming is the DEFAULT; staying out costs a typed reason "
          "the Supervisors read (owner)",
          "I hope your child is better now 🤍 Are you coming tomorrow?\n"
-         "សង្ឃឹមថា child របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?", nudge_kb),
+         "សង្ឃឹមថា កូន របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?", nudge_kb),
         ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
          "Davy: 3rd paperless sick in 30 days (all Mondays). Pattern flag for your review.\n"
          "(owner-only — English; staff never see this)", None),

@@ -1406,6 +1406,17 @@ _PB_FULLY_BOOKED = ("Your pay-back time is already fully booked ✓ Just work th
                     "ម៉ោងសងរបស់ប្អូនត្រូវបានកក់រួចរាល់ហើយ ✓ គ្រាន់តែធ្វើតាមម៉ោងដែលបានកក់។")
 
 
+# The stored `who` is an English key (child/spouse/parent/family); dropped raw into a Khmer
+# sentence it reads half-English ("សង្ឃឹមថា child របស់ប្អូន…"). Map to a BARE Khmer noun —
+# no possessive, because the templates already supply របស់ប្អូន / របស់អ្នក.
+_WHO_KH_BARE = {"child": "កូន", "spouse": "ប្តី/ប្រពន្ធ", "parent": "ឪពុក/ម្តាយ",
+                "family member": "សមាជិកគ្រួសារ", "family": "សមាជិកគ្រួសារ"}
+
+
+def _who_kh(who: str) -> str:
+    return _WHO_KH_BARE.get((who or "").strip().lower(), who or "")
+
+
 def _payback_slot_keyboard(staff: dict, balance: int):
     """Build payback slot buttons sized to `balance` = the REMAINING-to-book minutes (callers
     clamp via _pb_remaining): before/after each of the next working days + day-off option +
@@ -3170,7 +3181,7 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         await _att_send(context, uid, "Staff", nm,
             "I hope your %s is better now 🤍 Are you coming tomorrow?\n"
             "សង្ឃឹមថា %s របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?"
-            % (who, who), kb=kb)
+            % (who, _who_kh(who)), kb=kb)
 
 
 async def _sfam_book(context, case: dict, reason: str) -> None:
@@ -5184,10 +5195,10 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         nm = persona.get("call_name") or persona["canonical_name"]
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s takes sick leave for their %s today.\n"
-            "FYI: %s សុំច្បាប់ឈឺសម្រាប់%sថ្ងៃនេះ។" % (nm, pend["who"], nm, pend["who"]), group=True)
+            "FYI: %s សុំច្បាប់ឈឺសម្រាប់%sថ្ងៃនេះ។" % (nm, pend["who"], nm, _who_kh(pend["who"])), group=True)
         await confirm(
             "🤍 Noted — take care of your %s. The Supervisors are informed.\n"
-            "🤍 បានកត់ត្រា — សូមថែទាំ%sរបស់អ្នក។ បានជូនដំណឹងដល់បងៗ។" % (pend["who"], pend["who"]),
+            "🤍 បានកត់ត្រា — សូមថែទាំ%sរបស់អ្នក។ បានជូនដំណឹងដល់បងៗ។" % (pend["who"], _who_kh(pend["who"])),
             "🧪 Family-sick day booked (test) — the Supervisors FYI was routed to you. /testreset to wipe.")
     elif flow == "sfam_exp":
         # the typed reason for NOT coming after a family-sick day → books tomorrow (burns another

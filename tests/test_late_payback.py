@@ -103,3 +103,16 @@ def test_slot_keyboard_returns_none_when_fully_booked(monkeypatch):
     kb = bot._payback_slot_keyboard({"id": 1, "work_start": "07:00", "work_end": "17:00",
                                      "day_off": "Tue", "expertise": []}, 0)
     assert kb is None
+
+
+def test_who_kh_maps_relation_to_bare_khmer():
+    """The stored `who` is an English key — the Khmer half must show a Khmer noun, never the raw
+    English word (the 'សង្ឃឹមថា child របស់ប្អូន' bug). Unknown/empty falls back safely."""
+    from gm_bot import bot
+    assert bot._who_kh("child") == "កូន"
+    assert bot._who_kh("spouse") == "ប្តី/ប្រពន្ធ"
+    assert bot._who_kh("parent") == "ឪពុក/ម្តាយ"
+    assert bot._who_kh("family") == "សមាជិកគ្រួសារ"
+    assert bot._who_kh("CHILD ") == "កូន"          # case/space-insensitive
+    assert bot._who_kh("sibling") == "sibling"      # unknown → unchanged, never crashes
+    assert bot._who_kh(None) == "" and bot._who_kh("") == ""
