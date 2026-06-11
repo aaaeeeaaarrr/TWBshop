@@ -361,17 +361,65 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     ]
 
 
-def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
-    """Dry-run 3: ANNUAL LEAVE — request → approval → notice, every variant we now support."""
-    appr_kb = InlineKeyboardMarkup([
+_DEMO_AL_LABEL = "① the SENIOR's approval card — the REAL card render (tap the 👁 toggle!)"
+
+
+def _demo_al_card(p: dict, show_cov: bool) -> tuple[str, InlineKeyboardMarkup]:
+    """Dry-run 3 ①: rendered by the REAL _al_card builder so body/layout/toggle can NEVER drift
+    from what seniors actually receive (owner, Jun 11 — the hand-written preview had drifted:
+    no toggle, different formatting). Approve/Not-approve demo their outcomes; the 👁 toggle
+    edits in place exactly like the real card."""
+    from gm_bot.bot import _al_card
+    d1 = _today() + timedelta(days=12)
+    req = {"id": 0, "staff_id": p["id"], "days": [(d1 + timedelta(days=i)).isoformat()
+                                                  for i in range(3)],
+           "hours_start": None, "hours_end": None, "reason": "family trip", "status": "pending"}
+    body, _real_kb = _al_card(req, p, audience="senior", sen_id=0, show_cov=show_cov)
+    tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
+           else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
+    kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:appr")],
         [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:rej")],
+        [InlineKeyboardButton(tog, callback_data="att:drs:alcov:%d" % (0 if show_cov else 1))],
     ])
+    return body, kb
+
+
+_DEMO_SW_LABELS = {
+    "partner": "① staff requests a swap → the PARTNER is asked FIRST (real card — tap the 👁!)",
+    "senior": "④ seniors' approval card (real card, same-week rule) → 2 ✅ applies the dated swap",
+}
+
+
+def _demo_swap_card(p: dict, audience: str, show_cov: bool) -> tuple[str, InlineKeyboardMarkup]:
+    """Dry-run 6 swap cards via the REAL _swap_card builder (same no-drift guarantee), with demo
+    buttons; the 👁 toggle (BOTH affected days) edits in place like the real one."""
+    from gm_bot.bot import _swap_card
+    partner = next((r for r in staff_all("active") if r.get("org") == "TWB"
+                    and r["id"] != p["id"] and r.get("canonical_name") != "Tyty"), p)
+    sw = {"id": 0, "req_off_date": (_today() + timedelta(days=3)).isoformat(),
+          "partner_off_date": (_today() + timedelta(days=5)).isoformat(),
+          "reason": "clinic",
+          "partner_ok": True if audience == "senior" else None,
+          "status": "partner_ok" if audience == "senior" else "pending"}
+    body, _real_kb = _swap_card(sw, p, partner, audience=audience, show_cov=show_cov)
+    tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
+           else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
+    rows = ([[InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:drs:noop")],
+             [InlineKeyboardButton("✋ No · ទេ", callback_data="att:drs:noop")]]
+            if audience == "partner" else
+            [[InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:noop")],
+             [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:noop")]])
+    rows.append([InlineKeyboardButton(tog, callback_data="att:drs:swcov:%s:%d"
+                                      % (audience, 0 if show_cov else 1))])
+    return body, InlineKeyboardMarkup(rows)
+
+
+def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
+    """Dry-run 3: ANNUAL LEAVE — request → approval → notice, every variant we now support."""
+    al_body, al_kb = _demo_al_card(p, False)
     return [
-        ("① the SENIOR's approval card (every senior gets it privately — even on their day off)",
-         "Meng requests AL: Tue 23/06 → Thu 25/06 (full day). Reason: family trip\n"
-         "Meng ស្នើ AL: Tue 23/06 → Thu 25/06 (ពេញមួយថ្ងៃ)។ មូលហេតុ៖ family trip\n\n"
-         "Working those hours: Davy, Nak, Sey\nអ្នកធ្វើការពេលនោះ៖ Davy, Nak, Sey", appr_kb),
+        (_DEMO_AL_LABEL, al_body, al_kb),
         ("② SHORT-NOTICE request (within 7 days) — costs points, computed total shown",
          "⚠ Short notice (within 7 days) — about −54 points for a full day (−0.1/min).\n"
          "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
@@ -516,25 +564,18 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 
 
 def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
-    """Dry-run 7: DAY-OFF SWAP — partner asked FIRST, then 2 seniors, same-week rule."""
-    agree_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:drs:noop")],
-        [InlineKeyboardButton("✋ No · ទេ", callback_data="att:drs:noop")]])
+    """Dry-run 6 (swap): partner asked FIRST, then 2 seniors, same-week rule. The partner and
+    senior cards render via the REAL _swap_card builder (no drift, real 👁 toggle)."""
+    pa_body, pa_kb = _demo_swap_card(p, "partner", False)
     return [
-        ("① staff requests a swap → the PARTNER is asked FIRST (their veto is cheapest)",
-         "Davy wants to swap day off: Davy takes Wed off, you take Fri — same week. Reason: clinic\n"
-         "Davy ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ Davy ឈប់ថ្ងៃពុធ, អ្នកឈប់ថ្ងៃសុក្រ — ក្នុងសប្តាហ៍ដដែល។ "
-         "មូលហេតុ៖ clinic", agree_kb),
+        (_DEMO_SW_LABELS["partner"], pa_body, pa_kb),
         ("② partner agrees → goes to the seniors",
          "✅ You agreed — sent to seniors.\n"
          "✅ ប្អូនបានយល់ព្រមហើយ — បានផ្ញើទៅបងៗ។", None),
         ("③ partner declines OR stays silent → swap doesn't happen, seniors never bothered",
          "Your day-off swap wasn't accepted by your partner.\n"
          "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។", None),
-        ("④ seniors' approval card (same-week rule) → 2 ✅ applies the dated swap",
-         "Day-off swap: Davy ↔ Mealea. Reason: clinic\n"
-         "ប្តូរថ្ងៃឈប់៖ Davy ↔ Mealea។ មូលហេតុ៖ clinic",
-         _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
+        (_DEMO_SW_LABELS["senior"],) + _demo_swap_card(p, "senior", False),
         ("⑤ approved → SUPERVISORS notice",
          "Day-off swap: Davy off Fri 12/06, Mealea off Wed 10/06.\n"
          "ប្តូរថ្ងៃឈប់៖ Davy ឈប់ Fri 12/06, Mealea ឈប់ Wed 10/06។", None),
@@ -617,8 +658,10 @@ async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if i + 1 < len(events):
         rows.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (i + 2, len(events)),
                                           callback_data="att:dr:next")])
+    # real-builder card bodies carry HTML (<b> dates) — render them as the staff would see them
     await context.bot.send_message(chat_id, "🧪 %s\n────────────\n%s" % (label, text),
-                                   reply_markup=InlineKeyboardMarkup(rows) if rows else None)
+                                   reply_markup=InlineKeyboardMarkup(rows) if rows else None,
+                                   parse_mode="HTML" if "<b>" in text else None)
 
 
 # ---------------------------------------------------------------- shell state
@@ -1923,6 +1966,30 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         what = data[2] if len(data) > 2 else ""
         if what == "noop":            # acknowledge-style buttons (OK / I agree …) just advance
             return await _dryrun_next(update, context)
+        if what in ("alcov", "swcov"):    # the 👁 toggle — edits in place, like the real card
+            p2 = _persona(context) or next(
+                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None
+                 and r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"), None)
+            if p2 is None:
+                return
+            if what == "alcov":
+                label, (body, kb2) = _DEMO_AL_LABEL, _demo_al_card(p2, data[3] == "1")
+            else:
+                label = _DEMO_SW_LABELS.get(data[3], "")
+                body, kb2 = _demo_swap_card(p2, data[3], data[4] == "1")
+            ev = context.user_data.get("att_dr_events") or []
+            di = context.user_data.get("att_dr_i", 0)
+            rows2 = list(kb2.inline_keyboard)
+            if di < len(ev):
+                rows2.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (di + 1, len(ev)),
+                                                   callback_data="att:dr:next")])
+            try:
+                await query.edit_message_text("🧪 %s\n────────────\n%s" % (label, body),
+                                              reply_markup=InlineKeyboardMarkup(rows2),
+                                              parse_mode="HTML")
+            except Exception:
+                pass
+            return
         if what == "part":
             await context.bot.send_message(
                 update.effective_chat.id,

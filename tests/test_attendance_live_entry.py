@@ -1434,6 +1434,29 @@ def test_att_send_testkhmer_toggle(monkeypatch):
     assert "បានអនុម័ត។" in sent["text"]
 
 
+def test_demo_cards_use_real_builders():
+    """Dry-run AL/swap cards render via the REAL _al_card/_swap_card (owner, Jun 11: the
+    hand-written previews drifted — no 👁 toggle, wrong layout). The demo must carry the
+    toggle, the bold HTML dates, and flip its label with show_cov."""
+    import pytest
+    from shared import database as db
+    p = next((s for s in db.staff_all("active")
+              if s.get("org") == "TWB" and s.get("work_start")), None)
+    if p is None:
+        pytest.skip("no DB/staff available")
+    body, kb = ui._demo_al_card(p, False)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    cds = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "requests AL" in body and "<b>" in body            # the REAL card body, HTML dates
+    assert any("👁" in l for l in labels)                     # the toggle is there
+    assert "att:drs:alcov:1" in cds                           # demo toggle, show
+    body2, kb2 = ui._demo_al_card(p, True)
+    assert any("🙈" in b.text for row in kb2.inline_keyboard for b in row)   # flips to hide
+    sb, skb = ui._demo_swap_card(p, "partner", False)
+    assert "swap day off" in sb or "ប្តូរថ្ងៃឈប់" in sb       # the REAL swap card body
+    assert any("👁" in b.text for row in skb.inline_keyboard for b in row)
+
+
 def test_dryrun_choice_buttons_demo_not_skip():
     """Choice buttons inside a dry-run step keep their DEMO callbacks (att:drs:* sends the
     consequence message); real-flow callbacks become Next. Owner found 'Pay 1 hour only'
