@@ -1448,8 +1448,12 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
             if state == "early":
                 points_record(staff["id"], "early_arrival", 1, shift_date)
             elif state == "late":
-                informed = bool(att_get_session(staff["id"], shift_date))  # placeholder; declare-flag later
-                points_record(staff["id"], "late_uninformed", late, shift_date)
+                # declared beforehand → the cheaper rate (was a placeholder that charged
+                # EVERYONE late_uninformed −2/min; fixed when points went ACTIVE, Jun 11)
+                from shared.database import late_was_informed
+                cause = ("late_informed" if late_was_informed(staff["id"], shift_date)
+                         else "late_uninformed")
+                points_record(staff["id"], cause, late, shift_date)
         except Exception:
             pass
     if first and not update.edited_message:
@@ -2206,6 +2210,21 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         amount = alm.al_day_count(days, req["kind"], frac, day_off=requester.get("day_off"),
                                   non_working=nw)
         new_bal = al_deduct(req["staff_id"], amount)
+        # short-notice points event (−0.1/min rule): quantity = window-minutes × short-notice
+        # days, judged against the REQUEST date (when they asked, not when seniors decided)
+        try:
+            from datetime import date as _d
+            created = req["created_at"].date() if req.get("created_at") else _today_pp()
+            near = [d for d in days
+                    if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS]
+            if near:
+                win = sl
+                if req["kind"] == "hours" and req.get("hours_start"):
+                    win = (to_min(req["hours_end"]) - to_min(req["hours_start"])) % 1440 or sl
+                points_record(req["staff_id"], "short_notice_al",
+                              int(win * len(near)), "al:%d" % req["id"])
+        except Exception as e:
+            logger.error("short-notice points record failed: %s", e)
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
             "AL របស់ប្អូនសម្រាប់ %s បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត 🤍"

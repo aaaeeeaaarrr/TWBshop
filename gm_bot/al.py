@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 SHORT_NOTICE_DAYS = 7          # <7 days ahead = short notice (points cost)
-SHORT_NOTICE_PT_PER_MIN = 0.1  # pending activation
+SHORT_NOTICE_PT_PER_MIN = 0.1  # ACTIVE (owner, Jun 11) — mirrors points_rules short_notice_al
 APPROVALS_NEEDED = 2
 
 
@@ -23,7 +23,7 @@ def short_notice_days(al_days: list[str], today: date) -> list[str]:
 
 
 def points_cost(short_days: int, shift_minutes: int) -> int:
-    """Rough full-day short-notice points hit (pending activation)."""
+    """Rough full-day short-notice points hit."""
     return round(SHORT_NOTICE_PT_PER_MIN * shift_minutes * short_days)
 
 

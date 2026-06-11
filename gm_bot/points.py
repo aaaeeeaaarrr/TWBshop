@@ -8,8 +8,8 @@ points = sum over events of rule.value * quantity, counting only ACTIVE rules in
 """
 from __future__ import annotations
 
-# The catalogue (seeded inactive — owner sets values + flips active later).
-# cause: (default value, per-what)
+# The catalogue — ACTIVATED with these values by the owner 2026-06-11 (was seeded inactive).
+# cause: (value, per-what)
 CATALOGUE = {
     "early_arrival":     (10,  "per event  — arrived >5 min early (shift or payback slot)"),
     "late_informed":     (-1,  "per minute — late, told us before shift start"),
@@ -17,6 +17,8 @@ CATALOGUE = {
     "no_show":           (-2,  "per shift minute — never arrived"),
     "return_after_doctor": (15, "per event — came in after papers (no pressure)"),
     "ot_no_show":        (-30, "per event — accepted OT then didn't do it"),
+    "short_notice_al":   (-0.1, "per affected minute — AL day requested within 7 days "
+                                "(quantity = window-min × short-notice days)"),
 }
 
 

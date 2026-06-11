@@ -29,7 +29,7 @@ from shared.database import (staff_all, att_test_on, staff_get_by_uid, flow_save
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 _PP = ZoneInfo("Asia/Phnom_Penh")
-SHORT_NOTICE_PT_PER_MIN = 0.1   # owner, session 28: AL days within 7 days cost −0.1 pt/min (pending)
+SHORT_NOTICE_PT_PER_MIN = 0.1   # owner, session 28: AL days within 7 days cost −0.1 pt/min (ACTIVE since Jun 11)
 
 
 def _today() -> date:
@@ -1239,14 +1239,33 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
+def al_today_allowed(p: dict) -> bool:
+    """OWNER RULE (Jun 11): once today's shift has STARTED, same-day AL exists only if they
+    CHECKED IN (early or late) — otherwise the today button isn't even shown. Why: without it,
+    a no-show launders itself into an innocent AL day (dodging the 1-day-pay no-show penalty),
+    and an oversleeper dodges the late ladder by tapping 'AL from now' from bed. Before the
+    shift starts, today is requestable as normal (short-notice costs apply)."""
+    ws = to_min(p.get("work_start"))
+    if ws is None:
+        return True
+    if _now_min() < ws:                  # today's shift hasn't started yet
+        return True
+    from shared.database import att_get_session
+    sess = att_get_session(p["id"], _today().isoformat()) or {}
+    return bool(sess.get("checked_in_at"))
+
+
 def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     al_left = p.get("al_left")
     start = _today() + timedelta(days=page * 28)
     days = [start + timedelta(days=i) for i in range(28)]
     near_cut = _today() + timedelta(days=6)
+    today_iso = _today().isoformat()
     btns = []
     for d in days:
         iso = d.isoformat()
+        if iso == today_iso and not al_today_allowed(p):
+            continue                     # shift started, never checked in → no AL-today button
         mark = "✅ " if iso in picked else ""
         warn = "⚠ " if d <= near_cut else ""
         btns.append(InlineKeyboardButton(warn + mark + day_label(d), callback_data="att:al:d:%s" % iso))
@@ -2101,8 +2120,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                     pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
-                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
-                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min)."
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
                     _arm_pending(context, update,
@@ -2134,8 +2153,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if near:
                     window = t - f
                     pts = round(SHORT_NOTICE_PT_PER_MIN * window * len(near))
-                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min, pending activation)."
-                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min, រង់ចាំបើកប្រើ)។"
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min)."
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
                     _arm_pending(context, update,

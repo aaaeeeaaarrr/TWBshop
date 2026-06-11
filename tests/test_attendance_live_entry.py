@@ -1720,6 +1720,45 @@ def test_audit_validators():
           "al_left": 5, "work_start": None, "work_end": None}]))
 
 
+def test_al_today_gate(monkeypatch):
+    """OWNER RULE: once today's shift STARTED, the AL-today button exists only after a CHECK-IN —
+    otherwise a no-show could launder itself into an AL day (dodging the no-show penalty)."""
+    from shared import database as db
+    p = {"id": 11, "canonical_name": "Sao Visal", "call_name": "Visal",
+         "work_start": "08:00", "work_end": "17:00", "al_left": 10}
+    sess = {}
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: sess or None)
+
+    monkeypatch.setattr(ui, "_now_min", lambda: 7 * 60)          # 07:00 — before start
+    assert ui.al_today_allowed(p) is True                        # normal same-day request
+    monkeypatch.setattr(ui, "_now_min", lambda: 9 * 60)          # 09:00 — shift started
+    assert ui.al_today_allowed(p) is False                       # no check-in → gated
+    sess["checked_in_at"] = "2026-06-11T08:50:00"
+    assert ui.al_today_allowed(p) is True                        # checked in (even late) → allowed
+    # and the BUTTON itself disappears from the day grid
+    monkeypatch.setattr(ui, "al_today_allowed", lambda _p: False)
+    _, kb = ui.al_screen(p, set(), page=0)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    today_lbl = ui.day_label(ui._today())
+    assert not any(today_lbl in l for l in labels)               # the button is not even there
+    monkeypatch.setattr(ui, "al_today_allowed", lambda _p: True)
+    _, kb2 = ui.al_screen(p, set(), page=0)
+    labels2 = [b.text for row in kb2.inline_keyboard for b in row]
+    assert any(today_lbl in l for l in labels2)
+
+
+def test_points_catalogue_active_values():
+    """The activated values (owner, Jun 11): the catalogue is the contract the DB rules mirror,
+    and the informed/uninformed split actually halves the damage."""
+    from gm_bot.points import CATALOGUE, total_points
+    assert CATALOGUE["late_informed"][0] == -1 and CATALOGUE["late_uninformed"][0] == -2
+    assert CATALOGUE["early_arrival"][0] == 10 and CATALOGUE["short_notice_al"][0] == -0.1
+    rules = {c: {"value": v, "active": True} for c, (v, _) in CATALOGUE.items()}
+    assert total_points([{"cause": "late_informed", "quantity": 30}], rules) == -30
+    assert total_points([{"cause": "late_uninformed", "quantity": 30}], rules) == -60
+    assert total_points([{"cause": "short_notice_al", "quantity": 540}], rules) == -54  # 9h day
+
+
 def test_auto_audit_job_silent_clean_loud_on_problems(monkeypatch):
     """The daily auto-audit: clean → NO message at all; problems → owner DM with paste-to-Claude
     lines; always forced to REAL rows (test_rows=False) regardless of test mode."""

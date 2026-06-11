@@ -33,7 +33,12 @@
    swaps, staff schedule sanity). ✅ clean = the role-play actually produced lawful data; ❌ = a
    paste-to-Claude problem list. Then `/testreset`. (After live, `/audit` checks the real rows —
    run it whenever you want assurance. First real-data run 2026-06-11: CLEAN.)
-4. ⏳ **Points activation** — values stay dormant until the owner finalizes them (catalogued, not blocking).
+4. ✅ **Points ACTIVATED (owner, 2026-06-11)** with the catalogued values: early +10 · late
+   informed −1/min · late uninformed −2/min · no-show −2/shift-min · return-after-doctor +15 ·
+   OT no-show −30 · short-notice AL −0.1/affected-min. Found+fixed at activation: the verdict
+   charged EVERYONE late_uninformed (placeholder) — now reads the declare flag; short-notice AL
+   was displayed but never recorded — now recorded at approval. Also built: the AL-today gate
+   (shift started + no check-in → no AL-today button; kills no-show laundering).
 
 ## C. The flip
 1. Owner confirms role-play is clean → `/testreset` (wipe test rows) → `/teststatus` shows zero.

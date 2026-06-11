@@ -3474,6 +3474,17 @@ def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) 
             return cur.fetchone()["id"]
 
 
+def late_was_informed(staff_id: int, for_shift: str) -> bool:
+    """Did the staffer DECLARE this lateness before arriving? Drives the points cause:
+    late_informed (−1/min) vs late_uninformed (−2/min) — honesty halves the damage."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT 1 FROM lateness_records
+                           WHERE staff_id=%s AND for_shift=%s AND informed_before AND is_test=%s
+                           LIMIT 1""", (staff_id, for_shift, _ATT_TEST))
+            return cur.fetchone() is not None
+
+
 def payback_open_debt(staff_id: int) -> dict | None:
     """The staff's single open payback debt (balance = owed-paid), or None. Mode-scoped: in test
     mode it sees only is_test debts, in live only real ones (so the two never merge/mix)."""
