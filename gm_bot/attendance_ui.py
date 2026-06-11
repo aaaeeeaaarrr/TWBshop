@@ -1548,6 +1548,31 @@ def _sc_pool():
     return [r for r in staff_all("active") if r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"]
 
 
+def _sc_reason_prompt(p: dict, context, sid: int, tdidx: int, start: int, end: int,
+                      shift_sum: str, show_cov: bool):
+    """The senior's reason prompt for a shift redefine, with the 👁 who's-working toggle (owner,
+    Jun 11: both parties must see who covers the NEW times — it helps them decide). Coverage is
+    computed live for the redefined window on that date."""
+    line = shift_sum
+    if show_cov:
+        try:
+            from gm_bot.bot import _sc_coverage_lines
+            rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+            cov = _sc_coverage_lines(rec, (_today() + timedelta(days=tdidx)).isoformat(),
+                                     start, end) if rec else ""
+        except Exception:
+            cov = ""
+        if cov:
+            line += "\n\n👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
+    line += ("\n\n📝 Type the reason — your next message sends it "
+             "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការអនុម័ត។")
+    tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
+           else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
+    extra_rows = [[InlineKeyboardButton(tog, callback_data="att:scp:cov:%d:%d:%d:%d:%d"
+                                        % (sid, tdidx, start, end, 0 if show_cov else 1))]]
+    return _arm_prompt(p, context, line, "att:scp:staff", extra_rows=extra_rows)
+
+
 def sc_staff_pick(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """Give OT / change a shift — pick the staffer."""
     rows = [_back_row("att:aw")]
@@ -2403,11 +2428,24 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                      "when_date": (_today() + timedelta(days=tdidx)).isoformat(),
                      "start_min": start, "end_min": end, "normal_len": normal_len,
                      "_summary": _shift_sum})
-                return await show(_arm_prompt(p, context,
-                    "%s\n\n📝 Type the reason — your next message sends it "
-                    "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការអនុម័ត។"
-                    % _shift_sum, "att:scp:staff"))
+                return await show(_sc_reason_prompt(p, context, sid, tdidx, start, end,
+                                                    _shift_sum, show_cov=False))
             return await show(sc_staff_pick(p))
+        if sub == "cov":
+            # att:scp:cov:{sid}:{tdidx}:{start}:{end}:{flag} — the prompt's 👁 toggle (owner,
+            # Jun 11: the SENIOR deciding new times must see who's working them). The armed
+            # pending stays untouched — this only re-renders the prompt.
+            sid, tdidx, start, end, flag = (int(data[3]), int(data[4]), int(data[5]),
+                                            int(data[6]), int(data[7]))
+            rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+            normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+            extra = max(0, end - (start + normal_len))
+            rnm = (rec or {}).get("call_name") or "the staffer"
+            _shift_sum = ("Shift change — %s %s-%s%s for %s."
+                          % (day_label(_today() + timedelta(days=tdidx)), fmt12(start),
+                             fmt12(end % 1440), (" (+%dh OT)" % (extra // 60)) if extra else "", rnm))
+            return await show(_sc_reason_prompt(p, context, sid, tdidx, start, end,
+                                                _shift_sum, show_cov=bool(flag)))
         return await show(sc_staff_pick(p))
     if action == "ci":
         return await show(checkin_screen(p))

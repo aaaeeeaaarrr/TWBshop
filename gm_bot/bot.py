@@ -1667,16 +1667,27 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
     return leave_id
 
 
-async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
-                              start_min: int, end_min: int, normal_len: int, reason: str) -> int:
-    """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
-    Creates a PROPOSED row and sends the staff an approval card. OT is emergent = worked beyond
-    normal_len; normal attendance rules apply to [start,end]. Any extension first clears outstanding
-    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring)."""
-    from shared.database import shift_change_create, payback_open_debt
+def _sc_coverage_lines(staff: dict, when_date: str, start_min: int, end_min: int) -> str:
+    """Who's working the REDEFINED window on that date (plain text). An overnight tail past
+    midnight shows the when_date portion only — good enough to decide coverage."""
+    s = start_min % 1440
+    e = 1440 if end_min > 1440 else end_min
+    hs = "%02d:%02d" % (s // 60, s % 60)
+    he = "23:59" if e >= 1440 else "%02d:%02d" % (e // 60, e % 60)
+    try:
+        return _al_availability_lines(staff, [str(when_date)], hs, he) or ""
+    except Exception:
+        return ""
+
+
+def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    """The staff's shift-redefine card — Approve/Can't while proposed, the decision line after,
+    and a PERSISTENT 👁 who's-working toggle at every stage (owner, Jun 11: both parties must
+    see who covers the new times — it helps them decide)."""
+    from shared.database import payback_open_debt
     from gm_bot import ot as ot_mod
-    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len, reason)
-    sn = staff.get("call_name") or staff["canonical_name"]
+    start_min, end_min = int(g["start_min"]), int(g["end_min"])
+    normal_len = int(g.get("normal_len") or 0)
     extra = max(0, end_min - (start_min + normal_len))
     pb = 0
     if extra:
@@ -1691,11 +1702,61 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
             "Why · មូលហេតុ៖ %s\n\n"
             "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
             "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
-            % (when_date, win, tagtxt, when_date, win, tagtxt, reason))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
-        [InlineKeyboardButton("❌ Can't — explain · មិនអាច — ពន្យល់", callback_data="att:sc:no:%d" % cid)],
-    ])
+            % (g["when_date"], win, tagtxt, g["when_date"], win, tagtxt, g.get("reason") or "—"))
+    st = g.get("status")
+    if st == "approved":
+        body += "\n\n✅ Approved · បានយល់ព្រម"
+    elif st == "declined":
+        body += "\n\n❌ Declined · បានបដិសេធ"
+    elif st == "done":
+        body += "\n\n✅ Done · រួចរាល់"
+    if show_cov:
+        cov = _sc_coverage_lines(staff, g["when_date"], start_min, end_min)
+        if cov:
+            body += "\n\n👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
+    rows = []
+    if st == "proposed":
+        rows = [[InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % g["id"])],
+                [InlineKeyboardButton("❌ Can't — explain · មិនអាច — ពន្យល់",
+                                      callback_data="att:sc:no:%d" % g["id"])]]
+    cov_btn = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+               else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
+    rows.append([InlineKeyboardButton(cov_btn[0],
+                 callback_data="att:sccov:%d:%d" % (g["id"], cov_btn[1]))])
+    return body, InlineKeyboardMarkup(rows)
+
+
+async def _sc_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:sccov:{cid}:{flag} — the shift-change card's who's-working toggle, any stage."""
+    from shared.database import shift_change_get
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    g = shift_change_get(int(parts[2]))
+    staff = next((s for s in staff_all("active") if s["id"] == (g or {}).get("staff_id")), None)
+    if not g or not staff:
+        return await _expired_toast(query, context,
+                                    update.effective_user.id if update.effective_user else None)
+    body, kb = _sc_card(g, staff, show_cov=bool(int(parts[3])))
+    try:
+        await query.edit_message_text(body, reply_markup=kb)
+    except Exception:
+        pass
+
+
+async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
+                              start_min: int, end_min: int, normal_len: int, reason: str) -> int:
+    """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
+    Creates a PROPOSED row and sends the staff an approval card. OT is emergent = worked beyond
+    normal_len; normal attendance rules apply to [start,end]. Any extension first clears outstanding
+    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring)."""
+    from shared.database import shift_change_create, shift_change_get
+    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len, reason)
+    sn = staff.get("call_name") or staff["canonical_name"]
+    g = shift_change_get(cid) or {"id": cid, "when_date": when_date, "start_min": start_min,
+                                  "end_min": end_min, "normal_len": normal_len, "reason": reason,
+                                  "status": "proposed", "staff_id": staff["id"]}
+    body, kb = _sc_card(g, staff, show_cov=False)
     suid = (staff.get("telegram_ids") or [None])[0]
     msg = await _att_send(context, suid, "Staff", sn, body, kb=kb)
     if msg is not None:
@@ -1717,12 +1778,18 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         staff = staff_get_by_uid(update.effective_user.id)
         if not staff or staff["id"] != g["staff_id"]:
             return
+    stf0 = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
     if query.data.split(":")[2] == "no":
         shift_change_set_status(cid, "declined")
-        await query.edit_message_text(query.message.text + "\n\n❌ Declined · បានបដិសេធ")
+        if stf0:   # rebuild the card → decision line shown, the 👁 toggle SURVIVES (owner)
+            body0, kb0 = _sc_card(dict(g, status="declined"), stf0, show_cov=False)
+            try:
+                await query.edit_message_text(body0, reply_markup=kb0)
+            except Exception:
+                pass
         # tell the PROPOSING senior (owner, Jun 11: they were left waiting forever otherwise)
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
-        stf = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+        stf = stf0
         if sen:
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                 sen.get("call_name") or sen["canonical_name"],
@@ -1740,8 +1807,13 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             await _ask_reason(query, sen.get("call_name") or sen["canonical_name"])
         return
     shift_change_set_status(cid, "approved")
-    await query.edit_message_text(query.message.text + "\n\n✅ Approved · បានយល់ព្រម")
-    staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+    if stf0:   # rebuild → ✅ line + the 👁 toggle stays usable after the decision (owner)
+        body0, kb0 = _sc_card(dict(g, status="approved"), stf0, show_cov=False)
+        try:
+            await query.edit_message_text(body0, reply_markup=kb0)
+        except Exception:
+            pass
+    staff = stf0
     if staff:
         nm = staff.get("call_name") or staff["canonical_name"]
         win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
@@ -5745,6 +5817,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_swap_senior_callback, pattern=r"^att:swps:"))
     app.add_handler(CallbackQueryHandler(_swap_coverage_toggle, pattern=r"^att:swcov:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
+    app.add_handler(CallbackQueryHandler(_sc_cov_callback, pattern=r"^att:sccov:"))
     app.add_handler(CallbackQueryHandler(_shift_change_callback, pattern=r"^att:sc:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))

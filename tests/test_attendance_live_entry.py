@@ -2235,3 +2235,36 @@ def test_dead_tap_visibility(monkeypatch):
     assert len(alarms) == 1 and "12:57" in alarms[0] and "legacy:button" in alarms[0]
     asyncio.run(bot._expired_button_callback(upd, types.SimpleNamespace(bot=_OwnerBot())))
     assert len(alarms) == 1
+
+
+def test_sc_card_and_prompt_coverage_toggle(monkeypatch):
+    """Shift-redefine surfaces carry the who's-working toggle at every stage (owner, Jun 11):
+    the staff card (proposed AND decided) and the senior's reason prompt."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    staff = next((s for s in db.staff_all("active")
+                  if s.get("org") == "TWB" and s.get("work_start")), None)
+    import pytest
+    if staff is None:
+        pytest.skip("no DB/staff")
+    g = {"id": 9, "staff_id": staff["id"], "when_date": "2026-06-17",
+         "start_min": 150, "end_min": 930, "normal_len": 540,
+         "reason": "needed", "status": "proposed"}
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    body, kb = bot._sc_card(g, staff, show_cov=False)
+    labels = [b.text for row in kb.inline_keyboard for b in row]
+    assert any("Approve" in l for l in labels) and any("👁" in l for l in labels)
+    body2, kb2 = bot._sc_card(g, staff, show_cov=True)
+    assert any("🙈" in b.text for row in kb2.inline_keyboard for b in row)
+    # decided card: decision line shown, decision buttons gone, the toggle SURVIVES
+    body3, kb3 = bot._sc_card(dict(g, status="approved"), staff, show_cov=False)
+    labels3 = [b.text for row in kb3.inline_keyboard for b in row]
+    assert "✅ Approved" in body3 and not any("Approve ·" in l for l in labels3)
+    assert any("👁" in l for l in labels3)
+    # the senior's prompt carries the toggle too
+    from gm_bot import attendance_ui as ui2
+    ctx = types.SimpleNamespace(user_data={})
+    text, pkb = ui2._sc_reason_prompt(staff, ctx, staff["id"], 3, 360, 1020,
+                                      "Shift change — X.", show_cov=False)
+    plabels = [b.text for row in pkb.inline_keyboard for b in row]
+    assert any("👁" in l for l in plabels) and "Type the reason" in text
