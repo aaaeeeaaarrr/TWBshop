@@ -101,3 +101,8 @@ Please type the reason — it goes to the Supervisors. 🤍
 Noted — tomorrow is covered. Take care 🤍
 បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍
 
+I hope you're feeling better now 🤍 Are you coming in tomorrow?   (own-sick nightly check)
+សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 តើស្អែកមកធ្វើការទេ?
+
+[BUTTON] 📝 Really can't — explain · មកមិនបាន — សូមពន្យល់   (the sick opener's can't-come)
+

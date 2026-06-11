@@ -472,7 +472,7 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
          "What time can you come?\n"
          "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល។ អ្នកអាចមកម៉ោងប៉ុន្មាន?",
-         _ill(["9:30pm", "10pm", "10:30pm"], ["🛌 I really can't come today · ថ្ងៃនេះមកមិនបាន"])),
+         _ill(["9:30pm", "10pm", "10:30pm"], ["📝 Really can't — explain · មកមិនបាន — សូមពន្យល់"])),
         ("② Sick → Me: 'I really can't come today' → rest + papers ask",
          "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
          "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n"
@@ -501,9 +501,10 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑧ chose to rest instead",
          "Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។", None),
         ("⑨ each night while out → return check (never papers/pay-back); the answer goes to Supervisors",
-         "Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
-         "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។",
-         _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"], ["🛌 Still resting · សម្រាកបន្ត"],
+         "I hope you're feeling better now 🤍 Are you coming in tomorrow?\n"
+         "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 តើស្អែកមកធ្វើការទេ?",
+         _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"],
+              ["📝 Still resting — explain · សម្រាកបន្ត — សូមពន្យល់"],
               ["⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…"])),   # = the real buttons, bilingual
         ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for their child today.\n"
@@ -921,8 +922,8 @@ def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     offs = late_offsets(shift_len_min(p["work_start"], p["work_end"]))
     btns = [InlineKeyboardButton(fmt12(ws + o), callback_data="att:sp:meo:%d" % o) for o in offs]
     rows = [_back_row("att:sp:sick")] + grid(btns, 3)
-    rows.append([InlineKeyboardButton("🛌 I really can't come today · ថ្ងៃនេះមកមិនបានមែនទែន",
-                                      callback_data="att:sp:mecant")])
+    rows.append([InlineKeyboardButton("📝 Really can't — explain · មកមិនបាន — សូមពន្យល់",
+                                      callback_data="att:sp:mecant")])   # typed reason → Supervisors
     return _hdr(p, "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
                    "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល — មើលថាអ្នកមានអារម្មណ៍យ៉ាងម៉េច"
                    "នៅកន្លែងធ្វើការ។\n\n"

@@ -2064,5 +2064,9 @@ def test_rest_redefine_and_buyback_laws():
     # sick chain: 'extended' must have created tomorrow's case
     c1 = {"id": 5, "staff_id": 1, "who": "child", "the_date": "2026-06-11", "status": "extended"}
     c2 = {"id": 6, "staff_id": 1, "who": "child", "the_date": "2026-06-12", "status": "open"}
-    assert au.v_sick([c1, c2], staff) == []
-    assert any("never landed" in p for p in au.v_sick([c1], staff))
+    assert au.v_sick([c1, c2], staff, _dt.date(2026, 6, 12)) == []
+    assert any("never landed" in p for p in au.v_sick([c1], staff, _dt.date(2026, 6, 12)))
+    # the explain ladder's new failure mode: an open family case whose date passed = unanswered
+    stale_fam = {"id": 8, "staff_id": 1, "who": "child", "the_date": "2026-06-10", "status": "open"}
+    assert any("never answered" in p
+               for p in au.v_sick([stale_fam], staff, _dt.date(2026, 6, 12)))

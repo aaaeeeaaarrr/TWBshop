@@ -2508,8 +2508,8 @@ def _tyty_uid() -> int | None:
 
 # The nightly nudge is a RETURN CHECK only — never mentions papers or pay-back (they already know
 # paperless sick is paid back; papers are mentioned once at declaration).
-_SICK_RETURN_CHECK = ("Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
-                      "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។")
+_SICK_RETURN_CHECK = ("I hope you're feeling better now 🤍 Are you coming in tomorrow?\n"
+                      "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 តើស្អែកមកធ្វើការទេ?")
 
 
 def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
@@ -4692,8 +4692,10 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
             "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
         _snm = persona.get("call_name") or persona["canonical_name"]
+        # the typed reason was collected but DROPPED before Jun 11 — the Supervisors read it now
         await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។" % (_snm, _snm), group=True)
+            "FYI: %s is out sick today. Reason: %s\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។ មូលហេតុ៖ %s"
+            % (_snm, reason, _snm, reason), group=True)
         await confirm(
             "🤍 Rest well — I've noted your sick leave. If you see a doctor, send a photo of the papers.\n"
             "🤍 សម្រាកឱ្យបានល្អ — ខ្ញុំបានកត់ត្រាច្បាប់ឈឺ។ បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារមក។",

@@ -211,10 +211,11 @@ def v_buybacks(buybacks: list[dict], staff: dict, today: date) -> list[str]:
     return out
 
 
-def v_sick(cases: list[dict], staff: dict) -> list[str]:
-    """Sick cases: valid status (incl. 'extended' — the family nudge's one-tap re-book), and an
-    'extended' family case must have actually CREATED the next day's case (chain integrity);
-    family pool overruns (>7/year) flagged for the owner."""
+def v_sick(cases: list[dict], staff: dict, today: date | None = None) -> list[str]:
+    """Sick cases: valid status (incl. 'extended' — the explain re-book), chain integrity (an
+    'extended' case must have CREATED the next day's case), family pool overruns (>7/year), and
+    — the explain ladder's new failure mode (owner, Jun 11) — a FAMILY case left 'open' after its
+    date passed = the nudge was never answered (or 'explain' tapped but no reason ever typed)."""
     valid = {"open", "provisional", "papered", "cleared", "no_papers", "extended"}
     by_staff_dates = {}
     for c in cases:
@@ -229,6 +230,11 @@ def v_sick(cases: list[dict], staff: dict) -> list[str]:
             if nxt not in by_staff_dates.get(c["staff_id"], set()):
                 out.append("SICK: %s case #%s 'extended' but NO case exists for %s — the one-tap "
                            "re-book never landed" % (nm, c["id"], nxt))
+        if (today is not None and (c.get("who") or "me") != "me" and c.get("status") == "open"
+                and str(c.get("the_date")) < (today - timedelta(days=1)).isoformat()):
+            out.append("SICK: %s family case #%s (%s) still OPEN after its date — the night nudge "
+                       "was never answered (explain tapped but no reason typed?)"
+                       % (nm, c["id"], c.get("the_date")))
         if (c.get("who") or "me") != "me":
             k = (c["staff_id"], str(c.get("the_date"))[:4])
             fam_count[k] = fam_count.get(k, 0) + 1
@@ -374,7 +380,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_bookings(books, {d["id"]: d for d in debts}, staff, today)
                 + v_booking_redefine_pair(books, scs, staff, buybacks)
                 + v_buybacks(buybacks, staff, today)
-                + v_sick(sick, staff)
+                + v_sick(sick, staff, today)
                 + v_swaps(swaps, staff, today)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
