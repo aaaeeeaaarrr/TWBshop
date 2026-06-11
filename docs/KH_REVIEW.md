@@ -284,3 +284,98 @@ Booked ✓ — {day} {start}–{end}.
 Come 5 minutes early and you earn +10 points ⭐
 មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐
 
+**f) Stale-button recovery — short re-offer variant** (an old-format button was tapped;
+the bot shows a fresh picker with this shorter header)
+
+You owe {X} — pick when to work it off:
+អ្នកនៅត្រូវសង {X} — សូមជ្រើសពេល៖
+
+---
+
+**P11 ADDENDUM — recovery button** [BUTTON] (sits under the collapsed "expired message" line,
+one tap re-opens the main menu):
+📋 Open menu · បើកម៉ឺនុយ
+
+
+### P15 · Shift-change + day-off-swap cards & notices (Jun 11; KH = Claude DRAFT)
+
+Context: the shift-redefine flow (a senior re-times someone's working day; OT is what's worked
+beyond normal length) and the day-off swap flow. All staff-facing pieces are bilingual.
+{date} = "2026-06-14" or "Sat 14/06" · {window} = "7am-7pm" · {tag} = "(+2h OT)" or "(+1h PB)" ·
+{reason} = typed text · {name}/{req}/{partner} = call names · {d1}/{d2} = "Wed 10/06" style.
+
+---
+
+**a) Shift-change card — STAFF receives it from a senior, must approve/decline** [body]:
+
+🕒 Shift change — {date}: {window}{tag}
+🕒 ប្តូរវេន — {date}៖ {window}{tag}
+Why · មូលហេតុ៖ {reason}
+
+[then the already-approved "You're paid for the time you work…" line from section A]
+
+**Status suffixes** (appended to the same card as the decision lands) [body]:
+✅ Approved · បានយល់ព្រម
+❌ Declined · បានបដិសេធ
+✅ Done · រួចរាល់
+
+**Approve button** [BUTTON] (the decline button is P6c "❌ Can't — explain · មិនអាច — ពន្យល់"):
+✅ Approve · យល់ព្រម
+
+---
+
+**b) Senior's confirmation after sending a shift change** [body]:
+
+✅ Shift change sent — the staff is asked to approve.
+✅ បានផ្ញើការប្តូរវេន — បានសុំបុគ្គលិកអនុម័ត។
+
+---
+
+**c) Senior reason prompt — type why before the proposal goes out** [body, last line of the
+preview card; reader is a SENIOR but kept bilingual for junior seniors]:
+
+📝 Type the reason — your next message sends it to them for approval.
+📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការអនុម័ត។
+
+---
+
+**d) Senior picker header — whom to give OT / change a shift for** [body]:
+
+Give OT / change a shift — for whom?
+ឱ្យ OT / ប្តូរវេន — ឱ្យអ្នកណា?
+
+---
+
+**e) Day-off swap cards — THREE audiences, same swap** [bodies; "Reason · មូលហេតុ៖ {reason}"
+closes each one]:
+
+PARTNER (asked to accept; {req} wants the swap):
+{req} wants to swap day off: {req} takes {d1} off, you take {d2} — same week.
+{req} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ {req} ឈប់ {d1}, អ្នកឈប់ {d2} — ក្នុងសប្តាហ៍ដដែល។
+
+REQUESTER (their own card, tracks status):
+Day-off swap — your off {d1} ↔ {partner} off {d2}.
+ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {d1} ↔ {partner} ឈប់ {d2}។
+
+SENIOR (approval card after the partner says yes):
+Day-off swap: {req} ↔ {partner}
+{req} off {d1}, {partner} off {d2}.
+ប្តូរថ្ងៃឈប់៖ {req} ↔ {partner}។ {req} ឈប់ {d1}, {partner} ឈប់ {d2}។
+
+---
+
+**f) Partner declined — notice to the requester** [body; the partner's typed reason follows
+separately via the P10 relay line]:
+
+Your day-off swap ({d1} ↔ {d2}) wasn't accepted by your partner.
+អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ ({d1} ↔ {d2}) របស់អ្នកទេ។
+
+---
+
+**g) Family-sick extension FYI — Supervisors group** [body; {name} = staffer, {reason} = their
+typed reason for not coming tomorrow]:
+
+FYI: {name}'s family-sick continues tomorrow ({relation}).
+FYI: ច្បាប់ឈឺគ្រួសាររបស់ {name} បន្តដល់ថ្ងៃស្អែក។
+Reason · មូលហេតុ៖ {reason}
+
