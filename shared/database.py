@@ -3751,6 +3751,24 @@ def att_check_in(staff_id: int, shift_date: str, at_iso: str, in_zone: bool,
             return cur.fetchone() is not None
 
 
+def flow_pending_reasons() -> list[dict]:
+    """Armed typed-reason pends (LIVE rows) — the bounded 10/20/30 nudge job scans these."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT uid, data FROM gm_flow_state
+                           WHERE flow='att_pending' AND step='reason'
+                             AND (expires_at IS NULL OR expires_at > NOW())""")
+            out = []
+            for r in cur.fetchall():
+                try:
+                    d = _json.loads(r["data"] or "{}")
+                except Exception:
+                    d = {}
+                out.append({"uid": r["uid"], "data": d})
+            return out
+
+
 def att_check_out(staff_id: int, shift_date: str, at_iso: str) -> None:
     with _db() as conn:
         with conn.cursor() as cur:

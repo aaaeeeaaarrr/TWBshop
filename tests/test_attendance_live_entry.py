@@ -2070,3 +2070,68 @@ def test_rest_redefine_and_buyback_laws():
     stale_fam = {"id": 8, "staff_id": 1, "who": "child", "the_date": "2026-06-10", "status": "open"}
     assert any("never answered" in p
                for p in au.v_sick([stale_fam], staff, _dt.date(2026, 6, 12)))
+
+
+def test_reason_nudge_ladder(monkeypatch):
+    """The bounded 10/20/30 ladder: +10 min -> nudge (counter bumps); +30 min -> auto-resolve
+    (family books with the asked-3x marker; a rejection's reason is silently dropped); never
+    more than 2 nudges; non-ladder flows untouched."""
+    import datetime as _dt
+    import gm_bot.bot as bot
+    from shared import database as db
+
+    now = _dt.datetime(2026, 6, 11, 21, 0, tzinfo=bot.finance.PP_TZ)
+    monkeypatch.setattr(bot, "_now_pp", lambda: now)
+    monkeypatch.setattr(bot, "_job_gate", lambda live_only=False: True)
+
+    def at(mins_ago, flow, nudges=0, **extra):
+        return {"uid": 100 + mins_ago, "data": {
+            "flow": flow, "armed_at": (now - _dt.timedelta(minutes=mins_ago)).isoformat(),
+            "nudges": nudges, **extra}}
+
+    rows = [at(11, "rej_exp", 0, to_sid=1),                      # -> first nudge
+            at(31, "sfam_exp", 2, case_id=7),                    # -> auto-resolve: book
+            at(31, "rej_exp", 2, to_sid=1),                      # -> auto-resolve: drop silently
+            at(5, "al", 0)]                                      # not a ladder flow -> untouched
+    saved, cleared, sent_dm, booked = [], [], [], []
+    monkeypatch.setattr(db, "flow_pending_reasons", lambda: rows)
+    monkeypatch.setattr(db, "flow_save", lambda uid, f, s, d, ttl_min=None: saved.append((uid, d)))
+    monkeypatch.setattr(db, "flow_clear", lambda uid: cleared.append(uid))
+    monkeypatch.setattr(bot, "sick_get",
+                        lambda cid: {"id": 7, "staff_id": 1, "who": "child", "status": "open"})
+
+    async def _book(ctx, case, reason):
+        booked.append(reason)
+    monkeypatch.setattr(bot, "_sfam_book", _book)
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **k):
+            sent_dm.append((chat_id, text))
+
+    asyncio.run(bot._reason_nudge_job(types.SimpleNamespace(bot=_Bot())))
+    assert len(sent_dm) == 1 and sent_dm[0][0] == 111            # exactly one nudge, right uid
+    assert saved and saved[0][1]["nudges"] == 1                  # counter persisted
+    assert booked == ["(no reason given — asked 3×)"]            # family books with the marker
+    assert sorted(cleared) == [131, 131] or cleared == [131, 131]  # both 31-min rows cleared
+
+
+def test_rej_exp_relay(monkeypatch):
+    """A decliner's typed reason is relayed to the original recipient — destination unchanged,
+    explanation added."""
+    import gm_bot.bot as bot
+    sent = []
+    staff = {"id": 5, "canonical_name": "Meng X", "call_name": "Meng", "status": "active",
+             "telegram_ids": [55]}
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: [staff])
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: staff)
+
+    async def _send(ctx, uid, role, nm, text, **k):
+        sent.append((uid, text))
+    monkeypatch.setattr(bot, "_att_send", _send)
+    msg = types.SimpleNamespace(text="coverage too thin that day", replies=[])
+    async def _reply(t, **k): msg.replies.append(t)
+    msg.reply_text = _reply
+    upd = types.SimpleNamespace(message=msg, effective_user=types.SimpleNamespace(id=55))
+    asyncio.run(bot._att_dispatch(upd, types.SimpleNamespace(), {
+        "flow": "rej_exp", "to_sid": 5, "frm": "Rath", "what": "AL request"}, live=True))
+    assert any(uid == 55 and "Rath: coverage too thin" in t for uid, t in sent)

@@ -1613,7 +1613,7 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
             % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
-        [InlineKeyboardButton("❌ Can't · មិនអាច", callback_data="att:sc:no:%d" % cid)],
+        [InlineKeyboardButton("❌ Can't — explain · មិនអាច — សូមពន្យល់", callback_data="att:sc:no:%d" % cid)],
     ])
     suid = (staff.get("telegram_ids") or [None])[0]
     msg = await _att_send(context, suid, "Staff", sn, body, kb=kb)
@@ -1648,6 +1648,12 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 "❌ %s declined the shift change for %s (%s-%s)."
                 % ((stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff"),
                    g["when_date"], _fmt_min(g["start_min"]), _fmt_min(g["end_min"])))
+            # act-first, reason-after: the staffer's reason follows to the proposing senior
+            _arm_reason(context, update, {"flow": "rej_exp", "to_sid": sen["id"],
+                                          "frm": (stf or {}).get("call_name")
+                                                 or (stf or {}).get("canonical_name", "Staff"),
+                                          "what": "shift change", "persona_id": g["staff_id"]})
+            await _ask_reason(query, sen.get("call_name") or sen["canonical_name"])
         return
     shift_change_set_status(cid, "approved")
     await query.edit_message_text(query.message.text + "\n\n✅ Approved · បានយល់ព្រម")
@@ -1869,11 +1875,11 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
     if audience == "partner" and st == "pending":
         rows.append([InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម",
                      callback_data="att:swp:%d:agree" % sw["id"])])
-        rows.append([InlineKeyboardButton("✋ No · ទេ", callback_data="att:swp:%d:no" % sw["id"])])
+        rows.append([InlineKeyboardButton("✋ No — explain · ទេ — សូមពន្យល់", callback_data="att:swp:%d:no" % sw["id"])])
     elif audience == "senior" and st == "partner_ok":
         rows.append([InlineKeyboardButton("✅ Approve · អនុម័ត",
                      callback_data="att:swps:%d:approve" % sw["id"])])
-        rows.append([InlineKeyboardButton("❌ Not approve · មិនអនុម័ត",
+        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — សូមពន្យល់",
                      callback_data="att:swps:%d:not_approve" % sw["id"])])
     rows.append([InlineKeyboardButton(cov[0],
                  callback_data="att:swcov:%d:%s:%d" % (sw["id"], audience, cov[1]))])
@@ -1942,6 +1948,13 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
                 req.get("call_name") or req["canonical_name"],
                 "Your day-off swap wasn't accepted by your partner.\n"
                 "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។")
+            # act-first, reason-after: the partner's reason is relayed to the requester
+            _arm_reason(context, update, {"flow": "rej_exp", "to_sid": req["id"],
+                                          "frm": (partner or {}).get("call_name")
+                                                 or (partner or {}).get("canonical_name", "partner"),
+                                          "what": "day-off swap",
+                                          "persona_id": (partner or {}).get("id")})
+            await _ask_reason(query, req.get("call_name") or req["canonical_name"])
         return
     swap_set_partner(int(sw["id"]), True)
     sw = swap_get(int(sw["id"]))       # re-read: status now 'partner_ok' (drives both cards)
@@ -1997,6 +2010,14 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _swap_apply(context, sw, approved=True)
     elif alm.quorum_rejected(votes, needed):
         await _swap_apply(context, sw, approved=False)
+    if query.data.split(":")[3] == "not_approve" and requester:
+        # act-first, reason-after: the senior's reason is relayed to the requester
+        sen2 = sen if not _att_test_mode() else None
+        frm = ((sen2 or {}).get("call_name") or (sen2 or {}).get("canonical_name", "a senior"))
+        _arm_reason(context, update, {"flow": "rej_exp", "to_sid": requester["id"],
+                                      "frm": frm, "what": "day-off swap",
+                                      "persona_id": (sen2 or {}).get("id") or requester["id"]})
+        await _ask_reason(query, requester.get("call_name") or requester["canonical_name"])
 
 
 async def _swap_apply(context, sw: dict, approved: bool) -> None:
@@ -2134,7 +2155,7 @@ def _al_card(req: dict, requester: dict, *, audience: str, sen_id: int = 0,
     if audience == "senior" and st == "pending":
         rows.append([InlineKeyboardButton("✅ Approve",
                      callback_data="att:alapp:%d:approve:%d" % (req["id"], sen_id))])
-        rows.append([InlineKeyboardButton("❌ Not approve",
+        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — សូមពន្យល់",
                      callback_data="att:alapp:%d:not_approve:%d" % (req["id"], sen_id))])
     rows.append([InlineKeyboardButton(cov[0],
                  callback_data="att:alcov:%d:%s:%d:%d" % (req["id"], audience, sen_id, cov[1]))])
@@ -2235,6 +2256,14 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _al_finalize(context, req, approved=True)
     elif alm.quorum_rejected(decisions, needed):
         await _al_finalize(context, req, approved=False)
+    if decision == "not_approve":
+        # act-first, reason-after (owner): the ❌ already counted; the typed reason is relayed
+        # to the requester (the destination doesn't change — only the explanation is added)
+        rq_name = (requester or {}).get("call_name") or (requester or {}).get("canonical_name", "the requester")
+        _arm_reason(context, update, {"flow": "rej_exp", "to_sid": req["staff_id"],
+                                      "frm": sen.get("call_name") or sen["canonical_name"],
+                                      "what": "AL request", "persona_id": sen["id"]})
+        await _ask_reason(query, rq_name)
 
 
 async def _al_finalize(context, req: dict, approved: bool) -> None:
@@ -2533,15 +2562,36 @@ def _sick_return_kb(case_id: int) -> InlineKeyboardMarkup:
     ])
 
 
-def _arm_sick_explain(context, update, flow: str, case_id: int, staff_id: int) -> None:
-    """Arm the next typed message as the explain-reason for a sick nudge (test: owner shell;
-    live: the staffer's own next text, 15-min window — same pattern as _arm_pending)."""
-    pend = {"flow": flow, "case_id": case_id, "persona_id": staff_id}
+NUDGE_FLOWS = {"sfam_exp", "sret_exp", "sick_me", "rej_exp"}   # the bounded 10/20/30 ladder
+
+
+def _arm_reason(context, update, pend: dict) -> None:
+    """Arm the next typed message as a REQUIRED reason, with the 10/20/30 nudge-ladder metadata
+    (owner, Jun 11: 'they might think it's all known now that they tapped'). Test: owner shell;
+    live: the tapper's next text — 35-min window so the ladder can finish before expiry."""
+    pend = dict(pend)
+    pend["armed_at"] = _now_pp().isoformat()
+    pend["nudges"] = 0
     if _att_test_mode():
         context.user_data["att_test_pending"] = pend
     else:
         from shared.database import flow_save
-        flow_save(update.effective_user.id, "att_pending", "reason", pend, ttl_min=15)
+        flow_save(update.effective_user.id, "att_pending", "reason", pend, ttl_min=35)
+
+
+def _arm_sick_explain(context, update, flow: str, case_id: int, staff_id: int) -> None:
+    """Arm the explain-reason for a sick nudge (rides the generic _arm_reason ladder)."""
+    _arm_reason(context, update, {"flow": flow, "case_id": case_id, "persona_id": staff_id})
+
+
+async def _ask_reason(query, to_name: str) -> None:
+    """The type-it-here prompt right after a decline tap — says WHERE the reason goes."""
+    try:
+        await query.message.reply_text(
+            "📝 One line why — it goes to %s.\n📝 មូលហេតុមួយឃ្លា — នឹងទៅដល់ %s។"
+            % (to_name, to_name))
+    except Exception:
+        pass
 
 
 def _sret_time_kb(case_id: int) -> InlineKeyboardMarkup:
@@ -2778,6 +2828,38 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             % (who, who), kb=kb)
 
 
+async def _sfam_book(context, case: dict, reason: str) -> None:
+    """Book TOMORROW as a continued family-sick day (status-first) + the Supervisors read the
+    reason. Shared by the typed-reason dispatch and the 30-min auto-resolve."""
+    sick_set(case["id"], status="extended")
+    tmr = (_today_pp() + timedelta(days=1)).isoformat()
+    sick_create(case["staff_id"], case.get("who") or "family", tmr, "open")
+    stf = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
+    nm = (stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff")
+    await _att_send(context, None, "Supervisors group", "",
+        "FYI: %s's family-sick continues tomorrow (%s). Reason: %s\n"
+        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។ មូលហេតុ៖ %s"
+        % (nm, case.get("who") or "family", reason, nm, reason), group=True)
+
+
+async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> None:
+    """Day-1 own-sick booking (provisional case + paperless payback + rest-well + the FYI with
+    the reason). Shared by the typed-reason dispatch and the 30-min auto-resolve."""
+    sick_create(persona["id"], "me", date_iso, "provisional")
+    from gm_bot.attendance import to_min
+    ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
+    shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
+    payback_add_debt(persona["id"], shift_min, "paperless sick", date_iso)
+    await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
+        persona.get("call_name") or persona["canonical_name"],
+        "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
+        "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
+    _snm = persona.get("call_name") or persona["canonical_name"]
+    await _att_send(context, None, "Supervisors group", "",
+        "FYI: %s is out sick today. Reason: %s\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។ មូលហេតុ៖ %s"
+        % (_snm, reason, _snm, reason), group=True)
+
+
 async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:sfam:ok|exp:{case_id} — the family-sick night nudge (owner Jun 11: coming is the
     DEFAULT; staying out requires a typed reason the Supervisors read — no one-tap easy no).
@@ -2798,6 +2880,67 @@ async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFA
     await query.edit_message_text(
         "Please type the reason — it goes to the Supervisors. 🤍\n"
         "សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍")
+
+
+async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Every 5 min (gated): the BOUNDED 10/20/30 ladder for armed reason-prompts (owner, Jun 11:
+    'they might think tapping was enough'). +10 and +20 min → a gentle nudge; +30 min of silence
+    → auto-resolve so nothing dangles: sick flows BOOK with '(no reason given — asked 3×)' (the
+    shop covers reality, the non-compliance is visible to the seniors); a rejection's reason is
+    simply dropped (the decision already stood). LIVE pends only — the owner's test shell keeps
+    its pends in user_data and needs no nudging."""
+    if not _job_gate():
+        return
+    from shared.database import flow_pending_reasons, flow_save, flow_clear
+    now = _now_pp()
+    marker = "(no reason given — asked 3×)"
+    for row in flow_pending_reasons():
+        pend = row["data"]
+        if pend.get("flow") not in NUDGE_FLOWS or not pend.get("armed_at"):
+            continue
+        try:
+            armed = datetime.fromisoformat(pend["armed_at"])
+        except Exception:
+            continue
+        age = (now - armed).total_seconds()
+        uid = row["uid"]
+        if age >= 1800:
+            fl = pend["flow"]
+            try:
+                if fl == "sfam_exp":
+                    case = sick_get(pend.get("case_id"))
+                    if case and case.get("status") == "open":
+                        await _sfam_book(context, case, marker)
+                elif fl == "sret_exp":
+                    case = sick_get(pend.get("case_id"))
+                    stf = next((s for s in staff_all("active")
+                                if s["id"] == (case or {}).get("staff_id")), None)
+                    if stf:
+                        nm = stf.get("call_name") or stf["canonical_name"]
+                        await _att_send(context, None, "Supervisors group", "",
+                            "FYI: %s is still resting — NOT back tomorrow. Reason: %s\n"
+                            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។ មូលហេតុ៖ %s"
+                            % (nm, marker, nm, marker), group=True)
+                elif fl == "sick_me":
+                    persona = next((s for s in staff_all("active")
+                                    if s["id"] == pend.get("persona_id")), None)
+                    if persona and pend.get("date"):
+                        await _sickme_book(context, persona, pend["date"], marker)
+                # rej_exp: the decision already stood — silence just drops the explanation
+            except Exception as e:
+                logger.error("reason auto-resolve failed (%s): %s", fl, e)
+            flow_clear(uid)
+            continue
+        n = int(pend.get("nudges", 0))
+        if n < 2 and age >= 600 * (n + 1):
+            try:
+                await context.bot.send_message(uid,
+                    "Still need one line from you 🤍 just type why.\n"
+                    "នៅខ្វះមូលហេតុមួយឃ្លា 🤍 សូមវាយប្រាប់ផង។")
+            except Exception:
+                pass
+            pend["nudges"] = n + 1
+            flow_save(uid, "att_pending", "reason", pend, ttl_min=35)
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4680,22 +4823,9 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "🧪 Wife-birth leave booked (test) — congratulations + Supervisors notice routed to you. "
             "/testreset to wipe.")
     elif flow == "sick_me":
-        sick_create(persona["id"], "me", pend["date"], "provisional")
-        # paperless sick is PAY-BACK from the moment they declare (papers within 2 days cancel it).
-        from gm_bot.attendance import to_min
-        ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
-        shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
-        payback_add_debt(persona["id"], shift_min, "paperless sick", pend["date"])
-        # papers are mentioned ONCE here; never repeated in the nudges, and pay-back is never spelled out.
-        await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
-            persona.get("call_name") or persona["canonical_name"],
-            "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
-            "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
-        _snm = persona.get("call_name") or persona["canonical_name"]
-        # the typed reason was collected but DROPPED before Jun 11 — the Supervisors read it now
-        await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s is out sick today. Reason: %s\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។ មូលហេតុ៖ %s"
-            % (_snm, reason, _snm, reason), group=True)
+        # provisional case + paperless payback + rest-well + the FYI carrying the typed reason
+        # (papers are mentioned ONCE; pay-back never spelled out) — shared with the auto-resolve.
+        await _sickme_book(context, persona, pend["date"], reason)
         await confirm(
             "🤍 Rest well — I've noted your sick leave. If you see a doctor, send a photo of the papers.\n"
             "🤍 សម្រាកឱ្យបានល្អ — ខ្ញុំបានកត់ត្រាច្បាប់ឈឺ។ បើបានជួបពេទ្យ សូមផ្ញើរូបថតឯកសារមក។",
@@ -4716,18 +4846,21 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         # of the 7) + the reason goes to the Supervisors. Status-first → re-sends can't double-book.
         case = sick_get(pend["case_id"])
         if case and case.get("status") == "open":
-            sick_set(case["id"], status="extended")
-            tmr = (_today_pp() + timedelta(days=1)).isoformat()
-            sick_create(case["staff_id"], case.get("who") or "family", tmr, "open")
-            nm = persona.get("call_name") or persona["canonical_name"]
-            await _att_send(context, None, "Supervisors group", "",
-                "FYI: %s's family-sick continues tomorrow (%s). Reason: %s\n"
-                "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។ មូលហេតុ៖ %s"
-                % (nm, case.get("who") or "family", reason, nm, reason), group=True)
+            await _sfam_book(context, case, reason)
         await confirm(
             "Noted — tomorrow is covered. Take care 🤍\n"
             "បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍",
             "🧪 Family-sick extended with reason (test) — the group FYI was routed to you.")
+    elif flow == "rej_exp":
+        # a decliner's typed reason → relayed to whoever the decision already reached
+        # (the destination never changes; only the explanation is added)
+        tgt = next((s for s in staff_all("active") if s["id"] == pend.get("to_sid")), None)
+        if tgt:
+            await _att_send(context, (tgt.get("telegram_ids") or [None])[0], "Staff",
+                tgt.get("call_name") or tgt["canonical_name"],
+                "📝 About your %s — %s: %s" % (pend.get("what", "request"),
+                                               pend.get("frm", "—"), reason))
+        await confirm("Sent 🤍\nបានផ្ញើ 🤍", "🧪 Reason relayed (test) — routed to you.")
     elif flow == "sret_exp":
         # the typed reason for still-resting (own sick) → the Supervisors read it
         nm = persona.get("call_name") or persona["canonical_name"]
@@ -5507,6 +5640,9 @@ def build_app() -> Application:
     app.job_queue.run_daily(_auto_audit_job,
                             time=__import__("datetime").time(hour=0, minute=30),
                             name="gm_auto_audit")
+    # bounded reason-nudge ladder (10/20/30): every 5 min, gated
+    app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
+                                name="gm_reason_nudge")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

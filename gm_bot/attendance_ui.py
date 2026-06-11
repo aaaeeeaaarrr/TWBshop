@@ -744,10 +744,19 @@ def _arm_pending(context, update, pend: dict) -> None:
         if chat_id is not None and msg_id is not None:
             pend["_prompt_chat"] = chat_id
             pend["_prompt_msg"] = msg_id
+    # sick_me rides the bounded 10/20/30 reason ladder (owner, Jun 11) — armed_at + a 35-min
+    # window so the nudge job can finish before expiry; other flows keep the 15-min default.
+    if pend.get("flow") == "sick_me":
+        from gm_bot.finance import PP_TZ
+        pend.setdefault("armed_at", datetime.now(PP_TZ).isoformat())
+        pend.setdefault("nudges", 0)
+        ttl = 35
+    else:
+        ttl = 15
     if att_test_on():
         context.user_data["att_test_pending"] = pend
     else:
-        flow_save(uid, "att_pending", "reason", pend, ttl_min=15)
+        flow_save(uid, "att_pending", "reason", pend, ttl_min=ttl)
 
 
 def _arm_prompt(p: dict, context, base: str, back: str, extra_rows=None):

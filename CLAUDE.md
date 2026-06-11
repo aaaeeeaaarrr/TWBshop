@@ -211,9 +211,63 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-11 (session 32 cont. — hardening day: /audit invariant auditor, error
-handlers on ALL bots, 5 prod crashes fixed, watchdog ARMED (was dark), owner /menu + pay automation,
-/testkhmer + dry-run resync. Suite 461. attendance_live=OFF, attendance_test_mode=ON (owner walking).)
+**Last updated:** 2026-06-11 (session 32 cont. pt2 — owner WALKTHROUGH day: 8 real finds fixed live
+(dead demos, stateless dry-runs, the unwired mini-shift → slots ARE redefines, buyback twin bug,
+real-builder demo cards); points ACTIVATED; accountability pass (every "no" costs a typed reason,
+10/20/30 nudge ladder); /audit grew to 19 law families. Suite 476. attendance_live=OFF, test ON.)
+
+**Session 32 (Jun 11, pt2) — walkthrough finds + accountability design. All deployed & verified:**
+- **WALKTHROUGH FIXES (owner screenshots → fix → deploy, same hour):** double-tap "not modified" =
+  benign no-op in the shared error handler (all bots); dry-run demo buttons restored (slot/1-hour/
+  approve demos send their consequence, acks advance); **dry-runs made STATELESS** (step rides in
+  the button `att:dr:n:{key}:{i}` — my deploys were wiping user_data → "random stops" + dead
+  buttons; legacy buttons get an honest restart note); schedule summary grouped by shift pattern
+  (22 staff → 15 blocks); **AL/swap dry-run cards render via the REAL builders** (_al_card/_swap_card
+  — real bold span, live coverage, WORKING 👁 toggle that edits in place); dry-runs 4/5/7 audited
+  line-by-line vs the real flows (7 drifts synced; marriage approval = the AL engine's message);
+  dry-run renumber 1–7; return-check preview buttons = the real bilingual ones.
+- **PAYBACK SLOTS ARE SHIFT REDEFINES (owner unification):** the dry-run promised a "mini-shift"
+  that NEVER EXISTED (nothing credited a debt from a booked slot — go-live blocker). Booking now
+  auto-creates an approved redefine (before/after-edge merge; DAY-OFF = window with normal_len=0 →
+  every worked minute credits via the SAME settle engine; partial = clamped naturally; booking →
+  'done' at settle). Owner's day-off spec: top-3 neediest windows INSIDE their own shift hours,
+  1h/2h/3h partials, full-shift debt ⇒ whole shift. `payback.redefine_window` pure + tests.
+- **BUYBACK TWIN BUG (found by "anything for /audit?"):** rest-booking debited NOTHING (same hours
+  bookable forever) + attendance would mark earned rest LATE. Now: ot_bank_spend at booking +
+  'OT rest' redefine (`ot.rest_redefine`: rest-first→come later, rest-last→leave earlier) + 'taken'
+  at settle + group notice "🌴 OT rest: …" (coverage changed = group knows).
+- **POINTS ACTIVATED (owner)** with catalogue values (+10 early · −1/−2 late · −2/min no-show ·
+  +15 doctor-return · −30 OT no-show · −0.1/min short-notice AL = NEW 7th cause). Found at
+  activation: verdict charged EVERYONE the uninformed rate (placeholder) — now **split-late**: the
+  declaration MOMENT splits minutes (before it −2, after it −1; pre-start = all −1); short-notice
+  AL was shown but never recorded — records at approval vs the REQUEST date. **AL-today gate**
+  (owner rule, didn't exist): from start−30, no AL-today button without a CHECK-IN (kills no-show
+  laundering). `/testkhmer` etc. from pt1 unchanged.
+- **ACCOUNTABILITY PASS (owner design):** every "no" costs a typed reason; positives stay one-tap.
+  Sick nudges expectation-first ("I hope your child is better now 🤍 Are you coming tomorrow?");
+  family/own-sick/opener "— explain" buttons (the opener's typed reason was being DROPPED — FYI
+  now carries it); FAMILY night nudge BUILT (was preview-only): explain → reason → tomorrow books
+  (burns 1 of 7) + group reads the reason; **rejections act-FIRST, reason-after** (AL/swap senior
+  ❌, partner ✋, staff shift-decline — each relays the typed reason to whoever the decision already
+  reached; destinations unchanged); shift-change decline now TELLS the proposing senior; **bounded
+  10/20/30 ladder** (`_reason_nudge_job`, 5-min, DB-armed pends with armed_at/nudges): 2 gentle
+  nudges then auto-resolve — sick flows BOOK with "(no reason given — asked 3×)" (reality covered,
+  non-compliance visible), rejection reasons drop (decision stood).
+- **GROUP-NOTICE RULE VERIFIED:** every confirmed outcome lands in Supervisors (2 gaps closed:
+  buyback rest + shift-change decline); rejections/completions deliberately silent. AL Supervisors
+  notice ENGLISH-only + the missing Back-at-work line (al.back_at_work_date) + hours-AL window.
+- **/audit grew to 19 law families:** booking⇄redefine pairing BOTH currencies, v_buybacks (stale
+  'booked'), v_sick (status domain, 'extended' chain integrity, >7 family pool, OPEN-past-date =
+  nudge never answered), late-points sum law, AL-gate law (start−30, from Jun 11), normal_len=0
+  valid. The PB-PAIR law caught a TEST-SUITE LEAK on its first run (autobook test wrote real
+  shift_changes rows — mocked now, orphans cancelled, row-count proven stable across a suite run).
+  Real+test audits: 0 problems.
+- **Daily auto-audit** (07:30 PP, REAL rows, silent when clean, DM on problems); Davy PB cleared
+  (owner: "she paid", + test mirror, proof in ledger); dead `secretary.service` removed from the
+  server; KH_REVIEW: width rule for buttons + all new drafts in Pending.
+**NEXT:** owner continues the walkthrough (dry-runs now stateless + truthful; interactive flows =
+the real test) → /audit on test rows → /testreset → flip attendance_live. Kimying restore muted
+(auto, Jul 1). Delis pay numbers: owner eyeballs /menu.
 
 **Session 32 (Jun 11, cont.) — reliability + owner-tools day. All deployed & verified:**
 - **`/audit` — invariant auditor (checklist B3 capstone):** one command cross-checks every button

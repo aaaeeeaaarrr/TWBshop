@@ -106,3 +106,17 @@ I hope you're feeling better now 🤍 Are you coming in tomorrow?   (own-sick ni
 
 [BUTTON] 📝 Really can't — explain · មកមិនបាន — សូមពន្យល់   (the sick opener's can't-come)
 
+### Decline-with-reason package (Jun 11 — owner; KH drafts, please polish; BUTTONS stay short)
+[BUTTON] ❌ Not approve — explain · មិនអនុម័ត — សូមពន្យល់   (AL + swap senior cards)
+[BUTTON] ✋ No — explain · ទេ — សូមពន្យល់   (swap partner card)
+[BUTTON] ❌ Can't — explain · មិនអាច — សូមពន្យល់   (staff declining a shift change)
+
+📝 One line why — it goes to {name}.   (right after the decline tap)
+📝 មូលហេតុមួយឃ្លា — នឹងទៅដល់ {name}។
+
+Still need one line from you 🤍 just type why.   (the 10/20-min nudge)
+នៅខ្វះមូលហេតុមួយឃ្លា 🤍 សូមវាយប្រាប់ផង។
+
+Sent 🤍   (after the reason is relayed)
+បានផ្ញើ 🤍
+
