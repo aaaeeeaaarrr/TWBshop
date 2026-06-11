@@ -227,3 +227,60 @@ Choose the times below to pay — these are the times we need you most:
 **About Me button** [BUTTON]:
 📅 Book pay-back time · កក់ម៉ោងសងវិញ
 
+
+### P14 · Pay-back flow messages — late-arrival + booking states (Jun 11; KH = Claude DRAFT)
+
+Context: all these appear in staff DM only. Audience: junior staff (bilingual). Tone: matter-of-fact.
+{X} = formatted duration e.g. "1h 30m". {day} = "Sat 13/06". {start}/{end} = "9am" / "10am".
+
+---
+
+**a) Fully booked — all debt already covered by booked slots**
+(shown instead of the picker when remaining = 0)
+
+Your pay-back time is already fully booked ✓ Just work the booked times.
+ម៉ោងសងរបស់ប្អូនត្រូវបានកក់រួចរាល់ហើយ ✓ គ្រាន់តែធ្វើតាមម៉ោងដែលបានកក់។
+
+---
+
+**b) Late-arrival combined — picker WITH slots still remaining**
+(sent at check-in when late; {X} = minutes late)
+
+Checked in ✓ — {X} late (counts as pay-back). Pick when to work it off — the times we need you most:
+ចុះវត្តមានរួច ✓ — យឺត {X} (រាប់ជាម៉ោងសងវិញ)។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖
+
+**b2) Late-arrival combined — fully booked already**
+(same check-in, but all debt already covered)
+
+Checked in ✓ — {X} late (counts as pay-back).
+ចុះវត្តមានរួច ✓ — យឺត {X} (រាប់ជាម៉ោងសងវិញ)។
+
+[followed by the "fully booked" line from (a)]
+
+---
+
+**c) Re-offer / ladder — picker, not at check-in** (context: re-offer from ladder or About Me)
+
+You owe {X}. Pick when to work it off — these are the times we need you most:
+អ្នកនៅត្រូវសង {X}។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖
+
+**c2) Info line appended when some debt already booked** (appended to b or c above):
+
+({booked} booked already · កក់រួច {booked} — {remaining} left to book · នៅសល់ {remaining})
+
+---
+
+**d) Clash / stale button — picked slot no longer available, show fresh picker**
+
+That time isn't available any more — {remaining} left to book. Pick again:
+ពេលនោះមិនអាចកក់បានទៀតទេ — នៅសល់ {remaining} ត្រូវកក់។ សូមជ្រើសម្តងទៀត៖
+
+---
+
+**e) Booking confirmation** (replaces the picker after a successful book)
+
+Booked ✓ — {day} {start}–{end}.
+បានកក់រួច ✓ — {day} {start}–{end}។
+Come 5 minutes early and you earn +10 points ⭐
+មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐
+
