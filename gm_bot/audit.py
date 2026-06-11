@@ -192,8 +192,9 @@ def v_late_points(sessions: list[dict], events: list[dict], staff: dict) -> list
     return out
 
 
-AL_GATE_LAW_FROM = "2026-06-12"   # the gate's birthday — older requests predate it AND predate
-                                  # location check-ins entirely (no sessions exist pre-go-live)
+AL_GATE_LAW_FROM = "2026-06-11"   # the day the gate shipped (owner may go live same day) —
+                                  # older requests predate it AND predate location check-ins
+                                  # entirely (no sessions exist pre-go-live)
 
 
 def v_al_same_day_gate(requests: list[dict], sessions: list[dict], staff: dict) -> list[str]:
