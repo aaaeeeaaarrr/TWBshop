@@ -592,11 +592,15 @@ async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     label, text, kb = events[i]
     context.user_data["att_dr_i"] = i + 1
-    # a choice button ADVANCES the dry-run (shows the consequence) — never a dead tap
+    # Choice buttons: att:drs:* DEMO their consequence (a new message shows what that tap does —
+    # owner, Jun 11: 'Pay 1 hour only' must show the 1-hour picker, not just skip ahead); anything
+    # else (real-flow callbacks) becomes Next so a dry-run can never trigger live actions.
     rows = []
     if kb:
         for r in kb.inline_keyboard:
-            rows.append([InlineKeyboardButton(b.text, callback_data="att:dr:next") for b in r])
+            rows.append([b if (b.callback_data or "").startswith("att:drs:")
+                         else InlineKeyboardButton(b.text, callback_data="att:dr:next")
+                         for b in r])
     if i + 1 < len(events):
         rows.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (i + 2, len(events)),
                                           callback_data="att:dr:next")])
@@ -1904,6 +1908,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "drs":
         # dry-run sample buttons demonstrate their consequence (owner: ladders must continue)
         what = data[2] if len(data) > 2 else ""
+        if what == "noop":            # acknowledge-style buttons (OK / I agree …) just advance
+            return await _dryrun_next(update, context)
         if what == "part":
             await context.bot.send_message(
                 update.effective_chat.id,

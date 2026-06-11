@@ -1376,6 +1376,26 @@ def test_att_send_testkhmer_toggle(monkeypatch):
     assert "បានអនុម័ត។" in sent["text"]
 
 
+def test_dryrun_choice_buttons_demo_not_skip():
+    """Choice buttons inside a dry-run step keep their DEMO callbacks (att:drs:* sends the
+    consequence message); real-flow callbacks become Next. Owner found 'Pay 1 hour only'
+    just skipping ahead instead of showing the 1-hour picker."""
+    sent = {}
+
+    class _Bot:
+        async def send_message(self, chat_id, text, reply_markup=None, **k):
+            sent["kb"] = reply_markup
+
+    upd = types.SimpleNamespace(effective_chat=types.SimpleNamespace(id=1), callback_query=None)
+    ctx = types.SimpleNamespace(bot=_Bot(), user_data={
+        "att_dr_events": [("lbl", "txt", ui._slots_kb()), ("l2", "t2", None)],
+        "att_dr_i": 0})
+    asyncio.run(ui._dryrun_next(upd, ctx))
+    cds = [b.callback_data for row in sent["kb"].inline_keyboard for b in row]
+    assert "att:drs:slot" in cds and "att:drs:part" in cds   # demos stay live
+    assert "att:dr:next" in cds                              # Next row still there
+
+
 def test_dryrun_checkout_uses_live_constant():
     """Dry-run 1's checkout preview must BE the live _CO_DONE thank-you, not a hardcoded copy that
     drifts when the live wording changes (it had: 'rest well' while live said 'have a nice day')."""
