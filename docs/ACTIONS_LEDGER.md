@@ -16,6 +16,9 @@
 
 ## Done (with proof)
 
+- **2026-06-11 — Davy (id 26): payback cleared ("she paid").** Real debt #5 (60 min) + test mirror
+  #45 credited → cleared. No attached bookings (checked first). Independent re-read: both open
+  debts now None. (Rath explicitly NOT touched — owner's hypothetical only.)
 - **2026-06-11 — Tyty (id 28): pay record corrected + included in /menu pay views.** salary 1500→
   1700 (stale), 1st stays 1700, 2nd 0, bonus 0 (owner: "only on the 1st, $1700, no bonus"). Views
   now include her (1st list only; zero-2nd staff skip the 2nd list). Verified fresh-process re-read.
