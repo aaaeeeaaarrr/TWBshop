@@ -1639,6 +1639,15 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
     if query.data.split(":")[2] == "no":
         shift_change_set_status(cid, "declined")
         await query.edit_message_text(query.message.text + "\n\n❌ Declined · បានបដិសេធ")
+        # tell the PROPOSING senior (owner, Jun 11: they were left waiting forever otherwise)
+        sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+        stf = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+        if sen:
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                sen.get("call_name") or sen["canonical_name"],
+                "❌ %s declined the shift change for %s (%s-%s)."
+                % ((stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff"),
+                   g["when_date"], _fmt_min(g["start_min"]), _fmt_min(g["end_min"])))
         return
     shift_change_set_status(cid, "approved")
     await query.edit_message_text(query.message.text + "\n\n✅ Approved · បានយល់ព្រម")
@@ -1761,6 +1770,19 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         "Booked your rest ✓ — %s %s-%s 🌴\nបានកក់ម៉ោងសម្រាករបស់អ្នករួច ✓ — %s %s-%s 🌴"
         % (d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min)),
            d.strftime("%a %d/%m"), _fmt_min(int(s_min)), _fmt_min(int(e_min))))
+    # Supervisors must know the day's coverage changed (owner, Jun 11: every confirmed outcome
+    # lands in the group) — English-only, like the payback-booked sibling.
+    from gm_bot.attendance import to_min as _tm
+    nm = staff.get("call_name") or staff["canonical_name"]
+    ws0, we0 = _tm(staff.get("work_start")), _tm(staff.get("work_end"))
+    if ws0 is not None and int(s_min) % 1440 == ws0 % 1440:
+        detail = "starts at %s (OT rest first)" % _fmt_min(int(e_min))
+    elif we0 is not None and int(e_min) % 1440 == we0 % 1440:
+        detail = "leaves at %s (OT rest last)" % _fmt_min(int(s_min))
+    else:
+        detail = "rests %s-%s (earned OT)" % (_fmt_min(int(s_min)), _fmt_min(int(e_min)))
+    await _att_send(context, None, "Supervisors group", "",
+                    "🌴 OT rest: %s on %s — %s." % (nm, d.strftime("%a %d/%m"), detail), group=True)
 
 
 def _swap_coverage_html(req: dict, partner: dict, sw: dict) -> str:
