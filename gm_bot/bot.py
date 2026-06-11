@@ -2484,6 +2484,21 @@ async def _handle_sick_paper(update: Update, context: ContextTypes.DEFAULT_TYPE)
         staff = staff_get_by_uid(update.effective_user.id)
     if not staff or staff.get("status") != "active":
         return False
+    # DEATH CONTEXT (owner — was preview-only until Jun 11): a photo within a week of a death
+    # leave gets condolence ONLY — no AI ever reads it; forwarded to owner+Tyty alone.
+    from shared.database import death_leave_recent
+    if death_leave_recent(staff["id"], (_today_pp() - timedelta(days=7)).isoformat()):
+        await msg.reply_text(
+            "You don't need to send anything — we're so sorry for your loss 🤍\n"
+            "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍")
+        for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+            if not oid:
+                continue
+            try:
+                await context.bot.forward_message(oid, msg.chat_id, msg.message_id)
+            except Exception:
+                pass
+        return True
     case = _open_sick_case(staff["id"])
     if not case:
         return False

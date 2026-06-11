@@ -2135,3 +2135,36 @@ def test_rej_exp_relay(monkeypatch):
     asyncio.run(bot._att_dispatch(upd, types.SimpleNamespace(), {
         "flow": "rej_exp", "to_sid": 5, "frm": "Rath", "what": "AL request"}, live=True))
     assert any(uid == 55 and "Rath: coverage too thin" in t for uid, t in sent)
+
+
+def test_death_photo_condolence(monkeypatch):
+    """A photo within a week of a death leave: condolence ONLY, forwarded to owner+Tyty, the
+    sick-papers/Opus path never runs (built Jun 11 — was preview-only)."""
+    import gm_bot.bot as bot
+    from shared import database as db
+
+    staff = {"id": 3, "canonical_name": "An Davy", "call_name": "Davy", "status": "active"}
+    monkeypatch.setattr(bot, "_att_active", lambda: True)
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: staff)
+    monkeypatch.setattr(bot, "_tyty_uid", lambda: None)
+    monkeypatch.setattr(db, "death_leave_recent", lambda sid, since: True)
+    opened = []
+    monkeypatch.setattr(bot, "_open_sick_case", lambda sid: opened.append(sid))
+
+    replies, fwds = [], []
+
+    class _Msg:
+        photo = [object()]
+        chat_id = 9
+        message_id = 77
+        async def reply_text(self, t, **k): replies.append(t)
+
+    class _Bot:
+        async def forward_message(self, oid, cid, mid): fwds.append(oid)
+
+    upd = types.SimpleNamespace(message=_Msg(), effective_user=types.SimpleNamespace(id=5))
+    handled = asyncio.run(bot._handle_sick_paper(upd, types.SimpleNamespace(bot=_Bot())))
+    assert handled is True
+    assert any("sorry for your loss" in r for r in replies)
+    assert fwds and opened == []                  # forwarded; papers/Opus path never touched

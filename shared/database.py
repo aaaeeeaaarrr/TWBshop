@@ -2935,6 +2935,17 @@ def sick_provisional_open() -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def death_leave_recent(staff_id: int, since_iso: str) -> bool:
+    """A death special-leave starting on/after since_iso — the photo handler's death-context
+    check: such a photo gets condolence ONLY (no AI ever reads it; owner+Tyty alone see it)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT 1 FROM special_leaves
+                           WHERE staff_id=%s AND kind='death' AND start_date>=%s AND is_test=%s
+                           LIMIT 1""", (staff_id, since_iso, _ATT_TEST))
+            return cur.fetchone() is not None
+
+
 def sick_family_open_today(today_iso: str) -> list[dict]:
     """Open FAMILY-sick cases dated today — tonight's nudge asks about tomorrow (one-tap re-book,
     owner spec; burns another of the 7 yearly family days if continued)."""

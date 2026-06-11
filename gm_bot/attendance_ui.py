@@ -555,7 +555,8 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑧ owner upgraded → staff told",
          "Your leave is extended to 3 days 🤍\n"
          "ច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ 3 ថ្ងៃហើយ 🤍", None),
-        ("⑨ ⚠ PLANNED (not built yet) — death-context PHOTO → condolence only, NO AI",
+        ("⑨ a death-context PHOTO (within a week of the leave) → condolence only, NO AI, "
+         "forwarded to owner+Tyty alone",
          "You don't need to send anything — we're so sorry for your loss 🤍\n"
          "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍", None),
         ("⑩ WIFE giving birth (2 days) + the Supervisors notice",
@@ -595,12 +596,14 @@ def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① ⚠ PLANNED (not built yet) — 👍 ACK for normal (non-problem) replies",
          "Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។\n(a reply that IS a problem gets a real answer, never a 👍)",
          None),
-        ("② GROUP REDIRECT — someone posts leave/late in a group → GM nudges them private",
-         "— AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, or it "
-         "won't be recorded 🙂\n"
-         "— AL, ឈឺ និងថ្ងៃឈប់ នឹងរាប់បានតែពេលប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
+        ("② GROUP REDIRECT — the GM REPLIES to their message IN THE GROUP, tagging them by uid "
+         "(never typing a name → no misspelling risk)",
+         "[replying to Davy's message in the Supervisors group]\n"
+         "@Davy — AL, sick and days off only count when you tell me directly. Open @twb_gm_bot, "
+         "or it won't be recorded 🙂\n"
+         "@Davy — AL, ឈឺ និងថ្ងៃឈប់ នឹងរាប់បានតែពេលប្អូនប្រាប់ខ្ញុំផ្ទាល់។ សូមបើក @twb_gm_bot "
          "បើមិនដូច្នេះ វានឹងមិនត្រូវបានកត់ត្រាទេ 🙂\n"
-         "(one of 5 rotating variants — the GM never repeats the same line back-to-back)", None),
+         "(one of 5 rotating wordings · once per person per 30 min)", None),
         ("③ CALL-OUT — private DM when a pattern shows (warm, by name, Sonnet-written)",
          "Hi Davy — we noticed Mondays have been hard lately (3 of your last 4 lates). "
          "Everything okay? Let's fix Mondays together. 🤍\n(AI-written bilingual at send time; CC to owners)",
