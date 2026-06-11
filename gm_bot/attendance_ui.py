@@ -1887,9 +1887,11 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     upcoming.sort()
     up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
     today_iso = _today().isoformat()
-    if debt_min > 0:
+    if debt_min - booked_min > 0:
         # on-demand picker re-open (owner, Jun 11): if the slot picker ever gets lost/expired,
-        # the staffer can always re-open it from here — the menu is the universal recovery
+        # the staffer can always re-open it from here — the menu is the universal recovery.
+        # Only while something is LEFT to book: a fully-booked debt hides the button (owner,
+        # Jun 11 — book-and-book-again was minting OT from the surplus).
         rows.append([InlineKeyboardButton("📅 Book pay-back time · កក់ម៉ោងសងវិញ",
                                           callback_data="att:pb:offer")])
     # CANCEL buttons ONLY in the role-play (test) shell — the /test shell must never mutate REAL data.

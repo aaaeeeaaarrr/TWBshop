@@ -13,6 +13,23 @@ _DOW = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
 PB_DEADLINE_DAYS = 14   # a debt must be worked off within 14 days (owner spec, session 28)
 
+MAX_DAY_TOTAL_MIN = 15 * 60   # owner rule (Jun 11): one day's TOTAL work time never exceeds 15h
+
+
+def day_ext_cap(normal_len_min: int) -> int:
+    """Max extension minutes bookable onto a working day — normal shift + extension caps at 15h
+    total. The remainder of a bigger debt books onto other days instead."""
+    return max(0, MAX_DAY_TOTAL_MIN - max(0, normal_len_min or 0))
+
+
+def unbooked(balance_min: int, pending_ext_min: int) -> int:
+    """Remaining-to-book = open debt MINUS the extension already covered by approved upcoming
+    redefines (booked payback slots AND senior-given extensions — the same hour is never owed
+    twice). Every payback surface (picker, My-Schedule button, the ladder, the book tap itself)
+    must size itself with THIS number, never the raw balance: sizing with the raw balance let
+    staff book the same debt over and over and mint OT from the surplus (owner find, Jun 11)."""
+    return max(0, max(0, balance_min or 0) - max(0, pending_ext_min or 0))
+
 
 def working_days_ahead(day_off: str | None, leave_iso: set[str], start: date,
                        n_days: int, count: int) -> list[date]:

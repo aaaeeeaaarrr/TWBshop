@@ -870,6 +870,43 @@ def test_settle_clamps_to_approved_window(monkeypatch):
     assert banked == []
 
 
+def test_settle_payback_slot_never_banks_ot(monkeypatch):
+    """A redefine tagged 'payback slot' can never mint OT even if worked time exceeds normal_len —
+    the slot repays debt only (owner rule, Jun 11). Without the guard, surplus minutes became
+    pure OT: book 3× the debt, work them all, gain 2× OT for free."""
+    import datetime as _dt
+    from shared import database as db
+    from gm_bot import bot, finance
+
+    # 2h payback-slot redefine (normal_len=0 = day-off window; every minute is 'extension')
+    sc = {"id": 7, "status": "approved", "normal_len": 0,
+          "start_min": 420, "end_min": 540,        # 7am-9am = 120min
+          "reason": "payback slot"}
+    banked = []
+    credited = []
+    monkeypatch.setattr(db, "shift_change_active", lambda sid, iso: sc)
+    monkeypatch.setattr(db, "payback_open_debt",
+                        lambda sid: {"id": 3, "minutes_owed": 120, "minutes_paid": 0})
+    monkeypatch.setattr(db, "payback_credit", lambda did, m: credited.append(m))
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "ot_bank_add", lambda sid, m: banked.append(m))
+    monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+    monkeypatch.setattr(db, "shift_change_claim_settle", lambda cid: True)
+    monkeypatch.setattr(db, "payback_booking_mark_done", lambda sid, d: None)
+    monkeypatch.setattr(db, "ot_buyback_mark_taken", lambda sid, d: None)
+
+    def _at(hh, mm, day=16):
+        return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
+
+    sess = {"checked_in_at": _at(7, 0)}
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: sess)
+
+    # worked the full 2h slot — debt gets credited, NOTHING banks as OT
+    bot._settle_redefined_shift({"id": 11}, "2026-06-16", _at(9, 0))
+    assert banked == [], "payback slot must not bank OT"
+    assert credited == [120], "debt should be credited for worked time"
+
+
 def test_payback_ladder_shielded_by_agreed_ot(monkeypatch):
     """OT_DESIGN §4 shield: an agreed upcoming OT landing before the debt's 14-day deadline pauses
     the ignore-ladder (no warn, no auto-book); without it the ladder runs as before. Stateless —
@@ -1836,6 +1873,27 @@ def test_audit_validators():
     assert any("NO shift times" in p for p in au.v_staff_sanity(
         [{"canonical_name": "X", "call_name": "X", "status": "active", "org": "TWB",
           "al_left": 5, "work_start": None, "work_end": None}]))
+
+    # pb_overbook: a staff with 30min debt but 120min of approved payback-slot extensions
+    sc_pb = [{"id": 20, "staff_id": 1, "status": "approved", "reason": "payback slot",
+              "when_date": _dt.date(2026, 6, 20), "start_min": 420, "end_min": 540,
+              "normal_len": 0, "ot_banked": None}]   # 120min extension, 0 normal_len (day-off style)
+    debt_30 = [{"id": 11, "staff_id": 1, "minutes_owed": 30, "minutes_paid": 0, "status": "open"}]
+    probs = au.v_pb_overbook(debt_30, sc_pb, staff)
+    assert any("PB-OVERBOOK" in p for p in probs)
+    # clean: debt >= extension
+    debt_150 = [{"id": 12, "staff_id": 1, "minutes_owed": 150, "minutes_paid": 0, "status": "open"}]
+    assert au.v_pb_overbook(debt_150, sc_pb, staff) == []
+
+    # pb_mint: a done payback-slot redefine that banked OT — violation
+    sc_minted = [{"id": 21, "staff_id": 1, "status": "done", "reason": "payback slot",
+                  "when_date": _dt.date(2026, 6, 18), "start_min": 420, "end_min": 480,
+                  "normal_len": 0, "ot_banked": 30}]
+    probs = au.v_pb_overbook([], sc_minted, staff)
+    assert any("PB-MINT" in p for p in probs)
+    # clean: done payback-slot with 0 banked
+    sc_clean = [dict(sc_minted[0], ot_banked=0)]
+    assert au.v_pb_overbook([], sc_clean, staff) == []
 
 
 def test_al_today_gate(monkeypatch):

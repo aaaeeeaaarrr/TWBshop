@@ -52,3 +52,54 @@ def test_ignore_stage():
     assert payback.ignore_stage(3) == "warn"
     assert payback.ignore_stage(4) == "autobook"
     assert payback.ignore_stage(9) == "autobook"
+
+
+def test_day_ext_cap_15h():
+    # 10h normal shift: cap = 15-10 = 5h = 300min
+    assert payback.day_ext_cap(600) == 300
+    # 14h shift: cap = 1h
+    assert payback.day_ext_cap(840) == 60
+    # 15h+ shift: cap = 0 (no room)
+    assert payback.day_ext_cap(900) == 0
+    assert payback.day_ext_cap(960) == 0
+
+
+def test_unbooked_remaining():
+    # 2h debt, 0 booked → full balance left
+    assert payback.unbooked(120, 0) == 120
+    # 2h debt, 1h already covered → 1h left
+    assert payback.unbooked(120, 60) == 60
+    # fully covered → 0 (never negative)
+    assert payback.unbooked(120, 120) == 0
+    assert payback.unbooked(120, 180) == 0
+
+
+def test_slot_keyboard_caps_at_15h(monkeypatch):
+    """A 10h shift with 11h15m debt: the picker slots must be capped at 5h (300min),
+    not 11h15m — the owner's 15h-total-day rule (Jun 11 find)."""
+    from gm_bot import bot
+    from datetime import date
+
+    monkeypatch.setattr(bot, "al_leave_days_set", lambda sid: set())
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [])
+    monkeypatch.setattr(bot, "_sc_taken_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "_today_pp", lambda: date(2026, 6, 16))
+
+    staff = {"id": 1, "work_start": "07:00", "work_end": "17:00",  # 10h shift
+             "day_off": "Tue", "expertise": []}
+    kb = bot._payback_slot_keyboard(staff, 675)  # 11h15m debt
+    assert kb is not None
+    # working-day before/after slots must use the capped size (≤300min)
+    for row in kb.inline_keyboard:
+        for btn in row:
+            if btn.callback_data.startswith("att:pb:book:") and ("🌅" in btn.text or "🌙" in btn.text):
+                mins = int(btn.callback_data.split(":")[-1])
+                assert mins <= 300, "working-day slot %d > 300min cap" % mins
+
+
+def test_slot_keyboard_returns_none_when_fully_booked(monkeypatch):
+    """remaining=0 → None so callers show the 'already fully booked' line."""
+    from gm_bot import bot
+    kb = bot._payback_slot_keyboard({"id": 1, "work_start": "07:00", "work_end": "17:00",
+                                     "day_off": "Tue", "expertise": []}, 0)
+    assert kb is None

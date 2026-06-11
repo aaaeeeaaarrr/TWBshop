@@ -15,6 +15,7 @@ import json
 from datetime import date, timedelta
 
 OT_CAP_MIN = 840          # 14h bank cap
+MAX_DAY_TOTAL_MIN = 900   # 15h — one day's total work time cap (owner rule, = payback.MAX_DAY_TOTAL_MIN)
 STALE_PENDING_DAYS = 4    # a request nobody decided for this long = stuck ladder
 STALE_OPEN_SESSION_DAYS = 2
 
@@ -97,6 +98,42 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
         if st in ("approved", "done") and r.get("normal_len") is None:
             out.append("OT: %s change #%s %s without normal_len — settle can't compute OT"
                        % (nm, r["id"], st))   # normal_len=0 is VALID (day-off payback window)
+        if (st in ("approved", "done") and r.get("start_min") is not None
+                and r.get("end_min") is not None
+                and int(r["end_min"]) - int(r["start_min"]) > MAX_DAY_TOTAL_MIN):
+            out.append("OT: %s change #%s spans %dmin — one day's total work time caps at 15h "
+                       "(owner rule)" % (nm, r["id"], int(r["end_min"]) - int(r["start_min"])))
+    return out
+
+
+def v_pb_overbook(debts: list[dict], changes: list[dict], staff: dict) -> list[str]:
+    """Owner law (Jun 11): payback-slot redefines may never out-size the debt they repay —
+    over-booking was the book-and-book-again OT mint. Per staff: (a) the summed extension of
+    APPROVED 'payback slot' redefines must fit inside the open balance; (b) a settled ('done')
+    payback-slot redefine must have banked 0 (a slot repays debt only, never mints OT)."""
+    out = []
+    open_bal: dict[int, int] = {}
+    for d in debts:
+        if d.get("status") == "open":
+            open_bal[d["staff_id"]] = (open_bal.get(d["staff_id"], 0)
+                                       + int(d["minutes_owed"]) - int(d["minutes_paid"]))
+    ext_sum: dict[int, int] = {}
+    for c in changes:
+        if c.get("reason") != "payback slot":
+            continue
+        if (c.get("status") == "done" and int(c.get("ot_banked") or 0) > 0):
+            out.append("PB-MINT: %s payback-slot redefine #%s banked %smin OT — payback slots "
+                       "must never mint OT" % (_nm(staff, c["staff_id"]), c["id"], c["ot_banked"]))
+        if c.get("status") != "approved" or c.get("start_min") is None or c.get("end_min") is None:
+            continue
+        ext = max(0, int(c["end_min"]) - int(c["start_min"]) - int(c.get("normal_len") or 0))
+        ext_sum[c["staff_id"]] = ext_sum.get(c["staff_id"], 0) + ext
+    for sid, tot in ext_sum.items():
+        bal = open_bal.get(sid, 0)
+        if tot > bal:
+            out.append("PB-OVERBOOK: %s has %dmin of approved payback-slot bookings vs %dmin "
+                       "open debt — over-booked (the surplus would become unearned OT)"
+                       % (_nm(staff, sid), tot, bal))
     return out
 
 
@@ -402,6 +439,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_noshow_vs_sessions(nos, sess, staff)
                 + v_bookings(books, {d["id"]: d for d in debts}, staff, today)
                 + v_booking_redefine_pair(books, scs, staff, buybacks)
+                + v_pb_overbook(debts, scs, staff)
                 + v_buybacks(buybacks, staff, today)
                 + v_sick(sick, staff, today)
                 + v_swaps(swaps, staff, today)

@@ -1379,33 +1379,66 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             flow_save(uid, "checkout", "await", {"shift_date": sd}, ttl_min=60)
 
 
+def _sc_taken_dates(staff_id: int) -> set[str]:
+    """Upcoming dates already holding an approved redefine — never offer a payback slot there."""
+    try:
+        from shared.database import shift_change_upcoming_dates
+        return shift_change_upcoming_dates(staff_id, _today_pp().isoformat())
+    except Exception:
+        return set()
+
+
+def _pb_remaining(staff: dict, balance: int) -> int:
+    """The bookable remainder of an open debt (payback.unbooked) — the balance minus extension
+    already covered by approved upcoming redefines. Computed FRESH at every surface (picker,
+    offer, the book tap itself) so a stale button can never over-book (owner find, Jun 11:
+    book-and-book-again was minting OT from the surplus)."""
+    from gm_bot import payback as pb
+    from shared.database import ot_pending_extension_min
+    try:
+        pend = ot_pending_extension_min(staff["id"], _today_pp().isoformat())
+    except Exception:
+        pend = 0
+    return pb.unbooked(balance, pend)
+
+
+_PB_FULLY_BOOKED = ("Your pay-back time is already fully booked ✓ Just work the booked times.\n"
+                    "ម៉ោងសងរបស់ប្អូនត្រូវបានកក់រួចរាល់ហើយ ✓ គ្រាន់តែធ្វើតាមម៉ោងដែលបានកក់។")
+
+
 def _payback_slot_keyboard(staff: dict, balance: int):
-    """Build payback slot buttons: before/after each of the next working days + day-off option +
-    partial buttons. callback att:pb:book:{date}:{start}:{end}:{mins}."""
+    """Build payback slot buttons sized to `balance` = the REMAINING-to-book minutes (callers
+    clamp via _pb_remaining): before/after each of the next working days + day-off option +
+    partial buttons. Working-day slots cap so the day's TOTAL work time never exceeds 15h
+    (owner rule, Jun 11); dates already carrying an approved redefine are skipped (a second
+    redefine would supersede the first). callback att:pb:book:{date}:{start}:{end}:{mins}."""
     from gm_bot import payback as pb
     from gm_bot.attendance import to_min
     ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
-    if ws is None or we is None:
+    if ws is None or we is None or balance <= 0:
         return None
     from gm_bot import coverage as cov
     from gm_bot.attendance import to_min
     leave = al_leave_days_set(staff["id"])
     leave_isos = set(leave)
-    days = pb.working_days_ahead(staff.get("day_off"), leave_isos,
-                                 _today_pp(), 7, 3)
+    taken = _sc_taken_dates(staff["id"])
+    days = [d for d in pb.working_days_ahead(staff.get("day_off"), leave_isos,
+                                             _today_pp(), 7, 3) if d.isoformat() not in taken]
     roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
     expertise = staff.get("expertise") or []
+    normal_len = ((we - ws) % 1440) or 1440
+    slot_size = min(balance, pb.day_ext_cap(normal_len))   # 15h-total-day cap (owner rule)
     # build (score, button) then sort neediest-first (the shop's most-needed times rise to the top)
     scored = []
-    for d in days:
+    for d in (days if slot_size > 0 else []):
         wd = d.strftime("%a")
-        for label, s_min, e_min in pb.slot_windows(ws, we, balance):
+        for label, s_min, e_min in pb.slot_windows(ws, we, slot_size):
             score = cov.slot_score(expertise, s_min, e_min, wd, roster, set(), to_min)
             txt = "%s %s %s-%s%s" % (("🌅" if label == "before" else "🌙"),
                                      d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
                                      " ⚠" if score >= 2 else "")
             scored.append((score, [InlineKeyboardButton(
-                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, balance))]))
+                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, slot_size))]))
     scored.sort(key=lambda t: -t[0])
     rows = [btn for _score, btn in scored]
     # + ONE day-off option (owner spec, now wired): the neediest slot WITHIN their regular shift hours
@@ -1414,6 +1447,8 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     do_scored = []
     for do in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos,
                                     _today_pp(), 14):
+        if do.isoformat() in taken:
+            continue
         for s_min, e_min in pb.dayoff_windows(ws, we, balance):
             sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, set(), to_min)
             do_scored.append((sc, do, s_min, e_min))
@@ -1465,11 +1500,24 @@ def _create_payback_redefine(staff: dict, slot_date: str, s_min: int, e_min: int
 
 async def _offer_payback(context, staff: dict, balance: int, uid: int,
                          late_min: int | None = None) -> None:
-    """Send the payback slot picker. On a FRESH late arrival (late_min given) the check-in verdict is
-    COMBINED into this one message — so the reason ('X late, counts as pay-back') and the picker can't
-    be read separately. Other contexts (re-offers/ladder) get the plain 'You owe X' header."""
+    """Send the payback slot picker, sized to the REMAINING-to-book minutes (never the raw
+    balance — already-booked extension covers part of the debt). On a FRESH late arrival
+    (late_min given) the check-in verdict is COMBINED into this one message — so the reason
+    ('X late, counts as pay-back') and the picker can't be read separately. Other contexts
+    (re-offers/ladder) get the plain 'You owe X' header. Fully booked → no picker, just the
+    honest 'already booked' line."""
     from gm_bot.attendance_ui import _hm
-    kb = _payback_slot_keyboard(staff, balance)
+    remaining = _pb_remaining(staff, balance)
+    kb = _payback_slot_keyboard(staff, remaining)
+    if remaining <= 0 or kb is None:
+        # everything is already covered by booked time — no picker, honest line instead
+        head = ("Checked in ✓ — %s late (counts as pay-back).\n"
+                "ចុះវត្តមានរួច ✓ — យឺត %s (រាប់ជាម៉ោងសងវិញ)។"
+                % (_hm(late_min), _hm(late_min))) if late_min is not None else \
+               ("You owe %s.\nអ្នកនៅត្រូវសង %s។" % (_hm(balance), _hm(balance)))
+        await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
+                        head + "\n" + _PB_FULLY_BOOKED)
+        return
     if late_min is not None:
         text = ("Checked in ✓ — %s late (counts as pay-back). Pick when to work it off — the "
                 "times we need you most:\n"
@@ -1480,6 +1528,10 @@ async def _offer_payback(context, staff: dict, balance: int, uid: int,
         text = ("You owe %s. Pick when to work it off — these are the times we need you most:\n"
                 "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
                 % (_hm(balance), _hm(balance)))
+    if remaining < balance:
+        text += ("\n(%s booked already · កក់រួច %s — %s left to book · នៅសល់ %s)"
+                 % (_hm(balance - remaining), _hm(balance - remaining),
+                    _hm(remaining), _hm(remaining)))
     await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
                     text, kb=kb)
 
@@ -1861,6 +1913,8 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
         ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
+        if (sc.get("reason") or "") == "payback slot":
+            ot_banked = 0   # a payback slot repays debt ONLY — it can never mint OT (owner, Jun 11)
         if pb_cleared and debt:
             payback_credit(debt["id"], pb_cleared)   # OT clears the debt first (uncapped)
         new_bal = ot_bank_balance(staff["id"])
@@ -2556,25 +2610,54 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not debt:
         await query.edit_message_text("Your payback is already cleared ✓ / សងរួចរាល់ហើយ ✓")
         return
+    remaining = _pb_remaining(staff, debt["balance"])
     if sub == "offer":
         # on-demand re-open from My Schedule (owner, Jun 11) — same picker as the live offer;
         # the universal recovery when a picker message ever gets lost/expired
         from gm_bot.attendance_ui import _hm
-        kb = _payback_slot_keyboard(staff, debt["balance"])
-        await query.edit_message_text(
-            "You owe %s. Pick when to work it off — these are the times we need you most:\n"
-            "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
-            % (_hm(debt["balance"]), _hm(debt["balance"])), reply_markup=kb)
+        if remaining <= 0:
+            await query.edit_message_text(_PB_FULLY_BOOKED)
+            return
+        kb = _payback_slot_keyboard(staff, remaining)
+        text = ("You owe %s. Pick when to work it off — these are the times we need you most:\n"
+                "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                % (_hm(debt["balance"]), _hm(debt["balance"])))
+        if remaining < debt["balance"]:
+            text += ("\n(%s booked already · កក់រួច %s — %s left to book · នៅសល់ %s)"
+                     % (_hm(debt["balance"] - remaining), _hm(debt["balance"] - remaining),
+                        _hm(remaining), _hm(remaining)))
+        await query.edit_message_text(text, reply_markup=kb)
         return
     if sub == "part":
         from gm_bot.attendance_ui import _hm
-        part = min(int(data[3]), debt["balance"])
+        if remaining <= 0:
+            await query.edit_message_text(_PB_FULLY_BOOKED)
+            return
+        part = min(int(data[3]), remaining)
         kb = _payback_slot_keyboard({**staff}, part)
         await query.edit_message_text(
             "Pick a time for %s:\nសូមជ្រើសពេលសម្រាប់ %s៖" % (_hm(part), _hm(part)), reply_markup=kb)
         return
     if sub == "book":
         slot_date, s_min, e_min, mins = data[3], int(data[4]), int(data[5]), int(data[6])
+        # HARD GATE, recomputed at tap time (buttons can be stale): never book past the
+        # remaining debt, and never stack a second redefine onto a date that has one.
+        from shared.database import shift_change_active
+        try:
+            clash = shift_change_active(staff["id"], slot_date)
+        except Exception:
+            clash = None
+        if remaining <= 0:
+            await query.edit_message_text(_PB_FULLY_BOOKED)
+            return
+        if mins > remaining or clash:
+            from gm_bot.attendance_ui import _hm
+            kb = _payback_slot_keyboard(staff, remaining)
+            await query.edit_message_text(
+                "That time isn't available any more — %s left to book. Pick again:\n"
+                "ពេលនោះមិនអាចកក់បានទៀតទេ — នៅសល់ %s ត្រូវកក់។ សូមជ្រើសម្តងទៀត៖"
+                % (_hm(remaining), _hm(remaining)), reply_markup=kb)
+            return
         payback_book(debt["id"], staff["id"], slot_date, s_min, e_min, mins)
         _create_payback_redefine(staff, slot_date, s_min, e_min)   # the slot IS a redefine
         from datetime import date as _date
@@ -2630,22 +2713,32 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     days += 1
         stage = pb.ignore_stage(days)
         nm = staff.get("call_name") or staff["canonical_name"]
+        # fully-booked debts never warn/auto-book — the booked time already covers them
+        # (the shield usually pauses these, but a booking landing past the deadline wouldn't)
+        remaining = _pb_remaining(staff, debt["balance"])
+        if remaining <= 0:
+            continue
         try:
             if stage == "warn":
                 await _att_send(context, uid, "Staff", nm,
                     "Pick before tomorrow, or I'll pick for you.\n"
                     "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។",
-                    kb=_payback_slot_keyboard(staff, debt["balance"]))
+                    kb=_payback_slot_keyboard(staff, remaining))
             elif stage == "autobook":
                 from gm_bot import payback as _pb
                 from gm_bot.attendance import to_min
                 ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
-                days_ahead = _pb.working_days_ahead(staff.get("day_off"), set(), today, 7, 1)
-                if ws is not None and days_ahead:
+                taken = _sc_taken_dates(debt["staff_id"])
+                days_ahead = [d for d in _pb.working_days_ahead(staff.get("day_off"), set(),
+                                                                today, 7, 3)
+                              if d.isoformat() not in taken][:1]
+                if ws is not None and we is not None and days_ahead:
                     d0 = days_ahead[0]
-                    _lbl, s_min, e_min = _pb.slot_windows(ws, we, debt["balance"])[0]
+                    normal_len = ((we - ws) % 1440) or 1440
+                    amt = min(remaining, _pb.day_ext_cap(normal_len))   # 15h-total-day cap
+                    _lbl, s_min, e_min = _pb.slot_windows(ws, we, amt)[0]
                     payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
-                                 debt["balance"], auto_booked=True)
+                                 amt, auto_booked=True)
                     _create_payback_redefine(staff, d0.isoformat(), s_min, e_min)
                     await _att_send(context, uid, "Staff", nm,
                         "I booked you %s %s-%s (you didn't choose).\n"

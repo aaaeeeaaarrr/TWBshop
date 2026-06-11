@@ -3149,6 +3149,18 @@ def shift_change_autoapprove(staff_id: int, when_date: str, start_min: int, end_
             return cur.fetchone()["id"]
 
 
+def shift_change_upcoming_dates(staff_id: int, today_iso: str) -> set[str]:
+    """Dates (>= today) already holding an APPROVED redefine. The payback picker skips these —
+    a second redefine on the same date would supersede the first (latest-per-date wins) and
+    silently drop the earlier agreement. Test-isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT when_date FROM shift_changes
+                           WHERE staff_id=%s AND status='approved' AND when_date>=%s AND is_test=%s""",
+                        (staff_id, today_iso, _ATT_TEST))
+            return {str(r["when_date"]) for r in cur.fetchall()}
+
+
 def payback_booking_mark_done(staff_id: int, slot_date: str) -> None:
     """At settle: the slot's booking flips to done (the CREDIT flows through the settle engine —
     this is bookkeeping so reminders stop and the audit's stale-booking law stays quiet)."""
