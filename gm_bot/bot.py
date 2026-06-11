@@ -1613,7 +1613,7 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
             % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
-        [InlineKeyboardButton("❌ Can't — explain · មិនអាច — សូមពន្យល់", callback_data="att:sc:no:%d" % cid)],
+        [InlineKeyboardButton("❌ Can't — explain · មិនអាច — ពន្យល់", callback_data="att:sc:no:%d" % cid)],
     ])
     suid = (staff.get("telegram_ids") or [None])[0]
     msg = await _att_send(context, suid, "Staff", sn, body, kb=kb)
@@ -1875,11 +1875,11 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
     if audience == "partner" and st == "pending":
         rows.append([InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម",
                      callback_data="att:swp:%d:agree" % sw["id"])])
-        rows.append([InlineKeyboardButton("✋ No — explain · ទេ — សូមពន្យល់", callback_data="att:swp:%d:no" % sw["id"])])
+        rows.append([InlineKeyboardButton("✋ No — explain · ទេ — ពន្យល់", callback_data="att:swp:%d:no" % sw["id"])])
     elif audience == "senior" and st == "partner_ok":
         rows.append([InlineKeyboardButton("✅ Approve · អនុម័ត",
                      callback_data="att:swps:%d:approve" % sw["id"])])
-        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — សូមពន្យល់",
+        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — ពន្យល់",
                      callback_data="att:swps:%d:not_approve" % sw["id"])])
     rows.append([InlineKeyboardButton(cov[0],
                  callback_data="att:swcov:%d:%s:%d" % (sw["id"], audience, cov[1]))])
@@ -2155,7 +2155,7 @@ def _al_card(req: dict, requester: dict, *, audience: str, sen_id: int = 0,
     if audience == "senior" and st == "pending":
         rows.append([InlineKeyboardButton("✅ Approve",
                      callback_data="att:alapp:%d:approve:%d" % (req["id"], sen_id))])
-        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — សូមពន្យល់",
+        rows.append([InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — ពន្យល់",
                      callback_data="att:alapp:%d:not_approve:%d" % (req["id"], sen_id))])
     rows.append([InlineKeyboardButton(cov[0],
                  callback_data="att:alcov:%d:%s:%d:%d" % (req["id"], audience, sen_id, cov[1]))])
@@ -2554,7 +2554,7 @@ def _tyty_uid() -> int | None:
 # The nightly nudge is a RETURN CHECK only — never mentions papers or pay-back (they already know
 # paperless sick is paid back; papers are mentioned once at declaration).
 _SICK_RETURN_CHECK = ("I hope you're feeling better now 🤍 Are you coming in tomorrow?\n"
-                      "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 តើស្អែកមកធ្វើការទេ?")
+                      "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?")
 
 
 def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
@@ -2572,7 +2572,7 @@ def _sick_return_kb(case_id: int) -> InlineKeyboardMarkup:
     out requires a typed reason that the Supervisors read (warm but accountable)."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Coming in tomorrow · ស្អែកមកធ្វើការ", callback_data="att:sret:yes:%d" % case_id)],
-        [InlineKeyboardButton("📝 Still resting — explain · សម្រាកបន្ត — សូមពន្យល់",
+        [InlineKeyboardButton("📝 Still resting — explain · សម្រាកបន្ត — ពន្យល់",
                               callback_data="att:sret:no:%d" % case_id)],
         [InlineKeyboardButton("⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…", callback_data="att:sret:today:%d" % case_id)],
     ])
@@ -2604,7 +2604,7 @@ async def _ask_reason(query, to_name: str) -> None:
     """The type-it-here prompt right after a decline tap — says WHERE the reason goes."""
     try:
         await query.message.reply_text(
-            "📝 One line why — it goes to %s.\n📝 មូលហេតុមួយឃ្លា — នឹងទៅដល់ %s។"
+            "📝 One line why — it goes to %s.\n📝 មូលហេតុ 1 ឃ្លា — នឹងផ្ញើទៅ %s។"
             % (to_name, to_name))
     except Exception:
         pass
@@ -2637,7 +2637,7 @@ async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TY
         _arm_sick_explain(context, update, "sret_exp", case_id, case["staff_id"])
         await query.edit_message_text(
             "Please type the reason — it goes to the Supervisors. 🤍\n"
-            "សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍")
+            "សូមវាយមូលហេតុ — វានឹងផ្ញើទៅបងៗ។ 🤍")
     elif action == "today":
         await query.edit_message_text("What time today?\nម៉ោងប៉ុន្មានថ្ងៃនេះ?", reply_markup=_sret_time_kb(case_id))
     elif action == "t":
@@ -2843,11 +2843,11 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ Coming tomorrow · ស្អែកមកធ្វើការ",
                                   callback_data="att:sfam:ok:%d" % c["id"])],
-            [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — សូមពន្យល់",
+            [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — ពន្យល់",
                                   callback_data="att:sfam:exp:%d" % c["id"])]])
         await _att_send(context, uid, "Staff", nm,
             "I hope your %s is better now 🤍 Are you coming tomorrow?\n"
-            "សង្ឃឹមថា%sរបស់អ្នកធូរស្បើយហើយ 🤍 តើស្អែកប្អូនមកធ្វើការទេ?"
+            "សង្ឃឹមថា %s របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?"
             % (who, who), kb=kb)
 
 
@@ -2902,7 +2902,7 @@ async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFA
     _arm_sick_explain(context, update, "sfam_exp", cid, case["staff_id"])
     await query.edit_message_text(
         "Please type the reason — it goes to the Supervisors. 🤍\n"
-        "សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍")
+        "សូមវាយមូលហេតុ — វានឹងផ្ញើទៅបងៗ។ 🤍")
 
 
 async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2959,7 +2959,7 @@ async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 await context.bot.send_message(uid,
                     "Still need one line from you 🤍 just type why.\n"
-                    "នៅខ្វះមូលហេតុមួយឃ្លា 🤍 សូមវាយប្រាប់ផង។")
+                    "នៅខ្វះមូលហេតុ 1 ឃ្លាពីប្អូន 🤍 សូមវាយប្រាប់មូលហេតុ។")
             except Exception:
                 pass
             pend["nudges"] = n + 1
@@ -4872,7 +4872,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             await _sfam_book(context, case, reason)
         await confirm(
             "Noted — tomorrow is covered. Take care 🤍\n"
-            "បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍",
+            "កត់ចំណាំហើយ — ស្អែកបានរៀបចំការឈប់ឱ្យរួចហើយ។ ថែទាំឱ្យបានល្អ 🤍",
             "🧪 Family-sick extended with reason (test) — the group FYI was routed to you.")
     elif flow == "rej_exp":
         # a decliner's typed reason → relayed to whoever the decision already reached
@@ -4883,7 +4883,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 tgt.get("call_name") or tgt["canonical_name"],
                 "📝 About your %s — %s: %s" % (pend.get("what", "request"),
                                                pend.get("frm", "—"), reason))
-        await confirm("Sent 🤍\nបានផ្ញើ 🤍", "🧪 Reason relayed (test) — routed to you.")
+        await confirm("Sent 🤍\nផ្ញើរួចហើយ 🤍", "🧪 Reason relayed (test) — routed to you.")
     elif flow == "sret_exp":
         # the typed reason for still-resting (own sick) → the Supervisors read it
         nm = persona.get("call_name") or persona["canonical_name"]

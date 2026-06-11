@@ -379,7 +379,7 @@ def _demo_al_card(p: dict, show_cov: bool) -> tuple[str, InlineKeyboardMarkup]:
            else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:appr")],
-        [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:rej")],
+        [InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — ពន្យល់", callback_data="att:drs:rej")],
         [InlineKeyboardButton(tog, callback_data="att:drs:alcov:%d" % (0 if show_cov else 1))],
     ])
     return body, kb
@@ -406,10 +406,10 @@ def _demo_swap_card(p: dict, audience: str, show_cov: bool) -> tuple[str, Inline
     tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
            else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
     rows = ([[InlineKeyboardButton("✅ I agree · ខ្ញុំយល់ព្រម", callback_data="att:drs:noop")],
-             [InlineKeyboardButton("✋ No · ទេ", callback_data="att:drs:noop")]]
+             [InlineKeyboardButton("✋ No — explain · ទេ — ពន្យល់", callback_data="att:drs:noop")]]
             if audience == "partner" else
             [[InlineKeyboardButton("✅ Approve · អនុម័ត", callback_data="att:drs:noop")],
-             [InlineKeyboardButton("❌ Not approve · មិនអនុម័ត", callback_data="att:drs:noop")]])
+             [InlineKeyboardButton("❌ Not approve — explain · មិនអនុម័ត — ពន្យល់", callback_data="att:drs:noop")]])
     rows.append([InlineKeyboardButton(tog, callback_data="att:drs:swcov:%s:%d"
                                       % (audience, 0 if show_cov else 1))])
     return body, InlineKeyboardMarkup(rows)
@@ -465,14 +465,14 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:drs:noop")]])
     nudge_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Coming tomorrow · ស្អែកមកធ្វើការ", callback_data="att:drs:noop")],
-        [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — សូមពន្យល់",
+        [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — ពន្យល់",
                               callback_data="att:drs:noop")]])
     return [
         ("① Sick → Me: the anti-fake opener (try to come, see how you feel)",
          "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
          "What time can you come?\n"
          "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល។ អ្នកអាចមកម៉ោងប៉ុន្មាន?",
-         _ill(["9:30pm", "10pm", "10:30pm"], ["📝 Really can't — explain · មកមិនបាន — សូមពន្យល់"])),
+         _ill(["9:30pm", "10pm", "10:30pm"], ["📝 Really can't — explain · មិនអាចមក — ពន្យល់"])),
         ("② Sick → Me: 'I really can't come today' → rest + papers ask",
          "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
          "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n"
@@ -502,9 +502,9 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។", None),
         ("⑨ each night while out → return check (never papers/pay-back); the answer goes to Supervisors",
          "I hope you're feeling better now 🤍 Are you coming in tomorrow?\n"
-         "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 តើស្អែកមកធ្វើការទេ?",
+         "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?",
          _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"],
-              ["📝 Still resting — explain · សម្រាកបន្ត — សូមពន្យល់"],
+              ["📝 Still resting — explain · សម្រាកបន្ត — ពន្យល់"],
               ["⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…"])),   # = the real buttons, bilingual
         ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for their child today.\n"
@@ -512,7 +512,7 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑪ FAMILY-sick night nudge — coming is the DEFAULT; staying out costs a typed reason "
          "the Supervisors read (owner)",
          "I hope your child is better now 🤍 Are you coming tomorrow?\n"
-         "សង្ឃឹមថាកូនរបស់អ្នកធូរស្បើយហើយ 🤍 តើស្អែកប្អូនមកធ្វើការទេ?", nudge_kb),
+         "សង្ឃឹមថា child របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?", nudge_kb),
         ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
          "Davy: 3rd paperless sick in 30 days (all Mondays). Pattern flag for your review.\n"
          "(owner-only — English; staff never see this)", None),
@@ -934,7 +934,7 @@ def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     offs = late_offsets(shift_len_min(p["work_start"], p["work_end"]))
     btns = [InlineKeyboardButton(fmt12(ws + o), callback_data="att:sp:meo:%d" % o) for o in offs]
     rows = [_back_row("att:sp:sick")] + grid(btns, 3)
-    rows.append([InlineKeyboardButton("📝 Really can't — explain · មកមិនបាន — សូមពន្យល់",
+    rows.append([InlineKeyboardButton("📝 Really can't — explain · មិនអាចមក — ពន្យល់",
                                       callback_data="att:sp:mecant")])   # typed reason → Supervisors
     return _hdr(p, "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
                    "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល — មើលថាអ្នកមានអារម្មណ៍យ៉ាងម៉េច"
@@ -1190,7 +1190,7 @@ def _walk_steps(p: dict, name: str) -> list[tuple[str, InlineKeyboardMarkup | No
             ("[→ EVERY senior, privately] approval card:\n"
              "“%s requests %s — Tue 23/06 (full day). Reason: family trip.\n"
              "Working that day: Dara, Sok, Mealea (day-off: Pisey; on AL: Vann).”" % (nm, what),
-             _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
+             _ill(["✅ Approve · អនុម័ត", "❌ Not approve — explain · មិនអនុម័ត — ពន្យល់"])),
             ("[→ requester] “Senior 1 approved ✓ (1/2)…” (silent until the 2nd vote).", None),
             ("[→ all seniors] the cards collapse → fresh DM tagging who approved. "
              "2 ✅ = approved (2 ❌ = seniors-only recap, requester told no).", None),
@@ -1206,11 +1206,11 @@ def _walk_steps(p: dict, name: str) -> list[tuple[str, InlineKeyboardMarkup | No
             ("[→ %s] “Reason? (you type it)” → captured." % nm, None),
             ("[→ the PARTNER, privately — their veto is asked FIRST (cheapest)]\n"
              "“%s wants to swap day off: you take Wed off, %s takes Fri — same week. Reason: clinic.”"
-             % (nm, nm), _ill(["✅ I agree · ខ្ញុំយល់ព្រម", "✋ No · ទេ"])),
+             % (nm, nm), _ill(["✅ I agree · ខ្ញុំយល់ព្រម", "✋ No — explain · ទេ — ពន្យល់"])),
             ("[→ %s] “You agreed — sending to seniors.”  (partner silence/❌ = swap doesn't happen, "
              "%s told, seniors never bothered.)" % (nm, nm), None),
             ("[→ EVERY senior] approval card (same week rule) → 2 ✅ applies dated overrides.",
-             _ill(["✅ Approve · អនុម័ត", "❌ Not approve · មិនអនុម័ត"])),
+             _ill(["✅ Approve · អនុម័ត", "❌ Not approve — explain · មិនអនុម័ត — ពន្យល់"])),
             ("[→ SUPERVISORS group]\n“Day-off swap: %s off Fri, partner off Wed.”" % nm, None),
             ("[→ %s] “Your day-off swap is approved ✓”\n"
              "“ការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓”\n\n✓ Swap ladder complete." % nm, None),
