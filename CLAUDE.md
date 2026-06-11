@@ -211,10 +211,26 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-11 (session 32 cont. pt2 — owner WALKTHROUGH day: 8 real finds fixed live
-(dead demos, stateless dry-runs, the unwired mini-shift → slots ARE redefines, buyback twin bug,
-real-builder demo cards); points ACTIVATED; accountability pass (every "no" costs a typed reason,
-10/20/30 nudge ladder); /audit grew to 19 law families. Suite 476. attendance_live=OFF, test ON.)
+**Last updated:** 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
+picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
+Cancel-AL list+confirm flow; dead-PB-button fix; KH_REVIEW P12–P15 + full context on EVERY entry;
+**half-English Khmer fix** ({who} now maps to a Khmer noun — child→កូន — via _who_kh, 4 live spots +
+demo). Suite 486. attendance_live=OFF, test ON. NOTE: owner's ChatGPT-polished P10–P15 sits in
+docs/KH_REVIEW.md (bottom) NOT yet wired — verified in-context, only P11a "from the menu" drifted.)
+
+**Session 32 (Jun 12, pt3) — PB-picker move, Cancel-AL, KH context + half-English fix. Deployed & verified:**
+- **`_who_kh` half-English Khmer fix (a69a9ed):** stored `who` is an English key (child/spouse/parent/
+  family) — dropped raw into the Khmer half it read "សង្ឃឹមថា child របស់ប្អូន…". New `_who_kh()` maps to
+  a BARE Khmer noun (no possessive; templates supply របស់ប្អូន/របស់អ្នក). Applied: family night nudge,
+  family-sick Supervisors FYI + staff confirm, /test demo card. Unknown→unchanged, None→''. +1 regression
+  test. Server HEAD==origin, gm active, grep-verified.
+- **Book-payback button → About Me** (top, only when remaining>0), removed from My Schedule; picker
+  message redesigned (Debt · បំណុល / Booked · កក់រួច list / "Choose the times below…"). `payback_open_bookings()`.
+- **PB booking guard:** remaining-only picker (balance − pending_ext), 15h-day cap (`day_ext_cap`),
+  settle zeros OT on payback-slot redefines (slots NEVER mint OT). `v_pb_overbook` audit law.
+- **Cancel-AL flow:** ✕ Cancel AL button → list of cancelable days → "Are you sure?" confirm → cancel.
+- **KH_REVIEW:** P12–P15 added, context block on EVERY entry (incl. old record sections + P1–P9);
+  owner's ChatGPT-polished P10–P15 pasted at bottom (verified in-context, NOT yet wired).
 
 **Session 32 (Jun 11, pt2) — walkthrough finds + accountability design. All deployed & verified:**
 - **WALKTHROUGH FIXES (owner screenshots → fix → deploy, same hour):** double-tap "not modified" =
