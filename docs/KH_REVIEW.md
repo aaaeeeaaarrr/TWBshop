@@ -209,3 +209,21 @@ This will return 1 day to your AL balance.
 **Too-late toast** (shown if tapped after the day has already started) [TOAST]:
 Too late to cancel — that day has already started · យឺតពេលលុបចោលហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ
 
+
+### P13 · Book pay-back time — About Me picker message (Jun 11; KH = Claude DRAFT)
+
+Context: staff taps "Book pay-back time" from About Me → gets this message + slot buttons.
+Audience: junior staff DM (bilingual). Tone: matter-of-fact, not punitive.
+
+**Message body** — {debt} / {booked_total} / {slot_lines} are EN-formatted durations + date+time strings.
+
+Debt · បំណុល: {debt}
+Booked · កក់រួច: {booked_total}:
+  {slot_lines}   ← each line: "{dur}: {Day DD/MM} {start}–{end}"
+
+Choose the times below to pay — these are the times we need you most:
+សូមជ្រើសម៉ោងខាងក្រោមដើម្បីសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត:
+
+**About Me button** [BUTTON]:
+📅 Book pay-back time · កក់ម៉ោងសងវិញ
+

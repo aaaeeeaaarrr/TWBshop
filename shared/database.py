@@ -3613,6 +3613,21 @@ def payback_credit(debt_id: int, minutes: int) -> dict:
             return {"balance": max(bal, 0), "status": "cleared" if bal <= 0 else "open"}
 
 
+def payback_open_bookings(staff_id: int) -> list[dict]:
+    """Current 'booked' slots for a staff member, future-only, sorted by date."""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT slot_date, start_min, end_min, minutes
+                           FROM payback_bookings
+                           WHERE staff_id=%s AND status='booked' AND is_test=%s
+                             AND slot_date >= %s
+                           ORDER BY slot_date, start_min""",
+                        (staff_id, _ATT_TEST, today))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, end_min: int,
                  minutes: int, auto_booked: bool = False) -> int:
     with _db() as conn:

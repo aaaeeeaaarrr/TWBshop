@@ -885,8 +885,19 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def about_me_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    rows = [
-        _back_row(),
+    from shared.database import payback_open_debt, ot_pending_extension_min
+    rows = [_back_row()]
+    try:
+        debt = payback_open_debt(p["id"])
+        debt_min = debt["balance"] if debt else 0
+        pending_ext = ot_pending_extension_min(p["id"], _today().isoformat())
+        remaining = max(0, debt_min - max(0, pending_ext))
+    except Exception:
+        remaining = 0
+    if remaining > 0:
+        rows.append([InlineKeyboardButton("📅 Book pay-back time · កក់ម៉ោងសងវិញ",
+                                          callback_data="att:pb:offer")])
+    rows += [
         [InlineKeyboardButton("🏖 Annual Leave (AL) · ឈប់សម្រាកប្រចាំឆ្នាំ", callback_data="att:al")],
         [InlineKeyboardButton("🕊 Special Leave · ច្បាប់ពិសេស", callback_data="att:sp")],
         [InlineKeyboardButton("🔁 Change day off · ប្តូរថ្ងៃឈប់សម្រាក", callback_data="att:do")],
@@ -1887,9 +1898,6 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     upcoming.sort()
     up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
     today_iso = _today().isoformat()
-    if debt_min - booked_min > 0:
-        rows.append([InlineKeyboardButton("📅 Book pay-back time · កក់ម៉ោងសងវិញ",
-                                          callback_data="att:pb:offer")])
     # Cancel AL button — shows whenever there are future cancelable days (Jun 11, both modes)
     cancelable = [(d, rid) for d, rid in upcoming
                   if d > today_iso or (d == today_iso and not _shift_running(p))]

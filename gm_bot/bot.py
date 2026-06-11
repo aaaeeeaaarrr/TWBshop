@@ -2625,20 +2625,29 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     remaining = _pb_remaining(staff, debt["balance"])
     if sub == "offer":
-        # on-demand re-open from My Schedule (owner, Jun 11) — same picker as the live offer;
-        # the universal recovery when a picker message ever gets lost/expired
-        from gm_bot.attendance_ui import _hm
+        from gm_bot.attendance_ui import _hm, day_label, fmt12
+        from shared.database import payback_open_bookings
+        from datetime import date as _date
         if remaining <= 0:
             await query.edit_message_text(_PB_FULLY_BOOKED)
             return
         kb = _payback_slot_keyboard(staff, remaining)
-        text = ("You owe %s. Pick when to work it off — these are the times we need you most:\n"
-                "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
-                % (_hm(debt["balance"]), _hm(debt["balance"])))
-        if remaining < debt["balance"]:
-            text += ("\n(%s booked already · កក់រួច %s — %s left to book · នៅសល់ %s)"
-                     % (_hm(debt["balance"] - remaining), _hm(debt["balance"] - remaining),
-                        _hm(remaining), _hm(remaining)))
+        # build the booked-slots list
+        booked_slots = payback_open_bookings(staff["id"])
+        booked_total = sum(b["minutes"] for b in booked_slots)
+        header = ("Debt · បំណុល: %s" % _hm(debt["balance"]))
+        if booked_slots:
+            slot_lines = "\n".join(
+                "  %s: %s %s–%s" % (
+                    _hm(b["minutes"]),
+                    day_label(_date.fromisoformat(str(b["slot_date"]))),
+                    fmt12(b["start_min"]),
+                    fmt12(b["end_min"]),
+                ) for b in booked_slots
+            )
+            header += ("\nBooked · កក់រួច: %s:\n%s" % (_hm(booked_total), slot_lines))
+        text = (header + "\n\nChoose the times below to pay — these are the times we need you most:\n"
+                "សូមជ្រើសម៉ោងខាងក្រោមដើម្បីសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត:")
         await query.edit_message_text(text, reply_markup=kb)
         return
     if sub == "part":
