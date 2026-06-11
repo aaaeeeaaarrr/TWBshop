@@ -3041,6 +3041,33 @@ def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
             return cur.fetchone()["id"]
 
 
+def ot_bank_spend(staff_id: int, minutes: int) -> int:
+    """DEBIT the OT bank at rest-booking time (Jun 11 — booking previously debited NOTHING, so the
+    same hours were bookable forever). Clamped at the balance; never below 0. In TEST mode the real
+    bank is untouched — returns the computed remainder for display."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if _ATT_TEST:
+                cur.execute("SELECT COALESCE(balance_min,0) AS b FROM ot_bank WHERE staff_id=%s",
+                            (staff_id,))
+                r = cur.fetchone()
+                return max(0, int((r["b"] if r else 0) - minutes))
+            cur.execute("""UPDATE ot_bank SET balance_min=GREATEST(0, balance_min-%s)
+                           WHERE staff_id=%s RETURNING balance_min""", (minutes, staff_id))
+            r = cur.fetchone()
+            return int(r["balance_min"]) if r else 0
+
+
+def ot_buyback_mark_taken(staff_id: int, slot_date: str) -> None:
+    """At that day's settle: the booked rest flips to taken (bookkeeping — the bank was already
+    debited at booking; this stops the stale-booking audit law from firing)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE ot_buyback SET status='taken'
+                           WHERE staff_id=%s AND slot_date=%s AND status='booked' AND is_test=%s""",
+                        (staff_id, slot_date, _ATT_TEST))
+
+
 # ---- session 31: redefine-a-shift lifecycle (see docs/OT_DESIGN.md) ----
 def shift_change_create(senior_id, staff_id, when_date, start_min, end_min,
                         normal_len, reason) -> int:

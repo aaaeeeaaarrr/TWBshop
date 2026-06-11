@@ -2011,3 +2011,41 @@ def test_family_sick_nudge_callback(monkeypatch):
     case.update(status="open")
     asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:ok:7"), ctx))
     assert case["status"] == "cleared" and any("Glad to hear" in e for e in edits)
+
+
+def test_rest_redefine_and_buyback_laws():
+    """The buyback twin of the mini-shift bug (Jun 11): rest_redefine geometry + the audit laws
+    that keep it honest (pairing both ways, stale 'booked', sick chain integrity)."""
+    import datetime as _dt
+    from gm_bot.ot import rest_redefine
+    from gm_bot import audit as au
+
+    # day staff 12:00-21:00, 2h rest first -> shift becomes 14:00-21:00 (normal_len stays 9h)
+    assert rest_redefine(720, 1260, 720, 840) == (840, 840 + 420, 540)
+    # 2h rest last -> 12:00-19:00
+    assert rest_redefine(720, 1260, 1140, 1260) == (720, 720 + 420, 540)
+    # overnight baker 21:00-06:00, 1h rest first -> 22:00 start
+    assert rest_redefine(1260, 360, 1260, 1320) == (1320, 1320 + 480, 540)
+    # rest not at an edge, or swallowing the whole shift -> None
+    assert rest_redefine(720, 1260, 800, 860) is None
+    assert rest_redefine(720, 1260, 720, 1260) is None
+
+    staff = {1: {"call_name": "Davy", "canonical_name": "An Davy"}}
+    today = _dt.date(2026, 6, 15)
+    bb = {"id": 1, "staff_id": 1, "slot_date": "2026-06-16", "status": "booked", "minutes": 120}
+    rd = {"id": 2, "staff_id": 1, "when_date": "2026-06-16", "status": "approved",
+          "reason": "OT rest"}
+    assert au.v_booking_redefine_pair([], [rd], staff, [bb]) == []          # paired
+    assert any("mark them LATE" in p
+               for p in au.v_booking_redefine_pair([], [], staff, [bb]))    # rest w/o redefine
+    assert any("orphan" in p
+               for p in au.v_booking_redefine_pair([], [rd], staff, []))    # redefine w/o rest
+    stale = dict(bb, slot_date=_dt.date(2026, 6, 12))
+    assert any("never settled" in p for p in au.v_buybacks([stale], staff, today))
+    assert au.v_buybacks([dict(bb, slot_date=_dt.date(2026, 6, 16))], staff, today) == []
+
+    # sick chain: 'extended' must have created tomorrow's case
+    c1 = {"id": 5, "staff_id": 1, "who": "child", "the_date": "2026-06-11", "status": "extended"}
+    c2 = {"id": 6, "staff_id": 1, "who": "child", "the_date": "2026-06-12", "status": "open"}
+    assert au.v_sick([c1, c2], staff) == []
+    assert any("never landed" in p for p in au.v_sick([c1], staff))

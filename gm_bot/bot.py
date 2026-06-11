@@ -1710,6 +1710,8 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         shift_change_set_banked(sc["id"], banked)
         try:
             payback_booking_mark_done(staff["id"], shift_date)   # slot booking → done (bookkeeping)
+            from shared.database import ot_buyback_mark_taken
+            ot_buyback_mark_taken(staff["id"], shift_date)       # rest booking → taken (bookkeeping)
         except Exception:
             pass
         return banked, new_bal
@@ -1763,7 +1765,20 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             return
     if not staff:
         return
-    ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), int(e_min) - int(s_min))
+    rest_min = (int(e_min) - int(s_min)) % 1440 or 1440
+    ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), rest_min)
+    # Jun 11 (the buyback twin of the mini-shift bug): booking now DEBITS the bank immediately
+    # (was: nothing debited → the same hours bookable forever) and creates the shift REDEFINE so
+    # attendance is fair on the rest day (no false 'late' for using earned rest).
+    from shared.database import ot_bank_spend, shift_change_autoapprove
+    from gm_bot.attendance import to_min as _tm0
+    from gm_bot import ot as _ot
+    ot_bank_spend(staff["id"], rest_min)
+    _w0, _w1 = _tm0(staff.get("work_start")), _tm0(staff.get("work_end"))
+    if _w0 is not None and _w1 is not None:
+        win = _ot.rest_redefine(_w0, _w1, int(s_min), int(e_min))
+        if win:
+            shift_change_autoapprove(staff["id"], slot_date, win[0], win[1], win[2], "OT rest")
     from datetime import date as _date
     d = _date.fromisoformat(slot_date)
     await query.edit_message_text(

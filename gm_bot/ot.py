@@ -72,6 +72,25 @@ def settle_shift(worked_min: int, normal_len_min: int, pb_balance_min: int) -> t
     return ot_banked, pb_cleared, max(0, pb_balance_min) - pb_cleared
 
 
+def rest_redefine(ws_min: int, we_min: int, s_min: int, e_min: int) -> tuple[int, int, int] | None:
+    """The shift-REDEFINE a booked OT-rest (buyback) creates — the rest eats INTO the shift at an
+    edge, so the day's real shift is the remainder and attendance stays fair (no false 'late' for
+    using earned rest): rest-at-start → [rest_end .. original_end]; rest-at-end → [start ..
+    rest_start]. normal_len stays the FULL normal length (worked < normal → no OT, by design).
+    Returns (start_min, end_min_absolute, normal_len), or None if the window isn't at an edge."""
+    normal_len = (we_min - ws_min) % 1440 or 1440
+    rest = (e_min - s_min) % 1440 or 1440
+    if rest >= normal_len:
+        return None
+    if s_min % 1440 == ws_min % 1440:        # rest first → come in later
+        st = e_min % 1440
+        return st, st + (normal_len - rest), normal_len
+    if e_min % 1440 == we_min % 1440:        # rest last → leave earlier
+        st = ws_min % 1440
+        return st, st + (normal_len - rest), normal_len
+    return None
+
+
 def _ext_tag(pb_cleared: int, ot: int) -> str:
     """Button tag: while the extension only clears debt -> '+NPB'; once it earns OT -> '+MOT'."""
     if ot > 0:

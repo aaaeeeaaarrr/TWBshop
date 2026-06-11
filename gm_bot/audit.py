@@ -150,18 +150,22 @@ def v_bookings(bookings: list[dict], debts_by_id: dict, staff: dict, today: date
     return out
 
 
-PB_UNIFY_LAW_FROM = "2026-06-11"   # the slot→redefine unification's birthday
+PB_UNIFY_LAW_FROM = "2026-06-11"   # the slot→redefine unification's birthday (payback AND rest)
 
 
-def v_booking_redefine_pair(bookings: list[dict], changes: list[dict], staff: dict) -> list[str]:
-    """The unification's law (Jun 11): a booked payback slot and its auto-approved redefine are
-    ONE thing — each side must have the other. A booking with no redefine = the old dead
-    'mini-shift' bug reborn (no T−10, no credit, debt never clears); a 'payback slot' redefine
-    with no booking = orphan bookkeeping. Judged from the unification's birthday onward."""
+def v_booking_redefine_pair(bookings: list[dict], changes: list[dict], staff: dict,
+                            buybacks: list[dict] | None = None) -> list[str]:
+    """The unification's law (Jun 11): a booked slot and its auto-approved redefine are ONE thing
+    — each side must have the other. Covers BOTH currencies: payback slots ('payback slot'
+    redefines) and OT-rest buybacks ('OT rest' redefines). A booking with no redefine = the dead
+    mini-shift bug reborn (no prompts / no credit / false-late on rest); a tagged redefine with
+    no booking = orphan. Judged from the unification's birthday onward."""
     redef_dates = {(c["staff_id"], str(c["when_date"]))
                    for c in changes if c.get("status") in ("approved", "done")}
     booked_dates = {(b["staff_id"], str(b["slot_date"]))
                     for b in bookings if b.get("status") in ("booked", "done")}
+    rest_dates = {(b["staff_id"], str(b["slot_date"]))
+                  for b in (buybacks or []) if b.get("status") in ("booked", "taken")}
     out = []
     for b in bookings:
         if b.get("status") != "booked" or str(b.get("slot_date")) < PB_UNIFY_LAW_FROM:
@@ -170,13 +174,68 @@ def v_booking_redefine_pair(bookings: list[dict], changes: list[dict], staff: di
             out.append("PB-PAIR: %s booking #%s (%s) has NO shift-redefine — the slot won't "
                        "fire prompts or credit the debt (dead mini-shift bug)"
                        % (_nm(staff, b["staff_id"]), b["id"], b["slot_date"]))
-    for c in changes:
-        if (c.get("reason") != "payback slot" or c.get("status") != "approved"
-                or str(c.get("when_date")) < PB_UNIFY_LAW_FROM):
+    for b in (buybacks or []):
+        if b.get("status") != "booked" or str(b.get("slot_date")) < PB_UNIFY_LAW_FROM:
             continue
-        if (c["staff_id"], str(c["when_date"])) not in booked_dates:
+        if (b["staff_id"], str(b["slot_date"])) not in redef_dates:
+            out.append("REST-PAIR: %s OT-rest #%s (%s) has NO shift-redefine — attendance would "
+                       "mark them LATE for taking earned rest"
+                       % (_nm(staff, b["staff_id"]), b["id"], b["slot_date"]))
+    for c in changes:
+        if c.get("status") != "approved" or str(c.get("when_date")) < PB_UNIFY_LAW_FROM:
+            continue
+        key = (c["staff_id"], str(c["when_date"]))
+        if c.get("reason") == "payback slot" and key not in booked_dates:
             out.append("PB-PAIR: %s redefine #%s (%s) says 'payback slot' but NO booking exists "
                        "— orphan" % (_nm(staff, c["staff_id"]), c["id"], c["when_date"]))
+        if c.get("reason") == "OT rest" and key not in rest_dates:
+            out.append("REST-PAIR: %s redefine #%s (%s) says 'OT rest' but NO buyback exists — "
+                       "orphan" % (_nm(staff, c["staff_id"]), c["id"], c["when_date"]))
+    return out
+
+
+def v_buybacks(buybacks: list[dict], staff: dict, today: date) -> list[str]:
+    """OT-rest bookings: valid status, positive minutes, and never left 'booked' after the date
+    passed (the settle marks them 'taken'; a stale one = the rest day never settled)."""
+    out = []
+    for b in buybacks:
+        nm = _nm(staff, b["staff_id"])
+        if b.get("status") not in ("booked", "taken"):
+            out.append("REST: %s buyback #%s unknown status '%s'" % (nm, b["id"], b.get("status")))
+        if int(b.get("minutes") or 0) <= 0:
+            out.append("REST: %s buyback #%s has minutes=%s" % (nm, b["id"], b.get("minutes")))
+        if (b.get("status") == "booked" and b.get("slot_date")
+                and b["slot_date"] < today - timedelta(days=1)):
+            out.append("REST: %s buyback #%s slot %s passed but still 'booked' (never settled)"
+                       % (nm, b["id"], b["slot_date"]))
+    return out
+
+
+def v_sick(cases: list[dict], staff: dict) -> list[str]:
+    """Sick cases: valid status (incl. 'extended' — the family nudge's one-tap re-book), and an
+    'extended' family case must have actually CREATED the next day's case (chain integrity);
+    family pool overruns (>7/year) flagged for the owner."""
+    valid = {"open", "provisional", "papered", "cleared", "no_papers", "extended"}
+    by_staff_dates = {}
+    for c in cases:
+        by_staff_dates.setdefault(c["staff_id"], set()).add(str(c.get("the_date")))
+    out, fam_count = [], {}
+    for c in cases:
+        nm = _nm(staff, c["staff_id"])
+        if c.get("status") not in valid:
+            out.append("SICK: %s case #%s unknown status '%s'" % (nm, c["id"], c.get("status")))
+        if c.get("status") == "extended":
+            nxt = (date.fromisoformat(str(c["the_date"])) + timedelta(days=1)).isoformat()
+            if nxt not in by_staff_dates.get(c["staff_id"], set()):
+                out.append("SICK: %s case #%s 'extended' but NO case exists for %s — the one-tap "
+                           "re-book never landed" % (nm, c["id"], nxt))
+        if (c.get("who") or "me") != "me":
+            k = (c["staff_id"], str(c.get("the_date"))[:4])
+            fam_count[k] = fam_count.get(k, 0) + 1
+    for (sid, yr), n in fam_count.items():
+        if n > 7:
+            out.append("SICK: %s has used %d family-sick days in %s (pool is 7)"
+                       % (_nm(staff, sid), n, yr))
     return out
 
 
@@ -303,6 +362,8 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             books = q(cur, "SELECT * FROM payback_bookings WHERE is_test=%s", (flag,))
             swaps = q(cur, "SELECT * FROM dayoff_swaps WHERE is_test=%s", (flag,))
             pevents = q(cur, "SELECT * FROM points_events WHERE is_test=%s", (flag,))
+            buybacks = q(cur, "SELECT * FROM ot_buyback WHERE is_test=%s", (flag,))
+            sick = q(cur, "SELECT * FROM sick_cases WHERE is_test=%s", (flag,))
 
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)
@@ -311,12 +372,15 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_ot_bank(banks, staff)
                 + v_noshow_vs_sessions(nos, sess, staff)
                 + v_bookings(books, {d["id"]: d for d in debts}, staff, today)
-                + v_booking_redefine_pair(books, scs, staff)
+                + v_booking_redefine_pair(books, scs, staff, buybacks)
+                + v_buybacks(buybacks, staff, today)
+                + v_sick(sick, staff)
                 + v_swaps(swaps, staff, today)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_staff_sanity(list(staff.values())))
     stats = {"payback": len(debts), "AL": len(als), "shift-changes": len(scs),
              "sessions": len(sess), "OT banks": len(banks), "no-shows": len(nos),
-             "bookings": len(books), "swaps": len(swaps), "point-events": len(pevents)}
+             "bookings": len(books), "swaps": len(swaps), "point-events": len(pevents),
+             "OT-rests": len(buybacks), "sick": len(sick)}
     return problems, stats
