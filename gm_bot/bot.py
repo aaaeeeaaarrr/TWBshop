@@ -2603,7 +2603,20 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         staff = staff_get_by_uid(user.id)
     if not staff:
-        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
+        # In test mode: att_persona lost on restart. Collapse the old message (buttons still showing
+        # post-restart would keep looping the popup forever) and give the recovery tap.
+        _record_dead_tap(query.data or "?")
+        await _dead_tap_alarm(context, query.data or "?",
+                              update.effective_user.id if update.effective_user else None)
+        try:
+            await query.edit_message_text(
+                "⏳ Expired message — please start again.\n"
+                "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀត។",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                    "📋 Open menu · បើកម៉ឺនុយ", callback_data="att:menu")]]))
+        except Exception:
+            await query.answer("⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត", show_alert=True)
+        return
     data = query.data.split(":")
     sub = data[2] if len(data) > 2 else ""
     debt = payback_open_debt(staff["id"])
@@ -2639,6 +2652,17 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "Pick a time for %s:\nសូមជ្រើសពេលសម្រាប់ %s៖" % (_hm(part), _hm(part)), reply_markup=kb)
         return
     if sub == "book":
+        if len(data) < 7:
+            # stale button from pre-guard code (< 7 parts) — show a fresh picker instead of crashing
+            from gm_bot.attendance_ui import _hm
+            kb = _payback_slot_keyboard(staff, remaining) if remaining > 0 else None
+            if kb:
+                await query.edit_message_text(
+                    "You owe %s — pick when to work it off:\nអ្នកនៅត្រូវសង %s — សូមជ្រើសពេល៖"
+                    % (_hm(debt["balance"]), _hm(debt["balance"])), reply_markup=kb)
+            else:
+                await query.edit_message_text(_PB_FULLY_BOOKED)
+            return
         slot_date, s_min, e_min, mins = data[3], int(data[4]), int(data[5]), int(data[6])
         # HARD GATE, recomputed at tap time (buttons can be stale): never book past the
         # remaining debt, and never stack a second redefine onto a date that has one.
