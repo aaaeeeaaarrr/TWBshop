@@ -1457,24 +1457,32 @@ def test_demo_cards_use_real_builders():
     assert any("👁" in b.text for row in skb.inline_keyboard for b in row)
 
 
-def test_dryrun_choice_buttons_demo_not_skip():
-    """Choice buttons inside a dry-run step keep their DEMO callbacks (att:drs:* sends the
-    consequence message); real-flow callbacks become Next. Owner found 'Pay 1 hour only'
-    just skipping ahead instead of showing the 1-hour picker."""
+def test_dryrun_stateless_survives_restart(monkeypatch):
+    """Dry-runs are STATELESS (owner, Jun 11: deploys wiped user_data → runs 'stopped at random
+    steps' and buttons died). The step rides in the button (att:dr:n:{key}:{i}); demo buttons get
+    a :{key}:{i} suffix; a FRESH context (= just-restarted bot) can render any mid-run step."""
     sent = {}
 
     class _Bot:
         async def send_message(self, chat_id, text, reply_markup=None, **k):
+            sent["text"] = text
             sent["kb"] = reply_markup
 
     upd = types.SimpleNamespace(effective_chat=types.SimpleNamespace(id=1), callback_query=None)
-    ctx = types.SimpleNamespace(bot=_Bot(), user_data={
-        "att_dr_events": [("lbl", "txt", ui._slots_kb()), ("l2", "t2", None)],
-        "att_dr_i": 0})
-    asyncio.run(ui._dryrun_next(upd, ctx))
+    ctx = types.SimpleNamespace(bot=_Bot(), user_data={})    # EMPTY = post-restart
+    monkeypatch.setattr(ui, "_dr_sample", lambda c: {"id": 1})
+    monkeypatch.setattr(ui, "_dr_events", lambda k, s: [
+        ("s0", "t0", ui._slots_kb()), ("s1", "t1", None), ("s2", "t2", None)])
+    asyncio.run(ui._dryrun_send(upd, ctx, "goX", 0))
     cds = [b.callback_data for row in sent["kb"].inline_keyboard for b in row]
-    assert "att:drs:slot" in cds and "att:drs:part" in cds   # demos stay live
-    assert "att:dr:next" in cds                              # Next row still there
+    assert "att:drs:slot:goX:0" in cds and "att:drs:part:goX:0" in cds   # demos live + suffixed
+    assert "att:dr:n:goX:1" in cds                                       # stateless Next
+    # mid-run step on a totally fresh context — a restart can't lose the place
+    asyncio.run(ui._dryrun_send(upd, ctx, "goX", 2))
+    assert "t2" in sent["text"] and sent["kb"] is None       # last step → no Next
+    # one past the end → clean finish line (never '0 possibilities walked')
+    asyncio.run(ui._dryrun_send(upd, ctx, "goX", 3))
+    assert "3 possibilities walked" in sent["text"]
 
 
 def test_dryrun_checkout_uses_live_constant():

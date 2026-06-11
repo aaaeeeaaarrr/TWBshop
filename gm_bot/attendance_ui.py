@@ -637,27 +637,66 @@ def schedule_summary(target: date) -> str:
 
 
 async def _dryrun_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    events = context.user_data.get("att_dr_events") or []
-    i = context.user_data.get("att_dr_i", 0)
+    # legacy shim — old messages' buttons (pre-stateless) land here after any restart
+    await context.bot.send_message(update.effective_chat.id,
+        "⚠ The bot was updated since this dry-run started — its place was lost. "
+        "Open /test and tap the dry-run again (new runs survive updates).")
+
+
+_DR_INTROS = {
+    "go":  "🧪 Dry-run 1 — CHECK-IN, every message + today's who/when. %d steps:",
+    "go2": "🧪 Dry-run 2 — LATE + PAYBACK lifecycle. %d steps:",
+    "go3": "🧪 Dry-run 3 — ANNUAL LEAVE, every variant. %d steps:",
+    "go4": "🧪 Dry-run 4 — SICK (anti-fake ladder, papers, part-duty, family). %d steps:",
+    "go5": "🧪 Dry-run 5 — MARRIAGE · FAMILY DEATH · WIFE BIRTH. %d steps:",
+    "go7": "🧪 Dry-run 6 — DAY-OFF SWAP (partner first, then seniors). %d steps:",
+    "go8": "🧪 Dry-run 7 — ACKS · GROUP REDIRECT · CALL-OUTS · WELCOME. %d steps:",
+}
+
+
+def _dr_sample(context) -> dict | None:
+    return _persona(context) or next(
+        (r for r in staff_all("active") if to_min(r.get("work_start")) is not None
+         and r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"), None)
+
+
+def _dr_events(key: str, sample: dict):
+    """Build a dry-run's steps FRESH on every tap — STATELESS by design: the step number rides
+    in the button (att:dr:n:{key}:{i}), so a bot restart/deploy mid-walkthrough can never lose
+    the owner's place again (Jun 11: deploys wiped user_data → 'stopped at random steps' and
+    dead buttons)."""
+    if key == "go":
+        return build_catalogue(sample) + [("📅 schedule summary", schedule_summary(_today()), None)]
+    return {"go2": build_catalogue2, "go3": build_catalogue3, "go4": build_catalogue4,
+            "go5": build_catalogue5, "go6": build_catalogue7, "go7": build_catalogue7,
+            "go8": build_catalogue8}.get(key, build_catalogue8)(sample)
+
+
+async def _dryrun_send(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                       key: str, i: int) -> None:
+    sample = _dr_sample(context)
+    if sample is None:
+        return
+    events = _dr_events(key, sample)
     chat_id = update.effective_chat.id
     if i >= len(events):
         await context.bot.send_message(chat_id, "✅ Dry-run finished — %d possibilities walked."
                                        % len(events))
         return
     label, text, kb = events[i]
-    context.user_data["att_dr_i"] = i + 1
-    # Choice buttons: att:drs:* DEMO their consequence (a new message shows what that tap does —
-    # owner, Jun 11: 'Pay 1 hour only' must show the 1-hour picker, not just skip ahead); anything
-    # else (real-flow callbacks) becomes Next so a dry-run can never trigger live actions.
+    # Buttons: att:drs:* DEMO their consequence — suffixed :{key}:{i} so even the demos are
+    # restart-proof; anything else becomes Next (a dry-run can never trigger live actions).
+    nxt = "att:dr:n:%s:%d" % (key, i + 1)
     rows = []
     if kb:
         for r in kb.inline_keyboard:
-            rows.append([b if (b.callback_data or "").startswith("att:drs:")
-                         else InlineKeyboardButton(b.text, callback_data="att:dr:next")
-                         for b in r])
+            rows.append([InlineKeyboardButton(b.text, callback_data="%s:%s:%d"
+                                              % (b.callback_data, key, i))
+                         if (b.callback_data or "").startswith("att:drs:")
+                         else InlineKeyboardButton(b.text, callback_data=nxt) for b in r])
     if i + 1 < len(events):
         rows.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (i + 2, len(events)),
-                                          callback_data="att:dr:next")])
+                                          callback_data=nxt)])
     # real-builder card bodies carry HTML (<b> dates) — render them as the staff would see them
     await context.bot.send_message(chat_id, "🧪 %s\n────────────\n%s" % (label, text),
                                    reply_markup=InlineKeyboardMarkup(rows) if rows else None,
@@ -1962,27 +2001,34 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(main_menu(_persona(context)))   # live: locked to self
 
     if action == "drs":
-        # dry-run sample buttons demonstrate their consequence (owner: ladders must continue)
+        # dry-run sample buttons demonstrate their consequence (owner: ladders must continue).
+        # Sent buttons carry a :{key}:{step} suffix (stateless — restart-proof).
         what = data[2] if len(data) > 2 else ""
         if what == "noop":            # acknowledge-style buttons (OK / I agree …) just advance
-            return await _dryrun_next(update, context)
+            if len(data) >= 5:
+                return await _dryrun_send(update, context, data[3], int(data[4]) + 1)
+            return await _dryrun_next(update, context)   # legacy (pre-stateless message)
         if what in ("alcov", "swcov"):    # the 👁 toggle — edits in place, like the real card
-            p2 = _persona(context) or next(
-                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None
-                 and r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"), None)
+            p2 = _dr_sample(context)
             if p2 is None:
                 return
-            if what == "alcov":
+            if what == "alcov":           # att:drs:alcov:{flag}[:key:i]
                 label, (body, kb2) = _DEMO_AL_LABEL, _demo_al_card(p2, data[3] == "1")
-            else:
+                key, di = (data[4], int(data[5])) if len(data) >= 6 else (None, 0)
+            else:                         # att:drs:swcov:{aud}:{flag}[:key:i]
                 label = _DEMO_SW_LABELS.get(data[3], "")
                 body, kb2 = _demo_swap_card(p2, data[3], data[4] == "1")
-            ev = context.user_data.get("att_dr_events") or []
-            di = context.user_data.get("att_dr_i", 0)
-            rows2 = list(kb2.inline_keyboard)
-            if di < len(ev):
-                rows2.append([InlineKeyboardButton("Next ▶ (%d/%d)" % (di + 1, len(ev)),
-                                                   callback_data="att:dr:next")])
+                key, di = (data[5], int(data[6])) if len(data) >= 7 else (None, 0)
+            rows2 = [[InlineKeyboardButton(b.text, callback_data="%s:%s:%d"
+                                           % (b.callback_data, key, di))
+                      if key and (b.callback_data or "").startswith("att:drs:") else b
+                      for b in r] for r in kb2.inline_keyboard]
+            if key:
+                total = len(_dr_events(key, p2))
+                if di + 1 < total:
+                    rows2.append([InlineKeyboardButton(
+                        "Next ▶ (%d/%d)" % (di + 2, total),
+                        callback_data="att:dr:n:%s:%d" % (key, di + 1))])
             try:
                 await query.edit_message_text("🧪 %s\n────────────\n%s" % (label, body),
                                               reply_markup=InlineKeyboardMarkup(rows2),
@@ -2003,39 +2049,21 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         return
     if action == "dr":
-        if len(data) > 2 and data[2] in ("go", "go2", "go3", "go4", "go5", "go6", "go7", "go8"):
-            sample = _persona(context) or next(
-                (r for r in staff_all("active") if to_min(r.get("work_start")) is not None
-                 and r.get("org") == "TWB" and r.get("canonical_name") != "Tyty"), None)
+        sub = data[2] if len(data) > 2 else ""
+        if sub in _DR_INTROS or sub == "go6":
+            key = "go7" if sub == "go6" else sub
+            sample = _dr_sample(context)
             if sample is None:
                 await query.answer("No staff with shifts found")
                 return
-            if data[2] == "go":
-                events = build_catalogue(sample) + [
-                    ("📅 schedule summary", schedule_summary(_today()), None)]
-                intro = "🧪 Dry-run 1 — CHECK-IN, every message + today's who/when. %d steps:"
-            elif data[2] == "go2":
-                events = build_catalogue2(sample)
-                intro = "🧪 Dry-run 2 — LATE + PAYBACK lifecycle. %d steps:"
-            elif data[2] == "go3":
-                events = build_catalogue3(sample)
-                intro = "🧪 Dry-run 3 — ANNUAL LEAVE, every variant. %d steps:"
-            elif data[2] == "go4":
-                events = build_catalogue4(sample)
-                intro = "🧪 Dry-run 4 — SICK (anti-fake ladder, papers, part-duty, family). %d steps:"
-            elif data[2] == "go5":
-                events = build_catalogue5(sample)
-                intro = "🧪 Dry-run 5 — MARRIAGE · FAMILY DEATH · WIFE BIRTH. %d steps:"
-            elif data[2] == "go7":
-                events = build_catalogue7(sample)
-                intro = "🧪 Dry-run 6 — DAY-OFF SWAP (partner first, then seniors). %d steps:"
-            else:
-                events = build_catalogue8(sample)
-                intro = "🧪 Dry-run 7 — ACKS · GROUP REDIRECT · CALL-OUTS · WELCOME. %d steps:"
-            context.user_data["att_dr_events"] = events
-            context.user_data["att_dr_i"] = 0
-            await context.bot.send_message(update.effective_chat.id, intro % len(events))
-        await _dryrun_next(update, context)
+            await context.bot.send_message(update.effective_chat.id,
+                                           _DR_INTROS[key] % len(_dr_events(key, sample)))
+            await _dryrun_send(update, context, key, 0)
+            return
+        if sub == "n":                      # stateless step — survives any restart/deploy
+            await _dryrun_send(update, context, data[3], int(data[4]))
+            return
+        await _dryrun_next(update, context)   # legacy 'next' from pre-stateless messages
         return
     if action == "pick":
         return await show(persona_picker(0))
