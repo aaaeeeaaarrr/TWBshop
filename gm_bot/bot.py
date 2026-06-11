@@ -1649,10 +1649,13 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 % ((stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff"),
                    g["when_date"], _fmt_min(g["start_min"]), _fmt_min(g["end_min"])))
             # act-first, reason-after: the staffer's reason follows to the proposing senior
+            _win = "%s %s-%s" % (g["when_date"], _fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
             _arm_reason(context, update, {"flow": "rej_exp", "to_sid": sen["id"],
                                           "frm": (stf or {}).get("call_name")
                                                  or (stf or {}).get("canonical_name", "Staff"),
-                                          "what": "shift change", "persona_id": g["staff_id"]})
+                                          "what": "shift change (%s)" % _win,
+                                          "what_kh": "ការប្តូរវេន (%s)" % _win,
+                                          "persona_id": g["staff_id"]})
             await _ask_reason(query, sen.get("call_name") or sen["canonical_name"])
         return
     shift_change_set_status(cid, "approved")
@@ -1944,15 +1947,20 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
             pass
         await _swap_flip_requester_card(context, sw, req, partner)   # requester card → declined
         if req:
+            from datetime import date as _dp
+            d1p = _dp.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+            d2p = _dp.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
             await _att_send(context, (req.get("telegram_ids") or [None])[0], "Requester",
                 req.get("call_name") or req["canonical_name"],
-                "Your day-off swap wasn't accepted by your partner.\n"
-                "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។")
+                "Your day-off swap (%s ↔ %s) wasn't accepted by your partner.\n"
+                "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (%s ↔ %s) របស់អ្នកទេ។"
+                % (d1p, d2p, d1p, d2p))
             # act-first, reason-after: the partner's reason is relayed to the requester
             _arm_reason(context, update, {"flow": "rej_exp", "to_sid": req["id"],
                                           "frm": (partner or {}).get("call_name")
                                                  or (partner or {}).get("canonical_name", "partner"),
-                                          "what": "day-off swap",
+                                          "what": "day-off swap (%s ↔ %s)" % (d1p, d2p),
+                                          "what_kh": "ការប្តូរថ្ងៃឈប់ (%s ↔ %s)" % (d1p, d2p),
                                           "persona_id": (partner or {}).get("id")})
             await _ask_reason(query, req.get("call_name") or req["canonical_name"])
         return
@@ -2006,18 +2014,23 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
     needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
     votes = swap_add_senior_vote(int(sw["id"]), query.data.split(":")[3])
     await query.edit_message_text(query.message.text + "\n\n✓ voted: %s" % query.data.split(":")[3])
-    if alm.quorum_reached(votes, needed):
-        await _swap_apply(context, sw, approved=True)
-    elif alm.quorum_rejected(votes, needed):
+    if query.data.split(":")[3] == "not_approve":
+        # owner (Jun 11): ONE ❌ decides; approvals still need the quorum
         await _swap_apply(context, sw, approved=False)
-    if query.data.split(":")[3] == "not_approve" and requester:
-        # act-first, reason-after: the senior's reason is relayed to the requester
-        sen2 = sen if not _att_test_mode() else None
-        frm = ((sen2 or {}).get("call_name") or (sen2 or {}).get("canonical_name", "a senior"))
-        _arm_reason(context, update, {"flow": "rej_exp", "to_sid": requester["id"],
-                                      "frm": frm, "what": "day-off swap",
-                                      "persona_id": (sen2 or {}).get("id") or requester["id"]})
-        await _ask_reason(query, requester.get("call_name") or requester["canonical_name"])
+        if requester:
+            from datetime import date as _date
+            d1 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+            d2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
+            sen2 = sen if not _att_test_mode() else None
+            frm = ((sen2 or {}).get("call_name") or (sen2 or {}).get("canonical_name", "a senior"))
+            _arm_reason(context, update, {"flow": "rej_exp", "to_sid": requester["id"],
+                                          "frm": frm,
+                                          "what": "day-off swap (%s ↔ %s)" % (d1, d2),
+                                          "what_kh": "ការប្តូរថ្ងៃឈប់ (%s ↔ %s)" % (d1, d2),
+                                          "persona_id": (sen2 or {}).get("id") or requester["id"]})
+            await _ask_reason(query, requester.get("call_name") or requester["canonical_name"])
+    elif alm.quorum_reached(votes, needed):
+        await _swap_apply(context, sw, approved=True)
 
 
 async def _swap_apply(context, sw: dict, approved: bool) -> None:
@@ -2069,10 +2082,14 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
             "Day-off swap: %s off %s, %s off %s.\nប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
             % (rn2, rd2, pn2, pd2, rn2, rd2, pn2, pd2), group=True)
     else:
+        from datetime import date as _dr
+        rd3 = _dr.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
+        pd3 = _dr.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
         for s, role in ((req, "Requester"), (partner, "Partner")):
             await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
                 s.get("call_name") or s["canonical_name"],
-                "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។")
+                "The day-off swap (%s ↔ %s) wasn't approved.\n"
+                "ការប្តូរថ្ងៃឈប់ (%s ↔ %s) មិនបានអនុម័តទេ។" % (rd3, pd3, rd3, pd3))
 
 
 def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
@@ -2252,18 +2269,21 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
     needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
     decisions = al_add_approval(int(req_s), sen["id"], actor_uid, decision)
     await query.edit_message_text(query.message.text + "\n\n✓ You voted: %s" % decision)
-    if alm.quorum_reached(decisions, needed):
-        await _al_finalize(context, req, approved=True)
-    elif alm.quorum_rejected(decisions, needed):
-        await _al_finalize(context, req, approved=False)
     if decision == "not_approve":
-        # act-first, reason-after (owner): the ❌ already counted; the typed reason is relayed
-        # to the requester (the destination doesn't change — only the explanation is added)
+        # owner (Jun 11): ONE ❌ decides — a senior who refuses has a reason; approvals still
+        # need the quorum. Bonus: at most one reason relay ever (no doubled notes).
+        await _al_finalize(context, req, approved=False)
+        nw0 = staff_absent_dates(req["staff_id"])
+        span = alm.al_span_label(req["days"], (requester or {}).get("day_off"), nw0)
         rq_name = (requester or {}).get("call_name") or (requester or {}).get("canonical_name", "the requester")
         _arm_reason(context, update, {"flow": "rej_exp", "to_sid": req["staff_id"],
                                       "frm": sen.get("call_name") or sen["canonical_name"],
-                                      "what": "AL request", "persona_id": sen["id"]})
+                                      "what": "AL request (%s)" % span,
+                                      "what_kh": "សំណើ AL (%s)" % span,
+                                      "persona_id": sen["id"]})
         await _ask_reason(query, rq_name)
+    elif alm.quorum_reached(decisions, needed):
+        await _al_finalize(context, req, approved=True)
 
 
 async def _al_finalize(context, req: dict, approved: bool) -> None:
@@ -2352,8 +2372,10 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s."
             % (name, span_note, req.get("reason") or "—", day_off, back), group=True)
     else:
+        # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,
-            "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")
+            "Your AL for %s wasn't approved.\nAL របស់ប្អូនសម្រាប់ %s មិនបានអនុម័តទេ។"
+            % (days_txt, days_txt))
 
 
 async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4879,10 +4901,12 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         # (the destination never changes; only the explanation is added)
         tgt = next((s for s in staff_all("active") if s["id"] == pend.get("to_sid")), None)
         if tgt:
+            # bilingual (owner: some staff won't understand English)
             await _att_send(context, (tgt.get("telegram_ids") or [None])[0], "Staff",
                 tgt.get("call_name") or tgt["canonical_name"],
-                "📝 About your %s — %s: %s" % (pend.get("what", "request"),
-                                               pend.get("frm", "—"), reason))
+                "📝 About your %s — %s: %s\n📝 អំពី%sរបស់ប្អូន — %s៖ %s"
+                % (pend.get("what", "request"), pend.get("frm", "—"), reason,
+                   pend.get("what_kh", pend.get("what", "request")), pend.get("frm", "—"), reason))
         await confirm("Sent 🤍\nផ្ញើរួចហើយ 🤍", "🧪 Reason relayed (test) — routed to you.")
     elif flow == "sret_exp":
         # the typed reason for still-resting (own sick) → the Supervisors read it

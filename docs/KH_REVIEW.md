@@ -137,4 +137,20 @@ Sent 🤍
 > each {variable} is, the intended TONE, and BUTTON vs body. (See git history for the P1–P9
 > example format.)
 
-(nothing pending)
+### P10 · Reason-relay line + detailed rejections (Jun 11; KH = Claude DRAFT)
+- WHO: the REQUESTER (junior staff — hence bilingual, owner: "some staff won't understand"),
+  private DM, right after a decliner types their reason.
+- WHEN: a senior ❌'d their AL/swap (ONE ❌ now decides), the partner said no, or a staffer
+  declined a senior's shift change — the decision message already arrived; this is the why.
+- {what_kh}: សំណើ AL (dates) · ការប្តូរថ្ងៃឈប់ (d1 ↔ d2) · ការប្តូរវេន (date time) — dates ride
+  inside the parentheses as English (Tue 23/06), per the app-wide convention.
+- {name} = the decliner's call-name · {reason} = their typed text (any language).
+- TONE: neutral courier — the bot relays, it doesn't judge.
+
+📝 About your {what} — {name}: {reason}
+📝 អំពី{what_kh}របស់ប្អូន — {name}៖ {reason}
+
+Also new (compositions of already-approved fragments, sanity-check only):
+Your AL for {dates} wasn't approved. · AL របស់ប្អូនសម្រាប់ {dates} មិនបានអនុម័តទេ។
+The day-off swap ({d1} ↔ {d2}) wasn't approved. · ការប្តូរថ្ងៃឈប់ ({d1} ↔ {d2}) មិនបានអនុម័តទេ។
+

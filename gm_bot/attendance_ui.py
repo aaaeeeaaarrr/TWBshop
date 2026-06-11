@@ -282,9 +282,10 @@ _DRS = {
     "appr": ("→ your ✅ counts (1/2) — when the 2nd senior approves:",
              "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។\n\n"
              "(requester gets her ✓ message; Supervisors get the plain notice — steps ③+⑤)"),
-    "rej": ("→ your ❌ counts — if a 2nd senior also rejects:",
-            "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។\n\n"
-            "(requester only; seniors get the recap; NOTHING goes to the group)"),
+    "rej": ("→ your ❌ DECIDES instantly (owner: one rejection is enough):",
+            "Your AL for Tue 23/06 → Thu 25/06 wasn't approved.\n"
+            "AL របស់ប្អូនសម្រាប់ Tue 23/06 → Thu 25/06 មិនបានអនុម័តទេ។\n\n"
+            "(requester only — with WHICH request; your typed reason follows; NOTHING to the group)"),
     "take": ("→ tapping a buyback slot books the rest:",
              "Booked ✓ — Tue 10/06, 2pm–3pm.\nបានកក់រួច ✓ — Tue 10/06, 2pm–3pm។\n"
              "OT bank របស់អ្នក៖ 3.5h\n\n"
@@ -387,7 +388,7 @@ def _demo_al_card(p: dict, show_cov: bool) -> tuple[str, InlineKeyboardMarkup]:
 
 _DEMO_SW_LABELS = {
     "partner": "① staff requests a swap → the PARTNER is asked FIRST (real card — tap the 👁!)",
-    "senior": "④ seniors' approval card (real card, same-week rule) → 2 ✅ applies the dated swap",
+    "senior": "④ seniors' approval card (real card, same-week rule) → 2 ✅ apply · ONE ❌ rejects",
 }
 
 
@@ -434,14 +435,15 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Please choose a smaller amount — you can request up to 1.5.\n"
          "⚠ ប្អូននៅសល់ AL តែ 1.5 ថ្ងៃប៉ុណ្ណោះ ប៉ុន្តែសំណើនេះត្រូវប្រើ 3 ថ្ងៃ។\n"
          "សូមជ្រើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានច្រើនបំផុត 1.5 ថ្ងៃ។", None),
-        ("⑥ after 2 ✅ — the refreshed recap to all seniors",
+        ("⑥ after 2 ✅ (ONE ❌ would reject instantly) — the refreshed recap to all seniors",
          "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។", None),
         ("⑦ to the requester — approved + new balance",
          "Your AL for Tue 23/06 → Thu 25/06 is approved ✓. You have 4.5 AL days left. 🤍\n"
          "AL របស់ប្អូនសម្រាប់ Tue 23/06 → Thu 25/06 បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត 🤍",
          None),
-        ("⑧ to the requester — not approved (seniors-only recap, nothing to the group)",
-         "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
+        ("⑧ to the requester — ONE ❌ decides (owner) · says WHICH request · reason follows; nothing to the group",
+         "Your AL for Tue 23/06 → Thu 25/06 wasn't approved.\n"
+         "AL របស់ប្អូនសម្រាប់ Tue 23/06 → Thu 25/06 មិនបានអនុម័តទេ។", None),
         ("⑨ SUPERVISORS notice — FULL-DAY (ENGLISH-only, owner Jun 11; locked format)",
          "Meng on leave: Tue 23/06 → Thu 25/06.\n"
          "Reason: family trip\n"
@@ -577,16 +579,18 @@ def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "✅ You agreed — sent to seniors.\n"
          "✅ ប្អូនបានយល់ព្រមហើយ — បានផ្ញើទៅបងៗ។", None),
         ("③ partner declines OR stays silent → swap doesn't happen, seniors never bothered",
-         "Your day-off swap wasn't accepted by your partner.\n"
-         "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់របស់អ្នកទេ។", None),
+         "Your day-off swap (Wed 10/06 ↔ Fri 12/06) wasn't accepted by your partner.\n"
+         "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (Wed 10/06 ↔ Fri 12/06) របស់អ្នកទេ។",
+         None),
         (_DEMO_SW_LABELS["senior"],) + _demo_swap_card(p, "senior", False),
         ("⑤ approved → SUPERVISORS notice",
          "Day-off swap: Davy off Fri 12/06, Mealea off Wed 10/06.\n"
          "ប្តូរថ្ងៃឈប់៖ Davy ឈប់ Fri 12/06, Mealea ឈប់ Wed 10/06។", None),
         ("⑥ approved → to the requester",
          "Your day-off swap is approved ✓\nការប្តូរថ្ងៃឈប់របស់អ្នកបានអនុម័តហើយ ✓", None),
-        ("⑦ seniors rejected → to the requester",
-         "The day-off swap wasn't approved.\nការប្តូរថ្ងៃឈប់មិនបានអនុម័តទេ។", None),
+        ("⑦ ONE senior ❌ rejects (owner) → to the requester + partner, with the dates",
+         "The day-off swap (Wed 10/06 ↔ Fri 12/06) wasn't approved.\n"
+         "ការប្តូរថ្ងៃឈប់ (Wed 10/06 ↔ Fri 12/06) មិនបានអនុម័តទេ។", None),
     ]
 
 
