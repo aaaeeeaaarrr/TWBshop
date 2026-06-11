@@ -2180,3 +2180,39 @@ def test_al_over_balance_early_gate():
     over = ui._al_over_balance(p, 3.0)
     assert over and "only have 1.5" in over and "up to 1.5" in over
     assert ui._al_over_balance({"al_left": None}, 99) is None   # unknown balance → never block
+
+
+def test_dead_tap_visibility(monkeypatch):
+    """Owner's expired-button design: dead taps are RECORDED (gm_state, per day) and the audit
+    law flags today/yesterday entries with samples — silent dead buttons can't hide anymore."""
+    import datetime as _dt
+    import json as _json
+    import gm_bot.bot as bot
+    from gm_bot import audit as au
+
+    store = {}
+    monkeypatch.setattr(bot, "gm_get_state", lambda k: store.get(k))
+    monkeypatch.setattr(bot, "gm_set_state", lambda k, v: store.__setitem__(k, v))
+    monkeypatch.setattr(bot, "_today_pp", lambda: _dt.date(2026, 6, 11))
+    bot._record_dead_tap("att:pb:book:x")
+    bot._record_dead_tap("att:pb:book:x")          # duplicate sample, counted twice
+    bot._record_dead_tap("own:ghost")
+    rec = _json.loads(store["dead_taps:2026-06-11"])
+    assert rec["n"] == 3 and rec["samples"] == ["att:pb:book:x", "own:ghost"]
+
+    rows = list(store.items()) + [("dead_taps:2026-06-01", '{"n": 9, "samples": ["old"]}')]
+    probs = au.v_dead_taps(rows, _dt.date(2026, 6, 11))
+    assert len(probs) == 1 and "3 dead/expired" in probs[0] and "own:ghost" in probs[0]
+    # old entries age out (only today/yesterday alarm)
+    assert not any("old" in p for p in probs)
+
+    # the catch-all collapses the message + records
+    edits = []
+    class _Q:
+        data = "legacy:button"
+        async def answer(self): pass
+        async def edit_message_text(self, t, **k): edits.append(t)
+    asyncio.run(bot._expired_button_callback(
+        types.SimpleNamespace(callback_query=_Q()), types.SimpleNamespace()))
+    assert any("Expired message" in e and "សារផុតកំណត់" in e for e in edits)
+    assert _json.loads(store["dead_taps:2026-06-11"])["n"] == 4

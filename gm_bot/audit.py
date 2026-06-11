@@ -324,6 +324,27 @@ def v_al_same_day_gate(requests: list[dict], sessions: list[dict], staff: dict) 
     return out
 
 
+def v_dead_taps(rows: list[tuple], today: date) -> list[str]:
+    """Dead/expired button taps (recorded by the catch-all + the in-handler toasts, owner Jun 11):
+    any taps today or yesterday = a button died somewhere — investigate the samples. This is the
+    law that makes silent dead buttons VISIBLE (they write nothing else anywhere)."""
+    import json as _json
+    out = []
+    floor = (today - timedelta(days=1)).isoformat()
+    for key, val in rows:
+        day = key.split(":", 1)[1] if ":" in key else ""
+        if day < floor:
+            continue
+        try:
+            rec = _json.loads(val or "{}")
+        except Exception:
+            continue
+        if int(rec.get("n", 0)) > 0:
+            out.append("UI: %d dead/expired button tap(s) on %s — samples: %s"
+                       % (rec["n"], day, ", ".join(rec.get("samples", [])[:5]) or "?"))
+    return out
+
+
 def v_staff_sanity(staff_rows: list[dict]) -> list[str]:
     out = []
     for s in staff_rows:
@@ -370,6 +391,8 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             pevents = q(cur, "SELECT * FROM points_events WHERE is_test=%s", (flag,))
             buybacks = q(cur, "SELECT * FROM ot_buyback WHERE is_test=%s", (flag,))
             sick = q(cur, "SELECT * FROM sick_cases WHERE is_test=%s", (flag,))
+            cur.execute("SELECT key, value FROM gm_state WHERE key LIKE 'dead_taps:%%'")
+            taps = [(r["key"], r["value"]) for r in cur.fetchall()]
 
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)
@@ -384,6 +407,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_swaps(swaps, staff, today)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
+                + v_dead_taps(taps, today)
                 + v_staff_sanity(list(staff.values())))
     stats = {"payback": len(debts), "AL": len(als), "shift-changes": len(scs),
              "sessions": len(sess), "OT banks": len(banks), "no-shows": len(nos),

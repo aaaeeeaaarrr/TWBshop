@@ -1184,6 +1184,50 @@ def _today_pp():
     return _now_pp().date()
 
 
+def _record_dead_tap(data: str) -> None:
+    """Count unhandled/expired button taps (gm_state, per day, last 5 distinct samples) — the
+    daily auto-audit reads these, so a dead button can never stay invisible again (the
+    payback-picker lesson, Jun 11: a silent return writes nothing → no net could see it)."""
+    try:
+        import json as _json
+        key = "dead_taps:%s" % _today_pp().isoformat()
+        cur = gm_get_state(key)
+        rec = _json.loads(cur) if cur else {"n": 0, "samples": []}
+        rec["n"] += 1
+        if data and data not in rec["samples"]:
+            rec["samples"] = (rec["samples"] + [data])[-5:]
+        gm_set_state(key, _json.dumps(rec))
+    except Exception as e:
+        logger.error("dead-tap record failed: %s", e)
+
+
+async def _expired_toast(query) -> None:
+    """In-handler bail (stale card, missing record, unresolved tapper): a non-destructive popup —
+    the message stays intact for whoever it's still valid for — and the tap is recorded."""
+    _record_dead_tap(getattr(query, "data", "") or "?")
+    try:
+        await query.answer("⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត", show_alert=True)
+    except Exception:
+        pass
+
+
+async def _expired_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """CATCH-ALL (registered LAST): a tapped button NO handler recognises = an orphaned/legacy
+    message → collapse it into an honest expired note (owner, Jun 11) and record the tap."""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    _record_dead_tap(query.data or "?")
+    try:
+        await query.edit_message_text(
+            "⏳ Expired message — please start again from the menu.\n"
+            "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀតពីម៉ឺនុយ។")
+    except Exception:
+        pass
+
+
 def _msg_time_pp(update, fallback: datetime) -> datetime:
     """The Telegram-stamped time of this update, in PP tz. Queued updates (bot down/restarting,
     long-poll backlog) must be judged by when the STAFFER acted, not when we got to process them —
@@ -1632,7 +1676,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
     cid = int(query.data.split(":")[3])
     g = shift_change_get(cid)
     if not g or g["status"] != "proposed":
-        return
+        return await _expired_toast(query)
     if not _att_test_mode():
         staff = staff_get_by_uid(update.effective_user.id)
         if not staff or staff["id"] != g["staff_id"]:
@@ -1772,9 +1816,9 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         staff = staff_get_by_uid(update.effective_user.id)
         if not staff or staff["id"] != int(sid_s):
-            return
+            return await _expired_toast(query)
     if not staff:
-        return
+        return await _expired_toast(query)
     rest_min = (int(e_min) - int(s_min)) % 1440 or 1440
     ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), rest_min)
     # Jun 11 (the buyback twin of the mini-shift bug): booking now DEBITS the bank immediately
@@ -2397,7 +2441,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         staff = staff_get_by_uid(user.id)
     if not staff:
-        return
+        return await _expired_toast(query)
     data = query.data.split(":")
     sub = data[2] if len(data) > 2 else ""
     debt = payback_open_debt(staff["id"])
@@ -2929,7 +2973,7 @@ async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFA
     act, cid = parts[2], int(parts[3])
     case = sick_get(cid)
     if not case or case.get("status") != "open":
-        return                                  # already answered (or stale) — never act twice
+        return await _expired_toast(query)      # already answered (or stale) — never act twice
     if act == "ok":
         sick_set(cid, status="cleared")
         await query.edit_message_text("Great — see you tomorrow 🤍\nឃើញគ្នាស្អែក 🤍")
@@ -5722,6 +5766,11 @@ def build_app() -> Application:
     app.add_handler(MessageHandler(
         filters.ChatType.GROUPS & filters.UpdateType.EDITED_MESSAGE, _edited_group_handler))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, _live_group_handler))
+    # CATCH-ALL for buttons NO handler recognises — MUST be the LAST handler registered (same
+    # group 0: only unmatched taps fall through to it; conversations register their own callback
+    # handlers above). Collapses orphaned/legacy messages into an honest expired note (EN+KH)
+    # and records the tap for the daily auto-audit (owner, Jun 11).
+    app.add_handler(CallbackQueryHandler(_expired_button_callback))
 
     # Schedule analysis: every day at 08:00 Phnom Penh time (01:00 UTC)
     app.job_queue.run_daily(
