@@ -1185,26 +1185,57 @@ def _today_pp():
 
 
 def _record_dead_tap(data: str) -> None:
-    """Count unhandled/expired button taps (gm_state, per day, last 5 distinct samples) — the
-    daily auto-audit reads these, so a dead button can never stay invisible again (the
-    payback-picker lesson, Jun 11: a silent return writes nothing → no net could see it)."""
+    """Count unhandled/expired button taps (gm_state, per day, time-stamped samples) — the daily
+    auto-audit reads these, so a dead button can never stay invisible again (the payback-picker
+    lesson, Jun 11: a silent return writes nothing → no net could see it)."""
     try:
         import json as _json
         key = "dead_taps:%s" % _today_pp().isoformat()
         cur = gm_get_state(key)
         rec = _json.loads(cur) if cur else {"n": 0, "samples": []}
         rec["n"] += 1
-        if data and data not in rec["samples"]:
-            rec["samples"] = (rec["samples"] + [data])[-5:]
+        sample = "%s %s" % (_now_pp().strftime("%H:%M"), data or "?")
+        if not any(s.split(" ", 1)[-1] == (data or "?") for s in rec["samples"]):
+            rec["samples"] = (rec["samples"] + [sample])[-5:]
         gm_set_state(key, _json.dumps(rec))
     except Exception as e:
         logger.error("dead-tap record failed: %s", e)
 
 
-async def _expired_toast(query) -> None:
+_DEAD_TAP_LAST_DM = 0.0
+
+
+async def _dead_tap_alarm(context, data: str, uid: int | None) -> None:
+    """INSTANT owner DM on a dead tap (owner, Jun 11) — time + who + which button, so the source
+    is suspectable immediately. Throttled to one per 30 min (a confused staffer may tap 5×);
+    every tap is still recorded for the daily audit either way."""
+    global _DEAD_TAP_LAST_DM
+    import time as _time
+    now_t = _time.time()
+    if now_t - _DEAD_TAP_LAST_DM < 1800:
+        return
+    _DEAD_TAP_LAST_DM = now_t
+    who = "?"
+    if uid:
+        s = staff_get_by_uid(uid)
+        who = ((s.get("call_name") or s["canonical_name"]) if s
+               else ("owner" if uid == config.OWNER_TELEGRAM_ID else str(uid)))
+    try:
+        await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+            "🔘 Dead button at %s — %s tapped '%.40s' and nothing could handle it.\n"
+            "(recorded for the daily audit; more in the next 30 min are logged only)"
+            % (_now_pp().strftime("%H:%M"), who, data or "?"))
+    except Exception:
+        pass
+
+
+async def _expired_toast(query, context=None, uid: int | None = None) -> None:
     """In-handler bail (stale card, missing record, unresolved tapper): a non-destructive popup —
-    the message stays intact for whoever it's still valid for — and the tap is recorded."""
-    _record_dead_tap(getattr(query, "data", "") or "?")
+    the message stays intact for whoever it's still valid for — recorded + instant owner alarm."""
+    data = getattr(query, "data", "") or "?"
+    _record_dead_tap(data)
+    if context is not None:
+        await _dead_tap_alarm(context, data, uid)
     try:
         await query.answer("⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត", show_alert=True)
     except Exception:
@@ -1213,17 +1244,22 @@ async def _expired_toast(query) -> None:
 
 async def _expired_button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """CATCH-ALL (registered LAST): a tapped button NO handler recognises = an orphaned/legacy
-    message → collapse it into an honest expired note (owner, Jun 11) and record the tap."""
+    message → collapse it into an honest expired note WITH a recovery button (the menu is the
+    root of every flow), record the tap, and alarm the owner instantly."""
     query = update.callback_query
     try:
         await query.answer()
     except Exception:
         pass
     _record_dead_tap(query.data or "?")
+    await _dead_tap_alarm(context, query.data or "?",
+                          update.effective_user.id if update.effective_user else None)
     try:
         await query.edit_message_text(
-            "⏳ Expired message — please start again from the menu.\n"
-            "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀតពីម៉ឺនុយ។")
+            "⏳ Expired message — please start again.\n"
+            "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀត។",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                "📋 Open menu · បើកម៉ឺនុយ", callback_data="att:menu")]]))
     except Exception:
         pass
 
@@ -1676,7 +1712,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
     cid = int(query.data.split(":")[3])
     g = shift_change_get(cid)
     if not g or g["status"] != "proposed":
-        return await _expired_toast(query)
+        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     if not _att_test_mode():
         staff = staff_get_by_uid(update.effective_user.id)
         if not staff or staff["id"] != g["staff_id"]:
@@ -1816,9 +1852,9 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         staff = staff_get_by_uid(update.effective_user.id)
         if not staff or staff["id"] != int(sid_s):
-            return await _expired_toast(query)
+            return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     if not staff:
-        return await _expired_toast(query)
+        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     rest_min = (int(e_min) - int(s_min)) % 1440 or 1440
     ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), rest_min)
     # Jun 11 (the buyback twin of the mini-shift bug): booking now DEBITS the bank immediately
@@ -2441,12 +2477,22 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         staff = staff_get_by_uid(user.id)
     if not staff:
-        return await _expired_toast(query)
+        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     data = query.data.split(":")
     sub = data[2] if len(data) > 2 else ""
     debt = payback_open_debt(staff["id"])
     if not debt:
         await query.edit_message_text("Your payback is already cleared ✓ / សងរួចរាល់ហើយ ✓")
+        return
+    if sub == "offer":
+        # on-demand re-open from My Schedule (owner, Jun 11) — same picker as the live offer;
+        # the universal recovery when a picker message ever gets lost/expired
+        from gm_bot.attendance_ui import _hm
+        kb = _payback_slot_keyboard(staff, debt["balance"])
+        await query.edit_message_text(
+            "You owe %s. Pick when to work it off — these are the times we need you most:\n"
+            "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+            % (_hm(debt["balance"]), _hm(debt["balance"])), reply_markup=kb)
         return
     if sub == "part":
         from gm_bot.attendance_ui import _hm
@@ -2973,7 +3019,7 @@ async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFA
     act, cid = parts[2], int(parts[3])
     case = sick_get(cid)
     if not case or case.get("status") != "open":
-        return await _expired_toast(query)      # already answered (or stale) — never act twice
+        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)      # already answered (or stale) — never act twice
     if act == "ok":
         sick_set(cid, status="cleared")
         await query.edit_message_text("Great — see you tomorrow 🤍\nឃើញគ្នាស្អែក 🤍")

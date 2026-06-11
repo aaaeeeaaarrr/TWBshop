@@ -2194,11 +2194,14 @@ def test_dead_tap_visibility(monkeypatch):
     monkeypatch.setattr(bot, "gm_get_state", lambda k: store.get(k))
     monkeypatch.setattr(bot, "gm_set_state", lambda k, v: store.__setitem__(k, v))
     monkeypatch.setattr(bot, "_today_pp", lambda: _dt.date(2026, 6, 11))
+    monkeypatch.setattr(bot, "_now_pp",
+                        lambda: _dt.datetime(2026, 6, 11, 12, 57, tzinfo=bot.finance.PP_TZ))
     bot._record_dead_tap("att:pb:book:x")
     bot._record_dead_tap("att:pb:book:x")          # duplicate sample, counted twice
     bot._record_dead_tap("own:ghost")
     rec = _json.loads(store["dead_taps:2026-06-11"])
-    assert rec["n"] == 3 and rec["samples"] == ["att:pb:book:x", "own:ghost"]
+    assert rec["n"] == 3                           # samples carry the TIME (owner: when it tripped)
+    assert rec["samples"] == ["12:57 att:pb:book:x", "12:57 own:ghost"]
 
     rows = list(store.items()) + [("dead_taps:2026-06-01", '{"n": 9, "samples": ["old"]}')]
     probs = au.v_dead_taps(rows, _dt.date(2026, 6, 11))
@@ -2212,7 +2215,23 @@ def test_dead_tap_visibility(monkeypatch):
         data = "legacy:button"
         async def answer(self): pass
         async def edit_message_text(self, t, **k): edits.append(t)
-    asyncio.run(bot._expired_button_callback(
-        types.SimpleNamespace(callback_query=_Q()), types.SimpleNamespace()))
+    kbs, alarms = [], []
+    class _Q2(_Q):
+        async def edit_message_text(self, t, reply_markup=None, **k):
+            edits.append(t); kbs.append(reply_markup)
+    class _OwnerBot:
+        async def send_message(self, chat_id, text, **k): alarms.append(text)
+    bot._DEAD_TAP_LAST_DM = 0.0
+    upd = types.SimpleNamespace(callback_query=_Q2(),
+                                effective_user=types.SimpleNamespace(id=999))
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: None)
+    asyncio.run(bot._expired_button_callback(upd, types.SimpleNamespace(bot=_OwnerBot())))
     assert any("Expired message" in e and "សារផុតកំណត់" in e for e in edits)
     assert _json.loads(store["dead_taps:2026-06-11"])["n"] == 4
+    # recovery button (owner): the collapse carries Open-menu
+    assert any(kb and any("Open menu" in b.text for row in kb.inline_keyboard for b in row)
+               for kb in kbs)
+    # instant alarm with the time + the button (throttled after the first)
+    assert len(alarms) == 1 and "12:57" in alarms[0] and "legacy:button" in alarms[0]
+    asyncio.run(bot._expired_button_callback(upd, types.SimpleNamespace(bot=_OwnerBot())))
+    assert len(alarms) == 1
