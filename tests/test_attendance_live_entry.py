@@ -2168,3 +2168,14 @@ def test_death_photo_condolence(monkeypatch):
     assert handled is True
     assert any("sorry for your loss" in r for r in replies)
     assert fwds and opened == []                  # forwarded; papers/Opus path never touched
+
+
+def test_al_over_balance_early_gate():
+    """Owner (Jun 11): the not-enough-AL message fires right after the day/time pick, BEFORE the
+    reason prompt. Truth table for the gate itself."""
+    p = {"al_left": 1.5}
+    assert ui._al_over_balance(p, 1.5) is None          # exactly enough → no gate
+    assert ui._al_over_balance(p, 1.0) is None
+    over = ui._al_over_balance(p, 3.0)
+    assert over and "only have 1.5" in over and "up to 1.5" in over
+    assert ui._al_over_balance({"al_left": None}, 99) is None   # unknown balance → never block

@@ -1376,6 +1376,21 @@ def al_today_allowed(p: dict) -> bool:
     return bool(sess.get("checked_in_at"))
 
 
+def _al_over_balance(p: dict, amount: float) -> str | None:
+    """The owner's EARLY gate (Jun 11): not-enough-AL fires right after the day/time pick —
+    BEFORE the reason prompt (the dispatch check stays as the final net). Plain-AL flows only;
+    special leaves (marriage/death/birth) may go negative by design and never come through here."""
+    bal = p.get("al_left")
+    if bal is None or float(amount) <= float(bal):
+        return None
+    return ("⚠ You only have %g AL day(s) left, but this request needs %g.\n"
+            "Please choose a smaller amount — you can request up to %g.\n"
+            "⚠ ប្អូននៅសល់ AL តែ %g ថ្ងៃប៉ុណ្ណោះ ប៉ុន្តែសំណើនេះត្រូវប្រើ %g ថ្ងៃ។\n"
+            "សូមជ្រើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានច្រើនបំផុត %g ថ្ងៃ។"
+            % (float(bal), float(amount), float(bal),
+               float(bal), float(amount), float(bal)))
+
+
 def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     al_left = p.get("al_left")
     start = _today() + timedelta(days=page * 28)
@@ -2248,6 +2263,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 nw = staff_absent_dates(p["id"])                # other AL / special leave / swaps
                 charged = alm.al_charged_days(picked, doff, nw)  # never charge a day they're away
                 span = alm.al_span_label(picked, doff, nw)       # from → to, bridging ANY absence
+                over = _al_over_balance(p, float(len(charged)))
+                if over:                                          # owner: gate BEFORE the reason
+                    return await show((_hdr(p, over),
+                                       InlineKeyboardMarkup([_back_row("att:al")])))
                 near = _near_days(set(charged))
                 detail = ("Full-day AL: %s — %d AL day(s).\nAL ពេញមួយថ្ងៃ៖ %s — %d ថ្ងៃ។"
                           % (span, len(charged), span, len(charged)))
@@ -2281,6 +2300,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _charged = alm.al_charged_days(_picked, _doff, _nw)
                 _sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                 _total = round(alm.fractional_al(f, t, _sl) * len(_charged), 2)
+                over = _al_over_balance(p, _total)
+                if over:                                          # owner: gate BEFORE the reason
+                    return await show((_hdr(p, over),
+                                       InlineKeyboardMarkup([_back_row("att:al")])))
                 detail = ("AL: %s · %s–%s = %g AL.\nAL៖ %s · %s–%s = %g AL។"
                           % (_span, fmt12(f), fmt12(t), _total, _span, fmt12(f), fmt12(t), _total))
                 if len(_charged) != len(_picked):
