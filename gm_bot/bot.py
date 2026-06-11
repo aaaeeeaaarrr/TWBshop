@@ -1448,12 +1448,22 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
             if state == "early":
                 points_record(staff["id"], "early_arrival", 1, shift_date)
             elif state == "late":
-                # declared beforehand → the cheaper rate (was a placeholder that charged
-                # EVERYONE late_uninformed −2/min; fixed when points went ACTIVE, Jun 11)
-                from shared.database import late_was_informed
-                cause = ("late_informed" if late_was_informed(staff["id"], shift_date)
-                         else "late_uninformed")
-                points_record(staff["id"], cause, late, shift_date)
+                # the DECLARATION TIME splits the minutes (owner, Jun 11): already-late minutes
+                # before declaring stay −2/min; minutes after the declaration are −1/min;
+                # declared before shift start → all −1/min. Never declared → all −2/min.
+                from shared.database import late_declared_at
+                from gm_bot.points import split_late
+                dec = late_declared_at(staff["id"], shift_date)
+                off = None
+                if dec is not None:
+                    sd0 = datetime.fromisoformat(str(shift_date)).replace(
+                        tzinfo=finance.PP_TZ) + timedelta(minutes=ws)
+                    off = int((dec.astimezone(finance.PP_TZ) - sd0).total_seconds() // 60)
+                un_min, inf_min = split_late(late, off)
+                if un_min:
+                    points_record(staff["id"], "late_uninformed", un_min, shift_date)
+                if inf_min:
+                    points_record(staff["id"], "late_informed", inf_min, shift_date)
         except Exception:
             pass
     if first and not update.edited_message:

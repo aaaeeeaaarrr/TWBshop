@@ -3474,15 +3474,16 @@ def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) 
             return cur.fetchone()["id"]
 
 
-def late_was_informed(staff_id: int, for_shift: str) -> bool:
-    """Did the staffer DECLARE this lateness before arriving? Drives the points cause:
-    late_informed (−1/min) vs late_uninformed (−2/min) — honesty halves the damage."""
+def late_declared_at(staff_id: int, for_shift: str):
+    """The EARLIEST proactive late-declaration time for this shift, or None. The declaration
+    moment splits the late minutes (owner): before it −2/min, after it −1/min."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT 1 FROM lateness_records
-                           WHERE staff_id=%s AND for_shift=%s AND informed_before AND is_test=%s
-                           LIMIT 1""", (staff_id, for_shift, _ATT_TEST))
-            return cur.fetchone() is not None
+            cur.execute("""SELECT MIN(reported_at) AS m FROM lateness_records
+                           WHERE staff_id=%s AND for_shift=%s AND informed_before AND is_test=%s""",
+                        (staff_id, for_shift, _ATT_TEST))
+            r = cur.fetchone()
+            return r["m"] if r else None
 
 
 def payback_open_debt(staff_id: int) -> dict | None:

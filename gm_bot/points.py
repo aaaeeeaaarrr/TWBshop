@@ -22,6 +22,19 @@ CATALOGUE = {
 }
 
 
+def split_late(late_min: int, declare_offset_min: int | None) -> tuple[int, int]:
+    """OWNER RULE (Jun 11): the declaration time SPLITS the late minutes — minutes already
+    elapsed before they declared stay at the uninformed rate (−2), minutes after the
+    declaration earn the informed rate (−1). Declared before shift start → all informed.
+    declare_offset_min = minutes AFTER shift start when they declared (≤0 = before start;
+    None = never declared). Returns (uninformed_min, informed_min)."""
+    late_min = max(0, int(late_min))
+    if declare_offset_min is None:
+        return late_min, 0
+    un = max(0, min(late_min, int(declare_offset_min)))
+    return un, late_min - un
+
+
 def event_points(cause: str, quantity: int, rules: dict) -> float:
     """Points for one event given the rules map {cause: {'value', 'active'}}."""
     r = rules.get(cause)

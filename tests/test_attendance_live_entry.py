@@ -1729,8 +1729,10 @@ def test_al_today_gate(monkeypatch):
     sess = {}
     monkeypatch.setattr(db, "att_get_session", lambda sid, iso: sess or None)
 
-    monkeypatch.setattr(ui, "_now_min", lambda: 7 * 60)          # 07:00 — before start
+    monkeypatch.setattr(ui, "_now_min", lambda: 7 * 60)          # 07:00 — before start−30
     assert ui.al_today_allowed(p) is True                        # normal same-day request
+    monkeypatch.setattr(ui, "_now_min", lambda: 7 * 60 + 45)     # 07:45 — inside the 30-min arm
+    assert ui.al_today_allowed(p) is False                       # gate armed BEFORE start (owner)
     monkeypatch.setattr(ui, "_now_min", lambda: 9 * 60)          # 09:00 — shift started
     assert ui.al_today_allowed(p) is False                       # no check-in → gated
     sess["checked_in_at"] = "2026-06-11T08:50:00"
@@ -1745,6 +1747,39 @@ def test_al_today_gate(monkeypatch):
     _, kb2 = ui.al_screen(p, set(), page=0)
     labels2 = [b.text for row in kb2.inline_keyboard for b in row]
     assert any(today_lbl in l for l in labels2)
+
+
+def test_split_late_by_declaration_time():
+    """OWNER RULE: the declaration moment splits the minutes — before it −2/min (uninformed),
+    after it −1/min (informed); declared before start → all informed; never → all uninformed."""
+    from gm_bot.points import split_late
+    assert split_late(30, None) == (30, 0)       # never declared → all −2
+    assert split_late(30, -15) == (0, 30)        # declared 15 min BEFORE start → all −1
+    assert split_late(40, 25) == (25, 15)        # declared 25 min after start: 25 dear + 15 cheap
+    assert split_late(20, 45) == (20, 0)         # declared after arriving-time → all dear
+    assert split_late(0, 10) == (0, 0)
+
+
+def test_audit_late_points_and_al_gate_laws():
+    """The two new audit laws: late minutes must equal the late-event totals; a same-day AL
+    request created at/after start−30 with no check-in that day is flagged."""
+    import datetime as _dt
+    from gm_bot import audit as au
+    staff = {1: {"call_name": "Davy", "canonical_name": "An Davy", "work_start": "08:00"}}
+    sess = [{"staff_id": 1, "shift_date": _dt.date(2026, 6, 10), "minutes_late": 30,
+             "checked_in_at": _dt.datetime(2026, 6, 10, 8, 30)}]
+    ev_ok = [{"staff_id": 1, "cause": "late_uninformed", "quantity": 25, "ref": "2026-06-10"},
+             {"staff_id": 1, "cause": "late_informed", "quantity": 5, "ref": "2026-06-10"}]
+    assert au.v_late_points(sess, ev_ok, staff) == []            # split sums to 30 → lawful
+    ev_bad = ev_ok[:1]                                           # only 25 of 30 scored
+    assert any("late-events total 25" in p for p in au.v_late_points(sess, ev_bad, staff))
+
+    pp = _dt.timezone(_dt.timedelta(hours=7))
+    req = {"id": 3, "staff_id": 1, "status": "pending", "days": '["2026-06-12"]',
+           "created_at": _dt.datetime(2026, 6, 12, 9, 0, tzinfo=pp)}   # 9am, shift 8am, same day
+    assert any("gate bypass" in p for p in au.v_al_same_day_gate([req], [], staff))
+    early = dict(req, created_at=_dt.datetime(2026, 6, 12, 7, 0, tzinfo=pp))   # 07:00 < 07:30
+    assert au.v_al_same_day_gate([early], [], staff) == []       # asked well before shift → fine
 
 
 def test_points_catalogue_active_values():

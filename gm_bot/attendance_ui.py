@@ -1239,16 +1239,19 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
 
 
+AL_TODAY_GATE_MIN = 30   # the gate arms this many minutes BEFORE shift start (owner, Jun 11)
+
+
 def al_today_allowed(p: dict) -> bool:
-    """OWNER RULE (Jun 11): once today's shift has STARTED, same-day AL exists only if they
-    CHECKED IN (early or late) — otherwise the today button isn't even shown. Why: without it,
-    a no-show launders itself into an innocent AL day (dodging the 1-day-pay no-show penalty),
-    and an oversleeper dodges the late ladder by tapping 'AL from now' from bed. Before the
-    shift starts, today is requestable as normal (short-notice costs apply)."""
+    """OWNER RULE (Jun 11): from 30 min BEFORE shift start onward, same-day AL exists only if
+    they CHECKED IN (early or late) — otherwise the today button isn't even shown. Why: without
+    it, a no-show launders itself into an innocent AL day (dodging the 1-day-pay no-show
+    penalty), and an oversleeper dodges the late ladder by tapping 'AL from now' from bed.
+    Earlier than start−30, today is requestable as normal (short-notice costs apply)."""
     ws = to_min(p.get("work_start"))
     if ws is None:
         return True
-    if _now_min() < ws:                  # today's shift hasn't started yet
+    if _now_min() < ws - AL_TODAY_GATE_MIN:     # well before today's shift
         return True
     from shared.database import att_get_session
     sess = att_get_session(p["id"], _today().isoformat()) or {}

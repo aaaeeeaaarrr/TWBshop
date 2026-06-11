@@ -163,6 +163,71 @@ def v_swaps(rows: list[dict], staff: dict, today: date) -> list[str]:
     return out
 
 
+def _hhmm_min(s) -> int | None:
+    try:
+        h, m = str(s).split(":")[:2]
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
+def v_late_points(sessions: list[dict], events: list[dict], staff: dict) -> list[str]:
+    """ACTIVE-points law: a late check-in must carry late events totaling EXACTLY its minutes —
+    the informed/uninformed split may vary (declaration-time split), the SUM may not."""
+    totals: dict = {}
+    for e in events:
+        if e.get("cause") in ("late_informed", "late_uninformed"):
+            k = (e["staff_id"], str(e.get("ref")))
+            totals[k] = totals.get(k, 0) + int(e.get("quantity") or 0)
+    out = []
+    for s in sessions:
+        ml = int(s.get("minutes_late") or 0)
+        if ml <= 0:
+            continue
+        got = totals.get((s["staff_id"], str(s["shift_date"])), 0)
+        if got != ml:
+            out.append("POINTS: %s was %d min late on %s but late-events total %d min "
+                       "(missing or doubled scoring)"
+                       % (_nm(staff, s["staff_id"]), ml, s["shift_date"], got))
+    return out
+
+
+AL_GATE_LAW_FROM = "2026-06-12"   # the gate's birthday — older requests predate it AND predate
+                                  # location check-ins entirely (no sessions exist pre-go-live)
+
+
+def v_al_same_day_gate(requests: list[dict], sessions: list[dict], staff: dict) -> list[str]:
+    """The AL-today gate's data-side law: a request CREATED on a day it covers, at/after that
+    day's shift start −30 min, with NO check-in that day = the no-show laundering the gate
+    blocks. Catches any path around the button (pre-start same-day requests are fine).
+    Only judges requests from AL_GATE_LAW_FROM onward (the law can't apply before the gate
+    or before check-ins existed)."""
+    from datetime import timezone as _tz, timedelta as _tdelta
+    pp = _tz(_tdelta(hours=7))
+    checked = {(s["staff_id"], str(s["shift_date"]))
+               for s in sessions if s.get("checked_in_at")}
+    out = []
+    for r in requests:
+        if r.get("status") in ("rejected", "cancelled") or not r.get("created_at"):
+            continue
+        days = json.loads(r.get("days") or "[]")
+        cd = r["created_at"].astimezone(pp)
+        ciso = cd.date().isoformat()
+        if ciso < AL_GATE_LAW_FROM or ciso not in days:
+            continue
+        ws = _hhmm_min((staff.get(r["staff_id"]) or {}).get("work_start"))
+        if ws is None:
+            continue
+        if (cd.hour * 60 + cd.minute) < ws - 30:
+            continue                      # asked well before the shift — legitimate same-day
+        if (r["staff_id"], ciso) not in checked:
+            out.append("AL-GATE: %s req #%s asked for SAME-DAY AL at %s (shift starts %02d:%02d) "
+                       "with NO check-in that day — gate bypass / laundering symptom"
+                       % (_nm(staff, r["staff_id"]), r["id"], cd.strftime("%H:%M"),
+                          ws // 60, ws % 60))
+    return out
+
+
 def v_staff_sanity(staff_rows: list[dict]) -> list[str]:
     out = []
     for s in staff_rows:
@@ -206,6 +271,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             nos = q(cur, "SELECT * FROM no_show_records WHERE is_test=%s", (flag,))
             books = q(cur, "SELECT * FROM payback_bookings WHERE is_test=%s", (flag,))
             swaps = q(cur, "SELECT * FROM dayoff_swaps WHERE is_test=%s", (flag,))
+            pevents = q(cur, "SELECT * FROM points_events WHERE is_test=%s", (flag,))
 
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)
@@ -215,8 +281,10 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_noshow_vs_sessions(nos, sess, staff)
                 + v_bookings(books, {d["id"]: d for d in debts}, staff, today)
                 + v_swaps(swaps, staff, today)
+                + v_late_points(sess, pevents, staff)
+                + v_al_same_day_gate(als, sess, staff)
                 + v_staff_sanity(list(staff.values())))
     stats = {"payback": len(debts), "AL": len(als), "shift-changes": len(scs),
              "sessions": len(sess), "OT banks": len(banks), "no-shows": len(nos),
-             "bookings": len(books), "swaps": len(swaps)}
+             "bookings": len(books), "swaps": len(swaps), "point-events": len(pevents)}
     return problems, stats
