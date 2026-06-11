@@ -9,13 +9,19 @@
 
 ## Open (not yet done)
 
-- **⏰ Jul 1 (AUTOMATED · MUTED — owner: "drop it for now"): Kimying full-split restore.**
-  `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42` record once
-  June passes, and DMs the owner. Do NOT mention in open-loops reports; check ONLY if no DM arrived
-  by Jul 2 or the owner asks. (Automated 2026-06-11, `42adf31`.)
+- **⏰ Jul 1 (AUTOMATED · MUTED · SELF-DESTRUCT — owner: no redundancy): Kimying full-split
+  restore.** `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42`
+  record once June passes, and DMs the owner. Do NOT mention in open-loops reports; act ONLY if no
+  DM arrived by Jul 2. **Once fired & good: DELETE this entry entirely** — her state record is
+  auto-cleared by the job itself, the job is GENERIC (serves every future hire — stays), and her
+  proration history lives in Done below. Nothing Kimying-specific remains in code after that.
 
 ## Done (with proof)
 
+- **2026-06-11 — dead `secretary.service` removed from the server.** The Personal project's bot
+  unit (pointed at /root/Personal) was already stopped+disabled by the owner; the unit file was the
+  last remnant — deleted + daemon-reload, verified gone ("could not be found"). No cron entries, no
+  twbshop-code references existed. `/root/Personal` itself NOT touched (separate project decision).
 - **2026-06-11 — Davy (id 26): payback cleared ("she paid").** Real debt #5 (60 min) + test mirror
   #45 credited → cleared. No attached bookings (checked first). Independent re-read: both open
   debts now None. (Rath explicitly NOT touched — owner's hypothetical only.)
