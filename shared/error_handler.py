@@ -25,6 +25,17 @@ _last_dm: dict = {}   # bot_name → last owner-DM timestamp
 def make_error_handler(bot_name: str):
     async def _handler(update, context) -> None:
         err = context.error
+        # "Message is not modified" = a double-tap / re-tap of the screen already showing —
+        # Telegram refuses the identical re-render. Benign no-op: answer the tap quietly,
+        # never alarm the owner (first real alert, Jun 11, was exactly this on att:sp).
+        if "message is not modified" in str(err).lower():
+            logger.info("[%s] no-op re-tap (message not modified)", bot_name)
+            try:
+                if isinstance(update, Update) and update.callback_query:
+                    await update.callback_query.answer()
+            except Exception:
+                pass
+            return
         logger.error("[%s] UNHANDLED in handler: %s", bot_name, err, exc_info=err)
         try:
             if isinstance(update, Update) and update.callback_query:

@@ -1489,6 +1489,15 @@ def test_global_error_handler(monkeypatch):
     eh._last_dm.clear()
     asyncio.run(h(None, types.SimpleNamespace(error=ValueError("x"), bot=None)))
 
+    # "Message is not modified" (double-tap) = benign no-op: answered quietly, NO owner DM
+    eh._last_dm.clear()
+    sent.clear(); answered.clear()
+    ctx2 = types.SimpleNamespace(
+        error=RuntimeError("BadRequest: Message is not modified: specified new message..."),
+        bot=_Bot())
+    asyncio.run(h(upd, ctx2))
+    assert sent == [] and answered            # silent to the owner, smooth for the user
+
 
 def test_no_shadow_import_bugs():
     """REGRESSION (two prod crashes, Jun 10): a function-local import makes that name local to the
