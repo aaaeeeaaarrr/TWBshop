@@ -502,7 +502,8 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑨ each night while out → return check (never papers/pay-back); the answer goes to Supervisors",
          "Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
          "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។",
-         _ill(["✅ Coming in tomorrow"], ["🛌 Still resting"], ["⏰ Coming in today at…"])),
+         _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"], ["🛌 Still resting · សម្រាកបន្ត"],
+              ["⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…"])),   # = the real buttons, bilingual
         ("⑩ FAMILY-sick day → seniors informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for their child today.\n"
          "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនថ្ងៃនេះ។", None),

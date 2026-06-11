@@ -4,6 +4,12 @@
 > ChatGPT-polished and WIRED INTO CODE (gm_bot/). To review NEW strings: add them under the
 > "## Pending" heading at the bottom, then paste this whole file into ChatGPT.
 
+> **⚠ BUTTON LABELS — WIDTH RULE (owner, Jun 11):** Telegram truncates wide inline buttons.
+> For any string that lives ON A BUTTON: keep the Khmer SHORT (a compact phrase, not a full
+> sentence — e.g. `ស្អែកមកធ្វើការ`, never a polite long form). If English+Khmer together would
+> overflow a phone-width button, say so and propose either a shorter Khmer or Khmer-only/
+> English-only for that button. Message BODIES have no such limit — only buttons.
+
 ---
 
 > **STATUS — WIRED INTO CODE (session 32, 2026-06-11).** All the polished live strings below are now
