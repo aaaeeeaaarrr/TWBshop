@@ -211,8 +211,58 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-11 (session 32 — split-digest idea A + restart-safety #3/#4 SHIPPED &
-deployed. Suite 446. attendance_live=OFF, attendance_test_mode=OFF.)
+**Last updated:** 2026-06-11 (session 32 cont. — hardening day: /audit invariant auditor, error
+handlers on ALL bots, 5 prod crashes fixed, watchdog ARMED (was dark), owner /menu + pay automation,
+/testkhmer + dry-run resync. Suite 461. attendance_live=OFF, attendance_test_mode=ON (owner walking).)
+
+**Session 32 (Jun 11, cont.) — reliability + owner-tools day. All deployed & verified:**
+- **`/audit` — invariant auditor (checklist B3 capstone):** one command cross-checks every button
+  input → stored result over ALL rows: AL (approved+passed ⇒ deducted, rejected ⇒ no deduction),
+  PB (cleared ⇔ paid, single open debt), OT (done ⇒ banked 0..14h; approved-past-date = never-settled
+  flag), sessions (checkout≥checkin, stale opens), no-show-vs-check-in contradiction, bookings, swaps,
+  staff sanity (missing shift times = scheduler skips them). MODE-AWARE: test rows in test mode (audits
+  the owner's role-play), real rows live — label says which. Output ✅ clean or paste-to-Claude problem
+  lines. Validators pure + unit-tested; first real-data run CLEAN (5 PB + 4 AL rows); mode isolation
+  proven (5 real + 5 test PB, 4+4 AL). → `gm_bot/audit.py`.
+- **Crash sweep (owner: "check the whole thing"):** found + fixed 5 prod bugs — `gm_save_concern`
+  NameError (69 crashes — live concern recorder dead), `cmd_staff` UnboundLocal (shadow import),
+  same class in LIVE b2b repeat-order (`_SESAME_LABEL_CODE`), `_B2B_ORDER_IMAGE_SYSTEM` undefined
+  (b2b photo-orders silently returned []), /testmode edited-msg crash. Permanent guards:
+  `test_no_shadow_import_bugs` (AST scan, all bots), real-DB SQL-typing test, pyflakes clean.
+- **Global error handler on ALL FOUR bots** (`shared/error_handler.py`, one impl): any unhandled
+  crash → traceback to log + throttled ⚠ owner DM naming bot+button + callback answered (never a
+  spinning button). Listener (Telethon): error-burst alert (3+ in 10min → owner DM via GM token).
+- **Watchdog was NEVER RUNNING — armed + fixed:** the session-28 collection watchdog's cron DAEMON
+  was inactive (never ran once) AND its alert used the retail token → 400 chat-not-found (owner
+  never DM'd that bot). Enabled cron (proven by its own tick), alerts now via GM token (test 🚨
+  received). → `docs/RESILIENCE.md` (ALL down-safeguards, one record + 60s fire drill).
+- **Timestamp fairness:** queued check-ins judged by the staffer's Telegram send time, never bot
+  processing time (`_msg_time_pp`) — our downtime can't mark anyone late or fool auto-checkout.
+- **Dry-run 1 crash fixed** (`when_date = ANY(%s::date[])` — date=text killed schedule_summary AND
+  would've hit the live scheduler); dry-runs renumbered 1–7 (old 6 = retired Now/Later OT).
+- **Owner /menu** (owner-only): Staff info → PB+OT (ledger staff only, My-Schedule partition math) ·
+  AL+Joined · Salaries 1st/2nd — TWB + Delis sections w/ own totals + grand total; 2nd pay shows
+  bonus split ("ANAN — $30 +$20"); Tyty included (1st-only, $1700, record corrected from stale 1500).
+  Delis pay data was ALREADY in DB (owner's old Excel import; my earlier "0 of 6" probe had a
+  case-sensitivity bug — org is 'DELIS').
+- **Hire-date + pay automation:** `joined_date`+`joined_month_only` columns (additive, applied);
+  `/joined <name> <date>` (full or MM/YYYY); CURRENT-month full-date join auto-prorates (owner rule
+  pinned in payroll.py: ALWAYS 30-day basis; 1st = 80% of prorated rounded UP to 5/0; bonus rides
+  2nd unprorated) + `_pay_restore_job` (daily 07:05 PP) restores the full split when the join month
+  passes + DMs owner. Kimying (id 42) applied by hand + seeded: 160×27/30=144 → 1st 120 · 2nd 24+15
+  bonus; joined 2026-06-04; full split 145/30 auto-restores Jul 1 (ledger: VERIFY the DM).
+- **Real-data ops (ledger'd, independently proven):** Chantrea payback cleared (real 27min + test);
+  Davy −1.0 AL (15→14). **`docs/ACTIONS_LEDGER.md` + CLAUDE.md rule:** real-data instructions are
+  executed immediately with proof or logged Open — never dropped (the Chantrea/Davy lesson).
+- **KH:** /testkhmer on|off (test mode shows full bilingual for proof-reading); dry-runs 2–8 resynced
+  to live Khmer; hours-AL Supervisors notice KH applied; KH_REVIEW consolidated (one clean copy +
+  Pending slot). **Buttons:** every staff picker shows "POR — Chea Chaktopor", sorted by call name.
+- **Deploy discipline** in CLAUDE.md (quiet-window/batch/single-service/verify) + TimeoutStopSec=15
+  on all 5 units (verified) + OT-banking idempotency claim (no double-bank, regression-tested).
+**NEXT:** owner role-play walkthrough (resume Dry-run 2; setup: /testmode on · /testkhmer on ·
+/testseed) → /audit on test rows → wording tweaks → points activation → /testreset → flip
+attendance_live. Standing: Bedrock delta 2 (owner OS-lock), staging Postgres by 2026-06-30, verify
+Kimying restore DM ~Jul 1, Delis pay numbers eyeball.
 
 **Session 32 (Jun 11) — Reason categorization (split-digest idea "A") + restart-safety hardening:**
 - **Reason categorization (idea A) — DONE, deployed (`224a659`).** The inverse Brain+model pairing:
