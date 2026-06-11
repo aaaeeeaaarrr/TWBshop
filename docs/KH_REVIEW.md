@@ -84,3 +84,20 @@ One implementation warning: for variant 4, I used AL, ឈឺ និងថ្ង�
 ## Pending - new strings for the next ChatGPT pass
 
 (add new English + Khmer drafts here, then paste the whole file into ChatGPT)
+
+### Sick-nudge accountability wording (Jun 11 — owner; KH is Claude's DRAFT, please polish)
+Context: nightly sick nudges. Coming is the DEFAULT; staying out requires a typed reason that the
+Supervisors read. Warm-but-firm, ប្អូន register. The button lines must stay SHORT (width rule).
+
+I hope your {child/spouse/parent} is better now 🤍 Are you coming tomorrow?
+សង្ឃឹមថា{កូន}របស់អ្នកធូរស្បើយហើយ 🤍 តើស្អែកប្អូនមកធ្វើការទេ?
+
+[BUTTON] 📝 Can't come — explain · មកមិនបាន — សូមពន្យល់
+[BUTTON] 📝 Still resting — explain · សម្រាកបន្ត — សូមពន្យល់
+
+Please type the reason — it goes to the Supervisors. 🤍
+សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍
+
+Noted — tomorrow is covered. Take care 🤍
+បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍
+

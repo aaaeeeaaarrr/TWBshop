@@ -2000,17 +2000,34 @@ def test_family_sick_nudge_callback(monkeypatch):
         async def answer(self): pass
         async def edit_message_text(self, t, **k): edits.append(t)
 
-    upd = lambda d: types.SimpleNamespace(callback_query=_Q(d))
-    ctx = types.SimpleNamespace()
-    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:again:7"), ctx))
-    assert created == [(1, "child", "2026-06-12", "open")]   # tomorrow booked, chains tomorrow night
-    assert any("continues tomorrow" in m for m in group_msgs)
-    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:again:7"), ctx))
-    assert len(created) == 1                                  # duplicate tap -> gate stops it
+    armed = []
+    monkeypatch.setattr(bot, "_arm_sick_explain",
+                        lambda c, u, fl, cid, sid: armed.append((fl, cid, sid)))
+    staff = {"id": 1, "canonical_name": "Sun Kimying", "call_name": "Kimying",
+             "status": "active", "telegram_ids": [9]}
+    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: staff)
 
+    upd = lambda d: types.SimpleNamespace(callback_query=_Q(d),
+                                          effective_user=types.SimpleNamespace(id=9))
+    ctx = types.SimpleNamespace()
+    # owner wording (Jun 11): 'explain' ARMS the typed reason — books NOTHING at tap time
+    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:exp:7"), ctx))
+    assert armed == [("sfam_exp", 7, 1)] and created == []
+    assert any("type the reason" in e for e in edits)
+    # the typed reason (dispatch) books tomorrow + the Supervisors read the reason
+    msg = types.SimpleNamespace(text="grandma can't watch her, doctor again", replies=[])
+    async def _reply(t, **k): msg.replies.append(t)
+    msg.reply_text = _reply
+    dupd = types.SimpleNamespace(message=msg, effective_user=types.SimpleNamespace(id=9))
+    asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
+    assert created == [(1, "child", "2026-06-12", "open")]
+    assert any("Reason: grandma" in m for m in group_msgs)
+    asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
+    assert len(created) == 1                                  # status 'extended' → gated
+    # 'Coming tomorrow' → one tap, case cleared
     case.update(status="open")
     asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:ok:7"), ctx))
-    assert case["status"] == "cleared" and any("Glad to hear" in e for e in edits)
+    assert case["status"] == "cleared" and any("see you tomorrow" in e for e in edits)
 
 
 def test_rest_redefine_and_buyback_laws():

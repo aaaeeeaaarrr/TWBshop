@@ -464,8 +464,9 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         [InlineKeyboardButton("💪 I can come · ខ្ញុំអាចមក", callback_data="att:drs:noop")],
         [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:drs:noop")]])
     nudge_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Again tomorrow · ស្អែកទៀត", callback_data="att:drs:noop")],
-        [InlineKeyboardButton("👍 Better · ធូរស្បើយហើយ", callback_data="att:drs:noop")]])
+        [InlineKeyboardButton("✅ Coming tomorrow · ស្អែកមកធ្វើការ", callback_data="att:drs:noop")],
+        [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — សូមពន្យល់",
+                              callback_data="att:drs:noop")]])
     return [
         ("① Sick → Me: the anti-fake opener (try to come, see how you feel)",
          "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
@@ -507,9 +508,10 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for their child today.\n"
          "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនថ្ងៃនេះ។", None),
-        ("⑪ FAMILY-sick night nudge — one tap books tomorrow (another of the 7) or closes it",
-         "Is your child better? If you need tomorrow off too, tell me now.\n"
-         "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។", nudge_kb),
+        ("⑪ FAMILY-sick night nudge — coming is the DEFAULT; staying out costs a typed reason "
+         "the Supervisors read (owner)",
+         "I hope your child is better now 🤍 Are you coming tomorrow?\n"
+         "សង្ឃឹមថាកូនរបស់អ្នកធូរស្បើយហើយ 🤍 តើស្អែកប្អូនមកធ្វើការទេ?", nudge_kb),
         ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
          "Davy: 3rd paperless sick in 30 days (all Mondays). Pattern flag for your review.\n"
          "(owner-only — English; staff never see this)", None),

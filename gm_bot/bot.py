@@ -2523,12 +2523,25 @@ def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
 
 
 def _sick_return_kb(case_id: int) -> InlineKeyboardMarkup:
-    """Return-check buttons on the nightly nudge — the staff tells us if/when they're back."""
+    """Return-check buttons on the nightly nudge. Owner (Jun 11): no one-tap opt-out — staying
+    out requires a typed reason that the Supervisors read (warm but accountable)."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Coming in tomorrow · ស្អែកមកធ្វើការ", callback_data="att:sret:yes:%d" % case_id)],
-        [InlineKeyboardButton("🛌 Still resting · សម្រាកបន្ត", callback_data="att:sret:no:%d" % case_id)],
+        [InlineKeyboardButton("📝 Still resting — explain · សម្រាកបន្ត — សូមពន្យល់",
+                              callback_data="att:sret:no:%d" % case_id)],
         [InlineKeyboardButton("⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…", callback_data="att:sret:today:%d" % case_id)],
     ])
+
+
+def _arm_sick_explain(context, update, flow: str, case_id: int, staff_id: int) -> None:
+    """Arm the next typed message as the explain-reason for a sick nudge (test: owner shell;
+    live: the staffer's own next text, 15-min window — same pattern as _arm_pending)."""
+    pend = {"flow": flow, "case_id": case_id, "persona_id": staff_id}
+    if _att_test_mode():
+        context.user_data["att_test_pending"] = pend
+    else:
+        from shared.database import flow_save
+        flow_save(update.effective_user.id, "att_pending", "reason", pend, ttl_min=15)
 
 
 def _sret_time_kb(case_id: int) -> InlineKeyboardMarkup:
@@ -2554,10 +2567,11 @@ async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "FYI: %s is well enough to return TOMORROW.\nFYI: %s នឹងវិលត្រឡប់មកធ្វើការវិញនៅថ្ងៃស្អែក។"
             % (nm, nm), group=True)
     elif action == "no":
-        await query.edit_message_text("Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។")
-        await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s is still resting — NOT back tomorrow.\nFYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។"
-            % (nm, nm), group=True)
+        # owner (Jun 11): no one-tap stay-out — the reason is typed and the Supervisors read it
+        _arm_sick_explain(context, update, "sret_exp", case_id, case["staff_id"])
+        await query.edit_message_text(
+            "Please type the reason — it goes to the Supervisors. 🤍\n"
+            "សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍")
     elif action == "today":
         await query.edit_message_text("What time today?\nម៉ោងប៉ុន្មានថ្ងៃនេះ?", reply_markup=_sret_time_kb(case_id))
     elif action == "t":
@@ -2749,23 +2763,26 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         uid = (staff.get("telegram_ids") or [None])[0]
         nm = staff.get("call_name") or staff["canonical_name"]
+        # owner (Jun 11): expectation-first wording — coming is the default, staying out costs a
+        # typed reason the Supervisors read (the old "tell me if you need tomorrow off" made the
+        # easy no too easy).
         who = c.get("who") or "family member"
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Again tomorrow · ស្អែកទៀត",
-                                  callback_data="att:sfam:again:%d" % c["id"])],
-            [InlineKeyboardButton("👍 Better · ធូរស្បើយហើយ",
-                                  callback_data="att:sfam:ok:%d" % c["id"])]])
+            [InlineKeyboardButton("✅ Coming tomorrow · ស្អែកមកធ្វើការ",
+                                  callback_data="att:sfam:ok:%d" % c["id"])],
+            [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — សូមពន្យល់",
+                                  callback_data="att:sfam:exp:%d" % c["id"])]])
         await _att_send(context, uid, "Staff", nm,
-            "Is your %s better? If you need tomorrow off too, tell me now.\n"
-            "តើ%sរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។"
+            "I hope your %s is better now 🤍 Are you coming tomorrow?\n"
+            "សង្ឃឹមថា%sរបស់អ្នកធូរស្បើយហើយ 🤍 តើស្អែកប្អូនមកធ្វើការទេ?"
             % (who, who), kb=kb)
 
 
 async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:sfam:again|ok:{case_id} — the family-sick night nudge's one-tap answer.
-    'again' books TOMORROW as a new family-sick day (burns 1 of the 7 yearly family days) and
-    tells the Supervisors group; 'ok' closes the case. Idempotent: the status flips FIRST, so a
-    crash-redelivered duplicate can never double-book a day."""
+    """att:sfam:ok|exp:{case_id} — the family-sick night nudge (owner Jun 11: coming is the
+    DEFAULT; staying out requires a typed reason the Supervisors read — no one-tap easy no).
+    'ok' = coming tomorrow → case cleared; 'exp' (and the legacy 'again') arms the next typed
+    message as the reason — the booking happens in the dispatch branch, status-first."""
     query = update.callback_query
     await query.answer()
     parts = query.data.split(":")
@@ -2773,25 +2790,14 @@ async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFA
     case = sick_get(cid)
     if not case or case.get("status") != "open":
         return                                  # already answered (or stale) — never act twice
-    staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
-    if not staff:
-        return
-    nm = staff.get("call_name") or staff["canonical_name"]
-    who = case.get("who") or "family member"
     if act == "ok":
         sick_set(cid, status="cleared")
-        await query.edit_message_text("Glad to hear 🤍 see you at the next shift.\n"
-                                      "ល្អហើយ 🤍 ជួបគ្នាវេនក្រោយ។")
+        await query.edit_message_text("Great — see you tomorrow 🤍\nឃើញគ្នាស្អែក 🤍")
         return
-    sick_set(cid, status="extended")            # status-first: re-taps stop at the gate above
-    tmr = (_today_pp() + timedelta(days=1)).isoformat()
-    sick_create(case["staff_id"], who, tmr, "open")   # tomorrow's open case → nudged again tomorrow night
+    _arm_sick_explain(context, update, "sfam_exp", cid, case["staff_id"])
     await query.edit_message_text(
-        "Noted — tomorrow is covered too. Take care 🤍\n"
-        "បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍")
-    await _att_send(context, None, "Supervisors group", "",
-        "FYI: %s's family-sick continues tomorrow (%s).\n"
-        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។" % (nm, who, nm), group=True)
+        "Please type the reason — it goes to the Supervisors. 🤍\n"
+        "សូមវាយមូលហេតុ — វានឹងទៅដល់បងៗ។ 🤍")
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4703,6 +4709,33 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "🤍 Noted — take care of your %s. The Supervisors are informed.\n"
             "🤍 បានកត់ត្រា — សូមថែទាំ%sរបស់អ្នក។ បានជូនដំណឹងដល់បងៗ។" % (pend["who"], pend["who"]),
             "🧪 Family-sick day booked (test) — the Supervisors FYI was routed to you. /testreset to wipe.")
+    elif flow == "sfam_exp":
+        # the typed reason for NOT coming after a family-sick day → books tomorrow (burns another
+        # of the 7) + the reason goes to the Supervisors. Status-first → re-sends can't double-book.
+        case = sick_get(pend["case_id"])
+        if case and case.get("status") == "open":
+            sick_set(case["id"], status="extended")
+            tmr = (_today_pp() + timedelta(days=1)).isoformat()
+            sick_create(case["staff_id"], case.get("who") or "family", tmr, "open")
+            nm = persona.get("call_name") or persona["canonical_name"]
+            await _att_send(context, None, "Supervisors group", "",
+                "FYI: %s's family-sick continues tomorrow (%s). Reason: %s\n"
+                "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។ មូលហេតុ៖ %s"
+                % (nm, case.get("who") or "family", reason, nm, reason), group=True)
+        await confirm(
+            "Noted — tomorrow is covered. Take care 🤍\n"
+            "បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍",
+            "🧪 Family-sick extended with reason (test) — the group FYI was routed to you.")
+    elif flow == "sret_exp":
+        # the typed reason for still-resting (own sick) → the Supervisors read it
+        nm = persona.get("call_name") or persona["canonical_name"]
+        await _att_send(context, None, "Supervisors group", "",
+            "FYI: %s is still resting — NOT back tomorrow. Reason: %s\n"
+            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។ មូលហេតុ៖ %s"
+            % (nm, reason, nm, reason), group=True)
+        await confirm(
+            "Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។",
+            "🧪 Still-resting reason (test) — the group FYI was routed to you.")
 
 
 async def _owner_private_departure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
