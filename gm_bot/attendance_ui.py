@@ -486,28 +486,28 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          _ill(["✓ Accept (cover 2d)"], ["1d", "2d", "3d"], ["💺 Offer part-duty"],
               ["Skip → nightly nudges"])),
         ("⑤ owner accepts → real sick day, debt+points wiped, AL UNTOUCHED",
-         "Saved ✓ — your sick day is confirmed, nothing owed. Get well 🤍\n"
-         "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ មិនមានអ្វីត្រូវសងទេ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍", None),
+         "Saved ✓ — your sick day is confirmed. Get well 🤍\n"
+         "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍", None),
         ("⑥ owner offers PART-DUTY → staff invited back for light work (+15 ⭐, no pressure)",
          "Feeling a little better? If you're up to it, there's light work today (+15 points ⭐) — "
          "only if you truly feel able 🤍\n"
          "ធូរស្បើយបន្តិចហើយឬនៅ? បើអ្នកមានកម្លាំង អាចមកធ្វើការងារស្រាលៗថ្ងៃនេះបាន (+15 points ⭐) — "
          "តែបើអ្នកពិតជាអាចធ្វើបានប៉ុណ្ណោះ 🤍", cant_kb),
         ("⑦ came on light duty → the Supervisors-group memo + the staff welcome",
-         "[→ Supervisors group] Davy is coming on LIGHT DUTY today — easy/seated work only.\n"
+         "[→ Supervisors group] Davy is coming on LIGHT DUTY today — please give easy/seated work only.\n"
          "Davy នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។\n\n"
-         "[→ Davy] Thank you for coming 🤍 light duty only — a senior will point you to easy work.\n"
-         "អরគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារងាយៗឱ្យអ្នក។", None),
+         "[→ Davy] Thank you for coming in 🤍 light duty only — a senior will point you to seated/easy work.\n"
+         "អរគុណដែលមកជួយ 🤍 ធ្វើតែការងារស្រាលៗប៉ុណ្ណោះ — បងៗនឹងណែនាំការងារអង្គុយ ឬការងារងាយៗឱ្យអ្នក។", None),
         ("⑧ chose to rest instead",
-         "Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។", None),
+         "Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។", None),
         ("⑨ each night while out → return check (never papers/pay-back); the answer goes to Supervisors",
          "Hi 🤍 are you well enough to come in tomorrow? Let us know.\n"
          "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។",
          _ill(["✅ Coming in tomorrow"], ["🛌 Still resting"], ["⏰ Coming in today at…"])),
         ("⑩ FAMILY-sick day → seniors informed (no approval gate; burns 1 of 7 yearly days)",
-         "FYI: Kimying takes sick leave for her child today.\n"
-         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនរបស់គាត់ថ្ងៃនេះ។", None),
-        ("⑪ FAMILY-sick night nudge (12h before next shift) — one-tap re-book",
+         "FYI: Kimying takes sick leave for their child today.\n"
+         "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនថ្ងៃនេះ។", None),
+        ("⑪ ⚠ PLANNED (not built yet) — FAMILY-sick night nudge, one-tap re-book",
          "Is your child better? If you need tomorrow off too, tell me now.\n"
          "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។", nudge_kb),
         ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
@@ -531,9 +531,9 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① OWN marriage (3 days) → routes through senior approval (planned 30+ days ahead)",
          "💍 Your marriage: 3 days, Mon 14/07 → Wed 16/07. From AL (can go below zero, never salary).\n"
          "💍 រៀបការរបស់អ្នក៖ 3 ថ្ងៃ, Mon 14/07 → Wed 16/07។", None),
-        ("② marriage approved → warm confirmation",
-         "Your marriage leave is approved ✓ Mon 14/07 → Wed 16/07. Congratulations! 🤍\n"
-         "ច្បាប់រៀបការរបស់ប្អូនបានអនុម័តហើយ ✓ Mon 14/07 → Wed 16/07។ អបអរសាទរ! 🤍", None),
+        ("② marriage approved → the AL engine's confirmation (marriage rides the AL approval flow)",
+         "Your AL for Mon 14/07 → Wed 16/07 is approved ✓. You have 4.5 AL days left. 🤍\n"
+         "AL របស់ប្អូនសម្រាប់ Mon 14/07 → Wed 16/07 បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL 4.5 ថ្ងៃទៀត 🤍", None),
         ("③ CHILD's marriage (1 day)",
          "👰 Child's marriage: 1 day on Sat 19/07.\n👰 រៀបការកូន៖ 1 ថ្ងៃ នៅ Sat 19/07។", None),
         ("④ FAMILY DEATH — law tier (child/parent/spouse): instant, NO approval, 3–7 days",
@@ -552,11 +552,11 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("⑧ owner upgraded → staff told",
          "Your leave is extended to 3 days 🤍\n"
          "ច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ 3 ថ្ងៃហើយ 🤍", None),
-        ("⑨ a death-context PHOTO arrives → condolence only, NO AI, owner+Tyty only",
+        ("⑨ ⚠ PLANNED (not built yet) — death-context PHOTO → condolence only, NO AI",
          "You don't need to send anything — we're so sorry for your loss 🤍\n"
          "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍", None),
         ("⑩ WIFE giving birth (2 days) + the Supervisors notice",
-         "👶 Congratulations! 2 days of leave, Tue 09/06 → Wed 10/06.\n"
+         "Congratulations! 👶 2 days of leave, Tue 09/06 → Wed 10/06.\n"
          "អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, Tue 09/06 → Wed 10/06។\n\n"
          "[→ SUPERVISORS] Davy on leave Tue 09/06 → Wed 10/06 (wife giving birth).\n"
          "Davy ឈប់សម្រាក Tue 09/06 → Wed 10/06 (ប្រពន្ធសម្រាលកូន)។", None),
@@ -589,7 +589,7 @@ def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
     """Dry-run 8: CROSS-CUTTING — acks, group redirect, autonomous call-outs, welcome."""
     return [
-        ("① 👍 ACK — a normal (non-problem) reply gets a thumbs-up so they know they were heard",
+        ("① ⚠ PLANNED (not built yet) — 👍 ACK for normal (non-problem) replies",
          "Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។\n(a reply that IS a problem gets a real answer, never a 👍)",
          None),
         ("② GROUP REDIRECT — someone posts leave/late in a group → GM nudges them private",
