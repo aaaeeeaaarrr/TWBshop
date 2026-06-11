@@ -3920,6 +3920,32 @@ async def _pay_restore_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.error("pay restore notify failed: %s", e)
 
 
+async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/audit — owner: cross-check that every button input translated to the right stored result.
+    Runs all data invariants (AL deductions, payback math, OT banking/cap, sessions, no-shows,
+    bookings, swaps, staff sanity) over the CURRENT mode's rows — test rows during the role-play,
+    real rows once live. Problems are self-contained lines the owner can paste to Claude."""
+    if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
+        return
+    from gm_bot.audit import run_audit
+    try:
+        problems, stats = run_audit(_today_pp())
+    except Exception as e:
+        await update.message.reply_text("⚠ Audit itself failed: %s" % e)
+        return
+    mode = "🧪 TEST rows" if _att_test_mode() else "real rows"
+    counts = " · ".join("%s %d" % (k, v) for k, v in stats.items())
+    if not problems:
+        await update.message.reply_text(
+            "✅ AUDIT CLEAN (%s)\nEvery input → result invariant holds.\nChecked: %s"
+            % (mode, counts))
+        return
+    head = "❌ AUDIT — %d problem(s) (%s). Copy this message to Claude:\n\n" % (len(problems), mode)
+    body = head + "\n".join("• " + p for p in problems) + "\n\nChecked: " + counts
+    for i in range(0, len(body), 3500):
+        await update.message.reply_text(body[i:i + 3500])
+
+
 async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/commands — owner: the full list of GM commands, grouped, with one-line descriptions."""
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
@@ -3939,6 +3965,8 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/menu — your private menu: Staff info → PB+OT · AL+Joined · Salaries 1st/2nd\n"
         "/joined <name> <date> — set a hire date (03/05/2023, or 05/2023 if you only know the month)\n"
         "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
+        "/audit — cross-check ALL data: did every button input produce the right result? "
+        "✅ clean, or a paste-to-Claude problem list\n"
         "/holiday — manage paid public holidays (cost no AL; AL spans bridge them)\n"
         "/payroll [YYYY-MM] — payslip preview for a work-month (defaults to last month)\n"
         "/rollcall — who has pressed Start with the GM bot\n"
@@ -5188,6 +5216,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
     app.add_handler(CommandHandler("holiday",     cmd_holiday))
     app.add_handler(CommandHandler("pb",          cmd_pb))
+    app.add_handler(CommandHandler("audit",       cmd_audit))
     app.add_handler(CommandHandler("menu",        cmd_menu))
     app.add_handler(CommandHandler("joined",      cmd_joined))
     app.add_handler(CallbackQueryHandler(_owner_menu_callback, pattern=r"^own:"))

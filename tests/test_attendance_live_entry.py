@@ -1651,3 +1651,70 @@ def test_listener_error_burst_alert(monkeypatch):
     assert alerts == []                      # transient → quiet
     li._note_processing_error(-100)
     assert len(alerts) == 1 and "3 message-processing errors" in alerts[0]
+
+
+def test_audit_validators():
+    """The /audit invariants: each law catches its violation and passes clean rows. Pure — no DB."""
+    import datetime as _dt
+    from gm_bot import audit as au
+
+    staff = {1: {"call_name": "Davy", "canonical_name": "An Davy"}}
+    today = _dt.date(2026, 6, 11)
+
+    # payback: cleared-but-unpaid, open-but-paid, double-open
+    probs = au.v_payback([
+        {"id": 1, "staff_id": 1, "minutes_owed": 60, "minutes_paid": 0, "status": "cleared"},
+        {"id": 2, "staff_id": 1, "minutes_owed": 60, "minutes_paid": 60, "status": "open"},
+        {"id": 3, "staff_id": 1, "minutes_owed": 30, "minutes_paid": 0, "status": "open"},
+    ], staff)
+    assert any("'cleared' but only 0/60" in p for p in probs)
+    assert any("fully paid" in p for p in probs)
+    assert any("2 OPEN debts" in p for p in probs)
+    assert au.v_payback([{"id": 4, "staff_id": 1, "minutes_owed": 60, "minutes_paid": 60,
+                          "status": "cleared"}], staff) == []
+
+    # AL: passed-but-not-deducted, rejected-with-deduction
+    mk = lambda **k: {"id": 9, "staff_id": 1, "kind": "days", "created_at": None, **k}
+    probs = au.v_al([mk(status="approved", days='["2026-06-01"]', deducted_days="[]")],
+                    staff, today)
+    assert any("NOT deducted" in p for p in probs)
+    probs = au.v_al([mk(status="rejected", days='["2026-06-01"]',
+                        deducted_days='["2026-06-01"]')], staff, today)
+    assert any("refund missing" in p for p in probs)
+    assert au.v_al([mk(status="approved", days='["2026-06-01"]',
+                       deducted_days='["2026-06-01"]')], staff, today) == []
+
+    # shift changes: approved-but-never-settled (the silent-money case), done without banked
+    probs = au.v_shift_changes([
+        {"id": 5, "staff_id": 1, "status": "approved", "when_date": _dt.date(2026, 6, 9),
+         "normal_len": 480, "ot_banked": None},
+        {"id": 6, "staff_id": 1, "status": "done", "when_date": _dt.date(2026, 6, 9),
+         "normal_len": 480, "ot_banked": None},
+    ], staff, today)
+    assert any("never settled" in p for p in probs)
+    assert any("ot_banked=None" in p for p in probs)
+
+    # sessions: checkout before checkin; no-show on a checked-in day; bank over cap
+    t0 = _dt.datetime(2026, 6, 10, 8, 0)
+    sess = [{"staff_id": 1, "shift_date": _dt.date(2026, 6, 10), "checked_in_at": t0,
+             "checked_out_at": t0 - _dt.timedelta(hours=1), "status": "closed",
+             "minutes_late": 0, "minutes_early": 0}]
+    assert any("BEFORE checkin" in p for p in au.v_sessions(sess, staff, today))
+    nos = [{"staff_id": 1, "shift_date": _dt.date(2026, 6, 10), "status": "open"}]
+    assert any("CHECK-IN exists" in p for p in au.v_noshow_vs_sessions(nos, sess, staff))
+    assert any("outside 0..840" in p
+               for p in au.v_ot_bank([{"staff_id": 1, "balance_min": 900}], staff))
+
+    # bookings: orphan debt + stale past slot; swaps: approved sans partner
+    probs = au.v_bookings([{"id": 7, "staff_id": 1, "debt_id": 99, "minutes": 60,
+                            "slot_date": _dt.date(2026, 6, 1), "status": "booked"}],
+                          {}, staff, today)
+    assert any("doesn't exist" in p for p in probs) and any("still 'booked'" in p for p in probs)
+    assert any("partner never agreed" in p for p in au.v_swaps(
+        [{"id": 8, "requester_id": 1, "status": "approved", "partner_ok": None,
+          "req_off_date": _dt.date(2026, 6, 20)}], staff, today))
+
+    # staff sanity: missing shift times
+    assert any("NO shift times" in p for p in au.v_staff_sanity(
+        [{"canonical_name": "X", "call_name": "X", "status": "active", "org": "TWB",
+          "al_left": 5, "work_start": None, "work_end": None}]))
