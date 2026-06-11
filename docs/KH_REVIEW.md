@@ -154,3 +154,16 @@ Also new (compositions of already-approved fragments, sanity-check only):
 Your AL for {dates} wasn't approved. · AL របស់ប្អូនសម្រាប់ {dates} មិនបានអនុម័តទេ។
 The day-off swap ({d1} ↔ {d2}) wasn't approved. · ការប្តូរថ្ងៃឈប់ ({d1} ↔ {d2}) មិនបានអនុម័តទេ។
 
+### P11 · Expired-button lines (Jun 11 — owner's dead-tap design; KH = Claude DRAFT)
+- WHO: any staffer who taps a button that no longer works (an orphaned message after an update,
+  or a stale card someone already answered).
+- WHEN: (a) full collapse — the message itself is REPLACED by this line (orphaned buttons);
+  (b) popup toast — a small alert over an intact card (stale taps; the card stays for others).
+- TONE: blameless and directive — it's the SYSTEM that expired, they should simply retry.
+
+(a) ⏳ Expired message — please start again from the menu.
+    ⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀតពីម៉ឺនុយ។
+
+(b) [TOAST — keep VERY short] ⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត
+
+
