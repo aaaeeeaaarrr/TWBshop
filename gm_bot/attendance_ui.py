@@ -556,9 +556,9 @@ def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Your leave is extended to 3 days 🤍\n"
          "ច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ 3 ថ្ងៃហើយ 🤍", None),
         ("⑨ a death-context PHOTO (within a week of the leave) → condolence only, NO AI, "
-         "forwarded to owner+Tyty alone",
-         "You don't need to send anything — we're so sorry for your loss 🤍\n"
-         "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍", None),
+         "forwarded to owner+Tyty alone (photos welcome — never discouraged)",
+         "We're so sorry for your loss 🤍\n"
+         "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍", None),
         ("⑩ WIFE giving birth (2 days) + the Supervisors notice",
          "Congratulations! 👶 2 days of leave, Tue 09/06 → Wed 10/06.\n"
          "អបអរសាទរ! 👶 សម្រាក 2 ថ្ងៃ, Tue 09/06 → Wed 10/06។\n\n"

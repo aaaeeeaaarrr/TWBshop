@@ -2488,9 +2488,10 @@ async def _handle_sick_paper(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # leave gets condolence ONLY — no AI ever reads it; forwarded to owner+Tyty alone.
     from shared.database import death_leave_recent
     if death_leave_recent(staff["id"], (_today_pp() - timedelta(days=7)).isoformat()):
+        # owner: condolence ONLY — never "no need to send"; photos SHOULD keep coming to us
         await msg.reply_text(
-            "You don't need to send anything — we're so sorry for your loss 🤍\n"
-            "អ្នកមិនចាំបាច់ផ្ញើអ្វីទេ — យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍")
+            "We're so sorry for your loss 🤍\n"
+            "យើងសូមចូលរួមរំលែកទុក្ខចំពោះការបាត់បង់នេះ 🤍")
         for oid in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
             if not oid:
                 continue
