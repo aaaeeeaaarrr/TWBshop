@@ -1606,11 +1606,12 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
     tag = ot_mod._ext_tag(pb_cleared, ot_min)
     win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
     tagtxt = (" (%s)" % tag) if tag else ""
-    body = ("🕒 Shift change — %s: %s%s\nWhy: %s\n"
-            "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n\n"
-            "🕒 ប្តូរវេន — %s៖ %s%s\nមូលហេតុ៖ %s\n"
+    body = ("🕒 Shift change — %s: %s%s\n"
+            "🕒 ប្តូរវេន — %s៖ %s%s\n"
+            "Why · មូលហេតុ៖ %s\n\n"
+            "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
             "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
-            % (when_date, win, tagtxt, reason, when_date, win, tagtxt, reason))
+            % (when_date, win, tagtxt, when_date, win, tagtxt, reason))
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % cid)],
         [InlineKeyboardButton("❌ Can't — explain · មិនអាច — ពន្យល់", callback_data="att:sc:no:%d" % cid)],
@@ -1841,21 +1842,26 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
     reason = html.escape(sw.get("reason") or "—")
     st = sw.get("status")
     partner_ok = sw.get("partner_ok")
+    # reason appears ONCE after the EN+KH lines (owner, Jun 11 — never duplicate typed text)
     if audience == "partner":
-        body = ("%s wants to swap day off: %s takes %s off, you take %s — same week. Reason: %s\n"
-                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ %s ឈប់ %s, អ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។ មូលហេតុ៖ %s"
-                % (html.escape(rn), html.escape(rn), d1, d2, reason,
+        body = ("%s wants to swap day off: %s takes %s off, you take %s — same week.\n"
+                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ %s ឈប់ %s, អ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។\n"
+                "Reason · មូលហេតុ៖ %s"
+                % (html.escape(rn), html.escape(rn), d1, d2,
                    html.escape(rn), html.escape(rn), d1, d2, reason))
     elif audience == "requester":
-        body = ("Day-off swap — your off %s ↔ %s off %s. Reason: %s\n"
-                "ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ %s ឈប់ %s។ មូលហេតុ៖ %s"
-                % (d1, html.escape(pn), d2, reason,
+        body = ("Day-off swap — your off %s ↔ %s off %s.\n"
+                "ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ %s ឈប់ %s។\n"
+                "Reason · មូលហេតុ៖ %s"
+                % (d1, html.escape(pn), d2,
                    d1, html.escape(pn), d2, reason))
     else:  # senior
-        body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s. Reason: %s\n"
-                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s។ %s ឈប់ %s, %s ឈប់ %s។ មូលហេតុ៖ %s"
-                % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2, reason,
-                   html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2, reason))
+        body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s.\n"
+                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s។ %s ឈប់ %s, %s ឈប់ %s។\n"
+                "Reason · មូលហេតុ៖ %s"
+                % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
+                   html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
+                   reason))
     status_line = None
     if st == "approved":
         status_line = "✅ Approved · បានអនុម័ត"
@@ -2383,7 +2389,13 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     user = update.effective_user
-    staff = staff_get_by_uid(user.id)
+    if _att_test_mode() and user.id == config.OWNER_TELEGRAM_ID:
+        # test shell: the owner taps AS the persona (the callback data carries no staff id) —
+        # without this branch every payback button was DEAD in /test (owner find, Jun 11)
+        sid = context.user_data.get("att_persona")
+        staff = next((s for s in staff_all("active") if s["id"] == sid), None) if sid else None
+    else:
+        staff = staff_get_by_uid(user.id)
     if not staff:
         return
     data = query.data.split(":")
@@ -2882,9 +2894,10 @@ async def _sfam_book(context, case: dict, reason: str) -> None:
     stf = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
     nm = (stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff")
     await _att_send(context, None, "Supervisors group", "",
-        "FYI: %s's family-sick continues tomorrow (%s). Reason: %s\n"
-        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។ មូលហេតុ៖ %s"
-        % (nm, case.get("who") or "family", reason, nm, reason), group=True)
+        "FYI: %s's family-sick continues tomorrow (%s).\n"
+        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។\n"
+        "Reason · មូលហេតុ៖ %s"
+        % (nm, case.get("who") or "family", nm, reason), group=True)
 
 
 async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> None:
@@ -2901,8 +2914,8 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។")
     _snm = persona.get("call_name") or persona["canonical_name"]
     await _att_send(context, None, "Supervisors group", "",
-        "FYI: %s is out sick today. Reason: %s\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។ មូលហេតុ៖ %s"
-        % (_snm, reason, _snm, reason), group=True)
+        "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។\nReason · មូលហេតុ៖ %s"
+        % (_snm, _snm, reason), group=True)
 
 
 async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2963,9 +2976,10 @@ async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     if stf:
                         nm = stf.get("call_name") or stf["canonical_name"]
                         await _att_send(context, None, "Supervisors group", "",
-                            "FYI: %s is still resting — NOT back tomorrow. Reason: %s\n"
-                            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។ មូលហេតុ៖ %s"
-                            % (nm, marker, nm, marker), group=True)
+                            "FYI: %s is still resting — NOT back tomorrow.\n"
+                            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។\n"
+                            "Reason · មូលហេតុ៖ %s"
+                            % (nm, nm, marker), group=True)
                 elif fl == "sick_me":
                     persona = next((s for s in staff_all("active")
                                     if s["id"] == pend.get("persona_id")), None)
@@ -4775,9 +4789,10 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
         from gm_bot.attendance_ui import _hm
         await _att_send(context, None, "Supervisors group", "",
-            "%s will be ~%s late for today's shift. Reason: %s\n"
-            "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។ មូលហេតុ៖ %s"
-            % (nm, _hm(mins), reason, nm, _hm(mins), reason), group=True)
+            "%s will be ~%s late for today's shift.\n"
+            "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។\n"
+            "Reason · មូលហេតុ៖ %s"
+            % (nm, _hm(mins), nm, _hm(mins), reason), group=True)
         if not live:
             # TEST: mirror the LIVE split — declare = heads-up only; the outcome appears on ARRIVAL.
             # They CLICKED late, but might actually arrive early / on-time / late — so offer all three
@@ -4904,17 +4919,18 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             # bilingual (owner: some staff won't understand English)
             await _att_send(context, (tgt.get("telegram_ids") or [None])[0], "Staff",
                 tgt.get("call_name") or tgt["canonical_name"],
-                "📝 About your %s — %s: %s\n📝 អំពី%sរបស់ប្អូន — %s៖ %s"
-                % (pend.get("what", "request"), pend.get("frm", "—"), reason,
+                "📝 About your %s — %s:\n📝 អំពី%sរបស់ប្អូន — %s៖\n%s"
+                % (pend.get("what", "request"), pend.get("frm", "—"),
                    pend.get("what_kh", pend.get("what", "request")), pend.get("frm", "—"), reason))
         await confirm("Sent 🤍\nផ្ញើរួចហើយ 🤍", "🧪 Reason relayed (test) — routed to you.")
     elif flow == "sret_exp":
         # the typed reason for still-resting (own sick) → the Supervisors read it
         nm = persona.get("call_name") or persona["canonical_name"]
         await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s is still resting — NOT back tomorrow. Reason: %s\n"
-            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។ មូលហេតុ៖ %s"
-            % (nm, reason, nm, reason), group=True)
+            "FYI: %s is still resting — NOT back tomorrow.\n"
+            "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។\n"
+            "Reason · មូលហេតុ៖ %s"
+            % (nm, nm, reason), group=True)
         await confirm(
             "Rest well 🤍 get better.\nសម្រាកឱ្យបានល្អ 🤍 ឆាប់ជាសះស្បើយ។",
             "🧪 Still-resting reason (test) — the group FYI was routed to you.")

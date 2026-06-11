@@ -2021,7 +2021,7 @@ def test_family_sick_nudge_callback(monkeypatch):
     dupd = types.SimpleNamespace(message=msg, effective_user=types.SimpleNamespace(id=9))
     asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
     assert created == [(1, "child", "2026-06-12", "open")]
-    assert any("Reason: grandma" in m for m in group_msgs)
+    assert any("grandma" in m for m in group_msgs)   # reason once, after EN+KH lines
     asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
     assert len(created) == 1                                  # status 'extended' → gated
     # 'Coming tomorrow' → one tap, case cleared
@@ -2134,7 +2134,8 @@ def test_rej_exp_relay(monkeypatch):
     upd = types.SimpleNamespace(message=msg, effective_user=types.SimpleNamespace(id=55))
     asyncio.run(bot._att_dispatch(upd, types.SimpleNamespace(), {
         "flow": "rej_exp", "to_sid": 5, "frm": "Rath", "what": "AL request"}, live=True))
-    assert any(uid == 55 and "Rath: coverage too thin" in t for uid, t in sent)
+    assert any(uid == 55 and "Rath" in t and "coverage too thin" in t
+               for uid, t in sent)   # EN+KH header lines, reason ONCE below
 
 
 def test_death_photo_condolence(monkeypatch):

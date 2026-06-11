@@ -308,8 +308,9 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
         ("① late declared — pick time → REASON typed at declare-time → confirm + group heads-up WITH reason",
          "Noted — see you ~9:30pm 🤍\nកត់ចំណាំហើយ — ជួបគ្នា ~9:30pm 🤍\n\n"
          "[TEST PREVIEW → SUPERVISORS group, reason INCLUDED at declare-time]\n"
-         "“Davy will be ~30 min late for the 9pm shift today. Reason: moto broke.\n"
-         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេន 9pm ថ្ងៃនេះ។ មូលហេតុ៖ moto broke”",
+         "“Davy will be ~30 min late for today's shift.\n"
+         "Davy នឹងមកយឺតប្រហែល ~30 min សម្រាប់វេនថ្ងៃនេះ។\n"
+         "Reason · មូលហេតុ៖ moto broke”",
          None),
         ("② arrival watch — declared time passed, no location yet (repeats 4× every 15 min)",
          "Are you there yet?\nមកដល់ហើយឬនៅ?\n" + _CI_HOWTO, None),
