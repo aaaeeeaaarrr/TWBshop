@@ -1331,21 +1331,22 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     # + ONE day-off option (owner spec, now wired): the neediest slot WITHIN their regular shift hours
     # on an upcoming day off (a night-shift person gets a night window, never a 5am call). Natural cap
     # = a shift-length (dayoff_windows sizes the window to min(balance, shift span)).
-    do_best = None
+    do_scored = []
     for do in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos,
                                     _today_pp(), 14):
         for s_min, e_min in pb.dayoff_windows(ws, we, balance):
             sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, set(), to_min)
-            if do_best is None or sc > do_best[0]:
-                do_best = (sc, do, s_min, e_min)
-    if do_best:
-        _sc, do, s_min, e_min = do_best
+            do_scored.append((sc, do, s_min, e_min))
+    # owner spec (Jun 11): the TOP-3 neediest day-off windows, all within their own shift hours
+    # ("we choose the best hours for us"); full-shift debt naturally yields the whole shift.
+    do_scored.sort(key=lambda t: -t[0])
+    for _sc, do, s_min, e_min in do_scored[:3]:
         mins = (e_min - s_min) % 1440 or balance
         txt = "🛌 %s %s-%s · day off" % (do.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
         rows.append([InlineKeyboardButton(
             txt, callback_data="att:pb:book:%s:%d:%d:%d" % (do.isoformat(), s_min, e_min, mins))])
-    # partial options
-    for part in (60, 120):
+    # partial options — 1h/2h/3h (owner)
+    for part in (60, 120, 180):
         if part < balance:
             rows.append([InlineKeyboardButton("Pay %dh only · សងតែ %dh" % (part // 60, part // 60),
                                               callback_data="att:pb:part:%d" % part)])
@@ -1358,6 +1359,28 @@ def _fmt_min(m: int) -> str:
     sfx = "am" if h < 12 else "pm"
     h12 = h % 12 or 12
     return ("%d:%02d%s" % (h12, mm, sfx)) if mm else ("%d%s" % (h12, sfx))
+
+
+def _create_payback_redefine(staff: dict, slot_date: str, s_min: int, e_min: int) -> None:
+    """A booked payback slot IS a shift redefine (owner unification): the existing engine then
+    does everything — T−10 at the new start, lateness vs the new start, checkout settle credits
+    the slot minutes against the debt (partial naturally = clamped worked time). Best-effort:
+    a failure here never blocks the booking confirmation."""
+    try:
+        from datetime import date as _d
+        from gm_bot import payback as pb
+        from gm_bot.attendance import to_min
+        from shared.database import shift_change_autoapprove
+        ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+        off = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5,
+               "sun": 6}.get((staff.get("day_off") or "")[:3].lower())
+        is_dayoff = off is not None and _d.fromisoformat(slot_date).weekday() == off
+        win = pb.redefine_window(ws, we, is_dayoff, s_min, e_min)
+        if win:
+            shift_change_autoapprove(staff["id"], slot_date, win[0], win[1], win[2],
+                                     "payback slot")
+    except Exception as e:
+        logger.error("payback redefine create failed: %s", e)
 
 
 async def _offer_payback(context, staff: dict, balance: int, uid: int,
@@ -1637,10 +1660,13 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
     try:
         from shared.database import (shift_change_active, att_get_session, payback_open_debt,
                                      payback_credit, ot_bank_add, ot_bank_balance,
-                                     shift_change_set_banked, shift_change_claim_settle)
+                                     shift_change_set_banked, shift_change_claim_settle,
+                                     payback_booking_mark_done)
         from gm_bot import ot as ot_mod
         sc = shift_change_active(staff["id"], shift_date)
-        if not sc or sc.get("status") != "approved" or not sc.get("normal_len"):
+        # normal_len=0 is VALID: a day-off payback window — every worked minute is extension,
+        # so the engine credits the whole window against the debt. Only None means un-settleable.
+        if not sc or sc.get("status") != "approved" or sc.get("normal_len") is None:
             return 0, 0                  # not redefined, or already done
         sess = att_get_session(staff["id"], shift_date) or {}
         ci_dt = sess.get("checked_in_at")
@@ -1673,6 +1699,10 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
             if banked > 0:
                 new_bal = ot_bank_add(staff["id"], banked)      # post-add balance (test: computed)
         shift_change_set_banked(sc["id"], banked)
+        try:
+            payback_booking_mark_done(staff["id"], shift_date)   # slot booking → done (bookkeeping)
+        except Exception:
+            pass
         return banked, new_bal
     except Exception as e:
         logger.error("OT settle at checkout failed: %s", e)
@@ -2275,6 +2305,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if sub == "book":
         slot_date, s_min, e_min, mins = data[3], int(data[4]), int(data[5]), int(data[6])
         payback_book(debt["id"], staff["id"], slot_date, s_min, e_min, mins)
+        _create_payback_redefine(staff, slot_date, s_min, e_min)   # the slot IS a redefine
         from datetime import date as _date
         d = _date.fromisoformat(slot_date)
         await query.edit_message_text(
@@ -2344,6 +2375,7 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     _lbl, s_min, e_min = _pb.slot_windows(ws, we, debt["balance"])[0]
                     payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
                                  debt["balance"], auto_booked=True)
+                    _create_payback_redefine(staff, d0.isoformat(), s_min, e_min)
                     await _att_send(context, uid, "Staff", nm,
                         "I booked you %s %s-%s (you didn't choose).\n"
                         "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"

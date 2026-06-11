@@ -326,8 +326,11 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "Reminder — your payback time is tomorrow: 7:30pm–9pm.\n"
          "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺថ្ងៃស្អែក៖ 7:30pm–9pm។\n" + _PLUS10 + "\n" + _CI_HOWTO,
          None),
-        ("⑦ the slot itself = mini-shift (T−10, check-in, early ⭐) — same templates as Dry-run 1",
-         "(reused — a payback slot greets, checks in and rewards exactly like a shift)", None),
+        ("⑦ a booked slot EXTENDS the shift (the redefine engine — no separate machinery)",
+         "(booking auto-redefines that day's shift: T−10 fires at the NEW start, lateness is "
+         "judged vs the NEW start, and checkout settles the extra minutes straight into the "
+         "debt — partial credit automatic. A day-off slot = a window within their own shift "
+         "hours; every worked minute credits.)", None),
         ("⑧ partial credit — worked 60 of 90 min",
          "You paid back 60 min ✓ — 30 min stays on your balance.\n"
          "អ្នកបានសង 60 min ✓ — នៅសល់ 30 min ក្នុង balance របស់អ្នក។", None),

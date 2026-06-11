@@ -85,6 +85,31 @@ def takeback_windows(ws_min: int, we_min: int, minutes: int) -> list[tuple[str, 
     ]
 
 
+def redefine_window(ws_min: int | None, we_min: int | None, is_dayoff: bool,
+                    s_min: int, e_min: int) -> tuple[int, int, int] | None:
+    """The shift-REDEFINE a booked payback slot creates (owner unification, Jun 11 — a slot is
+    not a separate 'mini-shift', it EXTENDS the shift and the settle engine credits the debt):
+    - working day, slot glued BEFORE the shift → [slot_start, slot_start + slot + normal_len]
+    - working day, slot glued AFTER the shift  → [shift_start, shift_start + normal_len + slot]
+    - day off → the window itself with normal_len=0 (every worked minute is extension → credits)
+    Returns (start_min, end_min_absolute, normal_len) — end may exceed 1440 (overnight-safe,
+    same convention as the senior redefine ladder) — or None when the slot doesn't touch a
+    shift edge (shouldn't happen with slot_windows-generated slots)."""
+    slot = (e_min - s_min) % 1440 or 1440
+    if is_dayoff:
+        return s_min % 1440, (s_min % 1440) + slot, 0
+    if ws_min is None or we_min is None:
+        return None
+    normal_len = (we_min - ws_min) % 1440 or 1440
+    if e_min % 1440 == ws_min % 1440:      # before-shift slot: start earlier, same end
+        st = s_min % 1440
+        return st, st + slot + normal_len, normal_len
+    if s_min % 1440 == we_min % 1440:      # after-shift slot: same start, end later
+        st = ws_min % 1440
+        return st, st + normal_len + slot, normal_len
+    return None
+
+
 def apply_payback(balance_min: int, worked_min: int) -> tuple[int, int]:
     """Credit worked minutes against the balance. Returns (credited, new_balance).
     Over-work doesn't go negative — caps at the balance (extra is just early/OT elsewhere)."""

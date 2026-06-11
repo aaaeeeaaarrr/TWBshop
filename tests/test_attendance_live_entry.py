@@ -1300,6 +1300,58 @@ def test_dispatch_live_rejects_unknown_uid(monkeypatch):
     assert upd.message.replies == []
 
 
+def test_payback_redefine_window():
+    """Owner unification: a booked payback slot IS a shift redefine. Working-day slots glue to
+    the shift edge (merged window, normal_len = the normal shift); day-off slots are the window
+    itself with normal_len=0 (every worked minute credits)."""
+    from gm_bot.payback import redefine_window
+    # day staff 12:00–21:00, 90-min slot BEFORE (10:30–12:00) → shift becomes 10:30–21:00
+    assert redefine_window(720, 1260, False, 630, 720) == (630, 630 + 90 + 540, 540)
+    # same staff, slot AFTER (21:00–22:30) → 12:00 start, end pushed to 22:30
+    assert redefine_window(720, 1260, False, 1260, 1350) == (720, 720 + 540 + 90, 540)
+    # overnight baker 21:00–06:00, slot AFTER (06:00–07:30) → end runs past midnight, absolute
+    assert redefine_window(1260, 360, False, 360, 450) == (1260, 1260 + 540 + 90, 540)
+    # day-off window 17:00–21:00 → the window itself, normal_len=0
+    assert redefine_window(720, 1260, True, 1020, 1260) == (1020, 1260, 0)
+    # a slot not touching a shift edge → None (never created by slot_windows)
+    assert redefine_window(720, 1260, False, 600, 690) is None
+
+
+def test_settle_dayoff_payback_credits_debt(monkeypatch):
+    """A day-off payback window (normal_len=0) settles through the SAME engine: every worked
+    minute inside the approved window clears the debt; the booking flips to done."""
+    import datetime as _dt
+    from shared import database as db
+    from gm_bot import bot, finance
+    sc = {"id": 9, "status": "approved", "normal_len": 0,        # day-off window
+          "start_min": 1020, "end_min": 1260}                    # 17:00–21:00 = 4h
+    credited, done_marks = [], []
+    monkeypatch.setattr(db, "shift_change_active", lambda sid, iso: sc)
+    monkeypatch.setattr(db, "payback_open_debt",
+                        lambda sid: {"id": 70, "minutes_owed": 240, "minutes_paid": 0})
+    monkeypatch.setattr(db, "payback_credit", lambda did, m: credited.append((did, m)))
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "ot_bank_add", lambda sid, m: m)
+    monkeypatch.setattr(db, "shift_change_claim_settle", lambda cid: True)
+    monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+    monkeypatch.setattr(db, "payback_booking_mark_done", lambda sid, iso: done_marks.append(iso))
+
+    def _at(hh, mm):
+        return _dt.datetime(2026, 6, 15, hh, mm, tzinfo=finance.PP_TZ)
+
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: {"checked_in_at": _at(17, 0)})
+    banked, _ = bot._settle_redefined_shift({"id": 3}, "2026-06-15", _at(21, 0))
+    assert credited == [(70, 240)]           # full 4h window → 4h debt cleared
+    assert banked == 0                       # window sized to the debt → nothing banks
+    assert done_marks == ["2026-06-15"]      # the booking is marked done
+
+    # PARTIAL: came 2h late to the slot → only 2h credit (engine clamps naturally)
+    credited.clear()
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: {"checked_in_at": _at(19, 0)})
+    bot._settle_redefined_shift({"id": 3}, "2026-06-15", _at(21, 0))
+    assert credited == [(70, 120)]
+
+
 def test_settle_claims_once_no_double_bank(monkeypatch):
     """OT banking is idempotent. The atomic claim lets exactly ONE checkout path bank a redefined
     shift; a second call — the auto-checkout scheduler firing the same minute as a manual checkout,

@@ -94,9 +94,9 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
         if st == "proposed" and r.get("when_date") and r["when_date"] < today:
             out.append("OT: %s change #%s still PROPOSED but its date %s passed (staff never "
                        "answered)" % (nm, r["id"], r["when_date"]))
-        if st in ("approved", "done") and not r.get("normal_len"):
+        if st in ("approved", "done") and r.get("normal_len") is None:
             out.append("OT: %s change #%s %s without normal_len — settle can't compute OT"
-                       % (nm, r["id"], st))
+                       % (nm, r["id"], st))   # normal_len=0 is VALID (day-off payback window)
     return out
 
 

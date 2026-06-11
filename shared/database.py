@@ -3085,6 +3085,31 @@ def shift_change_set_banked(change_id: int, ot_banked: int) -> None:
                         (ot_banked, change_id))
 
 
+def shift_change_autoapprove(staff_id: int, when_date: str, start_min: int, end_min: int,
+                             normal_len: int, reason: str) -> int:
+    """Insert an auto-APPROVED shift redefine — payback slots (the staffer consented by booking;
+    no senior card needed). normal_len=0 = a day-off window: every worked minute is extension,
+    so the settle engine credits the whole window against the debt."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO shift_changes
+                (staff_id, when_date, start_min, end_min, normal_len, reason, status,
+                 approved_at, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,'approved',NOW(),%s) RETURNING id""",
+                (staff_id, when_date, start_min, end_min, normal_len, reason, _ATT_TEST))
+            return cur.fetchone()["id"]
+
+
+def payback_booking_mark_done(staff_id: int, slot_date: str) -> None:
+    """At settle: the slot's booking flips to done (the CREDIT flows through the settle engine —
+    this is bookkeeping so reminders stop and the audit's stale-booking law stays quiet)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE payback_bookings SET status='done'
+                           WHERE staff_id=%s AND slot_date=%s AND status='booked' AND is_test=%s""",
+                        (staff_id, slot_date, _ATT_TEST))
+
+
 def shift_change_claim_settle(change_id: int) -> bool:
     """Atomic idempotency claim for OT banking. Flips approved->done in ONE conditional UPDATE and
     returns True only if THIS caller made the flip (the row was still 'approved'). Every other
