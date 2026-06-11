@@ -1718,3 +1718,31 @@ def test_audit_validators():
     assert any("NO shift times" in p for p in au.v_staff_sanity(
         [{"canonical_name": "X", "call_name": "X", "status": "active", "org": "TWB",
           "al_left": 5, "work_start": None, "work_end": None}]))
+
+
+def test_auto_audit_job_silent_clean_loud_on_problems(monkeypatch):
+    """The daily auto-audit: clean → NO message at all; problems → owner DM with paste-to-Claude
+    lines; always forced to REAL rows (test_rows=False) regardless of test mode."""
+    import gm_bot.bot as bot
+    from gm_bot import audit as au
+
+    sent, seen_flags = [], []
+
+    class _Bot:
+        async def send_message(self, chat_id, text, **k):
+            sent.append(text)
+
+    ctx = types.SimpleNamespace(bot=_Bot())
+
+    def fake_audit(today, test_rows=None):
+        seen_flags.append(test_rows)
+        return ([], {})
+    monkeypatch.setattr(au, "run_audit", fake_audit)
+    asyncio.run(bot._auto_audit_job(ctx))
+    assert sent == []                       # clean → silent
+    assert seen_flags == [False]            # always the REAL ledger
+
+    monkeypatch.setattr(au, "run_audit",
+                        lambda today, test_rows=None: (["PB: DAVY debt #5 is 'cleared' but only 0/60 min paid"], {}))
+    asyncio.run(bot._auto_audit_job(ctx))
+    assert len(sent) == 1 and "DAILY AUTO-AUDIT" in sent[0] and "DAVY" in sent[0]

@@ -182,11 +182,14 @@ def v_staff_sanity(staff_rows: list[dict]) -> list[str]:
 
 # ───────────────────────────── DB runner ─────────────────────────────
 
-def run_audit(today: date | None = None) -> tuple[list[str], dict]:
-    """Run every invariant over the CURRENT mode's rows (test rows in test mode, real rows live).
+def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple[list[str], dict]:
+    """Run every invariant. test_rows: None = follow the current mode (test rows in test mode,
+    real rows live — the /audit command); True/False = explicit (the daily auto-audit passes
+    False so it ALWAYS checks the real ledger, even if the owner left test mode on).
     Returns (problems, stats). Each problem string is self-contained for pasting to Claude."""
     from shared.database import _db, _ATT_TEST, staff_all
     today = today or date.today()
+    flag = _ATT_TEST if test_rows is None else test_rows
     staff = {s["id"]: s for s in staff_all(None)}
 
     def q(cur, sql, args=()):
@@ -195,14 +198,14 @@ def run_audit(today: date | None = None) -> tuple[list[str], dict]:
 
     with _db() as conn:
         with conn.cursor() as cur:
-            debts = q(cur, "SELECT * FROM payback_debts WHERE is_test=%s", (_ATT_TEST,))
-            als = q(cur, "SELECT * FROM al_requests WHERE is_test=%s", (_ATT_TEST,))
-            scs = q(cur, "SELECT * FROM shift_changes WHERE is_test=%s", (_ATT_TEST,))
-            sess = q(cur, "SELECT * FROM attendance_sessions WHERE is_test=%s", (_ATT_TEST,))
+            debts = q(cur, "SELECT * FROM payback_debts WHERE is_test=%s", (flag,))
+            als = q(cur, "SELECT * FROM al_requests WHERE is_test=%s", (flag,))
+            scs = q(cur, "SELECT * FROM shift_changes WHERE is_test=%s", (flag,))
+            sess = q(cur, "SELECT * FROM attendance_sessions WHERE is_test=%s", (flag,))
             banks = q(cur, "SELECT * FROM ot_bank")          # no is_test: test never mutates it
-            nos = q(cur, "SELECT * FROM no_show_records WHERE is_test=%s", (_ATT_TEST,))
-            books = q(cur, "SELECT * FROM payback_bookings WHERE is_test=%s", (_ATT_TEST,))
-            swaps = q(cur, "SELECT * FROM dayoff_swaps WHERE is_test=%s", (_ATT_TEST,))
+            nos = q(cur, "SELECT * FROM no_show_records WHERE is_test=%s", (flag,))
+            books = q(cur, "SELECT * FROM payback_bookings WHERE is_test=%s", (flag,))
+            swaps = q(cur, "SELECT * FROM dayoff_swaps WHERE is_test=%s", (flag,))
 
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)

@@ -3920,6 +3920,34 @@ async def _pay_restore_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.error("pay restore notify failed: %s", e)
 
 
+async def _auto_audit_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily 07:30 PP: the invariant audit over the REAL ledger — SILENT when clean, owner DM only
+    when something is up (so data-law violations chase the owner instead of waiting to be asked).
+    Always real rows (test_rows=False), even if test mode was left on. Real wall clock."""
+    from gm_bot.audit import run_audit
+    try:
+        problems, _stats = run_audit(datetime.now(finance.PP_TZ).date(), test_rows=False)
+    except Exception as e:
+        logger.error("auto-audit failed to run: %s", e)
+        try:
+            await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+                                           "⚠ Daily auto-audit FAILED to run: %s" % e)
+        except Exception:
+            pass
+        return
+    if not problems:
+        logger.info("auto-audit: clean")
+        return
+    body = ("❌ DAILY AUTO-AUDIT — %d problem(s) in the REAL data. Copy this message to Claude:\n\n"
+            % len(problems)) + "\n".join("• " + p for p in problems)
+    for i in range(0, len(body), 3500):
+        try:
+            await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
+        except Exception as e:
+            logger.error("auto-audit DM failed: %s", e)
+            break
+
+
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/audit — owner: cross-check that every button input translated to the right stored result.
     Runs all data invariants (AL deductions, payback math, OT banking/cap, sessions, no-shows,
@@ -5280,6 +5308,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_pay_restore_job,
                             time=__import__("datetime").time(hour=0, minute=5),
                             name="gm_pay_restore")
+    # daily auto-audit: 07:30 PP (00:30 UTC), REAL rows, silent when clean, owner DM on problems
+    app.job_queue.run_daily(_auto_audit_job,
+                            time=__import__("datetime").time(hour=0, minute=30),
+                            name="gm_auto_audit")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.
