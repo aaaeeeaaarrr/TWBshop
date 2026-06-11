@@ -25,21 +25,36 @@
 ## 1. Check-in & check-out
 
 ### 1.1 Checked-out confirmation
+- WHO: any staffer, private DM. WHEN: every successful checkout (manual AND silent auto-checkout
+  at shift end). TONE: warm send-off — the last thing they read each day. [body]
 
 Checked out ✓ Thank you, have a nice day! 🤍
 ចុះវត្តមានចេញរួច ✓ អរគុណ សូមឱ្យថ្ងៃនេះល្អៗ 🤍
 
 ## A. Positive-points convention — ⭐ always
 
+- WHO: staff, private DM. WHEN: footer of the shift-change card a senior sends them (and any
+  card explaining pay-for-time). TONE: plain statement of the rules, the ⭐ marks the upside.
+  Convention: every positive-points mention in the app carries the ⭐. [body]
+
 You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.
 ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។
 
 ## B. Over-balance AL → tell the STAFF
 
+- WHO: the requesting staffer, private DM. WHEN: they picked AL days/hours costing more than
+  their balance — the request is NOT submitted; this blocks it at the picker, before any senior
+  sees it. {X} = days left, {Y} = days the request needs. TONE: helpful redirect, no blame. [body]
+
 ⚠ You only have {X} AL day(s) left, but this request needs {Y}. Please choose a smaller amount — you can request up to {X}.
 ⚠ ប្អូននៅសល់ AL តែ {X} ថ្ងៃប៉ុណ្ណោះ ប៉ុន្តែសំណើនេះត្រូវប្រើ {Y} ថ្ងៃ។ សូមជ្រើសចំនួនតិចជាងនេះ — ប្អូនអាចស្នើបានច្រើនបំផុត {X} ថ្ងៃ។
 
 ## C. Group-redirect — 5 rotating variants
+
+- WHO: a staffer who posted an AL/sick/day-off request in a Telegram GROUP (visible to the whole
+  group). WHEN: the bot detects it and replies in-group, redirecting them to DM — group messages
+  are never recorded. The 5 variants rotate so the reply doesn't read like a bot stamp.
+  TONE: friendly nudge, never scolding. [body, posted in-group]
 
 1.
 
@@ -68,6 +83,11 @@ You're paid for the time you work; come early → +10 points ⭐; normal late/no
 
 ## Z. Hours-AL Supervisors notice
 
+- WHO: the Supervisors group (seniors — but kept bilingual app-wide). WHEN: an HOURS-based AL
+  (part of a shift off, not whole days) was approved — the group must know the coverage gap and
+  when the person is back. {name} = call name; times/dates here are EXAMPLES, the code inserts
+  real ones. TONE: informational. [body, group post]
+
 {name} on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.
 {name} ឈប់សម្រាក 9pm–12am នៅ Tue 23/06, Wed 24/06, Thu 25/06។
 
@@ -83,45 +103,55 @@ One implementation warning: for variant 4, I used AL, ឈឺ និងថ្ង�
 
 ## D. Sick & decline accountability — WIRED Jun 11 (ChatGPT-polished, final)
 
-> Context per entry lives in git history; in short: nightly sick nudges are expectation-first
-> (coming = default), every "no" button costs a typed reason that the named recipient reads,
-> 10/20-min silence nudges, auto-resolve at 30. Buttons follow the width rule.
+> Shared context (all P1–P9 are staff private-DM unless noted): nightly sick nudges are
+> expectation-first (coming = default), every "no" button costs a typed reason that the named
+> recipient reads, 10/20-min silence nudges, auto-resolve at 30. Buttons follow the width rule.
 
-P1 family nudge ({relation} = child/spouse/parent, inserted as-is):
+P1 family nudge — sent ~8pm to a staffer off for a sick FAMILY member, asking about tomorrow
+({relation} = child/spouse/parent, inserted as-is) [body]:
 I hope your {relation} is better now 🤍 Are you coming tomorrow?
 សង្ឃឹមថា {relation} របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?
 
-P2 "no" buttons (a family · b own-sick night · c day-1 opener):
+P2 "no" buttons — the "not coming" answer on three nudges; tapping arms the typed-reason prompt
+(a = the P1 family nudge · b = the P3 own-sick nudge · c = day-1 sick opener "really can't come
+in today?") [BUTTONS]:
 [a] 📝 Can't come — explain · មកមិនបាន — ពន្យល់
 [b] 📝 Still resting — explain · សម្រាកបន្ត — ពន្យល់
 [c] 📝 Really can't — explain · មិនអាចមក — ពន្យល់
 
-P3 own-sick nightly question:
+P3 own-sick nightly question — sent ~8pm to a staffer off sick THEMSELVES, asking about
+tomorrow [body]:
 I hope you're feeling better now 🤍 Are you coming in tomorrow?
 សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?
 
-P4 type-the-reason prompt (sick):
+P4 type-the-reason prompt — after a P2 "no" tap on a SICK flow; their next typed message goes
+to the Supervisors group [body]:
 Please type the reason — it goes to the Supervisors. 🤍
 សូមវាយមូលហេតុ — វានឹងផ្ញើទៅបងៗ។ 🤍
 
-P5 family re-book confirmation:
+P5 family re-book confirmation — after the typed reason lands: tomorrow's family-sick day is
+booked (burns 1 of the 7-day family pool) and the staffer is told it's handled [body]:
 Noted — tomorrow is covered. Take care 🤍
 កត់ចំណាំហើយ — ស្អែកបានរៀបចំការឈប់ឱ្យរួចហើយ។ ថែទាំឱ្យបានល្អ 🤍
 
-P6 decline buttons (a senior cards · b swap partner · c staff vs shift change):
+P6 decline buttons — every rejection costs a typed reason; tapping arms the P7 prompt
+(a = senior rejecting an AL/swap approval card · b = swap partner refusing · c = staff
+declining a senior's shift change) [BUTTONS]:
 [a] ❌ Not approve — explain · មិនអនុម័ត — ពន្យល់
 [b] ✋ No — explain · ទេ — ពន្យល់
 [c] ❌ Can't — explain · មិនអាច — ពន្យល់
 
-P7 one-line-why prompt ({name} = who receives the reason):
+P7 one-line-why prompt — right after a P6 tap; the decision already landed (act-first),
+this asks for the why ({name} = the person who will read the reason) [body]:
 📝 One line why — it goes to {name}.
 📝 មូលហេតុ 1 ឃ្លា — នឹងផ្ញើទៅ {name}។
 
-P8 silence nudge (10/20 min, max twice):
+P8 silence nudge — they tapped a "no/explain" button but typed nothing; re-asked at 10 and
+20 minutes (max twice), auto-resolves at 30 [body]:
 Still need one line from you 🤍 just type why.
 នៅខ្វះមូលហេតុ 1 ឃ្លាពីប្អូន 🤍 សូមវាយប្រាប់មូលហេតុ។
 
-P9 relay ack:
+P9 relay ack — the typed reason was delivered to its recipient; closes the loop [body]:
 Sent 🤍
 ផ្ញើរួចហើយ 🤍
 
@@ -165,6 +195,10 @@ The day-off swap ({d1} ↔ {d2}) wasn't approved. · ការប្តូរថ
     ⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀតពីម៉ឺនុយ។
 
 (b) [TOAST — keep VERY short] ⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត
+
+(c) **Recovery button** [BUTTON] — sits under the collapsed line from (a); one tap re-opens
+    the main menu:
+    📋 Open menu · បើកម៉ឺនុយ
 
 
 ### P12 · Cancel AL flow — My Schedule button + list + confirmation (Jun 11; KH = Claude DRAFT)
@@ -289,12 +323,6 @@ the bot shows a fresh picker with this shorter header)
 
 You owe {X} — pick when to work it off:
 អ្នកនៅត្រូវសង {X} — សូមជ្រើសពេល៖
-
----
-
-**P11 ADDENDUM — recovery button** [BUTTON] (sits under the collapsed "expired message" line,
-one tap re-opens the main menu):
-📋 Open menu · បើកម៉ឺនុយ
 
 
 ### P15 · Shift-change + day-off-swap cards & notices (Jun 11; KH = Claude DRAFT)
