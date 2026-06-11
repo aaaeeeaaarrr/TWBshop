@@ -167,3 +167,45 @@ The day-off swap ({d1} ↔ {d2}) wasn't approved. · ការប្តូរថ
 (b) [TOAST — keep VERY short] ⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត
 
 
+### P12 · Cancel AL flow — My Schedule button + list + confirmation (Jun 11; KH = Claude DRAFT)
+
+Context: staff opens My Schedule → sees a "Cancel AL" button when they have future AL → taps →
+gets a list of cancelable days → picks one → sees a confirmation card → confirms or backs out.
+Audience: junior staff DM (bilingual throughout). Tone: clear and calm, not alarming.
+
+---
+
+**My Schedule button** [BUTTON]:
+✕ Cancel AL · បោះបង់ AL
+
+---
+
+**Cancel AL list screen** — header asking which day to pick:
+Which AL day do you want to cancel?
+ថ្ងៃ AL ណាដែលប្អូនចង់លុប?
+
+Per-day buttons (one per cancelable day; {lbl} = "Mon 23/06" or "Mon 23/06 9pm–12am" for hours-AL):
+✕ {lbl}
+
+No-upcoming case (shown if all AL days already passed or shift started):
+No upcoming AL to cancel.
+គ្មាន AL ខាងមុខដែលអាចលុបបានទេ។
+
+---
+
+**Confirmation card body** — {detail} = day label (+ hours if hours-AL):
+Are you sure you want to cancel your AL on {detail}?
+This will return 1 day to your AL balance.
+
+ប្អូនពិតជាចង់លុប AL ថ្ងៃ {detail} មែនទេ?
+ថ្ងៃ AL 1 ថ្ងៃនឹងត្រូវបានដាក់ចូលវិញក្នុងតុល្យភាព AL របស់ប្អូន។
+
+**Confirmation buttons** [BUTTON pair]:
+✅ Yes, cancel it · លុបចោលបាន
+← Back · ត្រឡប់ក្រោយ
+
+---
+
+**Too-late toast** (shown if tapped after the day has already started) [TOAST]:
+Too late to cancel — that day has already started · យឺតពេលលុបចោលហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ
+

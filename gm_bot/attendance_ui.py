@@ -1888,21 +1888,14 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     up_txt = ", ".join(day_label(date.fromisoformat(d)) for d, _ in upcoming) or "—"
     today_iso = _today().isoformat()
     if debt_min - booked_min > 0:
-        # on-demand picker re-open (owner, Jun 11): if the slot picker ever gets lost/expired,
-        # the staffer can always re-open it from here — the menu is the universal recovery.
-        # Only while something is LEFT to book: a fully-booked debt hides the button (owner,
-        # Jun 11 — book-and-book-again was minting OT from the surplus).
         rows.append([InlineKeyboardButton("📅 Book pay-back time · កក់ម៉ោងសងវិញ",
                                           callback_data="att:pb:offer")])
-    # CANCEL buttons ONLY in the role-play (test) shell — the /test shell must never mutate REAL data.
-    # (Real staff will cancel their own real ALs through the live staff entry, not here.)
-    if att_test_on():
-        for d, rid in upcoming[:6]:
-            # only offer cancel for dates that haven't STARTED (future, or today before shift begins)
-            if d < today_iso or (d == today_iso and _shift_running(p)):
-                continue
-            rows.append([InlineKeyboardButton("✕ Cancel AL · បោះបង់ AL %s" % day_label(date.fromisoformat(d)),
-                                              callback_data="att:my:cancel:%s:%d" % (d, rid))])
+    # Cancel AL button — shows whenever there are future cancelable days (Jun 11, both modes)
+    cancelable = [(d, rid) for d, rid in upcoming
+                  if d > today_iso or (d == today_iso and not _shift_running(p))]
+    if cancelable:
+        rows.append([InlineKeyboardButton("✕ Cancel AL · បោះបង់ AL",
+                                          callback_data="att:my:allist")])
     return _hdr(p, "📋 My schedule · កាលវិភាគខ្ញុំ\n"
                    "Shift · វេន: %s–%s\nDay off · ថ្ងៃឈប់: %s\nExpertise · ជំនាញ: %s\n\n"
                    "AL left: %s days\n"
@@ -1913,6 +1906,73 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                    p.get("day_off") or "?", exp, p.get("al_left", "?"),
                    debt_txt, bank_txt, up_txt)), \
         InlineKeyboardMarkup(rows)
+
+
+def al_cancel_list(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """List of upcoming approved AL days the staffer can cancel — one button per day.
+    Tapping opens the confirmation screen (att:my:alconfirm)."""
+    import json as _json
+    today_iso = _today().isoformat()
+    cancelable = []
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""SELECT id, days, kind, hours_start, hours_end FROM al_requests
+                               WHERE staff_id=%s AND status='approved' AND is_test=%s""",
+                            (p["id"], att_test_on()))
+                for r in cur.fetchall():
+                    for d in _json.loads(r["days"] or "[]"):
+                        if d < today_iso:
+                            continue
+                        if d == today_iso and _shift_running(p):
+                            continue
+                        cancelable.append((d, r["id"], r["kind"],
+                                           r.get("hours_start"), r.get("hours_end")))
+    except Exception:
+        pass
+    cancelable.sort()
+    rows = [_back_row("att:my")]
+    for d, rid, kind, hs, he in cancelable:
+        lbl = day_label(date.fromisoformat(d))
+        if kind == "hours" and hs and he:
+            lbl += " %s–%s" % (hs, he)
+        rows.append([InlineKeyboardButton("✕ %s" % lbl,
+                                          callback_data="att:my:alconfirm:%s:%d" % (d, rid))])
+    if not cancelable:
+        return _hdr(p, "No upcoming AL to cancel.\nគ្មាន AL ខាងមុខដែលអាចលុបបានទេ។"), \
+            InlineKeyboardMarkup(rows)
+    return _hdr(p, "Which AL day do you want to cancel?\nថ្ងៃ AL ណាដែលប្អូនចង់លុប?"), \
+        InlineKeyboardMarkup(rows)
+
+
+def al_cancel_confirm(p: dict, iso: str, rid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """Confirmation screen: shows the day details and asks the staffer to confirm before cancelling.
+    Confirm → att:my:cancel (actual cancel). Back → att:my:allist."""
+    import json as _json
+    kind, hs, he = "days", None, None
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT kind, hours_start, hours_end FROM al_requests WHERE id=%s", (rid,))
+                r = cur.fetchone()
+                if r:
+                    kind, hs, he = r["kind"], r.get("hours_start"), r.get("hours_end")
+    except Exception:
+        pass
+    lbl = day_label(date.fromisoformat(iso))
+    detail = ("%s %s–%s" % (lbl, hs, he)) if (kind == "hours" and hs and he) else lbl
+    body = ("Are you sure you want to cancel your AL on %s?\n"
+            "This will return 1 day to your AL balance.\n\n"
+            "ប្អូនពិតជាចង់លុប AL ថ្ងៃ %s មែនទេ?\n"
+            "ថ្ងៃ AL 1 ថ្ងៃនឹងត្រូវបានដាក់ចូលវិញក្នុងតុល្យភាព AL របស់ប្អូន។"
+            % (detail, detail))
+    rows = [
+        [InlineKeyboardButton("✅ Yes, cancel it · លុបចោលបាន",
+                              callback_data="att:my:cancel:%s:%d" % (iso, rid))],
+        [InlineKeyboardButton("← Back · ត្រឡប់ក្រោយ",
+                              callback_data="att:my:allist")],
+    ]
+    return _hdr(p, body), InlineKeyboardMarkup(rows)
 
 
 def staff_btn_label(r: dict) -> str:
@@ -2474,11 +2534,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await context.bot.send_message(chat_id, _CI_MSG_OUT2)
         return
     if action == "my":
+        if len(data) > 2 and data[2] == "allist":
+            return await show(al_cancel_list(p))
+        if len(data) > 2 and data[2] == "alconfirm":
+            iso, rid = data[3], int(data[4])
+            return await show(al_cancel_confirm(p, iso, rid))
         if len(data) > 2 and data[2] == "cancel":
-            if not att_test_on():
-                await query.answer("Role-play shell — turn /testmode on. This never changes real data.",
-                                   show_alert=True)
-                return await show(my_screen(p))
             iso, rid = data[3], int(data[4])
             from shared.database import al_cancel_day, al_deduct
             today_iso = _today().isoformat()
