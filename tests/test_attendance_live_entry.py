@@ -888,6 +888,11 @@ def test_payback_ladder_shielded_by_agreed_ot(monkeypatch):
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [staff])
     monkeypatch.setattr(bot, "al_leave_days_set", lambda sid: set())
     monkeypatch.setattr(bot, "payback_book", lambda *a, **k: booked.append(a))
+    redefs = []
+    monkeypatch.setattr(bot, "_create_payback_redefine",
+                        lambda s, d, sm, em: redefs.append((d, sm, em)))
+    # ^ MUST be mocked: the unification makes autobook create a redefine — unmocked, this test
+    #   wrote REAL shift_changes rows from the suite (caught by the PB-PAIR audit law, Jun 11).
 
     async def _send(*a, **k):
         sent.append(a)
@@ -908,6 +913,7 @@ def test_payback_ladder_shielded_by_agreed_ot(monkeypatch):
     monkeypatch.setattr(db, "ot_shield_until", lambda sid, t, ddl: None)
     asyncio.run(bot._payback_ladder_job(_Ctx()))
     assert booked and sent                                        # no shield → autobook fires
+    assert len(redefs) == len(booked)                             # every booking gets its redefine
 
 
 def test_ot_shield_until_requires_real_ot(monkeypatch):
@@ -1839,6 +1845,23 @@ def test_split_late_by_declaration_time():
     assert split_late(40, 25) == (25, 15)        # declared 25 min after start: 25 dear + 15 cheap
     assert split_late(20, 45) == (20, 0)         # declared after arriving-time → all dear
     assert split_late(0, 10) == (0, 0)
+
+
+def test_audit_booking_redefine_pair_law():
+    """The unification's pairing law: a booked slot without its redefine = the dead mini-shift
+    bug reborn; a 'payback slot' redefine without a booking = orphan. Pre-unification rows exempt."""
+    from gm_bot import audit as au
+    staff = {1: {"call_name": "Davy", "canonical_name": "An Davy"}}
+    bk = {"id": 1, "staff_id": 1, "slot_date": "2026-06-15", "status": "booked"}
+    rd = {"id": 2, "staff_id": 1, "when_date": "2026-06-15", "status": "approved",
+          "reason": "payback slot"}
+    assert au.v_booking_redefine_pair([bk], [rd], staff) == []          # paired → lawful
+    assert any("dead mini-shift" in p
+               for p in au.v_booking_redefine_pair([bk], [], staff))    # booking alone
+    assert any("orphan" in p
+               for p in au.v_booking_redefine_pair([], [rd], staff))    # redefine alone
+    old = dict(bk, slot_date="2026-06-01")
+    assert au.v_booking_redefine_pair([old], [], staff) == []           # pre-unification exempt
 
 
 def test_audit_late_points_and_al_gate_laws():

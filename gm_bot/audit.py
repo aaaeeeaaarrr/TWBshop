@@ -150,6 +150,36 @@ def v_bookings(bookings: list[dict], debts_by_id: dict, staff: dict, today: date
     return out
 
 
+PB_UNIFY_LAW_FROM = "2026-06-11"   # the slot→redefine unification's birthday
+
+
+def v_booking_redefine_pair(bookings: list[dict], changes: list[dict], staff: dict) -> list[str]:
+    """The unification's law (Jun 11): a booked payback slot and its auto-approved redefine are
+    ONE thing — each side must have the other. A booking with no redefine = the old dead
+    'mini-shift' bug reborn (no T−10, no credit, debt never clears); a 'payback slot' redefine
+    with no booking = orphan bookkeeping. Judged from the unification's birthday onward."""
+    redef_dates = {(c["staff_id"], str(c["when_date"]))
+                   for c in changes if c.get("status") in ("approved", "done")}
+    booked_dates = {(b["staff_id"], str(b["slot_date"]))
+                    for b in bookings if b.get("status") in ("booked", "done")}
+    out = []
+    for b in bookings:
+        if b.get("status") != "booked" or str(b.get("slot_date")) < PB_UNIFY_LAW_FROM:
+            continue
+        if (b["staff_id"], str(b["slot_date"])) not in redef_dates:
+            out.append("PB-PAIR: %s booking #%s (%s) has NO shift-redefine — the slot won't "
+                       "fire prompts or credit the debt (dead mini-shift bug)"
+                       % (_nm(staff, b["staff_id"]), b["id"], b["slot_date"]))
+    for c in changes:
+        if (c.get("reason") != "payback slot" or c.get("status") != "approved"
+                or str(c.get("when_date")) < PB_UNIFY_LAW_FROM):
+            continue
+        if (c["staff_id"], str(c["when_date"])) not in booked_dates:
+            out.append("PB-PAIR: %s redefine #%s (%s) says 'payback slot' but NO booking exists "
+                       "— orphan" % (_nm(staff, c["staff_id"]), c["id"], c["when_date"]))
+    return out
+
+
 def v_swaps(rows: list[dict], staff: dict, today: date) -> list[str]:
     out = []
     for r in rows:
@@ -281,6 +311,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_ot_bank(banks, staff)
                 + v_noshow_vs_sessions(nos, sess, staff)
                 + v_bookings(books, {d["id"]: d for d in debts}, staff, today)
+                + v_booking_redefine_pair(books, scs, staff)
                 + v_swaps(swaps, staff, today)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
