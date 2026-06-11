@@ -14,6 +14,23 @@ SHORT_NOTICE_PT_PER_MIN = 0.1  # ACTIVE (owner, Jun 11) — mirrors points_rules
 APPROVALS_NEEDED = 2
 
 
+_DOW_BACK = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+
+def back_at_work_date(days: list[str], day_off: str | None, non_working: set | None = None) -> date:
+    """The first WORKING day after an AL span — skips the leave days themselves, the staffer's
+    weekly day-off, and any other absence (other AL/special/swap) bridged by the span. Feeds the
+    'Back at work:' line of the Supervisors notice (locked format, owner session 28)."""
+    occupied = set(days) | set(non_working or ())
+    off = _DOW_BACK.get((day_off or "")[:3].lower())
+    d = max(date.fromisoformat(x) for x in days) + timedelta(days=1)
+    for _ in range(60):
+        if d.isoformat() not in occupied and d.weekday() != off:
+            return d
+        d += timedelta(days=1)
+    return d
+
+
 def is_short_notice(al_day: date, today: date) -> bool:
     return (al_day - today).days < SHORT_NOTICE_DAYS
 

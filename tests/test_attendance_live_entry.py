@@ -1947,3 +1947,16 @@ def test_auto_audit_job_silent_clean_loud_on_problems(monkeypatch):
                         lambda today, test_rows=None: (["PB: DAVY debt #5 is 'cleared' but only 0/60 min paid"], {}))
     asyncio.run(bot._auto_audit_job(ctx))
     assert len(sent) == 1 and "DAILY AUTO-AUDIT" in sent[0] and "DAVY" in sent[0]
+
+
+def test_back_at_work_date():
+    """The Supervisors notice's 'Back at work' line: first working day after the span, skipping
+    the weekly day-off and any bridged absence (the dry-run example: Tue-Thu leave, Fri off ->
+    back Saturday)."""
+    import datetime as _dt
+    from gm_bot.al import back_at_work_date
+    days = ["2026-06-23", "2026-06-24", "2026-06-25"]            # Tue-Thu
+    assert back_at_work_date(days, "Friday") == _dt.date(2026, 6, 27)   # skips Fri off -> Sat
+    assert back_at_work_date(days, "Monday") == _dt.date(2026, 6, 26)   # Fri is fine
+    # a bridged other-absence right after the span also gets skipped
+    assert back_at_work_date(days, "Monday", {"2026-06-26"}) == _dt.date(2026, 6, 27)

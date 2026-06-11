@@ -2269,13 +2269,22 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
             "AL របស់ប្អូនសម្រាប់ %s បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត 🤍"
             % (days_txt, new_bal, days_txt, new_bal))
+        # Supervisors notice — ENGLISH-ONLY (owner, Jun 11: the bilingual twin doubled every
+        # line; seniors read English). Locked format: leave + reason + day-off + BACK AT WORK
+        # (the back-at-work line was promised by the locked format but missing live — added).
         day_off = requester.get("day_off") or "—"
+        if req["kind"] == "hours" and req.get("hours_start"):
+            span_note = "%s (%s–%s each day)" % (days_txt, _fmt_min(to_min(req["hours_start"])),
+                                                 _fmt_min(to_min(req["hours_end"])))
+            back = "%s each of those days (rest of shift as normal)" % _fmt_min(to_min(req["hours_end"]))
+        else:
+            span_note = days_txt
+            bd = alm.back_at_work_date(days, requester.get("day_off"), nw)
+            back = "%s, %s" % (bd.strftime("%a %d/%m"),
+                               _fmt_min(to_min(requester.get("work_start")) or 0))
         await _att_send(context, None, "Supervisors group", "",
-            "%s on leave: %s.\n%s ឈប់សម្រាក៖ %s។\n"
-            "Reason: %s\nមូលហេតុ៖ %s\n"
-            "Normal day off: %s\nថ្ងៃឈប់ធម្មតា៖ %s"
-            % (name, days_txt, name, days_txt,
-               req.get("reason") or "—", req.get("reason") or "—", day_off, day_off), group=True)
+            "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s."
+            % (name, span_note, req.get("reason") or "—", day_off, back), group=True)
     else:
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។")

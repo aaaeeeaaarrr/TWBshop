@@ -442,17 +442,16 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          None),
         ("⑧ to the requester — not approved (seniors-only recap, nothing to the group)",
          "Your AL request wasn't approved.\nសំណើ AL របស់អ្នកមិនបានអនុម័តទេ។", None),
-        ("⑨ SUPERVISORS notice — FULL-DAY (locked format: leave + day-off + back-at-work)",
-         "Meng on leave: Tue 23/06 → Thu 25/06 (3 days).\n"
-         "Meng ឈប់សម្រាក៖ Tue 23/06 → Thu 25/06 (3 ថ្ងៃ)។\n"
-         "Reason: family trip\nមូលហេតុ៖ family trip\n"
-         "Normal day off: Friday 26/06.\nថ្ងៃឈប់ធម្មតា៖ Friday 26/06។\n"
-         "Back at work: Saturday 27/06, 9pm.\nត្រឡប់មកធ្វើការ៖ Saturday 27/06, 9pm។", None),
-        ("⑩ SUPERVISORS notice — HOURS-AL (return time that same day)",
-         "Meng on leave 9pm–12am on Tue 23/06, Wed 24/06, Thu 25/06.\n"
-         "Meng ឈប់សម្រាក 9pm–12am នៅ Tue 23/06, Wed 24/06, Thu 25/06។\n"
-         "Back at work: 12am each of those nights (rest of shift as normal).\n"
-         "ត្រឡប់មកធ្វើការ 12am រាល់យប់នោះ (ម៉ោងនៅសល់នៃវេនធ្វើធម្មតា)។", None),
+        ("⑨ SUPERVISORS notice — FULL-DAY (ENGLISH-only, owner Jun 11; locked format)",
+         "Meng on leave: Tue 23/06 → Thu 25/06.\n"
+         "Reason: family trip\n"
+         "Normal day off: Friday\n"
+         "Back at work: Sat 27/06, 9pm.", None),
+        ("⑩ SUPERVISORS notice — HOURS-AL (ENGLISH-only; shows the window + same-day return)",
+         "Meng on leave: Tue 23/06 → Thu 25/06 (9pm–12am each day).\n"
+         "Reason: family trip\n"
+         "Normal day off: Friday\n"
+         "Back at work: 12am each of those days (rest of shift as normal).", None),
         ("⑪ cancelling an AL — refund confirmation",
          "Your AL for Tue 23/06 is cancelled ✓ — 1 day(s) returned.\n"
          "AL របស់អ្នកសម្រាប់ Tue 23/06 ត្រូវបានលុបចោលហើយ ✓ — 1 ថ្ងៃបានត្រឡប់ចូលវិញ។", None),
