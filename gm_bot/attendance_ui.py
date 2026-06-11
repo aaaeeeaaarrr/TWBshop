@@ -572,16 +572,26 @@ def build_catalogue8(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
 
 
 def schedule_summary(target: date) -> str:
-    """Today's who/when in ONE message — the schedule math, compressed."""
+    """Today's who/when — grouped by SHIFT PATTERN, one block per group (owner, Jun 11: the
+    per-minute listing was 'too long and messy'). OWNER-ONLY preview (Dry-run 1's last step) —
+    in live operation each staffer receives only their own few lines, at their own times."""
     from collections import defaultdict
     ev = compute_day_events(target)
-    by: dict = defaultdict(list)
+    per: dict = defaultdict(list)          # name → [(minute, kind)]
     for minute, name, label, _text, _sd in ev:
-        by[(minute, label.split(" ")[0])].append(name)
-    lines = ["📅 Today's actual schedule (%s) — %d sends, same texts as above:"
-             % (day_label(target), len(ev))]
-    for (minute, kind), names in sorted(by.items()):
-        lines.append("%s %s ×%d: %s" % (fmt12(minute), kind, len(names), ", ".join(names)))
+        per[name].append((minute, label.split(" ")[0]))
+    groups: dict = defaultdict(list)       # identical event-pattern → [names]
+    for name, evs in per.items():
+        groups[tuple(sorted(evs))].append(name)
+    lines = ["📅 Today's plan (%s) — %d sends · %d staff · %d shift groups."
+             % (day_label(target), len(ev), len(per), len(groups)),
+             "(Owner-only preview. Each staffer gets ONLY their own lines, at these times.)"]
+    for evs, names in sorted(groups.items(), key=lambda kv: kv[0][0][0]):
+        names.sort()
+        shown = ", ".join(names[:6]) + ((" +%d more" % (len(names) - 6)) if len(names) > 6 else "")
+        lines.append("")
+        lines.append("👥 %s" % shown)
+        lines.append("   " + " · ".join("%s %s" % (k, fmt12(m)) for m, k in evs))
     return "\n".join(lines)
 
 
