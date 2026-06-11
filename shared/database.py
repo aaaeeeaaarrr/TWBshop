@@ -2935,6 +2935,17 @@ def sick_provisional_open() -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
 
 
+def sick_family_open_today(today_iso: str) -> list[dict]:
+    """Open FAMILY-sick cases dated today — tonight's nudge asks about tomorrow (one-tap re-book,
+    owner spec; burns another of the 7 yearly family days if continued)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT * FROM sick_cases
+                           WHERE status='open' AND who<>'me' AND the_date=%s AND is_test=%s""",
+                        (today_iso, _ATT_TEST))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def sick_family_days_used(staff_id: int, year: int) -> float:
     """Family-sick days used this year (toward the 7-day pool)."""
     with _db() as conn:

@@ -1968,3 +1968,46 @@ def test_back_at_work_date():
     assert back_at_work_date(days, "Monday") == _dt.date(2026, 6, 26)   # Fri is fine
     # a bridged other-absence right after the span also gets skipped
     assert back_at_work_date(days, "Monday", {"2026-06-26"}) == _dt.date(2026, 6, 27)
+
+
+def test_family_sick_nudge_callback(monkeypatch):
+    """The family-sick nudge (built Jun 11, was preview-only): 'again' books tomorrow ONCE
+    (status flips first - a duplicate tap can't double-book) + tells the Supervisors group;
+    'Better' closes the case."""
+    import datetime as _dt
+    import gm_bot.bot as bot
+
+    case = {"id": 7, "staff_id": 1, "who": "child", "status": "open"}
+    created, sets, group_msgs, edits = [], [], [], []
+    monkeypatch.setattr(bot, "sick_get", lambda cid: dict(case))
+    def _set(cid, **kw):
+        sets.append(kw)
+        case.update({k: v for k, v in kw.items() if v is not None})
+    monkeypatch.setattr(bot, "sick_set", _set)
+    monkeypatch.setattr(bot, "sick_create", lambda sid, who, d, st: created.append((sid, who, d, st)))
+    monkeypatch.setattr(bot, "staff_all", lambda st=None: [
+        {"id": 1, "canonical_name": "Sun Kimying", "call_name": "Kimying", "status": "active",
+         "telegram_ids": [9]}])
+    monkeypatch.setattr(bot, "_today_pp", lambda: _dt.date(2026, 6, 11))
+
+    async def _send(ctx, uid, role, nm, text, **k):
+        if k.get("group"):
+            group_msgs.append(text)
+    monkeypatch.setattr(bot, "_att_send", _send)
+
+    class _Q:
+        def __init__(self, data): self.data = data
+        async def answer(self): pass
+        async def edit_message_text(self, t, **k): edits.append(t)
+
+    upd = lambda d: types.SimpleNamespace(callback_query=_Q(d))
+    ctx = types.SimpleNamespace()
+    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:again:7"), ctx))
+    assert created == [(1, "child", "2026-06-12", "open")]   # tomorrow booked, chains tomorrow night
+    assert any("continues tomorrow" in m for m in group_msgs)
+    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:again:7"), ctx))
+    assert len(created) == 1                                  # duplicate tap -> gate stops it
+
+    case.update(status="open")
+    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:ok:7"), ctx))
+    assert case["status"] == "cleared" and any("Glad to hear" in e for e in edits)

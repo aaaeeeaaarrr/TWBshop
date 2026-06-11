@@ -2703,6 +2703,58 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             sick_set(c["id"], status="no_papers")   # window closed; the pay-back made at declaration stands
             continue
         await _att_send(context, uid, "Staff", nm, _SICK_RETURN_CHECK, kb=_sick_return_kb(c["id"]))
+    # FAMILY-sick night nudge (owner — was preview-only until Jun 11): the family day was today;
+    # one tap books tomorrow too (burns another of the 7 yearly family days) or closes the case.
+    from shared.database import sick_family_open_today
+    for c in sick_family_open_today(today.isoformat()):
+        staff = next((s for s in staff_all("active") if s["id"] == c["staff_id"]), None)
+        if not staff:
+            continue
+        uid = (staff.get("telegram_ids") or [None])[0]
+        nm = staff.get("call_name") or staff["canonical_name"]
+        who = c.get("who") or "family member"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Again tomorrow · ស្អែកទៀត",
+                                  callback_data="att:sfam:again:%d" % c["id"])],
+            [InlineKeyboardButton("👍 Better · ធូរស្បើយហើយ",
+                                  callback_data="att:sfam:ok:%d" % c["id"])]])
+        await _att_send(context, uid, "Staff", nm,
+            "Is your %s better? If you need tomorrow off too, tell me now.\n"
+            "តើ%sរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។"
+            % (who, who), kb=kb)
+
+
+async def _sick_family_nudge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:sfam:again|ok:{case_id} — the family-sick night nudge's one-tap answer.
+    'again' books TOMORROW as a new family-sick day (burns 1 of the 7 yearly family days) and
+    tells the Supervisors group; 'ok' closes the case. Idempotent: the status flips FIRST, so a
+    crash-redelivered duplicate can never double-book a day."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    act, cid = parts[2], int(parts[3])
+    case = sick_get(cid)
+    if not case or case.get("status") != "open":
+        return                                  # already answered (or stale) — never act twice
+    staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
+    if not staff:
+        return
+    nm = staff.get("call_name") or staff["canonical_name"]
+    who = case.get("who") or "family member"
+    if act == "ok":
+        sick_set(cid, status="cleared")
+        await query.edit_message_text("Glad to hear 🤍 see you at the next shift.\n"
+                                      "ល្អហើយ 🤍 ជួបគ្នាវេនក្រោយ។")
+        return
+    sick_set(cid, status="extended")            # status-first: re-taps stop at the gate above
+    tmr = (_today_pp() + timedelta(days=1)).isoformat()
+    sick_create(case["staff_id"], who, tmr, "open")   # tomorrow's open case → nudged again tomorrow night
+    await query.edit_message_text(
+        "Noted — tomorrow is covered too. Take care 🤍\n"
+        "បានកត់ត្រា — ស្អែកក៏បានឈប់ដែរ។ ថែទាំខ្លួនផង 🤍")
+    await _att_send(context, None, "Supervisors group", "",
+        "FYI: %s's family-sick continues tomorrow (%s).\n"
+        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។" % (nm, who, nm), group=True)
 
 
 async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5328,6 +5380,7 @@ def build_app() -> Application:
     from gm_bot import attendance_ui
     app.add_handler(CommandHandler("test", attendance_ui.cmd_test))
     app.add_handler(CallbackQueryHandler(_payback_callback, pattern=r"^att:pb:"))
+    app.add_handler(CallbackQueryHandler(_sick_family_nudge_callback, pattern=r"^att:sfam:"))
     app.add_handler(CallbackQueryHandler(_al_approval_callback, pattern=r"^att:alapp:"))
     app.add_handler(CallbackQueryHandler(_al_coverage_toggle, pattern=r"^att:alcov:"))
     app.add_handler(CallbackQueryHandler(_swap_partner_callback, pattern=r"^att:swp:"))

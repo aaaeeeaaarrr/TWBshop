@@ -504,10 +504,10 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "សួស្តី 🤍 ស្អែកអ្នកអាចមកធ្វើការបានទេ? សូមប្រាប់ពួកយើងផង។",
          _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"], ["🛌 Still resting · សម្រាកបន្ត"],
               ["⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…"])),   # = the real buttons, bilingual
-        ("⑩ FAMILY-sick day → seniors informed (no approval gate; burns 1 of 7 yearly days)",
+        ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days)",
          "FYI: Kimying takes sick leave for their child today.\n"
          "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនថ្ងៃនេះ។", None),
-        ("⑪ ⚠ PLANNED (not built yet) — FAMILY-sick night nudge, one-tap re-book",
+        ("⑪ FAMILY-sick night nudge — one tap books tomorrow (another of the 7) or closes it",
          "Is your child better? If you need tomorrow off too, tell me now.\n"
          "តើកូនរបស់អ្នកធូរស្បើយហើយឬនៅ? បើត្រូវការឈប់ថ្ងៃស្អែកទៀត សូមប្រាប់ខ្ញុំឥឡូវនេះ។", nudge_kb),
         ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
