@@ -249,14 +249,18 @@ the end, then owner re-walks from step 1. **DONE & deployed (suite 503):**
   (penalty input); split logic + v_late_points audit unaffected.
 - **Stage 4c** (4b29993): test late-sim now SHOWS the points split (informed/uninformed) so declaring is
   visibly cheaper. Display only.
-**NEXT — Stage 4d (Law 8, remaining):** outcomes become fresh detailed messages + delete old where a
-flow leaves a stale prompt (mainly LATE — AL/swap already morph in place); strip `← Back` from terminal/
-confirmed messages; terminal "🏠 Main menu" = NEW message (don't dissolve the details — owner pt#1).
-**Stage 5 (F14, HIGH-RISK = AL balance):** cross-request same-date collision — first-commit-wins atomic
-claim + senior override + `/audit` exclusivity law + backfill-run on real rows. **Stage 6:** P1 menu
-singleton. → **Fable red-team** → **final Law-9 polish pass** (regression sweep) → owner re-walks from #1.
-Owner walk findings folded in: late points already correct; sick-papers bounded by deadline job. Laws
-now 9 (added Law 9: ≥3 tests/path before the human walk). KH drafts MM2–MM7 → KH_REVIEW Pending.
+- **Stage 4d** (9535e12): terminal "🏠 Main menu" → `att:menunew` (posts a NEW message, doesn't dissolve
+  the ended record — owner pt#1; 9 buttons repointed, nav keeps att:menu); Law 8 deletes the consumed
+  LATE reason-prompt when the outcome appears. **STAGE 4 COMPLETE.**
+**NEXT — Stage 5 (F14, HIGH-RISK = AL balance, auto-bedrock):** cross-request same-date collision —
+first-commit-wins ATOMIC claim at approval (compare-and-swap, like OT-banking) + senior override +
+`/audit` exclusivity law (≤1 approved leave/redefine/swap per staff-date; each approved AL-day deducts
+once) + **backfill-run on REAL rows before go-live**. Full real-path proof required — do NOT rush.
+**Stage 6:** P1 menu singleton (collapse old NAV menus; never prompts/cards/terminals). → **Fable
+red-team** the finished behaviour → **final Law-9 polish pass** (regression sweep — later stages may
+have touched earlier ones) → owner re-walks from #1.
+Laws now 9 (Law 9: ≥3 tests/path before the human walk). Suite 512, 26 menu tests. Owner walk findings
+folded in: late points already correct; sick-papers bounded by deadline job. KH drafts MM2–MM7 → Pending.
 
 **(superseded) ▶ earlier: P2 + P3 SHIPPED (Jun 13), P1 held —**
 Deployed & verified (gm-only, 03:37 PP dead-window): **P2 prompt-supersession honesty** — arming a new
