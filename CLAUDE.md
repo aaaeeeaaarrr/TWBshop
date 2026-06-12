@@ -230,7 +230,27 @@ strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវស�
 the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
 relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
-**▶ MULTI-MENU FIX — P2 + P3 SHIPPED (Jun 13), P1 held for owner go-ahead.**
+**▶ MULTI-MENU + MENU-LAWS BUILD (Jun 13) — Stages 1–3 of 6 SHIPPED & deployed; 4–6 + Fable next.**
+Owner-approved full build of the 8 menu laws + Fable's F1–F14 backlog (design in
+`docs/STATEFUL_MENU_PATTERNS.md`). Plan: build all stages, commit+gm-deploy each, Fable red-team at
+the end, then owner re-walks from step 1. **DONE & deployed (suite 503):**
+- **Stage 1** (917057d, +fix a9c5e24): F1 voice/photo on a reason prompt → REFUSED + prompt kept armed
+  (was: silent thank-you-and-drop). F5: armed prompts show `✕ Cancel`(disarm) not `← Back`; `att:cancel`
+  clears pend + resets stashes + clean menu.
+- **Stage 2** (cc7c1b5): F2/F3 expiry → fresh `❗ NOT CONFIRMED — TRY AGAIN` PUSH message + delete old
+  (`_expiry_nudge`); `flow_load_or_expired` distinguishes expired-vs-never; reason TTL 15→30.
+- **Stage 3** (6bd1357): F4/F10 stale-stash guards (`_stale_screen` — no 0-day ghost AL, no crash, no
+  fabricated-today swap, no blanked summary); F8 mid-pick typing guard; F12 maintenance toast.
+**NEXT — Stage 4 (Law 8, big):** outcomes become fresh detailed messages + delete old; strip `← Back`
+from terminals; terminal "🏠 Main menu" = NEW message (don't dissolve the details); **declare-Late-FIRST**
+(heads-up the moment they pick the minutes, reason after); **photos try sick-papers FIRST** (DB-keyed,
+no awaiting-message exception needed); test-simulate shows the −1/−2 points split. **Stage 5 (F14,
+HIGH-RISK = AL balance):** cross-request same-date collision — first-commit-wins atomic claim + senior
+override + `/audit` exclusivity law + backfill-run on real rows. **Stage 6:** P1 menu singleton.
+Owner walk findings folded in: late points already correct (−1/min informed; test just didn't show it);
+sick-papers bounded by `_sick_papers_deadline_job`. KH drafts MM2–MM7 → KH_REVIEW Pending.
+
+**(superseded) ▶ earlier: P2 + P3 SHIPPED (Jun 13), P1 held —**
 Deployed & verified (gm-only, 03:37 PP dead-window): **P2 prompt-supersession honesty** — arming a new
 reason prompt edits the OLD one (the single per-uid `att_pending` slot it overwrites) to "↩ Replaced —
 answer the newer prompt below" via a centralized `_supersede_prev_pend()` wired into BOTH overwrite
