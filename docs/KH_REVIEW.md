@@ -331,5 +331,6 @@ Reason · មូលហេតុ៖ {reason}
 - **WHEN:** the moment they send non-text while a reason prompt is armed; the prompt stays armed so
   their next typed line still submits.
 - **TONE:** gentle, helpful, not an error — "I can't read that here, please type." **BODY.** No vars.
-- Live English: `🎤 I can't read a voice note / photo here — please type your reason in one line, or use the buttons below.`
-- Draft KH (mine, needs polish): `🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់ ឬប្រើប៊ូតុងខាងក្រោម។`
+- Live English: `🎤 I can't read a voice note / photo here — please type your reason in one line.`
+- Draft KH (mine, needs polish): `🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់។`
+- (owner walk Jun 13: dropped "or use the buttons below" — the refuse is a standalone reply, no buttons under it)

@@ -1110,9 +1110,8 @@ async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TY
     if not armed:
         return False
     await msg.reply_text(
-        "🎤 I can't read a voice note / photo here — please type your reason in one line, "
-        "or use the buttons below.\n"
-        "🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់ ឬប្រើប៊ូតុងខាងក្រោម។")
+        "🎤 I can't read a voice note / photo here — please type your reason in one line.\n"
+        "🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់។")
     return True
 
 

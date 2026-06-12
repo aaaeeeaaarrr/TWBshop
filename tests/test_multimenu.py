@@ -141,6 +141,7 @@ def test_voice_reason_refused_keeps_pend(monkeypatch):
     assert handled is True
     assert ctx.user_data.get("att_test_pending") == {"flow": "al"}   # pend NOT cleared
     assert "type your reason" in replies[0]
+    assert "buttons below" not in replies[0]   # the refuse msg is standalone — no buttons under it
 
 
 def test_voice_reason_passes_through_when_no_pend(monkeypatch):
