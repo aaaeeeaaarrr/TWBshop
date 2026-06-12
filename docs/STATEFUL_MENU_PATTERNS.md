@@ -40,7 +40,7 @@ Two distinct failure shapes — and the second needs only ONE menu:
 
 ---
 
-## The laws (eight)
+## The laws (nine)
 
 1. **A button must never trust the screen it sits on.** Recompute from a trustworthy source at *action
    time*. Three ways, most-preferred first:
@@ -102,6 +102,13 @@ Two distinct failure shapes — and the second needs only ONE menu:
    the fresh push. This fresh message IS the lasting record — it satisfies "staff remember what was
    agreed" better than a silent in-place morph, and reconciles with the terminal-persistence rule
    (the record still stays; it's just delivered, not whispered).
+9. **Test each path ≥3 ways BEFORE the human walks it.** (Owner, Jun 13.) Every interactive element —
+   each button, each branch, each reachable state — gets at least **three automated backend tests
+   before any manual walkthrough**: the happy path **plus ≥2 failure/edge branches** drawn from
+   {expired · stale-stash · wrong-actor · duplicate · empty · race · permission}. The machine proves
+   correctness across branches first; the human walk then confirms **feel and wording**, not basic
+   "does it work." Instantiates the global precision standard's COVER-EVERY-BRANCH rule for menus —
+   and means the owner never burns a walk on a bug a test should have caught.
 
 ### The honesty rule (why staff never read it as "broken")
 Every collapse / supersede should leave a **self-explanatory** message, and every failed edit should
