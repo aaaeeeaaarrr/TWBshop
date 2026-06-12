@@ -148,6 +148,16 @@ Example flow:
 No giant single files. Small, focused modules so Claude Code can load only what's
 relevant in future sessions without hitting context limits.
 
+### 5. Stateful Menus — Apply the Menu Patterns Law (TRIPWIRE)
+Building or editing **any** menu, picker, wizard, or multi-step flow that stashes selection state
+between taps (Telegram inline menus today; also any future web / Messenger / WhatsApp flow, or any UI
+where two copies of a screen can share one state bag) → **read `docs/STATEFUL_MENU_PATTERNS.md`
+FIRST** and apply its five laws. The trap: one shared state store backed by multiple live menu
+instances → cross-contamination, plus the single-slot input-overwrite bug that needs only ONE menu.
+The laws (button never trusts its screen · singleton the nav not the commitments · supersession
+honesty · reset on entry · always a backstop, never a silent nothing) and the per-project status
+(GM attendance: P2+P3 shipped, P1 pending; retail/b2b/hire menus un-audited) live there.
+
 ---
 
 ## Tech Stack
