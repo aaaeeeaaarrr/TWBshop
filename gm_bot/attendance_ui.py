@@ -255,7 +255,7 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
 
 
 _PLUS10 = ("Come 5 minutes early and you earn +10 points ⭐\n"
-           "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐")
+           "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐")
 
 
 def _slots_kb() -> InlineKeyboardMarkup:
@@ -271,14 +271,14 @@ _DRS = {
     "slot": ("→ tapping a full slot books it:",
              "Booked ✓ — Mon 09/06, 7:30pm–9pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–9pm។\n"
              + "Come 5 minutes early and you earn +10 points ⭐\n"
-               "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐\n\n"
+               "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐\n\n"
                "(then: the 12h-before reminder → the slot runs as a mini-shift)"),
     "pslot": ("→ tapping a 1-hour slot books the partial:",
               "Booked ✓ — Mon 09/06, 7:30pm–8:30pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–8:30pm។\n"
               "Come 5 minutes early and you earn +10 points ⭐\n"
-              "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐\n\n"
+              "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐\n\n"
               "You still owe 30 min — pick another time anytime.\n"
-              "អ្នកនៅត្រូវសង 30 min — អាចជ្រើសពេលបន្ថែមនៅពេលណាក៏បាន។"),
+              "ប្អូននៅត្រូវសង 30 min — អាចជ្រើសពេលបន្ថែមនៅពេលណាក៏បាន។"),
     "appr": ("→ your ✅ counts (1/2) — when the 2nd senior approves:",
              "Approved by Rath and Vannary.\nអនុម័តដោយ Rath និង Vannary។\n\n"
              "(requester gets her ✓ message; Supervisors get the plain notice — steps ③+⑤)"),
@@ -319,7 +319,7 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "is asked 'Why were you late?' here instead.)", None),
         ("④ payback slot picker (right after the reason; no AL option — late = time)",
          "You owe 90 min. Pick when to work it off — these are the times we need you most:\n"
-         "អ្នកនៅត្រូវសង 90 min។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖",
+         "ប្អូននៅត្រូវសង 90 min។ សូមជ្រើសពេលធ្វើសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖",
          _slots_kb()),
         ("⑤ booked confirmation (self-picked or auto) — always encouraging",
          "Booked ✓ — Mon 09/06, 7:30pm–9pm.\nបានកក់រួច ✓ — Mon 09/06, 7:30pm–9pm។\n" + _PLUS10,
@@ -338,7 +338,7 @@ def build_catalogue2(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "អ្នកបានសង 60 min ✓ — នៅសល់ 30 min ក្នុង balance របស់អ្នក។", None),
         ("⑨ unbooked debt — the daily line at check-in (never hourly)",
          "Checked in ✓ — you still owe 90 min, pick a time:\n"
-         "ចុះវត្តមានរួច ✓ — អ្នកនៅត្រូវសង 90 min, សូមជ្រើសពេល៖", _slots_kb()),
+         "ចុះវត្តមានរួច ✓ — ប្អូននៅត្រូវសង 90 min, សូមជ្រើសពេល៖", _slots_kb()),
         ("⑩ day 3 — the warning",
          "Pick before tomorrow, or I'll pick for you.\n"
          "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។", _slots_kb()),
@@ -581,7 +581,7 @@ def build_catalogue7(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          "✅ ប្អូនបានយល់ព្រមហើយ — បានផ្ញើទៅបងៗ។", None),
         ("③ partner declines OR stays silent → swap doesn't happen, seniors never bothered",
          "Your day-off swap (Wed 10/06 ↔ Fri 12/06) wasn't accepted by your partner.\n"
-         "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (Wed 10/06 ↔ Fri 12/06) របស់អ្នកទេ។",
+         "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (Wed 10/06 ↔ Fri 12/06) របស់ប្អូនទេ។",
          None),
         (_DEMO_SW_LABELS["senior"],) + _demo_swap_card(p, "senior", False),
         ("⑤ approved → SUPERVISORS notice",
@@ -1192,7 +1192,7 @@ def _walk_steps(p: dict, name: str) -> list[tuple[str, InlineKeyboardMarkup | No
              _ill(["Fri 06/06 7:30–7:43pm"], ["Sat 07/06 5:47–6:00am"], ["Pay 1 hour only · សងតែ 1h"])),
             ("[→ %s] booked ✓ — runs like a mini-shift (T−10, check-in, +10 if early):\n"
              "“Booked ✓ — Fri 06/06 7:30–7:43pm. Come 5 minutes early and you earn +10 points ⭐”\n"
-             "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐”" % nm, None),
+             "“បានកក់រួច ✓ — មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐”" % nm, None),
             ("[→ SUPERVISORS group]\n“%s pays back Fri 06/06, 7:30–7:43pm.”\n\n"
              "✓ Lateness ladder complete." % nm, None),
         ]
@@ -1576,7 +1576,7 @@ def _sc_reason_prompt(p: dict, context, sid: int, tdidx: int, start: int, end: i
         if cov:
             line += "\n\n👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
     line += ("\n\n📝 Type the reason — your next message sends it "
-             "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការអនុម័ត។")
+             "to them for approval.\n📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការយល់ព្រម។")
     tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
            else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
     extra_rows = [[InlineKeyboardButton(tog, callback_data="att:scp:cov:%d:%d:%d:%d:%d"
@@ -1589,7 +1589,7 @@ def sc_staff_pick(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [_back_row("att:aw")]
     rows += [[InlineKeyboardButton(staff_btn_label(r), callback_data="att:scp:d:%d" % r["id"])]
              for r in staff_sort(_sc_pool())][:35]
-    return _hdr(p, "Give OT / change a shift — for whom?\nឱ្យ OT / ប្តូរវេន — ឱ្យអ្នកណា?"), \
+    return _hdr(p, "Give OT / change a shift — for whom?\nឱ្យ OT / ប្តូរវេន — សម្រាប់អ្នកណា?"), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1807,7 +1807,7 @@ def _ci_msg_pre(p: dict) -> str:
             "វេនការងាររបស់អ្នកនឹងចាប់ផ្តើមក្នុង 10 នាទីទៀត (%s)។\n"
             + _CI_HOWTO + "\n\n"
             "Arrive 5 minutes early and you earn +10 points ⭐\n"
-            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐") % (t, t)
+            "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐") % (t, t)
 
 
 def _kb_im_late() -> InlineKeyboardMarkup:
@@ -1947,9 +1947,9 @@ def al_cancel_list(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         rows.append([InlineKeyboardButton("✕ %s" % lbl,
                                           callback_data="att:my:alconfirm:%s:%d" % (d, rid))])
     if not cancelable:
-        return _hdr(p, "No upcoming AL to cancel.\nគ្មាន AL ខាងមុខដែលអាចលុបបានទេ។"), \
+        return _hdr(p, "No upcoming AL to cancel.\nគ្មាន AL ខាងមុខដែលអាចបោះបង់បានទេ។"), \
             InlineKeyboardMarkup(rows)
-    return _hdr(p, "Which AL day do you want to cancel?\nថ្ងៃ AL ណាដែលប្អូនចង់លុប?"), \
+    return _hdr(p, "Which AL day do you want to cancel?\nប្អូនចង់បោះបង់ AL ថ្ងៃណា?"), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1971,11 +1971,11 @@ def al_cancel_confirm(p: dict, iso: str, rid: int) -> tuple[str, InlineKeyboardM
     detail = ("%s %s–%s" % (lbl, hs, he)) if (kind == "hours" and hs and he) else lbl
     body = ("Are you sure you want to cancel your AL on %s?\n"
             "This will return 1 day to your AL balance.\n\n"
-            "ប្អូនពិតជាចង់លុប AL ថ្ងៃ %s មែនទេ?\n"
-            "ថ្ងៃ AL 1 ថ្ងៃនឹងត្រូវបានដាក់ចូលវិញក្នុងតុល្យភាព AL របស់ប្អូន។"
+            "ប្អូនពិតជាចង់បោះបង់ AL នៅ %s មែនទេ?\n"
+            "វានឹងដាក់ AL 1 ថ្ងៃ ត្រឡប់ចូល balance របស់ប្អូនវិញ។"
             % (detail, detail))
     rows = [
-        [InlineKeyboardButton("✅ Yes, cancel it · លុបចោលបាន",
+        [InlineKeyboardButton("✅ Yes, cancel it · បោះបង់",
                               callback_data="att:my:cancel:%s:%d" % (iso, rid))],
         [InlineKeyboardButton("← Back · ត្រឡប់ក្រោយ",
                               callback_data="att:my:allist")],
@@ -2554,7 +2554,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # cutoff (window-aware): block past dates, and today's once the shift/window has started
             if iso < today_iso or (iso == today_iso and _shift_running(p)):
                 await query.answer("Too late to cancel — that day has already started · "
-                                   "យឺតពេលលុបចោលហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ", show_alert=True)
+                                   "យឺតពេលបោះបង់ហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ", show_alert=True)
                 return await show(my_screen(p))
             # per-date cancel: drop ONLY this day, keep the rest of the request
             remaining, sid = al_cancel_day(rid, iso)

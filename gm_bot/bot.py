@@ -1237,7 +1237,7 @@ async def _expired_toast(query, context=None, uid: int | None = None) -> None:
     if context is not None:
         await _dead_tap_alarm(context, data, uid)
     try:
-        await query.answer("⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត", show_alert=True)
+        await query.answer("⏳ Expired — try again · ផុតកំណត់ — សាកម្តងទៀត", show_alert=True)
     except Exception:
         pass
 
@@ -1257,9 +1257,9 @@ async def _expired_button_callback(update: Update, context: ContextTypes.DEFAULT
     try:
         await query.edit_message_text(
             "⏳ Expired message — please start again.\n"
-            "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀត។",
+            "⏳ សារនេះផុតកំណត់ហើយ — សូមចាប់ផ្តើមម្តងទៀត។",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
-                "📋 Open menu · បើកម៉ឺនុយ", callback_data="att:menu")]]))
+                "📋 Open menu · បើក menu", callback_data="att:menu")]]))
     except Exception:
         pass
 
@@ -1403,7 +1403,7 @@ def _pb_remaining(staff: dict, balance: int) -> int:
 
 
 _PB_FULLY_BOOKED = ("Your pay-back time is already fully booked ✓ Just work the booked times.\n"
-                    "ម៉ោងសងរបស់ប្អូនត្រូវបានកក់រួចរាល់ហើយ ✓ គ្រាន់តែធ្វើតាមម៉ោងដែលបានកក់។")
+                    "ម៉ោងសងវិញរបស់ប្អូនបានកក់រួចទាំងអស់ហើយ ✓ សូមមកធ្វើតាមម៉ោងដែលបានកក់។")
 
 
 # The stored `who` is an English key (child/spouse/parent/family); dropped raw into a Khmer
@@ -1525,7 +1525,7 @@ async def _offer_payback(context, staff: dict, balance: int, uid: int,
         head = ("Checked in ✓ — %s late (counts as pay-back).\n"
                 "ចុះវត្តមានរួច ✓ — យឺត %s (រាប់ជាម៉ោងសងវិញ)។"
                 % (_hm(late_min), _hm(late_min))) if late_min is not None else \
-               ("You owe %s.\nអ្នកនៅត្រូវសង %s។" % (_hm(balance), _hm(balance)))
+               ("You owe %s.\nប្អូននៅត្រូវសង %s។" % (_hm(balance), _hm(balance)))
         await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
                         head + "\n" + _PB_FULLY_BOOKED)
         return
@@ -1533,14 +1533,14 @@ async def _offer_payback(context, staff: dict, balance: int, uid: int,
         text = ("Checked in ✓ — %s late (counts as pay-back). Pick when to work it off — the "
                 "times we need you most:\n"
                 "ចុះវត្តមានរួច ✓ — យឺត %s (រាប់ជាម៉ោងសងវិញ)។ "
-                "សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                "សូមជ្រើសពេលធ្វើសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖"
                 % (_hm(late_min), _hm(late_min)))
     else:
         text = ("You owe %s. Pick when to work it off — these are the times we need you most:\n"
-                "អ្នកនៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើម៉ោងសងវិញ — ពេលទាំងនេះហាងត្រូវការអ្នកបំផុត៖"
+                "ប្អូននៅត្រូវសង %s។ សូមជ្រើសពេលធ្វើសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖"
                 % (_hm(balance), _hm(balance)))
     if remaining < balance:
-        text += ("\n(%s booked already · កក់រួច %s — %s left to book · នៅសល់ %s)"
+        text += ("\n(%s booked already · បានកក់រួច %s — %s left to book · នៅសល់ %s ត្រូវកក់)"
                  % (_hm(balance - remaining), _hm(balance - remaining),
                     _hm(remaining), _hm(remaining)))
     await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
@@ -1770,7 +1770,7 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     if st == "approved":
         body += "\n\n✅ Approved · បានយល់ព្រម"
     elif st == "declined":
-        body += "\n\n❌ Declined · បានបដិសេធ"
+        body += "\n\n❌ Declined · មិនបានយល់ព្រម"
     elif st == "done":
         body += "\n\n✅ Done · រួចរាល់"
     if show_cov:
@@ -2062,7 +2062,7 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
     # reason appears ONCE after the EN+KH lines (owner, Jun 11 — never duplicate typed text)
     if audience == "partner":
         body = ("%s wants to swap day off: %s takes %s off, you take %s — same week.\n"
-                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយអ្នក៖ %s ឈប់ %s, អ្នកឈប់ %s — ក្នុងសប្តាហ៍ដដែល។\n"
+                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយប្អូន៖ %s ឈប់ %s, ប្អូនឈប់ %s — ក្នុងសប្តាហ៍ដដែល។\n"
                 "Reason · មូលហេតុ៖ %s"
                 % (html.escape(rn), html.escape(rn), d1, d2,
                    html.escape(rn), html.escape(rn), d1, d2, reason))
@@ -2074,7 +2074,7 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
                    d1, html.escape(pn), d2, reason))
     else:  # senior
         body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s.\n"
-                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s។ %s ឈប់ %s, %s ឈប់ %s។\n"
+                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s\n%s ឈប់ %s, %s ឈប់ %s។\n"
                 "Reason · មូលហេតុ៖ %s"
                 % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
                    html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
@@ -2176,7 +2176,7 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
             await _att_send(context, (req.get("telegram_ids") or [None])[0], "Requester",
                 req.get("call_name") or req["canonical_name"],
                 "Your day-off swap (%s ↔ %s) wasn't accepted by your partner.\n"
-                "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (%s ↔ %s) របស់អ្នកទេ។"
+                "អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ (%s ↔ %s) របស់ប្អូនទេ។"
                 % (d1p, d2p, d1p, d2p))
             # act-first, reason-after: the partner's reason is relayed to the requester
             _arm_reason(context, update, {"flow": "rej_exp", "to_sid": req["id"],
@@ -2622,11 +2622,11 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         try:
             await query.edit_message_text(
                 "⏳ Expired message — please start again.\n"
-                "⏳ សារផុតកំណត់ — សូមចាប់ផ្តើមម្តងទៀត។",
+                "⏳ សារនេះផុតកំណត់ហើយ — សូមចាប់ផ្តើមម្តងទៀត។",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
-                    "📋 Open menu · បើកម៉ឺនុយ", callback_data="att:menu")]]))
+                    "📋 Open menu · បើក menu", callback_data="att:menu")]]))
         except Exception:
-            await query.answer("⏳ Expired — try again · ផុតកំណត់ — សូមម្តងទៀត", show_alert=True)
+            await query.answer("⏳ Expired — try again · ផុតកំណត់ — សាកម្តងទៀត", show_alert=True)
         return
     data = query.data.split(":")
     sub = data[2] if len(data) > 2 else ""
@@ -2646,7 +2646,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         # build the booked-slots list
         booked_slots = payback_open_bookings(staff["id"])
         booked_total = sum(b["minutes"] for b in booked_slots)
-        header = ("Debt · បំណុល: %s" % _hm(debt["balance"]))
+        header = ("Debt · ម៉ោងត្រូវសង: %s" % _hm(debt["balance"]))
         if booked_slots:
             slot_lines = "\n".join(
                 "  %s: %s %s–%s" % (
@@ -2656,9 +2656,9 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     fmt12(b["end_min"]),
                 ) for b in booked_slots
             )
-            header += ("\nBooked · កក់រួច: %s:\n%s" % (_hm(booked_total), slot_lines))
+            header += ("\nBooked · បានកក់រួច: %s:\n%s" % (_hm(booked_total), slot_lines))
         text = (header + "\n\nChoose the times below to pay — these are the times we need you most:\n"
-                "សូមជ្រើសម៉ោងខាងក្រោមដើម្បីសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត:")
+                "សូមជ្រើសម៉ោងខាងក្រោមដើម្បីសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖")
         await query.edit_message_text(text, reply_markup=kb)
         return
     if sub == "part":
@@ -2678,7 +2678,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             kb = _payback_slot_keyboard(staff, remaining) if remaining > 0 else None
             if kb:
                 await query.edit_message_text(
-                    "You owe %s — pick when to work it off:\nអ្នកនៅត្រូវសង %s — សូមជ្រើសពេល៖"
+                    "You owe %s — pick when to work it off:\nប្អូននៅត្រូវសង %s — សូមជ្រើសពេលធ្វើសង៖"
                     % (_hm(debt["balance"]), _hm(debt["balance"])), reply_markup=kb)
             else:
                 await query.edit_message_text(_PB_FULLY_BOOKED)
@@ -2709,7 +2709,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.edit_message_text(
             "Booked ✓ — %s %s-%s.\nបានកក់រួច ✓ — %s %s-%s។\n"
             "Come 5 minutes early and you earn +10 points ⭐\n"
-            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
+            "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐"
             % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
                d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         # plain Supervisors notice
@@ -3194,9 +3194,10 @@ async def _sfam_book(context, case: dict, reason: str) -> None:
     nm = (stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff")
     await _att_send(context, None, "Supervisors group", "",
         "FYI: %s's family-sick continues tomorrow (%s).\n"
-        "FYI: ច្បាប់ឈឺគ្រួសាររបស់ %s បន្តដល់ថ្ងៃស្អែក។\n"
+        "FYI: %s បន្តសុំច្បាប់ឈឺសម្រាប់%sដល់ថ្ងៃស្អែក។\n"
         "Reason · មូលហេតុ៖ %s"
-        % (nm, case.get("who") or "family", nm, reason), group=True)
+        % (nm, case.get("who") or "family", nm, _who_kh(case.get("who") or "family"), reason),
+        group=True)
 
 
 async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> None:
@@ -3325,7 +3326,7 @@ async def _booking_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             "Reminder — your payback time is %s %s.\n"
             "រំលឹក — ម៉ោងសងវិញរបស់អ្នកគឺ %s %s។\n"
             "Come 5 minutes early and you earn +10 points ⭐\n"
-            "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐"
+            "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐"
             % (b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"]),
                b["slot_date"].strftime("%a %d/%m"), _fmt_min(b["start_min"])))
         payback_mark_reminded(b["id"])
@@ -5124,7 +5125,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                                   pend["start_min"], pend["end_min"], pend["normal_len"], reason)
         await confirm(
             "✅ Shift change sent — the staff is asked to approve.\n"
-            "✅ បានផ្ញើការប្តូរវេន — បានសុំបុគ្គលិកអនុម័ត។",
+            "✅ បានផ្ញើការស្នើប្តូរវេនហើយ — កំពុងរង់ចាំបុគ្គលិកយល់ព្រម។",
             "🧪 Shift change submitted (test) — you got the staff's Approve/Can't card. On Approve, that "
             "day uses the new times; OT (beyond normal length) banks at checkout, clearing payback first. "
             "/testreset to wipe.")
@@ -5218,7 +5219,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             # bilingual (owner: some staff won't understand English)
             await _att_send(context, (tgt.get("telegram_ids") or [None])[0], "Staff",
                 tgt.get("call_name") or tgt["canonical_name"],
-                "📝 About your %s — %s:\n📝 អំពី%sរបស់ប្អូន — %s៖\n%s"
+                "📝 About your %s — %s:\n📝 អំពី %s របស់ប្អូន — %s៖\n%s"
                 % (pend.get("what", "request"), pend.get("frm", "—"),
                    pend.get("what_kh", pend.get("what", "request")), pend.get("frm", "—"), reason))
         await confirm("Sent 🤍\nផ្ញើរួចហើយ 🤍", "🧪 Reason relayed (test) — routed to you.")

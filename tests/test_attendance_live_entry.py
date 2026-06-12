@@ -2284,7 +2284,7 @@ def test_dead_tap_visibility(monkeypatch):
                                 effective_user=types.SimpleNamespace(id=999))
     monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: None)
     asyncio.run(bot._expired_button_callback(upd, types.SimpleNamespace(bot=_OwnerBot())))
-    assert any("Expired message" in e and "សារផុតកំណត់" in e for e in edits)
+    assert any("Expired message" in e and "សារនេះផុតកំណត់ហើយ" in e for e in edits)
     assert _json.loads(store["dead_taps:2026-06-11"])["n"] == 4
     # recovery button (owner): the collapse carries Open-menu
     assert any(kb and any("Open menu" in b.text for row in kb.inline_keyboard for b in row)

@@ -215,8 +215,10 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
 Cancel-AL list+confirm flow; dead-PB-button fix; KH_REVIEW P12–P15 + full context on EVERY entry;
 **half-English Khmer fix** ({who} now maps to a Khmer noun — child→កូន — via _who_kh, 4 live spots +
-demo). Suite 486. attendance_live=OFF, test ON. NOTE: owner's ChatGPT-polished P10–P15 sits in
-docs/KH_REVIEW.md (bottom) NOT yet wired — verified in-context, only P11a "from the menu" drifted.)
+demo). Suite 486. attendance_live=OFF, test ON. **Jun 13: ChatGPT P10–P15 polish WIRED** (~24
+strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវសង debt label, អ្នក→ប្អូន register everywhere incl.
+the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
+relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
 **▶ RESUME HERE — MULTI-MENU FIX, owner-approved design (Jun 12, analysis done, BUILD NEXT):**
 Owner found staff can open multiple GM menus (each /start AND any typed text with no armed pend →
