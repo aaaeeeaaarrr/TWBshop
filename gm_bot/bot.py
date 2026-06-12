@@ -5183,6 +5183,14 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។\n"
                 "Reason · មូលហេតុ៖ %s"
                 % (nm, _hm(mins), nm, _hm(mins), reason), group=True)
+        # Law 8: the late reason-prompt is consumed — delete it so it doesn't sit stale above the
+        # outcome (the live confirm / test sim-arrival buttons are the fresh message). Best-effort.
+        _pc, _pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")
+        if _pc and _pm:
+            try:
+                await context.bot.delete_message(_pc, _pm)
+            except Exception:
+                pass
         if not live:
             # TEST: mirror the LIVE split — declare = heads-up only; the outcome appears on ARRIVAL.
             # They CLICKED late, but might actually arrive early / on-time / late — so offer all three

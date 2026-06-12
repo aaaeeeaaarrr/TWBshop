@@ -403,18 +403,23 @@ def _dispatch_late(monkeypatch, pend):
     async def _reply(t, reply_markup=None):
         replies.append(t)
 
+    deletes = []
+
+    async def _del(chat, msg):
+        deletes.append((chat, msg))
+
     update = SimpleNamespace(message=SimpleNamespace(text="traffic jam", reply_text=_reply),
                              effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
                              effective_chat=SimpleNamespace(id=1))
-    ctx = SimpleNamespace(bot=SimpleNamespace(), user_data={})
+    ctx = SimpleNamespace(bot=SimpleNamespace(delete_message=_del), user_data={})
     asyncio.run(bot._att_dispatch(update, ctx, pend, live=False))
-    return sends, setr, declared
+    return sends, setr, declared, deletes
 
 
 def test_late_dispatch_declared_attaches_reason(monkeypatch):
     """With _declared, the reason is ATTACHED (late_set_reason) — no duplicate late_declare — and sent
     as an addendum."""
-    sends, setr, declared = _dispatch_late(
+    sends, setr, declared, _ = _dispatch_late(
         monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30, "_declared": True})
     assert setr == ["traffic jam"] and not declared
     assert any("Reason from" in s for s in sends)
@@ -422,10 +427,47 @@ def test_late_dispatch_declared_attaches_reason(monkeypatch):
 
 def test_late_dispatch_legacy_full_headsup(monkeypatch):
     """Without _declared (legacy), the full heads-up with reason goes out via late_declare."""
-    sends, setr, declared = _dispatch_late(
+    sends, setr, declared, _ = _dispatch_late(
         monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30})
     assert declared and not setr
     assert any("late for today's shift" in s for s in sends)
+
+
+def test_late_dispatch_deletes_stale_prompt(monkeypatch):
+    """Law 8 (Stage 4d): the consumed late reason-prompt is deleted so it doesn't sit stale."""
+    sends, setr, declared, deletes = _dispatch_late(
+        monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30, "_declared": True,
+                      "_prompt_chat": 7, "_prompt_msg": 9})
+    assert deletes == [(7, 9)]
+
+
+# ── Stage 4d: terminal Main-menu opens a NEW message ──
+def test_menunew_opens_new_message(monkeypatch):
+    """att:menunew posts a fresh menu message and does NOT edit over the terminal's details."""
+    from gm_bot import attendance_ui as ui
+    import config
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "X", "call_name": "X"})
+    monkeypatch.setattr(ui, "main_menu", lambda p: ("MENU", None))
+    replies, edits = [], []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    async def _reply(text, reply_markup=None):
+        replies.append(text)
+
+    q = SimpleNamespace(data="att:menunew", answer=_ans, edit_message_text=_edit,
+                        message=SimpleNamespace(message_id=5, chat_id=1, reply_text=_reply))
+    update = SimpleNamespace(callback_query=q,
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID))
+    ud = {"att_al_picked": {"d"}, "att_live_self": False}
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data=ud)))
+    assert replies == ["MENU"]          # NEW message
+    assert edits == []                  # terminal NOT dissolved
+    assert ud["att_al_picked"] == set()
 
 
 def test_split_late_branches_for_points_display():

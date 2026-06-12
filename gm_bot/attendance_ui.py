@@ -1030,7 +1030,7 @@ def sick_me_time(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                "(Missed time becomes pay-back, same as informed late. Doctor papers later wipe it.)"
                % (t, t, p.get("call_name") or p["canonical_name"], t))
     return txt, InlineKeyboardMarkup([_back_row("att:sp:me"), _walk_btn("sickme"),
-                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1040,7 +1040,7 @@ def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
                "(Provisional: the missed shift becomes pay-back time unless papers arrive within 3 days.\n"
                "Papers → real sick day: no pay-back, no points, AL untouched.)")
     return txt, InlineKeyboardMarkup([_back_row("att:sp:me"), _walk_btn("sickme"),
-                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 def sick_family_dates(p: dict, who: str) -> tuple[str, InlineKeyboardMarkup]:
@@ -1100,7 +1100,7 @@ def sick_family_stub(p: dict, who: str, iso: str, window: str = "full day") -> t
                    "Take care 🤍\nថែទាំឱ្យបានល្អ 🤍"
                 % (who, d, window, _WHO_KH.get(who, who), d, window)), \
         InlineKeyboardMarkup([_back_row("att:sp:sick"), _walk_btn("sickfam"),
-                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 def marriage_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1142,7 +1142,7 @@ def marriage_stub(p: dict, iso: str, child: bool) -> tuple[str, InlineKeyboardMa
     return _hdr(p, detail + "\nFrom AL — balance can go below zero, never from salary. "
                             "Senior approval like a normal AL."), \
         InlineKeyboardMarkup([_back_row("att:sp:mar"), _walk_btn("marriage"),
-                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 def death_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1189,7 +1189,7 @@ def death_stub(p: dict, who: str, iso: str, days: int) -> tuple[str, InlineKeybo
                     "🤍 បើអ្នកត្រូវការពេលថែមទៀត គ្រាន់តែបើក Special Leave ម្តងទៀត — យើងនៅជាមួយអ្នក។"
                     if days == 1 else "✓ booked · បានកក់រួច"))), \
         InlineKeyboardMarkup([_back_row("att:sp:death"), _walk_btn("death"),
-                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 def birth_dates(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1206,7 +1206,7 @@ def birth_stub(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
                 % (day_label(d), d2)), \
         InlineKeyboardMarkup([_back_row("att:sp"),
                               _walk_btn("birth"),
-                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                              [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 # ───────────────────────── FLOW WALKTHROUGHS ─────────────────────────
@@ -1358,7 +1358,7 @@ def walk_card(p: dict, name: str, idx: int) -> tuple[str, InlineKeyboardMarkup]:
         rows.append([InlineKeyboardButton("▶️ Next step (%d/%d)" % (idx + 2, n),
                                           callback_data="att:walk:%s:%d" % (name, idx + 1))])
     else:
-        rows.append([InlineKeyboardButton("🏠 Main menu — flow complete ✓", callback_data="att:menu")])
+        rows.append([InlineKeyboardButton("🏠 Main menu — flow complete ✓", callback_data="att:menunew")])
     return _hdr(p, "Step %d of %d — the flow continues:\n\n%s" % (idx + 1, n, text)), \
         InlineKeyboardMarkup(rows)
 
@@ -1427,7 +1427,7 @@ def late_picked(p: dict, offset: int) -> tuple[str, InlineKeyboardMarkup]:
                % (fmt12(ws + offset), offset, fmt12(ws + offset), offset,
                   p.get("call_name") or p["canonical_name"], offset, fmt12(ws)))
     return txt, InlineKeyboardMarkup([_back_row("att:late"), _walk_btn("late"),
-                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")]])
+                                      [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
 
 
 AL_TODAY_GATE_MIN = 30   # the gate arms this many minutes BEFORE shift start (owner, Jun 11)
@@ -1551,7 +1551,7 @@ def al_stub(p: dict, detail: str, walk: str = "al") -> tuple[str, InlineKeyboard
     rows = [_back_row()]
     if walk:
         rows.append(_walk_btn(walk))
-    rows.append([InlineKeyboardButton("🏠 Main menu", callback_data="att:menu")])
+    rows.append([InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")])
     return _hdr(p, detail), InlineKeyboardMarkup(rows)
 
 
@@ -2288,6 +2288,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "menu":
         context.user_data["att_al_picked"] = set()
         return await show(main_menu(p))
+    if action == "menunew":
+        # Law 8 / owner pt#1: a TERMINAL/ended message holds useful details — its "🏠 Main menu" must
+        # open a NEW message, never edit OVER the record. (Nav screens keep att:menu = edit in place.)
+        context.user_data["att_al_picked"] = set()
+        text, kb = main_menu(p)
+        try:
+            await query.message.reply_text(text, reply_markup=kb)
+        except Exception:
+            await show((text, kb))   # fallback: edit in place if we can't post a new message
+        return
     if action == "cancel":
         # F5/Law 6: the exit from an armed prompt MUST disarm the pend, or a later stray message
         # becomes a ghost submission. Clear both stores (test user_data + live flow_state), reset the
