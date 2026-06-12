@@ -4891,6 +4891,16 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
                 return
             rec = staff_get_by_uid(uid)
             if rec and rec.get("status") == "active" and rec.get("org") == "TWB":
+                # F8: opening a fresh menu RESETS the selection stashes — so a message typed
+                # mid-pick would silently wipe the days/time/swap they were choosing. Guard it:
+                # tell them they're mid-pick instead of destroying the selection.
+                if (context.user_data.get("att_al_picked")
+                        or context.user_data.get("att_do_day")
+                        or context.user_data.get("att_al_from") is not None):
+                    await update.message.reply_text(
+                        "You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above.\n"
+                        "ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ រួចរាល់ ឬ ✕ បោះបង់ នៅសារខាងលើ។")
+                    return
                 await attendance_ui.open_live_menu(update, context, rec)
                 return
         from gm_bot import rollcall

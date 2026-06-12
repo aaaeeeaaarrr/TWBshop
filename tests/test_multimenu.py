@@ -242,3 +242,69 @@ def test_expired_tap_confirm_pushes_nudge(monkeypatch):
     asyncio.run(bot._att_go_callback(update, ctx))
     assert deletes == [(7, 9)]
     assert sends and "NOT CONFIRMED" in sends[0] and "Death leave" in sends[0]
+
+
+# ── Stage 3: F4/F8/F10/F12 guards ──
+def _owner_cb(monkeypatch, data, user_data):
+    """Drive attendance_ui.callback as the owner; return the list of edited texts."""
+    from gm_bot import attendance_ui as ui
+    import config
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "X", "call_name": "X"})
+    edits = []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    q = SimpleNamespace(data=data, answer=_ans, edit_message_text=_edit,
+                        message=SimpleNamespace(message_id=5, chat_id=1))
+    update = SimpleNamespace(callback_query=q,
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID))
+    user_data.setdefault("att_live_self", False)
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data=user_data)))
+    return edits
+
+
+def test_al_done_empty_picked_shows_stale(monkeypatch):
+    """F4: tapping Done on a stale AL grid (empty picked) shows the stale screen, never a 0-day ghost."""
+    edits = _owner_cb(monkeypatch, "att:al:done", {"att_al_picked": set()})
+    assert edits and "old" in edits[0].lower()
+
+
+def test_al_time_to_without_from_shows_stale(monkeypatch):
+    """F4: the 'Until' tap with att_al_from popped used to crash — now shows the stale screen."""
+    edits = _owner_cb(monkeypatch, "att:al:t:600", {"att_al_picked": {"2026-06-20"}})
+    assert edits and "old" in edits[0].lower()
+
+
+def test_swap_partner_without_day_shows_stale(monkeypatch):
+    """F4: the partner tap with att_do_day missing used to fabricate a swap for TODAY — now stale."""
+    from gm_bot import attendance_ui as ui
+    monkeypatch.setattr(ui, "_armed", lambda ctx: True)
+    edits = _owner_cb(monkeypatch, "att:do:p:2", {})
+    assert edits and "old" in edits[0].lower()
+
+
+def test_al_cov_empty_stash_shows_stale(monkeypatch):
+    """F10: the 👁 toggle after a reset (empty att_al_cov) shows stale, not a blanked summary."""
+    edits = _owner_cb(monkeypatch, "att:al:cov:1", {})
+    assert edits and "old" in edits[0].lower()
+
+
+def test_maintenance_toast_when_paused(monkeypatch):
+    """F12: any staff tap while attendance_live is OFF gets a maintenance toast, not a dead button."""
+    from gm_bot import attendance_ui as ui
+    from gm_bot import bot
+    monkeypatch.setattr(bot, "_attendance_live", lambda: False)
+    answers = []
+
+    async def _ans(text=None, show_alert=False, **k):
+        answers.append((text, show_alert))
+
+    q = SimpleNamespace(data="att:menu", answer=_ans,
+                        message=SimpleNamespace(message_id=1, chat_id=1))
+    update = SimpleNamespace(callback_query=q, effective_user=SimpleNamespace(id=424242))
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data={})))
+    assert answers and answers[0][1] is True and "paused" in (answers[0][0] or "")

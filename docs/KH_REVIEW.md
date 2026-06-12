@@ -344,3 +344,21 @@ Reason · មូលហេតុ៖ {reason}
 - **BUTTON + BODY.** No variables (the detail line is the expired card's own text).
 - Header EN: `❗ NOT CONFIRMED — TRY AGAIN` · KH (bold): `❗ មិនទាន់បានបញ្ជាក់ — សូមធ្វើម្ដងទៀត`
 - Button: `📋 Open menu · បើក menu`
+
+### MM5 — stale screen guard (Stage 3, F4/F10)
+- **WHO:** a staffer tapping a button on an OLD screen whose selection was reset (new menu / restart).
+- **WHEN:** instead of filing empty data or crashing. **BODY + Open-menu button.** No vars.
+- EN: `⏳ This screen is old — please open the menu to start again.`
+- KH: `⏳ ផ្ទាំងនេះចាស់ហើយ — សូមបើក menu ដើម្បីចាប់ផ្តើមម្តងទៀត។`
+
+### MM6 — maintenance toast (Stage 3, F12)
+- **WHO:** any staffer tapping any att button while attendance_live is OFF (maintenance/rollback).
+- **WHEN:** instead of a silently dead button. **TOAST (show_alert popup).** No vars.
+- EN: `🔧 Attendance is paused for maintenance — please talk to your senior.`
+- KH: `ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។`
+
+### MM7 — mid-pick typing guard (Stage 3, F8)
+- **WHO:** a staffer who TYPES while mid-selection (days/time/swap) instead of tapping Done/Cancel.
+- **WHEN:** to stop the typed message wiping their in-progress pick. **BODY.** No vars.
+- EN: `You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above.`
+- KH: `ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ រួចរាល់ ឬ ✕ បោះបង់ នៅសារខាងលើ។`

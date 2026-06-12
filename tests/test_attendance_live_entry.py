@@ -380,6 +380,7 @@ def test_reason_terminals_format_bilingual(monkeypatch):
     for data, needle in cases:
         upd = _CbUpdate(config.OWNER_TELEGRAM_ID, data)
         ctx = _Ctx(); ctx.user_data["att_persona"] = 11
+        ctx.user_data["att_al_picked"] = {"2026-06-25"}   # a real selection (F4 guard needs days)
         asyncio.run(ui.callback(upd, ctx))
         out = upd.callback_query.edited[-1]
         assert needle in out, "%s → missing %r in: %s" % (data, needle, out[:120])

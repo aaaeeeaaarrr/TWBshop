@@ -916,6 +916,15 @@ def _cancel_row() -> list[InlineKeyboardButton]:
     return [InlineKeyboardButton("✕ Cancel · បោះបង់", callback_data="att:cancel")]
 
 
+def _stale_screen(p: dict):
+    """Law 1c (F4/F10): a button on an OLD screen whose selection stash was reset (new menu opened, or
+    a restart) must read empty and ask to start again — never act on wrong/empty data or crash."""
+    return (_hdr(p, "⏳ This screen is old — please open the menu to start again.\n"
+                    "⏳ ផ្ទាំងនេះចាស់ហើយ — សូមបើក menu ដើម្បីចាប់ផ្តើមម្តងទៀត។"),
+            InlineKeyboardMarkup([[InlineKeyboardButton("📋 Open menu · បើក menu",
+                                                        callback_data="att:menu")]]))
+
+
 # ---------------------------------------------------------------- screens
 
 def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -2172,7 +2181,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if uid != config.OWNER_TELEGRAM_ID:
         from gm_bot.bot import _attendance_live
-        rec = staff_get_by_uid(uid) if _attendance_live() else None
+        if not _attendance_live():
+            # F12: when the master switch is OFF (e.g. a rollback), every staff tap used to die
+            # silently → "boss it's broken". Tell them it's paused, don't leave a dead button.
+            await query.answer("🔧 Attendance is paused for maintenance — please talk to your senior."
+                               " · ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។", show_alert=True)
+            return
+        rec = staff_get_by_uid(uid)
         if not rec or rec.get("status") != "active" or rec.get("org") != "TWB":
             await query.answer()
             return
@@ -2416,7 +2431,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if len(data) > 2:
             sub = data[2]
             if sub == "cov":   # toggle who's-working on the reason prompt (from the stashed selection)
-                st = context.user_data.get("att_al_cov") or {}
+                st = context.user_data.get("att_al_cov")
+                if not st:     # F10: stash reset under an old prompt → don't blank the request summary
+                    return await show(_stale_screen(p))
                 flag = bool(int(data[3])) if len(data) > 3 else False
                 return await show(_al_prompt(p, context, st.get("detail", ""), st.get("days", []),
                                              st.get("hs"), st.get("he"), flag))
@@ -2428,8 +2445,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 context.user_data["att_al_page"] = int(data[3])
                 return await show(al_screen(p, picked, int(data[3])))
             if sub == "done":
+                if not picked:   # F4: stale grid (stash reset) → don't file a 0-day ghost AL
+                    return await show(_stale_screen(p))
                 return await show(al_fullday_or_time(p, picked))
             if sub == "full":
+                if not picked:   # F4: stale grid (stash reset) → don't file a 0-day ghost AL
+                    return await show(_stale_screen(p))
                 from gm_bot import al as alm
                 doff = p.get("day_off")
                 nw = staff_absent_dates(p["id"])                # other AL / special leave / swaps
@@ -2464,6 +2485,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return await show(al_time_grid(p, "to", int(data[3])))
             if sub == "t":
                 f = context.user_data.get("att_al_from")
+                if f is None or not picked:   # F4: stale time grid (stash reset) → don't crash/ghost
+                    return await show(_stale_screen(p))
                 t = int(data[3])
                 from gm_bot import al as alm
                 _picked = sorted(picked)
@@ -2501,7 +2524,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(al_screen(p, picked, 0))
     if action == "do":
         if len(data) > 2 and data[2] == "cov":   # toggle both-days who's-working on the swap prompt
-            st = context.user_data.get("att_do_cov") or {}
+            st = context.user_data.get("att_do_cov")
+            if not st:     # F10: stash reset under an old swap prompt → don't blank the summary
+                return await show(_stale_screen(p))
             flag = bool(int(data[3])) if len(data) > 3 else False
             return await show(_swap_prompt(p, context, st.get("base", ""), st.get("partner_id"),
                                            st.get("req_off"), st.get("partner_off"), flag))
@@ -2510,7 +2535,9 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
             if _armed(context):
-                req_off = context.user_data.get("att_do_day") or _today().isoformat()
+                req_off = context.user_data.get("att_do_day")
+                if not req_off:   # F4: stale partner screen → don't fabricate a swap for TODAY
+                    return await show(_stale_screen(p))
                 ro = date.fromisoformat(req_off)
                 off_wd = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
                 partner_off = (ro + timedelta(days=(off_wd - ro.weekday())) if off_wd is not None
