@@ -738,11 +738,56 @@ def _armed(context) -> bool:
     return att_test_on() or _is_live(context)
 
 
+def _supersede_prev_pend(context, update) -> None:
+    """Prompt-supersession honesty (multi-menu fix, piece 2). There is ONE typed-text pend slot per
+    uid, so arming a NEW reason prompt silently OVERWRITES an older armed one — and whatever the
+    staffer then types lands in the new flow even though the old prompt still looks alive (the
+    cross-wiring today-bug: an AL excuse recorded as a swap-decline reason). Before the overwrite,
+    edit the OLD prompt in place so it says it was replaced — no typed reason can vanish into the
+    wrong flow invisibly. Best-effort (fire-and-forget); the dead-tap guard backs it up. Mode-agnostic:
+    reads whichever slot holds the old pend (user_data in owner-test, flow_state when live)."""
+    try:
+        uid = update.effective_user.id
+        old = context.user_data.get("att_test_pending")
+        if not old:
+            from shared.database import flow_load
+            fs = flow_load(uid)
+            old = (fs.get("data") or {}) if fs and fs.get("flow") == "att_pending" else None
+        if not old:
+            return
+        pc, pm = old.get("_prompt_chat"), old.get("_prompt_msg")
+        if not (pc and pm):
+            return
+        # never relabel the very message we are about to re-arm onto (same-message re-entry)
+        q = getattr(update, "callback_query", None)
+        msg = getattr(q, "message", None) if q is not None else None
+        cur_id = getattr(msg, "message_id", None) if msg is not None else None
+        if cur_id is not None and cur_id == pm:
+            return
+        app = getattr(context, "application", None)
+        if app is None:
+            return
+
+        async def _edit():
+            try:
+                await context.bot.edit_message_text(
+                    "↩ Replaced — answer the newer prompt below\n"
+                    "↩ បានជំនួស — សូមឆ្លើយសំណួរថ្មីខាងក្រោម",
+                    chat_id=pc, message_id=pm)
+            except Exception:
+                pass
+
+        app.create_task(_edit())
+    except Exception:
+        pass
+
+
 def _arm_pending(context, update, pend: dict) -> None:
     """Stash the pending reason/'go' for the next typed message. Owner test → user_data (ephemeral);
     live staffer → flow_state (DB, restart-safe), per docs/ATTENDANCE_TEST_MODE.md item 8.
     Also captures the reason-PROMPT message coords so the dispatcher can edit it in place into an
     'awaiting approval' card once the reason is typed (only when the flow set pend['_summary'])."""
+    _supersede_prev_pend(context, update)   # honesty: relabel any prompt this one overwrites
     uid = update.effective_user.id
     q = getattr(update, "callback_query", None)
     msg = getattr(q, "message", None) if q is not None else None
@@ -2103,7 +2148,12 @@ async def open_live_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, rec
     attendance_live). Persona is LOCKED to themselves; the owner role-play shell is unaffected."""
     context.user_data["att_persona"] = rec["id"]
     context.user_data["att_live_self"] = True
+    # multi-menu fix (piece 3): a fresh menu starts a clean slate. Opening a new menu must not let a
+    # half-done flow's stashes (from an older, now-stale menu sharing this same user_data) leak into
+    # it — reset ALL the per-flow selection stashes, not just the AL day-set.
     context.user_data["att_al_picked"] = set()
+    for _k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
+        context.user_data.pop(_k, None)
     text, kb = main_menu(_persona(context))
     await update.message.reply_text(text, reply_markup=kb)
 

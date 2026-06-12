@@ -220,7 +220,23 @@ strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវស�
 the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
 relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
-**▶ RESUME HERE — MULTI-MENU FIX, owner-approved design (Jun 12, analysis done, BUILD NEXT):**
+**▶ MULTI-MENU FIX — P2 + P3 SHIPPED (Jun 13), P1 held for owner go-ahead.**
+Deployed & verified (gm-only, 03:37 PP dead-window): **P2 prompt-supersession honesty** — arming a new
+reason prompt edits the OLD one (the single per-uid `att_pending` slot it overwrites) to "↩ Replaced —
+answer the newer prompt below" via a centralized `_supersede_prev_pend()` wired into BOTH overwrite
+paths (`_arm_pending` AL/swap/shift/sick-reason + `_arm_reason` nudge-ladder); fire-and-forget edit,
+mode-agnostic (user_data in test, flow_state live), skips same-message re-entry. This is the today-bug
+(cross-wired typed reasons), needed no second menu. **P3 stash reset on `open_live_menu`** — extends the
+`att_al_picked` reset to all 6 per-flow stashes (att_al_cov/do_day/do_cov/al_from/al_page/ci_armed);
+live-staff entry, gated OFF → zero test interference. +6 tests (tests/test_multimenu.py), suite **492**.
+New KH → KH_REVIEW Pending (MM1). VERIFIED FROM CODE: senior ✅/❌, partner ✋, shift Approve,
+⏳-awaiting are SEPARATE messages (request-id in callback) — never the nav menu, a collapse can NEVER
+hide an approval; AL/swap/shift morph the requester's prompt IN PLACE into their awaiting card (no orphan
+left). **P1 (menu singleton / collapse old nav menus) HELD** — only piece that edits old menus +
+interacts with prior testing; owner's "delete the old menu once we've arrived" folds into P1 and is only
+needed for new-message terminals (payback picker, check-in verdict), not the in-place morphs.
+
+**P1 design kept below for the go-ahead conversation (owner-approved Jun 12):**
 Owner found staff can open multiple GM menus (each /start AND any typed text with no armed pend →
 NEW menu message, `bot.py:4853`) — all share ONE user_data, so two open menus cross-contaminate the
 stashes (`att_al_picked`, `att_al_cov`, `att_do_day`, `att_do_cov`, `att_al_from/page`,

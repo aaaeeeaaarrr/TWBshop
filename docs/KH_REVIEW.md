@@ -309,4 +309,12 @@ Reason · មូលហេតុ៖ {reason}
 > each {variable} is, the intended TONE, and BUTTON vs body. (See the record sections above for
 > the format.)
 
-(empty — all caught up as of 2026-06-13)
+### MM1 — prompt superseded (multi-menu fix, piece 2)
+- **WHO reads it:** a staffer who had a reason-prompt open ("type why…") and then started a *second*
+  flow that opened its own prompt. The OLD prompt message is edited in place to this line.
+- **WHEN it fires:** the moment the newer prompt is armed (the old one's typed-reason slot is about to
+  be overwritten) — so they don't type into a dead prompt and have it silently land in the new flow.
+- **TONE:** plain, reassuring, directive — "this one's stale, use the new one below." Not an error.
+- **BUTTON vs body:** body text (buttons already removed/irrelevant). No variables.
+- Live English: `↩ Replaced — answer the newer prompt below`
+- Draft KH (mine, needs polish): `↩ បានជំនួស — សូមឆ្លើយសំណួរថ្មីខាងក្រោម`

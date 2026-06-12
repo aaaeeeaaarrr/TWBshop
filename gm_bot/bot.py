@@ -2918,6 +2918,8 @@ def _arm_reason(context, update, pend: dict) -> None:
     """Arm the next typed message as a REQUIRED reason, with the 10/20/30 nudge-ladder metadata
     (owner, Jun 11: 'they might think it's all known now that they tapped'). Test: owner shell;
     live: the tapper's next text — 35-min window so the ladder can finish before expiry."""
+    from gm_bot.attendance_ui import _supersede_prev_pend
+    _supersede_prev_pend(context, update)   # honesty: relabel any prompt this one overwrites
     pend = dict(pend)
     pend["armed_at"] = _now_pp().isoformat()
     pend["nudges"] = 0
