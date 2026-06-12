@@ -1897,6 +1897,35 @@ def test_audit_validators():
     assert au.v_pb_overbook([], sc_clean, staff) == []
 
 
+def test_audit_exclusivity():
+    """F14 exclusivity law: the two harmful same-date collisions are flagged; the OK cases aren't."""
+    import datetime as _dt
+    from gm_bot import audit as au
+    staff = {1: {"call_name": "Davy", "canonical_name": "An Davy"}}
+    today = _dt.date(2026, 6, 11)
+    al = lambda i, days, st="approved": {"id": i, "staff_id": 1, "status": st, "days": days}
+    sc = lambda i, d, st="approved": {"id": i, "staff_id": 1, "status": st, "when_date": d}
+
+    # (a) two approved AL requests claim the SAME day → double deduction
+    probs = au.v_exclusivity([al(1, '["2026-06-20"]'), al(2, '["2026-06-20"]')], [], staff, today)
+    assert any("double deduction" in p and "2026-06-20" in p for p in probs)
+
+    # (b) approved AL day that ALSO has an approved shift-change → on leave AND scheduled to work
+    probs = au.v_exclusivity([al(3, '["2026-06-21"]')], [sc(9, _dt.date(2026, 6, 21))], staff, today)
+    assert any("on leave AND scheduled to work" in p for p in probs)
+
+    # clean: one AL, a shift-change on a DIFFERENT day
+    assert au.v_exclusivity([al(4, '["2026-06-22"]')], [sc(10, _dt.date(2026, 6, 25))], staff, today) == []
+
+    # NOT a collision: two shift-changes on one date (redefine model — latest-per-date wins)
+    assert au.v_exclusivity([], [sc(11, _dt.date(2026, 6, 23)), sc(12, _dt.date(2026, 6, 23))],
+                            staff, today) == []
+
+    # pending AL doesn't count (only approved claims a date)
+    assert au.v_exclusivity([al(5, '["2026-06-24"]', st="pending"),
+                             al(6, '["2026-06-24"]', st="pending")], [], staff, today) == []
+
+
 def test_al_today_gate(monkeypatch):
     """OWNER RULE: once today's shift STARTED, the AL-today button exists only after a CHECK-IN —
     otherwise a no-show could launder itself into an AL day (dodging the no-show penalty)."""

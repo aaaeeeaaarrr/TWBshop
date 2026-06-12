@@ -295,6 +295,37 @@ def v_swaps(rows: list[dict], staff: dict, today: date) -> list[str]:
     return out
 
 
+def v_exclusivity(als: list[dict], scs: list[dict], staff: dict, today: date) -> list[str]:
+    """F14 exclusivity law (owner Jun 13): at most one approved leave/redefine may claim a staff-date.
+    Flags the two UNAMBIGUOUS, harmful collisions only (so the daily auto-audit stays false-alarm-free):
+      (a) the SAME calendar day approved by >1 AL request → double AL deduction;
+      (b) an approved-AL day that ALSO carries an approved/done shift-change → 'on leave AND scheduled
+          to work'.
+    Two shift-changes on one date are NOT a collision (the redefine model: latest-per-date wins).
+    Day-off SWAPS are deferred — their day-off semantics need their own pass before auditing here."""
+    out = []
+    al_day_reqs: dict = {}   # (sid, 'YYYY-MM-DD') -> [approved AL req ids claiming that day]
+    for r in als:
+        if r.get("status") == "approved":
+            for d in json.loads(r.get("days") or "[]"):
+                al_day_reqs.setdefault((r["staff_id"], str(d)), []).append(r["id"])
+    for (sid, d), ids in sorted(al_day_reqs.items()):
+        if len(ids) > 1:
+            out.append("EXCL: %s has %d approved AL requests claiming the SAME day %s (#%s) — "
+                       "double deduction" % (_nm(staff, sid), len(ids), d,
+                                             ", #".join(str(i) for i in ids)))
+    sc_days: dict = {}       # (sid, 'YYYY-MM-DD') -> [approved/done shift-change ids]
+    for r in scs:
+        if r.get("status") in ("approved", "done") and r.get("when_date"):
+            sc_days.setdefault((r["staff_id"], str(r["when_date"])), []).append(r["id"])
+    for (sid, d), ids in sorted(al_day_reqs.items()):
+        if (sid, d) in sc_days:
+            out.append("EXCL: %s is on approved AL for %s but also has an approved shift-change "
+                       "(#%s) that day — on leave AND scheduled to work"
+                       % (_nm(staff, sid), d, sc_days[(sid, d)][0]))
+    return out
+
+
 def _hhmm_min(s) -> int | None:
     try:
         h, m = str(s).split(":")[:2]
@@ -445,6 +476,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_swaps(swaps, staff, today)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
+                + v_exclusivity(als, scs, staff, today)
                 + v_dead_taps(taps, today)
                 + v_staff_sanity(list(staff.values())))
     stats = {"payback": len(debts), "AL": len(als), "shift-changes": len(scs),
