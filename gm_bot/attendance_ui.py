@@ -2414,17 +2414,36 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(rules_screen(p))
     if action == "late":
         if len(data) > 2 and data[2] == "o":
+            mins = int(data[3])
             if _armed(context):
+                # declare-Late-FIRST (owner Jun 13): the MOMENT they pick the minutes, RECORD the
+                # declaration (so split-late credits the cheaper 'informed' rate even if no reason
+                # follows) and tell Supervisors NOW (so someone always knows). The reason arrives
+                # later as an addendum + is attached to this same record.
+                from gm_bot.attendance import to_min
+                from shared.database import late_declare as _late_declare
+                _ws = to_min(p.get("work_start"))
+                _late_declare(p["id"], _today().isoformat(),
+                              (_ws + mins) if _ws is not None else mins, "")
+                try:
+                    from gm_bot.bot import _att_send
+                    _nm = p.get("call_name") or p["canonical_name"]
+                    await _att_send(context, None, "Supervisors group", "",
+                        "%s will be ~%s late for today's shift (reason to follow).\n"
+                        "%s នឹងមកយឺត ~%s សម្រាប់វេនថ្ងៃនេះ (មូលហេតុនឹងមកតាមក្រោយ)។"
+                        % (_nm, _hm(mins), _nm, _hm(mins)), group=True)
+                except Exception:
+                    pass
                 _arm_pending(context, update,
-                    {"flow": "late", "persona_id": p["id"], "mins": int(data[3])})
+                    {"flow": "late", "persona_id": p["id"], "mins": mins, "_declared": True})
                 return await show(_arm_prompt(p, context,
-                    "Late ~%d min. · មកយឺត ~%d នាទី។\n\n"
-                    "📝 Type your reason — it sends the Supervisors a heads-up. Share your live "
-                    "location when you arrive and I'll work out the payback.\n"
-                    "📝 សរសេរមូលហេតុ — វាជូនដំណឹងដល់បងៗ។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ "
+                    "Late ~%d min — Supervisors notified ✓ · មកយឺត ~%d នាទី — បានជូនដំណឹងបងៗ ✓\n\n"
+                    "📝 Type your reason (added to the heads-up). Share your live location when you "
+                    "arrive and I'll work out the payback.\n"
+                    "📝 សរសេរមូលហេតុ (បន្ថែមលើដំណឹង)។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ "
                     "ខ្ញុំនឹងគណនាម៉ោងសងវិញ។"
-                    % (int(data[3]), int(data[3])), "att:late"))
-            return await show(late_picked(p, int(data[3])))
+                    % (mins, mins), "att:late"))
+            return await show(late_picked(p, mins))
         return await show(late_screen(p))
     if action == "al":
         picked = context.user_data.setdefault("att_al_picked", set())

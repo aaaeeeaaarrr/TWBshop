@@ -342,3 +342,87 @@ def test_photo_not_papers_falls_to_refuse(monkeypatch):
 def test_photo_neither_passes_through(monkeypatch):
     """No case, no armed reason → both decline, nothing happens (no crash)."""
     assert _photo_router_calls(monkeypatch, paper_ret=False, voice_ret=False) == ["paper", "voice"]
+
+
+# ── Stage 4: declare-Late-first ──
+def test_late_declares_and_notifies_at_pick(monkeypatch):
+    """Picking the minutes RECORDS the declaration (empty reason) + pushes the Supervisors heads-up
+    immediately, and arms the pend with _declared — so points credit even if no reason follows."""
+    from gm_bot import attendance_ui as ui
+    from gm_bot import bot
+    import shared.database as db
+    import config
+    declares, sends = [], []
+    monkeypatch.setattr(db, "late_declare", lambda sid, fs, em, r: declares.append((sid, r)) or 1)
+    monkeypatch.setattr(db, "flow_load", lambda uid: None)
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)
+    monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "X", "call_name": "X",
+                                                     "work_start": "07:00"})
+
+    async def _send(context, suid, role, name, text, group=False, **k):
+        sends.append(text)
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    edits = []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    q = SimpleNamespace(data="att:late:o:30", answer=_ans, edit_message_text=_edit,
+                        message=SimpleNamespace(message_id=5, chat_id=1))
+    update = SimpleNamespace(callback_query=q, effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=1))
+    ud = {"att_persona": 1, "att_live_self": False}
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data=ud)))
+    assert declares and declares[0][1] == ""              # declared at pick, reason empty
+    assert sends and "late" in sends[0].lower()           # heads-up pushed now
+    assert ud.get("att_test_pending", {}).get("_declared") is True
+    assert edits and "notified" in edits[0].lower()
+
+
+def _dispatch_late(monkeypatch, pend):
+    from gm_bot import bot
+    import shared.database as db
+    import config
+    sends, setr, declared = [], [], []
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 1, "canonical_name": "X", "call_name": "X", "work_start": "07:00"}])
+
+    async def _send(context, suid, role, name, text, group=False, **k):
+        sends.append(text)
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    monkeypatch.setattr(db, "late_set_reason", lambda sid, fs, r: setr.append(r))
+    monkeypatch.setattr(bot, "late_declare", lambda *a, **k: declared.append(1) or 1)
+    replies = []
+
+    async def _reply(t, reply_markup=None):
+        replies.append(t)
+
+    update = SimpleNamespace(message=SimpleNamespace(text="traffic jam", reply_text=_reply),
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=1))
+    ctx = SimpleNamespace(bot=SimpleNamespace(), user_data={})
+    asyncio.run(bot._att_dispatch(update, ctx, pend, live=False))
+    return sends, setr, declared
+
+
+def test_late_dispatch_declared_attaches_reason(monkeypatch):
+    """With _declared, the reason is ATTACHED (late_set_reason) — no duplicate late_declare — and sent
+    as an addendum."""
+    sends, setr, declared = _dispatch_late(
+        monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30, "_declared": True})
+    assert setr == ["traffic jam"] and not declared
+    assert any("Reason from" in s for s in sends)
+
+
+def test_late_dispatch_legacy_full_headsup(monkeypatch):
+    """Without _declared (legacy), the full heads-up with reason goes out via late_declare."""
+    sends, setr, declared = _dispatch_late(
+        monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30})
+    assert declared and not setr
+    assert any("late for today's shift" in s for s in sends)

@@ -3560,6 +3560,20 @@ def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) 
             return cur.fetchone()["id"]
 
 
+def late_set_reason(staff_id: int, for_shift: str, reason: str) -> None:
+    """Attach the typed reason to the proactive declaration already recorded at pick time
+    (declare-Late-first, owner Jun 13) — UPDATEs the latest declaration row, never inserts a duplicate,
+    so the split-late MIN(reported_at) moment (= the pick) is preserved and the reason still lands for
+    the digest/categoriser."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE lateness_records SET reason=%s
+                           WHERE id = (SELECT id FROM lateness_records
+                                       WHERE staff_id=%s AND for_shift=%s AND informed_before AND is_test=%s
+                                       ORDER BY reported_at DESC LIMIT 1)""",
+                        (reason, staff_id, for_shift, _ATT_TEST))
+
+
 def late_declared_at(staff_id: int, for_shift: str):
     """The EARLIEST proactive late-declaration time for this shift, or None. The declaration
     moment splits the late minutes (owner): before it −2/min, after it −1/min."""

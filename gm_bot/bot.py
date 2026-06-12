@@ -5144,13 +5144,24 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         today = _today_pp().isoformat()
         ws = to_min(persona.get("work_start"))
         nm = persona.get("call_name") or persona["canonical_name"]
-        late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
         from gm_bot.attendance_ui import _hm
-        await _att_send(context, None, "Supervisors group", "",
-            "%s will be ~%s late for today's shift.\n"
-            "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។\n"
-            "Reason · មូលហេតុ៖ %s"
-            % (nm, _hm(mins), nm, _hm(mins), reason), group=True)
+        if pend.get("_declared"):
+            # declare-Late-first: the declaration + heads-up already went out at pick time. ATTACH the
+            # reason to that same record (no duplicate row → split-late moment preserved) and send the
+            # reason as an addendum.
+            from shared.database import late_set_reason
+            late_set_reason(persona["id"], today, reason)
+            await _att_send(context, None, "Supervisors group", "",
+                "Reason from %s (late ~%s today) · មូលហេតុពី %s៖ %s"
+                % (nm, _hm(mins), nm, reason), group=True)
+        else:
+            # legacy path (not declared-first): full heads-up carrying the reason
+            late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
+            await _att_send(context, None, "Supervisors group", "",
+                "%s will be ~%s late for today's shift.\n"
+                "%s នឹងមកយឺតប្រហែល %s សម្រាប់វេនថ្ងៃនេះ។\n"
+                "Reason · មូលហេតុ៖ %s"
+                % (nm, _hm(mins), nm, _hm(mins), reason), group=True)
         if not live:
             # TEST: mirror the LIVE split — declare = heads-up only; the outcome appears on ARRIVAL.
             # They CLICKED late, but might actually arrive early / on-time / late — so offer all three
