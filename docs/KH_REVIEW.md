@@ -407,3 +407,182 @@ FYI: {name}'s family-sick continues tomorrow ({relation}).
 FYI: ច្បាប់ឈឺគ្រួសាររបស់ {name} បន្តដល់ថ្ងៃស្អែក។
 Reason · មូលហេតុ៖ {reason}
 
+## P10 · Reason-relay line + detailed rejections
+
+📝 About your {what} — {name}: {reason}
+📝 អំពី {what_kh} របស់ប្អូន — {name}៖ {reason}
+
+Your AL for {dates} wasn't approved.
+AL របស់ប្អូនសម្រាប់ {dates} មិនបានអនុម័តទេ។
+
+The day-off swap ({d1} ↔ {d2}) wasn't approved.
+ការប្តូរថ្ងៃឈប់ ({d1} ↔ {d2}) មិនបានអនុម័តទេ។
+
+## P11 · Expired-button lines
+
+(a) ⏳ Expired message — please start again from the menu.
+⏳ សារនេះផុតកំណត់ហើយ — សូមចាប់ផ្តើមម្តងទៀតពី menu។
+
+(b) [TOAST] ⏳ Expired — try again · ផុតកំណត់ — សាកម្តងទៀត
+
+(c) 📋 Open menu · បើក menu
+
+## P12 · Cancel AL flow
+
+My Schedule button
+✕ Cancel AL · បោះបង់ AL
+
+Cancel AL list screen
+Which AL day do you want to cancel?
+ប្អូនចង់បោះបង់ AL ថ្ងៃណា?
+
+Per-day buttons
+✕ {lbl}
+
+No-upcoming case
+No upcoming AL to cancel.
+គ្មាន AL ខាងមុខដែលអាចបោះបង់បានទេ។
+
+Confirmation card body
+Are you sure you want to cancel your AL on {detail}?
+ប្អូនពិតជាចង់បោះបង់ AL នៅ {detail} មែនទេ?
+
+This will return 1 day to your AL balance.
+វានឹងដាក់ AL 1 ថ្ងៃ ត្រឡប់ចូល balance របស់ប្អូនវិញ។
+
+Confirmation buttons
+✅ Yes, cancel it · បោះបង់
+
+← Back · ត្រឡប់ក្រោយ
+
+Too-late toast
+Too late to cancel — that day has already started · យឺតពេលបោះបង់ហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ
+
+## P13 · Book pay-back time — About Me picker message
+
+Debt · ម៉ោងត្រូវសង: {debt}
+
+Booked · បានកក់រួច: {booked_total}:
+{slot_lines}
+
+Choose the times below to pay — these are the times we need you most:
+សូមជ្រើសម៉ោងខាងក្រោមដើម្បីសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖
+
+About Me button
+📅 Book pay-back time · កក់ម៉ោងសងវិញ
+
+## P14 · Pay-back flow messages
+
+a) Fully booked
+
+Your pay-back time is already fully booked ✓ Just work the booked times.
+ម៉ោងសងវិញរបស់ប្អូនបានកក់រួចទាំងអស់ហើយ ✓ សូមមកធ្វើតាមម៉ោងដែលបានកក់។
+
+b) Late-arrival combined — picker with slots remaining
+
+Checked in ✓ — {X} late (counts as pay-back). Pick when to work it off — the times we need you most:
+ចុះវត្តមានរួច ✓ — យឺត {X} (រាប់ជាម៉ោងសងវិញ)។ សូមជ្រើសពេលធ្វើសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖
+
+b2) Late-arrival combined — fully booked already
+
+Checked in ✓ — {X} late (counts as pay-back).
+ចុះវត្តមានរួច ✓ — យឺត {X} (រាប់ជាម៉ោងសងវិញ)។
+
+c) Re-offer / ladder — picker, not at check-in
+
+You owe {X}. Pick when to work it off — these are the times we need you most:
+ប្អូននៅត្រូវសង {X}។ សូមជ្រើសពេលធ្វើសង — ពេលទាំងនេះហាងត្រូវការប្អូនបំផុត៖
+
+c2) Info line appended when some debt already booked
+
+({booked} booked already · បានកក់រួច {booked} — {remaining} left to book · នៅសល់ {remaining} ត្រូវកក់)
+
+d) Clash / stale button
+
+That time isn't available any more — {remaining} left to book. Pick again:
+ពេលនោះមិនអាចកក់បានទៀតទេ — នៅសល់ {remaining} ត្រូវកក់។ សូមជ្រើសម្តងទៀត៖
+
+e) Booking confirmation
+
+Booked ✓ — {day} {start}–{end}.
+បានកក់រួច ✓ — {day} {start}–{end}។
+
+Come 5 minutes early and you earn +10 points ⭐
+មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐
+
+f) Stale-button recovery — short re-offer
+
+You owe {X} — pick when to work it off:
+ប្អូននៅត្រូវសង {X} — សូមជ្រើសពេលធ្វើសង៖
+
+## P15 · Shift-change + day-off-swap cards & notices
+
+a) Shift-change card — staff receives it
+
+🕒 Shift change — {date}: {window}{tag}
+🕒 ប្តូរវេន — {date}៖ {window}{tag}
+
+Why · មូលហេតុ៖ {reason}
+
+Status suffixes
+✅ Approved · បានយល់ព្រម
+
+❌ Declined · មិនបានយល់ព្រម
+
+✅ Done · រួចរាល់
+
+Approve button
+✅ Approve · យល់ព្រម
+
+b) Senior's confirmation after sending a shift change
+
+✅ Shift change sent — the staff is asked to approve.
+✅ បានផ្ញើការស្នើប្តូរវេនហើយ — កំពុងរង់ចាំបុគ្គលិកយល់ព្រម។
+
+c) Senior reason prompt
+
+📝 Type the reason — your next message sends it to them for approval.
+📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការយល់ព្រម។
+
+d) Senior picker header
+
+Give OT / change a shift — for whom?
+ឱ្យ OT / ប្តូរវេន — សម្រាប់អ្នកណា?
+
+e) Day-off swap cards
+
+PARTNER
+
+{req} wants to swap day off: {req} takes {d1} off, you take {d2} — same week.
+{req} ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយប្អូន៖ {req} ឈប់ {d1}, ប្អូនឈប់ {d2} — ក្នុងសប្តាហ៍ដដែល។
+
+Reason · មូលហេតុ៖ {reason}
+
+REQUESTER
+
+Day-off swap — your off {d1} ↔ {partner} off {d2}.
+ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {d1} ↔ {partner} ឈប់ {d2}។
+
+Reason · មូលហេតុ៖ {reason}
+
+SENIOR
+
+Day-off swap: {req} ↔ {partner}
+ប្តូរថ្ងៃឈប់៖ {req} ↔ {partner}
+
+{req} off {d1}, {partner} off {d2}.
+{req} ឈប់ {d1}, {partner} ឈប់ {d2}។
+
+Reason · មូលហេតុ៖ {reason}
+
+f) Partner declined — notice to requester
+
+Your day-off swap ({d1} ↔ {d2}) wasn't accepted by your partner.
+អ្នកដែលត្រូវប្តូរជាមួយ មិនបានយល់ព្រមលើការប្តូរថ្ងៃឈប់ ({d1} ↔ {d2}) របស់ប្អូនទេ។
+
+g) Family-sick extension FYI — Supervisors group
+
+FYI: {name}'s family-sick continues tomorrow ({relation}).
+FYI: {name} បន្តសុំច្បាប់ឈឺសម្រាប់ {relation} ដល់ថ្ងៃស្អែក។
+
+Reason · មូលហេតុ៖ {reason}

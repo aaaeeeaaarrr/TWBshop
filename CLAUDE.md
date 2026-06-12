@@ -218,6 +218,33 @@ Cancel-AL list+confirm flow; dead-PB-button fix; KH_REVIEW P12–P15 + full cont
 demo). Suite 486. attendance_live=OFF, test ON. NOTE: owner's ChatGPT-polished P10–P15 sits in
 docs/KH_REVIEW.md (bottom) NOT yet wired — verified in-context, only P11a "from the menu" drifted.)
 
+**▶ RESUME HERE — MULTI-MENU FIX, owner-approved design (Jun 12, analysis done, BUILD NEXT):**
+Owner found staff can open multiple GM menus (each /start AND any typed text with no armed pend →
+NEW menu message, `bot.py:4853`) — all share ONE user_data, so two open menus cross-contaminate the
+stashes (`att_al_picked`, `att_al_cov`, `att_do_day`, `att_do_cov`, `att_al_from/page`,
+`att_ci_armed`). WORSE — found a today-bug needing no second menu: ONE typed-text pend slot per uid
+(`flow_save(uid,"att_pending",…)` / `att_test_pending`) means reaching flow B's reason prompt
+silently OVERWRITES flow A's pend — prompt A still looks alive but the typed text lands in B
+(e.g. AL excuse recorded as a swap-decline reason). Case matrix agreed with owner:
+(1) NAV screens (menu/About Me/pickers/grids) → safe to collapse; (2) ARMED REASON PROMPTS → never
+collapse on menu-open (staffer may check who's-working then come back; 15-min TTL governs), only a
+NEWER prompt supersedes; (3) DECISION/AWAITING cards (⏳ awaiting, senior ✅/❌, partner ✋,
+shift-change Approve) → NEVER collapse — separate messages w/ request-id in callback, excludable;
+(4) TERMINAL/OFFER msgs (Booked ✓, PB picker) → no need, tap-time DB hard-gate already guards.
+**BUILD (3 pieces, ~50–70 lines + tests, gm_bot/ only):**
+  1. **Menu singleton** scoped to class 1: track current nav-menu msg id; new menu opens → old one
+     edits to "⤵ Menu continues below · ម៉ឺនុយនៅខាងក្រោម" (buttons removed, try/except best-effort;
+     dead-tap guard = backstop). The moment a message becomes a prompt/awaiting-card → UNREGISTER
+     (immune to collapse). Chokepoints: open_live_menu + cmd_test + att:menu action (claim);
+     _arm_pending (release). Recovery "📋 Open menu" button claims too (goes through att:menu).
+  2. **Prompt supersession honesty** (the today-bug, most urgent): when a new pend overwrites an
+     old one, edit the OLD prompt (coords already stored in pend `_prompt_chat`/`_prompt_msg`) to
+     "↩ Replaced — answer the newer prompt below". New KH strings → KH_REVIEW Pending.
+  3. **Stash reset on open**: open_live_menu already resets att_al_picked — extend to the other 5
+     stash keys (consistent: collapsed old menu can't continue its half-done flow anyway).
+Edge cases covered in design: restart→orphans hit expired-collapse; edit fails→dead-tap backstop;
+double-tap race→"not modified" no-op; senior/partner cards untracked; 48h-old menus→try/except.
+
 **Session 32 (Jun 12, pt3) — PB-picker move, Cancel-AL, KH context + half-English fix. Deployed & verified:**
 - **`_who_kh` half-English Khmer fix (a69a9ed):** stored `who` is an English key (child/spouse/parent/
   family) — dropped raw into the Khmer half it read "សង្ឃឹមថា child របស់ប្អូន…". New `_who_kh()` maps to
