@@ -805,7 +805,7 @@ def _arm_pending(context, update, pend: dict) -> None:
         pend.setdefault("nudges", 0)
         ttl = 35
     else:
-        ttl = 15
+        ttl = 30   # owner Jun 13: lifted 15→30 so busy hands rarely hit expiry (F3)
     if att_test_on():
         context.user_data["att_test_pending"] = pend
     else:

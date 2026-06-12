@@ -195,3 +195,50 @@ def test_armed_prompts_use_cancel_not_back():
     from gm_bot import attendance_ui as ui
     row = ui._cancel_row()
     assert row[0].callback_data == "att:cancel" and "Cancel" in row[0].text
+
+
+# ── Stage 2: F2/F3 expiry push-nudge ──
+def test_expiry_nudge_pushes_fresh_and_deletes_old():
+    """The nudge deletes the stale card and pushes a FRESH 'NOT CONFIRMED' message carrying detail."""
+    from gm_bot import bot
+    sends, deletes = [], []
+
+    async def _send(chat_id, text, reply_markup=None, parse_mode=None):
+        sends.append((chat_id, text))
+
+    async def _del(chat_id, message_id):
+        deletes.append((chat_id, message_id))
+
+    ctx = SimpleNamespace(bot=SimpleNamespace(delete_message=_del, send_message=_send))
+    asyncio.run(bot._expiry_nudge(ctx, 7, "Death leave · 12–14 Jun", old_chat=7, old_msg=9))
+    assert deletes == [(7, 9)]
+    assert sends and sends[0][0] == 7
+    assert "NOT CONFIRMED" in sends[0][1] and "Death leave" in sends[0][1]
+
+
+def test_expired_tap_confirm_pushes_nudge(monkeypatch):
+    """F2: tapping an expired '✅ I confirm' (no pend) pushes the nudge with the card's details +
+    removes the stale card — instead of the old silent return."""
+    from gm_bot import bot
+    import config
+    sends, deletes = [], []
+
+    async def _send(chat_id, text, reply_markup=None, parse_mode=None):
+        sends.append(text)
+
+    async def _del(chat_id, message_id):
+        deletes.append((chat_id, message_id))
+
+    async def _ans(*a, **k):
+        pass
+
+    q = SimpleNamespace(data="att:go", answer=_ans,
+                        message=SimpleNamespace(text="Death leave 12-14 Jun", chat_id=7, message_id=9))
+    update = SimpleNamespace(callback_query=q,
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=7))
+    ctx = SimpleNamespace(bot=SimpleNamespace(delete_message=_del, send_message=_send),
+                          user_data={})   # no att_test_pending → expired path
+    asyncio.run(bot._att_go_callback(update, ctx))
+    assert deletes == [(7, 9)]
+    assert sends and "NOT CONFIRMED" in sends[0] and "Death leave" in sends[0]

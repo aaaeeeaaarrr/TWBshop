@@ -1133,6 +1133,36 @@ async def _private_voice_router(update: Update, context: ContextTypes.DEFAULT_TY
         logger.error("voice reason handling failed: %s", e)
 
 
+async def _expiry_nudge(context: ContextTypes.DEFAULT_TYPE, chat_id: int, detail: str = "",
+                        old_chat=None, old_msg=None) -> None:
+    """Law 6/8 (F2/F3): an armed state expired or a dead tap landed → PUSH a FRESH message headed
+    'NOT CONFIRMED — TRY AGAIN' (caps EN + bold KH) carrying what expired, and remove the stale card
+    (delete ≤48h, else strip its buttons). A new message push-notifies; a silent in-place edit would
+    be missed (owner, Jun 13). Best-effort throughout."""
+    if old_chat and old_msg:
+        try:
+            await context.bot.delete_message(old_chat, old_msg)
+        except Exception:
+            try:
+                await context.bot.edit_message_reply_markup(chat_id=old_chat, message_id=old_msg,
+                                                            reply_markup=None)
+            except Exception:
+                pass
+    body = "❗ NOT CONFIRMED — TRY AGAIN\n❗ <b>មិនទាន់បានបញ្ជាក់ — សូមធ្វើម្ដងទៀត</b>"
+    detail = (detail or "").strip()
+    if detail:
+        body += "\n\n" + detail
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("📋 Open menu · បើក menu", callback_data="att:menu")]])
+    try:
+        await context.bot.send_message(chat_id, body, reply_markup=kb, parse_mode="HTML")
+    except Exception:
+        try:    # parse_mode can choke if the quoted detail has stray markup — retry plain
+            await context.bot.send_message(chat_id, body.replace("<b>", "").replace("</b>", ""),
+                                           reply_markup=kb)
+        except Exception:
+            pass
+
+
 async def _private_location_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Staff check-in (gated/live) takes precedence; otherwise the owner-only test handler."""
     try:
@@ -4844,13 +4874,20 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
         # live attendance entry (gated): a typed reason completes a real flow; otherwise the
         # active staffer opens their own menu. Falls through to roll-call when not live.
         if _attendance_live():
-            from shared.database import flow_load, flow_clear
+            from shared.database import flow_load_or_expired, flow_clear
             from gm_bot import attendance_ui
-            fs = flow_load(uid)
-            if fs and fs.get("flow") == "att_pending":
-                pend = fs.get("data") or {}
+            active, expired = flow_load_or_expired(uid)
+            if active and active.get("flow") == "att_pending":
+                pend = active.get("data") or {}
                 flow_clear(uid)
                 await _att_dispatch(update, context, pend, live=True)
+                return
+            if expired and expired.get("flow") == "att_pending":
+                # F3/Law 6: they typed their reason AFTER the prompt expired. Don't let a cheerful
+                # fresh menu eat it — push an honest 'NOT CONFIRMED — TRY AGAIN' with what expired.
+                ep = expired.get("data") or {}
+                await _expiry_nudge(context, update.effective_chat.id, ep.get("_summary") or "",
+                                    old_chat=ep.get("_prompt_chat"), old_msg=ep.get("_prompt_msg"))
                 return
             rec = staff_get_by_uid(uid)
             if rec and rec.get("status") == "active" and rec.get("org") == "TWB":
@@ -4983,6 +5020,11 @@ async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             flow_clear(uid)
             live = True
     if not pend:
+        # F2/Law 6: an expired/dead tap-confirm used to die silently here. Push an honest
+        # 'NOT CONFIRMED — TRY AGAIN' carrying the card's own details, and remove the stale card.
+        detail = (query.message.text or "").strip()
+        await _expiry_nudge(context, update.effective_chat.id, detail,
+                            old_chat=query.message.chat_id, old_msg=query.message.message_id)
         return
     try:
         await query.edit_message_text((query.message.text or "") + "\n\n✅ Confirmed.")

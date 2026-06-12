@@ -3830,6 +3830,31 @@ def flow_save(uid: int, flow: str, step: str, data: dict | None = None,
             """, (uid, flow, step, _json.dumps(data or {}), new_expiry(ttl)))
 
 
+def flow_load_or_expired(uid: int) -> tuple[dict | None, dict | None]:
+    """Like flow_load, but DISTINGUISHES 'expired' from 'never existed' so the caller can give an
+    honest 'that expired' nudge (F3) instead of silently opening a menu. Returns (active, expired):
+    at most one is non-None. The expired row is deleted (same as flow_load)."""
+    import json as _json
+    from gm_bot.flow import is_expired
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT uid, flow, step, data, expires_at FROM gm_flow_state WHERE uid=%s",
+                        (uid,))
+            row = cur.fetchone()
+            if not row:
+                return (None, None)
+            exp = row["expires_at"]
+            d = dict(row)
+            try:
+                d["data"] = _json.loads(d.get("data") or "{}")
+            except Exception:
+                d["data"] = {}
+            if is_expired(exp.isoformat() if hasattr(exp, "isoformat") else exp):
+                cur.execute("DELETE FROM gm_flow_state WHERE uid=%s", (uid,))
+                return (None, d)
+            return (d, None)
+
+
 def flow_load(uid: int) -> dict | None:
     """The uid's active flow, or None. Expired rows are auto-purged and return None
     (so the caller just opens the main menu — never a dead half-flow)."""

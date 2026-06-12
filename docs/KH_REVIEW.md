@@ -334,3 +334,13 @@ Reason · មូលហេតុ៖ {reason}
 - Live English: `🎤 I can't read a voice note / photo here — please type your reason in one line.`
 - Draft KH (mine, needs polish): `🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់។`
 - (owner walk Jun 13: dropped "or use the buttons below" — the refuse is a standalone reply, no buttons under it)
+
+### MM4 — expiry / dead-tap nudge (Stage 2, F2/F3, Law 6/8)
+- **WHO reads it:** a staffer whose tap-confirm card expired, or who typed a reason after the prompt
+  expired. A FRESH message is pushed (so it notifies); the stale card is deleted.
+- **WHEN:** on a dead/expired tap-confirm, or loose text after a just-expired reason pend.
+- **TONE:** an honest alarm-but-recoverable nudge — caps EN, **bold KH**, then the details of what
+  expired, then an Open-menu button. NOT a generic error.
+- **BUTTON + BODY.** No variables (the detail line is the expired card's own text).
+- Header EN: `❗ NOT CONFIRMED — TRY AGAIN` · KH (bold): `❗ មិនទាន់បានបញ្ជាក់ — សូមធ្វើម្ដងទៀត`
+- Button: `📋 Open menu · បើក menu`
