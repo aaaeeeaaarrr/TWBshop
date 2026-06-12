@@ -40,7 +40,7 @@ Two distinct failure shapes — and the second needs only ONE menu:
 
 ---
 
-## The laws (seven)
+## The laws (eight)
 
 1. **A button must never trust the screen it sits on.** Recompute from a trustworthy source at *action
    time*. Three ways, most-preferred first:
@@ -91,7 +91,17 @@ Two distinct failure shapes — and the second needs only ONE menu:
    terminal rule), and the approving senior gets an **override** for the case where the new one should
    supersede (e.g. bereavement over a minor shift-change). This invariant is also an **`/audit` law**
    ("≤1 approved leave/redefine/swap per staff-date; each approved AL-day deducts AL once") — run it on
-   real rows **before go-live** to catch collisions already in the data.
+   real rows **before go-live** to catch collisions already in the data. Tell **both** humans **why,
+   with details**: the loser-request's staffer ("❌ Unavailable — leave already approved for 12 Jun")
+   AND the senior who was mid-approval — details turn "rejected" into "ah, that day was taken."
+8. **Outcomes are pushed, not just displayed.** (Owner, Jun 13.) Every finalized outcome a human must
+   know — confirmed / approved / declined / unavailable / expired — is delivered as a **FRESH message
+   carrying full details** ("✅ APPROVED — AL 12–14 Jun"), so it push-notifies and they're never lost;
+   the stale interactive card it supersedes is **removed** (≤48h delete, else edit to a stub). The party
+   who **just tapped** may see it in place (already looking); the **passive/waiting** party always gets
+   the fresh push. This fresh message IS the lasting record — it satisfies "staff remember what was
+   agreed" better than a silent in-place morph, and reconciles with the terminal-persistence rule
+   (the record still stays; it's just delivered, not whispered).
 
 ### The honesty rule (why staff never read it as "broken")
 Every collapse / supersede should leave a **self-explanatory** message, and every failed edit should
@@ -165,6 +175,12 @@ independently re-verified in code by the reviewing session: F1, F2.)
   for supersede. Add the `/audit` exclusivity law + backfill-run on real rows pre-go-live. → Law 7.
 - **Fable:** not needed to build; do ONE red-team pass AFTER building, on the NEW behaviour (does the
   caps nudge scare, does auto-unavailable confuse the loser, does the override read clearly).
+- **MODs fold into the laws (walk complete Jun 13):** F6 (wording) + F7 (supersede) + F9 ("Replaced"
+  subject) → resolved by **Law 6/8** (push a fresh detailed message, wording matches cause — "already
+  decided" not "try again"). F10 (toggle blanks summary) + F12 (live-off → silent dead buttons) →
+  mechanical build-time fixes (rebuild from pend / maintenance toast). F11 (awaiting silence + dup) →
+  duplicate side is **F14/Law 7**; the "decided" push is **Law 8**; add one reassurance line. No MOD
+  needs a separate owner decision — all carried by the locked batch.
 
 **Top 5 to do first (Fable's ranking):** F1 (voice submits or honestly refuses) · kill every silent
 `return` after `query.answer()` (F2/F6/F12, reuse the existing dead-tap collapse) · expiry honesty
@@ -178,6 +194,10 @@ as fresh push messages; the double-tap "not modified" no-op.
 ## Other surfaces to audit against this (not yet done)
 Same PTB `user_data` pattern, so the same trap is latent — audit each when next touched:
 - **Retail bot** menus (`run_bot.py`) · **B2B** order menus (`b2b_bot/`) · **Hire bot** intake.
+- **B2B (owner, Jun 13):** owner has seen these same bugs in B2B "many times", paused B2B fixes, and
+  will resume later applying **all 8 laws**. **When B2B work resumes, this is the trip — remind the
+  owner and re-audit B2B menus against the 8 laws before/while changing them.** (The CLAUDE.md Rule 5
+  tripwire + this line are the mechanism; don't rely on memory.)
 - Any future **web / Messenger / WhatsApp** flow we build — apply the laws from day one.
 
 ## Pre-ship checklist (run before shipping any such menu)
