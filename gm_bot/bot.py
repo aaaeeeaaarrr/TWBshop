@@ -4937,6 +4937,27 @@ async def _late_simarr_callback(update: Update, context: ContextTypes.DEFAULT_TY
     else:   # late >5 — combined verdict + payback picker
         mins = int(parts[4])
         today = _today_pp().isoformat()
+        # show the POINTS split (owner Jun 13: the sim never displayed it, so declaring 'Late' looked
+        # like it earned nothing). Mirror the real verdict's split_late: declaring before arrival
+        # credits the cheaper −1/min informed rate.
+        try:
+            from shared.database import late_declared_at
+            from gm_bot.points import split_late
+            from gm_bot.attendance import to_min
+            ws = to_min(persona.get("work_start"))
+            dec = late_declared_at(persona["id"], today)
+            off = None
+            if dec is not None and ws is not None:
+                sd0 = datetime.fromisoformat(today).replace(tzinfo=finance.PP_TZ) + timedelta(minutes=ws)
+                off = int((dec.astimezone(finance.PP_TZ) - sd0).total_seconds() // 60)
+            un_min, inf_min = split_late(mins, off)
+            pts = inf_min + un_min * 2
+            await _att_send(context, config.OWNER_TELEGRAM_ID, "Staff", nm,
+                "📊 Points (test): %d min late → %d informed (−1/min) + %d uninformed (−2/min) = −%d.\n"
+                "Declaring 'Late' before you arrive earns the cheaper informed rate."
+                % (mins, inf_min, un_min, pts))
+        except Exception:
+            pass
         payback_add_debt(persona["id"], mins, "late arrival (test)", today)
         d = payback_open_debt(persona["id"])
         if d:

@@ -426,3 +426,11 @@ def test_late_dispatch_legacy_full_headsup(monkeypatch):
         monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30})
     assert declared and not setr
     assert any("late for today's shift" in s for s in sends)
+
+
+def test_split_late_branches_for_points_display():
+    """The 3 branches the test-sim points display reflects (declare-first credits the informed rate)."""
+    from gm_bot.points import split_late
+    assert split_late(30, -5) == (0, 30)     # declared BEFORE start → all informed (−1/min)
+    assert split_late(30, 10) == (10, 20)    # declared 10 min after start → 10 uninformed + 20 informed
+    assert split_late(30, None) == (30, 0)   # never declared → all uninformed (−2/min)
