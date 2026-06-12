@@ -241,14 +241,22 @@ the end, then owner re-walks from step 1. **DONE & deployed (suite 503):**
   (`_expiry_nudge`); `flow_load_or_expired` distinguishes expired-vs-never; reason TTL 15→30.
 - **Stage 3** (6bd1357): F4/F10 stale-stash guards (`_stale_screen` — no 0-day ghost AL, no crash, no
   fabricated-today swap, no blanked summary); F8 mid-pick typing guard; F12 maintenance toast.
-**NEXT — Stage 4 (Law 8, big):** outcomes become fresh detailed messages + delete old; strip `← Back`
-from terminals; terminal "🏠 Main menu" = NEW message (don't dissolve the details); **declare-Late-FIRST**
-(heads-up the moment they pick the minutes, reason after); **photos try sick-papers FIRST** (DB-keyed,
-no awaiting-message exception needed); test-simulate shows the −1/−2 points split. **Stage 5 (F14,
-HIGH-RISK = AL balance):** cross-request same-date collision — first-commit-wins atomic claim + senior
-override + `/audit` exclusivity law + backfill-run on real rows. **Stage 6:** P1 menu singleton.
-Owner walk findings folded in: late points already correct (−1/min informed; test just didn't show it);
-sick-papers bounded by `_sick_papers_deadline_job`. KH drafts MM2–MM7 → KH_REVIEW Pending.
+- **Stage 4a** (c98d43b): photos try **sick-papers FIRST** (`_private_photo_router` order swapped) —
+  DB-keyed capture survives menu resurrection; F1 refusal still catches true non-text reasons.
+- **Stage 4b** (d9a5e39): **declare-Late-FIRST** — `late_declare`(empty reason) + Supervisors heads-up
+  fire the MOMENT they pick the minutes (split-late MIN=pick → informed −1/min even w/ no reason); the
+  typed reason ATTACHES via new `late_set_reason` (UPDATE not INSERT) + addendum. Touches lateness_records
+  (penalty input); split logic + v_late_points audit unaffected.
+- **Stage 4c** (4b29993): test late-sim now SHOWS the points split (informed/uninformed) so declaring is
+  visibly cheaper. Display only.
+**NEXT — Stage 4d (Law 8, remaining):** outcomes become fresh detailed messages + delete old where a
+flow leaves a stale prompt (mainly LATE — AL/swap already morph in place); strip `← Back` from terminal/
+confirmed messages; terminal "🏠 Main menu" = NEW message (don't dissolve the details — owner pt#1).
+**Stage 5 (F14, HIGH-RISK = AL balance):** cross-request same-date collision — first-commit-wins atomic
+claim + senior override + `/audit` exclusivity law + backfill-run on real rows. **Stage 6:** P1 menu
+singleton. → **Fable red-team** → **final Law-9 polish pass** (regression sweep) → owner re-walks from #1.
+Owner walk findings folded in: late points already correct; sick-papers bounded by deadline job. Laws
+now 9 (added Law 9: ≥3 tests/path before the human walk). KH drafts MM2–MM7 → KH_REVIEW Pending.
 
 **(superseded) ▶ earlier: P2 + P3 SHIPPED (Jun 13), P1 held —**
 Deployed & verified (gm-only, 03:37 PP dead-window): **P2 prompt-supersession honesty** — arming a new
