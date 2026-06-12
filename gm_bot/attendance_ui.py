@@ -820,7 +820,7 @@ def _arm_prompt(p: dict, context, base: str, back: str, extra_rows=None):
     if att_test_on():
         line += "\n🧪 (test — every reply/card routes to you; /testreset to wipe when done.)"
     rows = list(extra_rows or [])
-    rows.append(_back_row(back))
+    rows.append(_cancel_row())   # armed prompt → Cancel disarms; a plain Back would leave a ghost pend
     return _hdr(p, line), InlineKeyboardMarkup(rows)
 
 
@@ -893,7 +893,7 @@ def _confirm_prompt(p: dict, context, base: str, back: str):
         line += "\n🧪 (test — routes to you; /testreset to wipe.)"
     return _hdr(p, line), InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ I confirm · ខ្ញុំបញ្ជាក់", callback_data="att:go")],
-        _back_row(back),
+        _cancel_row(),   # armed confirm → Cancel disarms (a plain Back would leave a ghost pend)
     ])
 
 
@@ -907,6 +907,13 @@ def _hdr(p: dict, line: str = "") -> str:
 
 def _back_row(target: str = "att:menu") -> list[InlineKeyboardButton]:
     return [InlineKeyboardButton("← Back · ត្រឡប់ក្រោយ", callback_data=target)]
+
+
+def _cancel_row() -> list[InlineKeyboardButton]:
+    """Armed prompts use this INSTEAD of a plain Back (multi-menu fix F5/Law 6): a harmless Back on a
+    reason prompt leaves the pend armed, so a later stray message becomes a ghost submission. Cancel
+    DISARMS the pend, then returns to a clean menu — the only safe exit from an armed input state."""
+    return [InlineKeyboardButton("✕ Cancel · បោះបង់", callback_data="att:cancel")]
 
 
 # ---------------------------------------------------------------- screens
@@ -2265,6 +2272,20 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "menu":
         context.user_data["att_al_picked"] = set()
+        return await show(main_menu(p))
+    if action == "cancel":
+        # F5/Law 6: the exit from an armed prompt MUST disarm the pend, or a later stray message
+        # becomes a ghost submission. Clear both stores (test user_data + live flow_state), reset the
+        # selection stashes, and return to a clean menu.
+        context.user_data.pop("att_test_pending", None)
+        try:
+            from shared.database import flow_clear
+            flow_clear(uid)
+        except Exception:
+            pass
+        context.user_data["att_al_picked"] = set()
+        for _k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
+            context.user_data.pop(_k, None)
         return await show(main_menu(p))
     if action == "am":
         return await show(about_me_menu(p))

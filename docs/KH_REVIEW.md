@@ -318,3 +318,18 @@ Reason · មូលហេតុ៖ {reason}
 - **BUTTON vs body:** body text (buttons already removed/irrelevant). No variables.
 - Live English: `↩ Replaced — answer the newer prompt below`
 - Draft KH (mine, needs polish): `↩ បានជំនួស — សូមឆ្លើយសំណួរថ្មីខាងក្រោម`
+
+### MM2 — Cancel button on armed prompts (Stage 1, F5)
+- **WHO reads it:** any staffer on an armed reason/confirm prompt (AL, swap, shift, sick/marriage/
+  death/birth). Replaces the old `← Back` on those prompts only.
+- **WHEN:** always shown on the armed prompt; tapping it disarms the pend and returns to the menu.
+- **TONE:** plain action label. **BUTTON.** No variables.
+- Live English: `✕ Cancel` · Draft KH: `បោះបង់`
+
+### MM3 — voice/photo refused on a reason prompt (Stage 1, F1)
+- **WHO reads it:** a staffer who sends a voice note / photo instead of typing their reason.
+- **WHEN:** the moment they send non-text while a reason prompt is armed; the prompt stays armed so
+  their next typed line still submits.
+- **TONE:** gentle, helpful, not an error — "I can't read that here, please type." **BODY.** No vars.
+- Live English: `🎤 I can't read a voice note / photo here — please type your reason in one line, or use the buttons below.`
+- Draft KH (mine, needs polish): `🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់ ឬប្រើប៊ូតុងខាងក្រោម។`

@@ -120,3 +120,77 @@ def test_open_live_menu_resets_all_stashes(monkeypatch):
     for k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
         assert k not in ud, "%s should be reset on menu open" % k
     assert sent["text"] == "menu"
+
+
+# ── Stage 1: F1 voice-refuse + F5 Back→Cancel ──
+def test_voice_reason_refused_keeps_pend(monkeypatch):
+    """A voice note on an armed reason prompt is REFUSED and the pend is KEPT (not the old silent
+    thank-you-and-drop). Returns True so the photo router doesn't treat it as a sick-paper."""
+    from gm_bot import bot
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    replies = []
+
+    async def _reply(t):
+        replies.append(t)
+
+    msg = SimpleNamespace(voice=True, photo=None, sticker=None, reply_text=_reply,
+                          chat_id=1, message_id=2)
+    update = SimpleNamespace(message=msg, effective_user=SimpleNamespace(id=9))
+    ctx = SimpleNamespace(user_data={"att_test_pending": {"flow": "al"}})
+    handled = asyncio.run(bot._capture_voice_reason(update, ctx))
+    assert handled is True
+    assert ctx.user_data.get("att_test_pending") == {"flow": "al"}   # pend NOT cleared
+    assert "type your reason" in replies[0]
+
+
+def test_voice_reason_passes_through_when_no_pend(monkeypatch):
+    """No armed reason pend → returns False so the photo router falls through to sick-paper handling."""
+    from gm_bot import bot
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "_attendance_live", lambda: False)
+
+    async def _reply(t):
+        pass
+
+    msg = SimpleNamespace(voice=True, photo=None, sticker=None, reply_text=_reply,
+                          chat_id=1, message_id=2)
+    update = SimpleNamespace(message=msg, effective_user=SimpleNamespace(id=9))
+    ctx = SimpleNamespace(user_data={})
+    assert asyncio.run(bot._capture_voice_reason(update, ctx)) is False
+
+
+def test_att_cancel_disarms_pend(monkeypatch):
+    """att:cancel clears the armed pend (both stores) + resets stashes + shows a clean menu — the safe
+    exit from an armed prompt (F5/Law 6), so no later stray message becomes a ghost submission."""
+    from gm_bot import attendance_ui as ui
+    import config
+    import shared.database as db
+    monkeypatch.setattr(db, "flow_clear", lambda uid: None)
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "X"})
+    monkeypatch.setattr(ui, "main_menu", lambda p: ("MENU", None))
+    edits = []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    q = SimpleNamespace(data="att:cancel", answer=_ans, edit_message_text=_edit,
+                        message=SimpleNamespace(message_id=5, chat_id=1))
+    update = SimpleNamespace(callback_query=q,
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID))
+    ud = {"att_test_pending": {"flow": "al"}, "att_al_picked": {"d"}, "att_do_day": "x",
+          "att_al_page": 3, "att_live_self": False}
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data=ud)))
+    assert "att_test_pending" not in ud
+    assert ud["att_al_picked"] == set()
+    assert "att_do_day" not in ud and "att_al_page" not in ud
+    assert edits and edits[0] == "MENU"
+
+
+def test_armed_prompts_use_cancel_not_back():
+    """The two armed-prompt builders must render ✕ Cancel (att:cancel), never a plain Back."""
+    from gm_bot import attendance_ui as ui
+    row = ui._cancel_row()
+    assert row[0].callback_data == "att:cancel" and "Cancel" in row[0].text

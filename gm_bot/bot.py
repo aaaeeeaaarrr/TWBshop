@@ -1089,28 +1089,30 @@ async def _send_reconciliation(context, business_day: str) -> None:
 
 
 async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """If a staff is on a reason-wait (flow_state step ends with 'reason') and sends voice/photo/
-    sticker instead of typing → store it verbatim + post to Supervisors (lateness reasons). Gated."""
-    if not _attendance_live():
-        return False
+    """A staffer on a reason-wait who sends voice / photo / sticker INSTEAD of typing. Owner decision
+    (Jun 13, menu-patterns Law 6 — F1): the old code said "Got it 👍 thank you", forwarded the media,
+    and NEVER submitted — the request silently vanished. Now we REFUSE the non-text input and KEEP the
+    prompt armed, so their next typed line still submits. Returns True only when an armed reason pend
+    existed (so the photo router doesn't then treat it as a sick-paper). Test-mode aware so it's
+    walkable: owner test pend lives in user_data; a live staffer's in flow_state."""
     msg = update.message
     user = update.effective_user
     if not msg or not user:
         return False
-    from shared.database import flow_load, flow_clear
-    fs = flow_load(user.id)
-    if not fs or not str(fs.get("step", "")).endswith("reason"):
+    armed = False
+    if _att_test_mode() and context.user_data.get("att_test_pending"):
+        armed = True
+    elif _attendance_live():
+        from shared.database import flow_load
+        fs = flow_load(user.id)
+        if fs and str(fs.get("step", "")).endswith("reason"):
+            armed = True
+    if not armed:
         return False
-    staff = staff_get_by_uid(user.id)
-    kind = ("voice" if msg.voice else "photo" if msg.photo else "sticker" if msg.sticker else "media")
-    flow_clear(user.id)
-    await msg.reply_text("Got it 👍 thank you.\nបានហើយ 👍 អរគុណ។")
-    try:
-        await context.bot.send_message(config.SUPERVISORS_CHAT_ID,
-            "%s sent a %s reason:" % ((staff.get("call_name") if staff else "Staff"), kind))
-        await context.bot.forward_message(config.SUPERVISORS_CHAT_ID, msg.chat_id, msg.message_id)
-    except Exception:
-        pass
+    await msg.reply_text(
+        "🎤 I can't read a voice note / photo here — please type your reason in one line, "
+        "or use the buttons below.\n"
+        "🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់ ឬប្រើប៊ូតុងខាងក្រោម។")
     return True
 
 
