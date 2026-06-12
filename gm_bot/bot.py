@@ -1116,11 +1116,14 @@ async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def _private_photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Private photo: voice/photo reason capture first, then staff sick papers (gated)."""
+    """Private photo: sick-PAPERS first, then the voice/photo-on-a-reason-prompt refusal (owner,
+    Jun 13). A photo is almost always a DOCUMENT, not a 'reason' — and paper-capture is DB-keyed (the
+    open sick case), so it works regardless of menu state, even after a menu is reopened. Only if it's
+    NOT papers-for-an-open-case do we fall through to refuse it as a non-text reason."""
     try:
-        if await _capture_voice_reason(update, context):
+        if await _handle_sick_paper(update, context):
             return
-        await _handle_sick_paper(update, context)
+        await _capture_voice_reason(update, context)
     except Exception as e:
         logger.error("private photo handling failed: %s", e)
 

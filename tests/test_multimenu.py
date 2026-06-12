@@ -308,3 +308,37 @@ def test_maintenance_toast_when_paused(monkeypatch):
     update = SimpleNamespace(callback_query=q, effective_user=SimpleNamespace(id=424242))
     asyncio.run(ui.callback(update, SimpleNamespace(user_data={})))
     assert answers and answers[0][1] is True and "paused" in (answers[0][0] or "")
+
+
+# ── Stage 4: photos try sick-papers FIRST ──
+def _photo_router_calls(monkeypatch, paper_ret, voice_ret):
+    from gm_bot import bot
+    calls = []
+
+    async def _paper(u, c):
+        calls.append("paper")
+        return paper_ret
+
+    async def _voice(u, c):
+        calls.append("voice")
+        return voice_ret
+
+    monkeypatch.setattr(bot, "_handle_sick_paper", _paper)
+    monkeypatch.setattr(bot, "_capture_voice_reason", _voice)
+    asyncio.run(bot._private_photo_router(SimpleNamespace(), SimpleNamespace()))
+    return calls
+
+
+def test_photo_papers_first_captured(monkeypatch):
+    """An open sick case captures the photo as papers → the refuse path is never reached."""
+    assert _photo_router_calls(monkeypatch, paper_ret=True, voice_ret=False) == ["paper"]
+
+
+def test_photo_not_papers_falls_to_refuse(monkeypatch):
+    """No open case → fall through to the voice/photo-on-a-reason-prompt refusal."""
+    assert _photo_router_calls(monkeypatch, paper_ret=False, voice_ret=True) == ["paper", "voice"]
+
+
+def test_photo_neither_passes_through(monkeypatch):
+    """No case, no armed reason → both decline, nothing happens (no crash)."""
+    assert _photo_router_calls(monkeypatch, paper_ret=False, voice_ret=False) == ["paper", "voice"]
