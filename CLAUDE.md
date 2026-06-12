@@ -252,10 +252,15 @@ the end, then owner re-walks from step 1. **DONE & deployed (suite 503):**
 - **Stage 4d** (9535e12): terminal "🏠 Main menu" → `att:menunew` (posts a NEW message, doesn't dissolve
   the ended record — owner pt#1; 9 buttons repointed, nav keeps att:menu); Law 8 deletes the consumed
   LATE reason-prompt when the outcome appears. **STAGE 4 COMPLETE.**
-**NEXT — Stage 5 (F14, HIGH-RISK = AL balance, auto-bedrock):** cross-request same-date collision —
-first-commit-wins ATOMIC claim at approval (compare-and-swap, like OT-banking) + senior override +
-`/audit` exclusivity law (≤1 approved leave/redefine/swap per staff-date; each approved AL-day deducts
-once) + **backfill-run on REAL rows before go-live**. Full real-path proof required — do NOT rush.
+- **Stage 5a** (bf9382a): **`/audit` exclusivity law** (`v_exclusivity`, read-only detector) — flags
+  same-day double-AL + AL-vs-approved-shift-change. Backfill-run on REAL rows = **0 collisions** (clean).
+  Now in the daily auto-audit. The balance-moving GUARD is held (below).
+**NEXT — Stage 5b (F14 GUARD, HIGH-RISK = AL balance, auto-bedrock — DESIGN READY, build w/ Fable review):**
+request-time block (don't offer/submit a day already approved) + **approval-time atomic claim** via a
+Postgres `pg_advisory_xact_lock(hash(staff_id,date))` (race-proof, NO schema change) wrapping the
+existence-check + status-flip in the AL-finalize / swap-apply / shift-approve flows; loser told
+"❌ Unavailable", senior **override** to supersede. Detector (5a) is the live backstop meanwhile. Needs
+full real-path proof (race + each flow + override) + second-opinion — do in a focused pass, not a tail.
 **Stage 6:** P1 menu singleton (collapse old NAV menus; never prompts/cards/terminals). → **Fable
 red-team** the finished behaviour → **final Law-9 polish pass** (regression sweep — later stages may
 have touched earlier ones) → owner re-walks from #1.
