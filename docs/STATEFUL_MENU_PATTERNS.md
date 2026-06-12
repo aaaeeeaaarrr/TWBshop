@@ -40,7 +40,7 @@ Two distinct failure shapes — and the second needs only ONE menu:
 
 ---
 
-## The laws (six)
+## The laws (seven)
 
 1. **A button must never trust the screen it sits on.** Recompute from a trustworthy source at *action
    time*. Three ways, most-preferred first:
@@ -71,14 +71,27 @@ Two distinct failure shapes — and the second needs only ONE menu:
    for double-tap races. Every `return` after `query.answer()` is a silent dead-tap — route it through
    the dead-tap collapse instead. Wording must match the cause: "try again" only where retry can
    actually succeed (use "already decided" / "not for you anymore" otherwise).
-6. **Every armed state must be leavable and must announce its own death.** (Added Jun 13 — the law the
-   taxonomy was missing.) An armed input prompt needs: (a) a user-initiated exit — navigating away or a
-   ✕ Cancel **disarms** the slot, so a later stray message can't become a ghost submission; (b) a death
-   notice — when its TTL expires, edit the prompt it leaves behind ("⏳ Expired — open the menu to start
-   again") using the coords it stored; never let loose text that arrives after expiry be eaten by a
-   cheerful fresh menu. **Non-text input is input:** if a flow waits for a typed reason, a voice
-   note / photo / sticker must either complete the same flow or be honestly refused — never thank-you'd
-   and dropped.
+6. **Every armed state must be leavable and must announce its own death — WITH A PUSH.** (Added
+   Jun 13; death-notice upgraded by owner Jun 13.) An armed input prompt needs: (a) a user-initiated
+   exit — a ✕ Cancel that **disarms** the slot (so a later stray message can't become a ghost
+   submission), while a harmless `← Back` may stay on pure-nav screens; (b) a death notice that
+   **PUSH-notifies** — on expiry or dead-tap, send a **NEW message** (an in-place edit does NOT
+   notify and is missed by change-blindness) headed **"❗ NOT CONFIRMED — TRY AGAIN"** (caps EN +
+   **bold KH**) carrying *what* expired ("Death leave · 12–14 Jun") + 📋 Open menu, then remove the
+   stale card (Telegram delete ≤48h, else edit it to a stub). Applies to **expired armed states only**
+   — never to a finalized approved/declined card (those stay). **Non-text input is input:** if a flow
+   waits for a typed reason, a voice note / photo / sticker must complete the same flow or be honestly
+   refused — never thank-you'd and dropped.
+7. **Resource exclusivity — first commit wins, at one atomic chokepoint.** (Added Jun 13.)
+   Mutually-exclusive commitments on a shared resource (a staff-date/time) are enforced in ONE place:
+   **hidden at request time** where clearly taken (a duplicate same-day isn't even offered) and
+   **hard-claimed at approval time** with an atomic compare-and-swap (same idempotency trick as
+   OT-banking — a plain read-check races and double-approves). First atomic claim wins; the rest are
+   refused with a clear "❌ Unavailable — already approved for that day" (which **stays**, per the
+   terminal rule), and the approving senior gets an **override** for the case where the new one should
+   supersede (e.g. bereavement over a minor shift-change). This invariant is also an **`/audit` law**
+   ("≤1 approved leave/redefine/swap per staff-date; each approved AL-day deducts AL once") — run it on
+   real rows **before go-live** to catch collisions already in the data.
 
 ### The honesty rule (why staff never read it as "broken")
 Every collapse / supersede should leave a **self-explanatory** message, and every failed edit should
@@ -135,6 +148,23 @@ independently re-verified in code by the reviewing session: F1, F2.)
 | **F11** | "⏳ Awaiting approval" sits silently for hours → re-submits (no duplicate guard). | 5 (waiting) | MOD | `_al_finalize` path | open |
 | **F12** | If `attendance_live` flipped OFF (rollback), **every staff button goes silently dead** → 20 staff DM the owner "it's broken". | 5 | MOD→HIGH on first rollback | gate `attendance_ui.py:2166-2171` | open |
 | **F13** | Multi-instance human reasons (chat-scroll loss, phone+desktop, **shared phone/spouse**), `_supersede` same-msg check ignores `chat_id`. | — | MINOR | `attendance_ui.py:765, 2172-2174` | note |
+| **F14** | **Cross-request same-date collision** (owner find, Jun 13): nothing cross-checks requests on one date — AL+shift-change, swap+shift-change can contradict; **two AL on the same day deduct twice**. Only guard today is payback-skips-approved-redefine (`bot.py:1383,1424`). Owner lean: warn the approving senior. | data integrity | **HIGH** (pre-go-live) | `submit_shift_change`/`submit_swap`/`submit_al_request` — no overlap check | open |
+
+### Agreed resolutions (owner walk, Jun 13 — build briefs)
+- **F1 + F5 + Back buttons:** swap `← Back`→`✕ Cancel`(disarms the pend) on the **2 armed-prompt spots
+  only** (`_arm_prompt:823`, `_confirm_prompt:896`); keep `← Back` on the ~38 nav spots. Keep the 👁
+  toggle. Voice/photo on a reason prompt → refuse ("🎤 please type one line") + keep prompt armed.
+  Carve-out: **selection screens** (AL grid / time grid / swap-day) — typing there must not silently
+  wipe the pick (F8 guard).
+- **F2 + F3 (expiry/dead-tap):** on expiry → **NEW push message** "❗ NOT CONFIRMED — TRY AGAIN"
+  (caps EN + bold KH) + what expired + 📋 Open menu, then delete the stale card (≤48h, else stub).
+  F3 = same nudge on type-after-expiry (no cheerful menu). Lift TTL to ~30–35 min. Optional upgrade:
+  a proactive expiry sweep so they're nudged at the moment, not only on next touch. → Law 6.
+- **F14 (cross-request collision):** first-commit-wins at one atomic chokepoint (hide at request,
+  compare-and-swap claim at approval); loser told "❌ Unavailable — already approved", senior override
+  for supersede. Add the `/audit` exclusivity law + backfill-run on real rows pre-go-live. → Law 7.
+- **Fable:** not needed to build; do ONE red-team pass AFTER building, on the NEW behaviour (does the
+  caps nudge scare, does auto-unavailable confuse the loser, does the override read clearly).
 
 **Top 5 to do first (Fable's ranking):** F1 (voice submits or honestly refuses) · kill every silent
 `return` after `query.answer()` (F2/F6/F12, reuse the existing dead-tap collapse) · expiry honesty
