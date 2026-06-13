@@ -80,6 +80,19 @@ def al_day_count(al_days: list[str], kind: str, frac_per_day: float = 1.0,
     return round(n * (frac_per_day if kind == "hours" else 1.0), 2)
 
 
+def al_deduction_map(al_days: list[str], kind: str, frac_per_day: float = 1.0,
+                     day_off: str | None = None, non_working: set | None = None,
+                     no_deduct: bool = False) -> tuple[dict, float]:
+    """The FROZEN per-day AL charge: {date: amount} for EVERY selected day — the charge on a working
+    day, 0 on a day-off / already-absent day / PH-comp request — plus the total. By construction
+    keys == al_days (so refund + audit read the row, never recompute) and sum == al_day_count. This
+    is the single place the deduction is computed, so the value frozen at approval is exact (S1)."""
+    per_day = 0.0 if no_deduct else (frac_per_day if kind == "hours" else 1.0)
+    charged = set(al_charged_days(al_days, day_off, non_working))
+    dmap = {d: (per_day if d in charged else 0) for d in al_days}
+    return dmap, round(sum(dmap.values()), 2)
+
+
 def al_span_label(al_days: list[str], day_off: str | None = None,
                   non_working: set | None = None) -> str:
     """Format the leave as 'from → to' segments, BRIDGING any day the staff is NOT in for any

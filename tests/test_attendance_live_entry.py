@@ -446,14 +446,16 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
          "status": "pending", "hours_start": None, "hours_end": None}
     monkeypatch.setattr(bot, "al_get_request", lambda i: g)
     monkeypatch.setattr(bot, "al_set_status", lambda i, st: g.__setitem__("status", st))
-    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid, exclude_req_id=None: set())
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
         {"id": 2, "canonical_name": "Pisey", "call_name": "Pisey", "telegram_ids": [222],
          "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}])
     monkeypatch.setattr(bot, "al_get_approvals", lambda i: [
         {"decision": "approve", "canonical_name": "A", "call_name": "A"},
         {"decision": "approve", "canonical_name": "B", "call_name": "B"}])
-    monkeypatch.setattr(bot, "al_deduct", lambda sid, amt: 5)
+    # finalize now deducts via the atomic approve (flips status + returns new balance)
+    monkeypatch.setattr(bot, "al_approve_and_deduct",
+                        lambda i, total, dmap, pmap: g.__setitem__("status", "approved") or 5)
     monkeypatch.setattr(bot, "_seniors", lambda exclude_staff_id=None: [])
 
     async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):

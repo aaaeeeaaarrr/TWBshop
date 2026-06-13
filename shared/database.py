@@ -2860,7 +2860,9 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                        s.canonical_name, s.call_name, s.al_left
                 FROM al_requests a JOIN staff_registry s ON s.id = a.staff_id
                 WHERE a.status = 'approved' AND a.kind = 'days' AND a.is_test = FALSE
-            """)
+                  AND a.deducted_map IS NULL
+            """)   # partition: rows deducted AT APPROVAL carry a map — the daily job NEVER
+                   # touches them (invariant S3/#3); only legacy rows are charged as dates pass
             for r in cur.fetchall():
                 try:
                     days = _json.loads(r["days"] or "[]")
@@ -3483,15 +3485,22 @@ def points_events_for(staff_id: int, since_iso: str | None = None) -> list[dict]
 
 
 def al_create_request(staff_id: int, kind: str, days: list[str], hours_start: str | None,
-                      hours_end: str | None, reason: str, requested_by_uid: int) -> int:
+                      hours_end: str | None, reason: str, requested_by_uid: int,
+                      no_deduct: bool | None = None) -> int:
+    """Create a pending AL request. `no_deduct` is the STRUCTURAL PH-compensation flag (the leave
+    costs no AL): when None it's bridged once here from a 'PH…' reason so all downstream logic reads
+    the column, never re-parses the text; a future granter UI can pass it explicitly."""
     import json as _json
+    if no_deduct is None:
+        no_deduct = (reason or "").upper().startswith("PH")
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO al_requests
-                (staff_id, requested_by_uid, kind, days, hours_start, hours_end, reason, status, is_test)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%s) RETURNING id""",
+                (staff_id, requested_by_uid, kind, days, hours_start, hours_end, reason, status,
+                 no_deduct, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%s,%s) RETURNING id""",
                 (staff_id, requested_by_uid, kind, _json.dumps(days), hours_start, hours_end,
-                 reason, _ATT_TEST))
+                 reason, bool(no_deduct), _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3623,6 +3632,17 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                            WHERE id=%s RETURNING al_left""", (total, staff_id))
             r = cur.fetchone()
             return float(r["al_left"]) if r else 0.0
+
+
+def al_reject(req_id: int) -> bool:
+    """Atomic reject: claim pending→rejected (no balance moves). Returns True if THIS call won the
+    claim, else False (the request was already decided). Mirrors the pending-claim of the approve
+    path so a reject can't race an approve."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE al_requests SET status='rejected', decided_at=NOW() "
+                        "WHERE id=%s AND status='pending' RETURNING id", (req_id,))
+            return cur.fetchone() is not None
 
 
 def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | None = None):

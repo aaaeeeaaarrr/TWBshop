@@ -31,6 +31,7 @@ from shared.database import (
     att_get_session, att_check_in, att_record_ping,
     late_declare, payback_open_debt, payback_add_debt, payback_credit, payback_book, payback_all_open,
     al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
+    al_approve_and_deduct, al_reject,
     al_pending_requests, al_deduct, points_record, points_seed_catalogue,
     al_leave_days_set, staff_absent_dates, payback_bookings_due_reminder, payback_mark_reminded,
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
@@ -2552,18 +2553,52 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def _al_finalize(context, req: dict, approved: bool) -> None:
     """On 2 ✅ or 2 ❌: recap to seniors, notify requester, (if approved) Supervisors notice + deduct."""
     if al_get_request(req["id"])["status"] != "pending":
-        return  # race guard
-    al_set_status(req["id"], "approved" if approved else "rejected")
+        return  # cheap early-out; the real claim is the atomic CAS below
     requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
     if not requester:
         return
     import html
     from gm_bot import al as alm
+    from gm_bot.attendance import to_min
     name = requester.get("call_name") or requester["canonical_name"]
     days = req["days"]
-    nw = staff_absent_dates(req["staff_id"])                        # other AL / special leave / swaps
+    # absent set EXCLUDING this request's own days — explicit so a reorder can never re-introduce the
+    # self-exclusion deduct-nothing bug; is_test-scoped so a test approval never bleeds into real math.
+    nw = staff_absent_dates(req["staff_id"], exclude_req_id=req["id"])
     days_txt = alm.al_span_label(days, requester.get("day_off"), nw)   # from→to, bridging any absence
     runc = requester.get("telegram_ids") or []
+    sl = (to_min(requester.get("work_end")) - to_min(requester.get("work_start"))) % 1440 or 1440
+
+    # ── settle the decision ATOMICALLY before touching any card (S1/S2/S3) ─────
+    new_bal = None
+    if approved:
+        no_deduct = bool(req.get("no_deduct"))            # structural PH-comp flag → costs no AL
+        frac = alm.fractional_al(to_min(req["hours_start"]), to_min(req["hours_end"]), sl) \
+            if req["kind"] == "hours" and req.get("hours_start") else 1.0
+        # frozen per-day charge (keys == days, 0 for day-off/absent/PH-comp) — refund + audit read it
+        deducted_map, total = alm.al_deduction_map(days, req["kind"], frac, requester.get("day_off"),
+                                                   nw, no_deduct)
+        # short-notice penalty FROZEN per day (−0.1/min), judged vs the REQUEST date; none for PH-comp
+        from datetime import date as _d
+        created = req["created_at"].date() if req.get("created_at") else _today_pp()
+        win = sl
+        if req["kind"] == "hours" and req.get("hours_start"):
+            win = (to_min(req["hours_end"]) - to_min(req["hours_start"])) % 1440 or sl
+        points_map = {} if no_deduct else {
+            d: win for d in days
+            if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS}
+        new_bal = al_approve_and_deduct(req["id"], total, deducted_map, points_map)
+        if new_bal is None:
+            return  # lost the claim — another finalize already decided this request
+        for d, q in points_map.items():               # live ledger; the frozen map drives the refund
+            try:
+                points_record(req["staff_id"], "short_notice_al", int(q), "al:%d:%s" % (req["id"], d))
+            except Exception as e:
+                logger.error("short-notice points record failed: %s", e)
+    else:
+        if not al_reject(req["id"]):
+            return  # lost the claim
+
     # EDIT the senior cards in place — request text stays intact, the decision is appended, and the
     # 👁 Show-who's-working toggle STAYS (seniors can still check coverage after the decision).
     req2 = al_get_request(req["id"])   # status now approved/rejected
@@ -2592,28 +2627,6 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             pass
     # the requester + Supervisors notices stay bilingual (the owner sees English via strip_khmer)
     if approved:
-        from gm_bot.attendance import to_min
-        sl = (to_min(requester.get("work_end")) - to_min(requester.get("work_start"))) % 1440 or 1440
-        frac = alm.fractional_al(to_min(req["hours_start"]), to_min(req["hours_end"]), sl) \
-            if req["kind"] == "hours" and req.get("hours_start") else 1.0
-        amount = alm.al_day_count(days, req["kind"], frac, day_off=requester.get("day_off"),
-                                  non_working=nw)
-        new_bal = al_deduct(req["staff_id"], amount)
-        # short-notice points event (−0.1/min rule): quantity = window-minutes × short-notice
-        # days, judged against the REQUEST date (when they asked, not when seniors decided)
-        try:
-            from datetime import date as _d
-            created = req["created_at"].date() if req.get("created_at") else _today_pp()
-            near = [d for d in days
-                    if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS]
-            if near:
-                win = sl
-                if req["kind"] == "hours" and req.get("hours_start"):
-                    win = (to_min(req["hours_end"]) - to_min(req["hours_start"])) % 1440 or sl
-                points_record(req["staff_id"], "short_notice_al",
-                              int(win * len(near)), "al:%d" % req["id"])
-        except Exception as e:
-            logger.error("short-notice points record failed: %s", e)
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
             "AL របស់ប្អូនសម្រាប់ %s បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត 🤍"

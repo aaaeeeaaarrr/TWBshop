@@ -231,13 +231,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
 **Last updated:** 2026-06-13 (session 33 — **STAGING DB stood up (Phase A+B)** + **AL overhaul Steps
-1–2 built & proven on staging**. Staging: `twbshop_staging` created on the DO instance, schema cloned
+1–3 built & proven on staging**. Staging: `twbshop_staging` created on the DO instance, schema cloned
 with zero prod data via every `init_*_db()` + a prod↔staging column diff (closed 1 real drift — pay
 columns now canonical); `TWBSHOP_ENV` switch in `shared/database.py` (default prod = zero behavior
 change); latent init-ordering bug fixed; owner added the `STAGING_DATABASE_URL` secret (real path
-verified → lands on twbshop_staging). AL overhaul: Step 1 columns + Step 2 atomic approve/cancel
-functions + isolation fixes, real before/after proof on staging + permanent regression guard
-(`tests/test_al_atomic.py`). Inert until Step 3 wires them. attendance_live=OFF.)
+verified → lands on twbshop_staging). AL overhaul: Step 1 columns + Step 2 atomic approve/cancel +
+isolation fixes + **Step 3 wired** (deduct-at-approval in `_al_finalize`, exact-refund Cancel-AL,
+daily-job partitioned, `v_al` map-aware, PH→`no_deduct` bridge, S4 confirm), real before/after proof
+on staging + permanent guards (`tests/test_al_atomic.py` + `test_al_step3.py`). Suite 536. Still behind
+attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. Next: special-leave
+refund path + `v_special`, then Fable red-team before lock.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
@@ -276,13 +279,20 @@ state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live
    no_deduct/special_leaves.deducted_amount — additive, dormant on prod) `d47c32e`; Step 2 atomic
    `al_approve_and_deduct` + `al_cancel_and_refund` + isolation fixes (staff_absent_dates exclude_req_id
    + is_test on it & al_leave_days_set) `abf10a2`, proven + permanent guard `tests/test_al_atomic.py`
-   (4 tests; suite 524 on staging). **NEXT — Step 3 (the live-relevant wiring):** rewire `_al_finalize`
-   (compute deducted_map via `staff_absent_dates(exclude_req_id=req)`, call the atomic approve, record
-   short-notice points PER-DAY into points_map) + the Cancel-AL handler (call the atomic refund, drop
-   the flat −1, verify ownership) + the no_deduct structural PH flag at grant time. Then Step 6
-   (partition daily job `WHERE deducted_map IS NULL` + mechanical `v_al` + `v_special`) → **Fable
-   red-team the finished build before lock** → F14 (#3 below). Honest: Steps 1–2 are inert until Step 3
-   wires them; attendance_live=OFF so nothing live changes yet.
+   (4 tests; suite 524 on staging). **Step 3 DONE (Jun 13, the live-relevant wiring):** `_al_finalize`
+   now computes the frozen map via a NEW pure `al.al_deduction_map()` + `staff_absent_dates(exclude_req_id
+   =req)`, calls the atomic approve (status flip + deduct in one txn), records short-notice points
+   PER-DAY into points_map, and rejects via atomic `al_reject`; the Cancel-AL handler calls
+   `al_cancel_and_refund` (exact frozen refund, drops the buggy flat −1, ownership-checked); the confirm
+   screen shows the TRUE refund (S4, fraction/0); the daily job is **partitioned** (`WHERE deducted_map
+   IS NULL` — no double-charge as dates pass); `v_al` is **map-aware** (no false alarms); `al_create_request`
+   **bridges** a 'PH…' reason into the structural `no_deduct` column. Guards: `tests/test_al_step3.py`
+   (12: v_al map-awareness, daily-job partition, no_deduct bridge, deduction-map invariant). Suite **536
+   on staging** (1 known empty-staging FK fixture for staff#11, not AL). **NEXT — Step 6 + finish:** give
+   special leaves a frozen `deducted_amount` + refund path + `v_special`; optional submit-time/approval
+   over-balance senior warning (Fable M1); then **Fable red-team the finished build before lock** → F14
+   (#3 below). Honest: still all behind `attendance_live=OFF` — nothing live changed; deduct-at-approval
+   activates at go-live. Prod still runs the legacy daily-job path (its rows have no map → unaffected).
 3. **F14 guard (Stage 5b)** — atomic same-date collision claim, on the corrected AL base.
 Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
 keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.

@@ -2027,23 +2027,33 @@ def al_cancel_confirm(p: dict, iso: str, rid: int) -> tuple[str, InlineKeyboardM
     """Confirmation screen: shows the day details and asks the staffer to confirm before cancelling.
     Confirm → att:my:cancel (actual cancel). Back → att:my:allist."""
     import json as _json
-    kind, hs, he = "days", None, None
+    kind, hs, he, refund = "days", None, None, None
     try:
         with _db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT kind, hours_start, hours_end FROM al_requests WHERE id=%s", (rid,))
+                cur.execute("SELECT kind, hours_start, hours_end, deducted_map FROM al_requests "
+                            "WHERE id=%s", (rid,))
                 r = cur.fetchone()
                 if r:
                     kind, hs, he = r["kind"], r.get("hours_start"), r.get("hours_end")
+                    dm = r.get("deducted_map") or {}
+                    refund = dm.get(iso)   # the EXACT frozen amount (None on a legacy row)
     except Exception:
         pass
     lbl = day_label(date.fromisoformat(iso))
     detail = ("%s %s–%s" % (lbl, hs, he)) if (kind == "hours" and hs and he) else lbl
+    # S4: show the amount that will ACTUALLY return — fraction for hours-AL, 0 for a day-off day
+    if refund is None or refund == 1:
+        ret_en, ret_kh = "1 day", "AL 1 ថ្ងៃ"
+    elif refund == 0:
+        ret_en, ret_kh = "no AL (this day costs none)", "មិនដក AL (ថ្ងៃនេះមិនអស់ AL)"
+    else:
+        ret_en, ret_kh = "%g AL" % refund, "AL %g" % refund
     body = ("Are you sure you want to cancel your AL on %s?\n"
-            "This will return 1 day to your AL balance.\n\n"
+            "This will return %s to your AL balance.\n\n"
             "ប្អូនពិតជាចង់បោះបង់ AL នៅ %s មែនទេ?\n"
-            "វានឹងដាក់ AL 1 ថ្ងៃ ត្រឡប់ចូល balance របស់ប្អូនវិញ។"
-            % (detail, detail))
+            "វានឹងដាក់ %s ត្រឡប់ចូល balance របស់ប្អូនវិញ។"
+            % (detail, ret_en, detail, ret_kh))
     rows = [
         [InlineKeyboardButton("✅ Yes, cancel it · បោះបង់",
                               callback_data="att:my:cancel:%s:%d" % (iso, rid))],
@@ -2729,17 +2739,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(al_cancel_confirm(p, iso, rid))
         if len(data) > 2 and data[2] == "cancel":
             iso, rid = data[3], int(data[4])
-            from shared.database import al_cancel_day, al_deduct
+            from shared.database import al_cancel_and_refund
             today_iso = _today().isoformat()
             # cutoff (window-aware): block past dates, and today's once the shift/window has started
             if iso < today_iso or (iso == today_iso and _shift_running(p)):
                 await query.answer("Too late to cancel — that day has already started · "
                                    "យឺតពេលបោះបង់ហើយ — ថ្ងៃនោះបានចាប់ផ្តើមហើយ", show_alert=True)
                 return await show(my_screen(p))
-            # per-date cancel: drop ONLY this day, keep the rest of the request
-            remaining, sid = al_cancel_day(rid, iso)
-            if remaining >= 0:
-                al_deduct(p["id"], -1)   # refund just the one cancelled day
+            # per-date cancel: pop ONLY this day + refund the EXACT frozen amount, atomically (S1).
+            # None ⇒ nothing to refund (double-tap / not approved / past) → just refresh, no FYI.
+            res = al_cancel_and_refund(rid, p["id"], iso, today_iso=today_iso)
+            if res is not None:
                 from gm_bot.bot import _att_send
                 nmx = p.get("call_name") or p["canonical_name"]
                 dlbl = date.fromisoformat(iso).strftime("%a %d/%m")

@@ -56,8 +56,27 @@ def v_al(requests: list[dict], staff: dict, today: date) -> list[str]:
     for r in requests:
         nm = _nm(staff, r["staff_id"])
         days = json.loads(r.get("days") or "[]")
-        ded = json.loads(r.get("deducted_days") or "[]")
         st = r["status"]
+        # stale-pending applies to BOTH deduction models
+        if st == "pending" and r.get("created_at"):
+            age = (today - r["created_at"].date()).days
+            if age >= STALE_PENDING_DAYS:
+                out.append("AL: %s req #%s PENDING for %d days — approval ladder stuck?"
+                           % (nm, r["id"], age))
+        dmap = r.get("deducted_map")   # dict on deduct-at-approval rows; None on legacy / never-approved
+        if dmap is not None:
+            # NEW model: the frozen per-day map IS the truth — mechanical, no recompute (no false
+            # positives). approved ⇒ keys == days (0 for day-off/absent/PH-comp); a refunded/rejected
+            # request must hold no leftover map.
+            if st == "approved" and set(dmap.keys()) != set(days):
+                out.append("AL: %s req #%s approved but deducted_map keys %s != days %s"
+                           % (nm, r["id"], sorted(dmap), sorted(days)))
+            if st in ("rejected", "cancelled") and dmap:
+                out.append("AL: %s req #%s is %s but deducted_map still holds %s (refund missing?)"
+                           % (nm, r["id"], st, dmap))
+            continue
+        # LEGACY model: the daily job deducts as dates pass (deducted_days list)
+        ded = json.loads(r.get("deducted_days") or "[]")
         bad = [d for d in ded if d not in days]
         if bad:
             out.append("AL: %s req #%s deducted days not in the request: %s" % (nm, r["id"], bad))
@@ -70,11 +89,6 @@ def v_al(requests: list[dict], staff: dict, today: date) -> list[str]:
         if st in ("rejected", "cancelled") and ded:
             out.append("AL: %s req #%s is %s but has deductions %s (refund missing?)"
                        % (nm, r["id"], st, ded))
-        if st == "pending" and r.get("created_at"):
-            age = (today - r["created_at"].date()).days
-            if age >= STALE_PENDING_DAYS:
-                out.append("AL: %s req #%s PENDING for %d days — approval ladder stuck?"
-                           % (nm, r["id"], age))
     return out
 
 
