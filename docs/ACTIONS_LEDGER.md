@@ -63,6 +63,23 @@
   - Ask the advisors: can these collapse into ONE universal principle ("a change isn't done until the
     whole it touches is re-verified; a resource with many writers needs one resolver + reverse-on-supersede
     + announce") without weakening the precise/by-construction guarantees? Don't lean if it costs precision.
+  - **▶ NEW (Jun 14) — Rule 4 WHOLE-PICTURE RE-SWEEP needs a TRIGGER + ARTIFACT, not just prose. EVIDENCE
+    OF THE GAP:** I codified the re-sweep clause on Jun 13, then in the SAME session shipped 4 HIGH-RISK
+    phases + declared "functionally complete" WITHOUT a system-scope sweep — owner had to prompt it again.
+    So a prose "do it proactively" rule does NOT self-trigger even when freshly written. Diagnosis (see
+    memory [[breadth-over-narrowness]] #9): NOT a wires/Bedrock failure (guard was on, auto-bedrock rigor
+    ran — but a command-pattern hook can't detect "about to declare done"); NOT a tripwire failure (Rule
+    5/6 are ENTRY gates, fired fine — there is no CLOSING-step tripwire and a pre-work gate can't be one);
+    the real miss = per-CHANGE (local) sweeps felt complete so the per-ARC (SYSTEM) sweep fell between
+    phases (narrowness recurring at the sweep step). **PROPOSED FIX for the advisors to judge/lean:** split
+    the rule into (a) per-change local sweep and (b) per-arc SYSTEM sweep that fires at a NAMED boundary —
+    any "done/complete/shipped" claim AND before any HIGH-RISK push — and require it as a POPULATED report
+    section (specific other-readers/writers, cross-bot blast radius grepped, audit invariant, human-process)
+    where blank/"✓ swept" = NOT done. It is NOT a yes/no attestation (those get rubber-stamped like the
+    "ask" permission). A pre-push hook could SURFACE the checklist but cannot VERIFY a judgment, so the
+    lever is the mandatory populated section, not a new wire. Question for advisors: is this the "definition
+    of done" for SHIPPABLE/HIGH-RISK, and does it belong in Rule 6's closing evidence block as a required
+    line? (Held from unilateral edit — standing-rule change = advisor + second-opinion pass.)
 
 
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
