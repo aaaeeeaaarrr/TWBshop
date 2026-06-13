@@ -368,3 +368,32 @@ Reason · មូលហេតុ៖ {reason}
 - **WHEN:** to stop the typed message wiping their in-progress pick. **BODY.** No vars.
 - EN: `You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above.`
 - KH: `ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ រួចរាល់ ឬ ✕ បោះបង់ នៅសារខាងលើ។`
+
+---
+### F14 / schedule-model strings (session 33, Jun 13 — KH is MY draft, needs the native pass).
+All behind attendance_live=OFF; rare conflict paths. Collected late (the re-sweep miss).
+
+### SM1 — AL approval blocked by a same-day conflict (→ requester)
+- **WHO/WHEN:** F14 — a senior tried to approve AL on a day already holding approved leave/shift-change.
+- EN: `Couldn't approve — you already have approved leave on one of those days.`
+- KH: `មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកដែលអនុម័តរួចនៅថ្ងៃនោះ។`
+
+### SM2 — shift-change approval blocked by AL that day (→ staff)
+- EN: `Couldn't approve — you have approved leave that day.`
+- KH: `មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកនៅថ្ងៃនោះ។`
+
+### SM3 — day-off swap approval blocked (→ both parties)
+- EN: `Couldn't approve the swap — one of you has approved leave on a day it needs worked.`
+- KH: `មិនអាចអនុម័តការប្តូរបានទេ — ម្នាក់ក្នុងចំណោមអ្នកមានច្បាប់ឈប់សម្រាកនៅថ្ងៃដែលត្រូវធ្វើការ។`
+
+### SM4 — request-side block: don't submit an already-committed day (→ requester). VAR: `%s` = date(s).
+- EN: `⚠ You already have approved leave or a scheduled shift change on: %s.` / `Pick other day(s).`
+- KH: `⚠ ប្អូនមានច្បាប់ឈប់សម្រាក ឬការប្តូរវេនដែលអនុម័តរួចនៅ៖ %s។ សូមជ្រើសថ្ងៃផ្សេង។`
+
+### SM5 — Cancel-AL confirm, exact refund label (S4). VAR: `%g` = fractional AL.
+- EN: `1 day` · `no AL (this day costs none)` · `%g AL`
+- KH: `AL 1 ថ្ងៃ` · `មិនដក AL (ថ្ងៃនេះមិនអស់ AL)` · `AL %g`
+
+### SM6 (FUTURE, Phase 4 notify-all — draft only, not yet wired) — "new replaced old".
+- EN: `🔁 {new — date · times · who} replaces {old — date · times · who}` (to supervisors + staff + senior + partner)
+- KH: (to draft with ChatGPT when Phase 4 lands — the verb "ជំនួស/ផ្លាស់ប្តូរ" + the bilingual card form)
