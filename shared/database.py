@@ -3662,6 +3662,12 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                         pass
                 if claimed & dates:
                     return "conflict"             # another approved AL owns one of these days
+                cur.execute("SELECT 1 FROM shift_changes WHERE staff_id=%s "
+                            "AND status IN ('approved','done') AND is_test=%s "
+                            "AND when_date = ANY(%s::date[]) LIMIT 1",
+                            (staff_id, is_test, list(dates)))
+                if cur.fetchone():
+                    return "conflict"             # an approved shift-change schedules them to WORK that day
             cur.execute("""UPDATE al_requests
                            SET status='approved', deducted_map=%s, points_map=%s, decided_at=NOW()
                            WHERE id=%s AND status='pending'

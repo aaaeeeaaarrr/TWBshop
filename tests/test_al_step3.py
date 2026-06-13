@@ -181,6 +181,24 @@ def test_f14_sequential_same_date_conflict():
         _teardown(sid)
 
 
+def test_f14_rejects_al_on_an_approved_shift_change_day():
+    sid = _seed("ZZ_F14_SCDAY", 5.0)
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'approved',FALSE)",
+                        (sid, "2099-09-10"))
+        r = _pending(sid, ["2099-09-10"])
+        # scheduled to WORK that day (approved shift-change) → AL must not approve/deduct
+        assert db.al_approve_and_deduct(r, 1.0, {"2099-09-10": 1}, {}) == "conflict"
+        assert _al_left(sid) == 5.0
+        assert db.al_get_request(r)["status"] == "pending"
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_f14_concurrent_same_date_exactly_one_wins():
     """Real two-thread race on staging: two pending AL for the same day approved at once → the
     advisory xact-lock serializes them so exactly ONE wins and AL is deducted exactly once."""
