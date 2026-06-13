@@ -307,14 +307,20 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
 - Re-changing a shift does NOT clear an AL block (still an approved redefine that day).
 
 **NEXT (all rare, behind go-live; in `docs/ACTIONS_LEDGER.md` → Parked = S5 follow-ups):**
-0. **▶ UNIFIED SCHEDULE-EVENT MODEL designed (Jun 13) → `docs/SCHEDULE_RESOLUTION_MODEL.md`.** Owner's
+0. **▶ UNIFIED SCHEDULE-EVENT MODEL — building, phased → `docs/SCHEDULE_RESOLUTION_MODEL.md`.** Owner's
    direction: newest decision wins, old stands down, ITS BALANCE REVERSES, and ALL involved are notified
-   ("X replaced Y"); humans re-cover (two-party = human boundary). Subsumes the override + the S5
-   follow-ups below. Traced the resolver: precedence is IMPLICIT today (a redefine SILENTLY overrides AL,
-   no refund/notice — the bug the model kills) and SICK doesn't touch `compute_day_events` at all. First
-   build step = one `resolve_day()` used by every reader. Build phased on staging, F14 stays backstop.
-1. **swap ↔ redefine resolution** — now understood (see the doc): `works_on` yields swap-work to AL, but
-   the main loop fires a redefine REGARDLESS (redefine > AL/swap/day-off, silently). Folded into the model.
+   ("X replaced Y"); humans re-cover (two-party = human boundary). **Phase 1a+1b DONE (Jun 13) — THE TWO
+   BUGS HAVE VANISHED** in the scheduler + no-show paths: `resolve_day()` (the one resolver — leave
+   PROTECTED above a redefine, sick a first-class AWAY event, is_test-scoped) + `compute_day_events`
+   repointed to it via a batched `_day_context` (perf preserved; existing redefine/overnight tests green).
+   Proven on staging: AL+redefine on a day → excluded; sick → excluded (never mis-flagged no-show); the
+   is_test bleed closed. Suite 563. **NEXT PHASES (staging, each proven, F14 backstop):** 2 = repoint the
+   OTHER readers (`_settle_redefined_shift`, lateness verdict) to `resolve_day`; 3 = the **supersede
+   engine** (`supersede_day` = mark loser superseded + reverse its balance in one txn) + confirmed-revoke
+   for working-over-AWAY; 4 = **notify-all**; 5 = retire the silent redefine-over-AL path; 6 = swap-side
+   reversal + coverage alert. Then evolve laws + /audit (S5 extension · `v_one_active_decision` ·
+   `v_supersede_reversed`).
+1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill
    `special_leaves.deducted_amount` at go-live. 5. Optional literal-Fable pass. 6. Owner re-walk in `/test`
