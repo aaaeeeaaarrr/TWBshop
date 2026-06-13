@@ -239,7 +239,27 @@ strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវស�
 the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
 relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
-**▶ MULTI-MENU + MENU-LAWS BUILD (Jun 13) — Stages 1–3 of 6 SHIPPED & deployed; 4–6 + Fable next.**
+**▶▶ RESUME HERE (Jun 13, end of a long session — read this, then the 3 docs named):**
+The menu-laws build is DONE: **Stages 1–6 shipped + deployed** (F1–F12, voice-refuse, Cancel-disarm,
+expiry push-nudge, stale guards, maintenance toast, photos-papers-first, declare-Late-first, points
+display, terminal Main-menu=new-msg, P1 singleton) + **all Fable regressions A1–A7 fixed** + **Stage
+5a `/audit` exclusivity detector** (real-data clean) + the v_al PH-comp false-positive fix. Suite ~523.
+Two universal law sets created: **9 menu laws** (`docs/STATEFUL_MENU_PATTERNS.md`, Rule 5) + **4
+state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live=OFF.
+**NEXT, in order:**
+1. **Staging DB** — owner chose to set one up so dev stops pointing at prod. Recommended: a separate
+   `twbshop_staging` database on the existing DO managed instance (free, isolated, no install) + a
+   `STAGING_DATABASE_URL` secret + a `TWBSHOP_ENV` config switch. Owner go + one secrets line pending.
+2. **AL balance overhaul (HIGH-RISK, dormant until go-live)** — owner chose Option (i) deduct-at-
+   approval + refund-on-cancel. Fable red-teamed it → **REDESIGNED** to a per-day `{date:amount}` map +
+   two atomic CAS functions. FULL BUILD BRIEF + 5 must-hold invariants → **`docs/AL_DEDUCTION_REDESIGN.md`**.
+   Build on the staging DB with real before/after proof. (Also covers points-on-cancel + swap-override
+   S1 gaps + structural PH flag + mechanical v_al.)
+3. **F14 guard (Stage 5b)** — atomic same-date collision claim, on the corrected AL base.
+Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
+keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.
+
+**(history) MULTI-MENU + MENU-LAWS BUILD (Jun 13) — full 6-stage + regression detail below.**
 Owner-approved full build of the 8 menu laws + Fable's F1–F14 backlog (design in
 `docs/STATEFUL_MENU_PATTERNS.md`). Plan: build all stages, commit+gm-deploy each, Fable red-team at
 the end, then owner re-walks from step 1. **DONE & deployed (suite 503):**
