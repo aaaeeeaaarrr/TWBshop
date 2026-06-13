@@ -299,13 +299,15 @@ state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live
    via `pg_advisory_xact_lock(911, staff_id)` and REJECTS (returns `"conflict"`) if another approved AL
    claims any of the days — `_al_finalize` tells the requester, leaves the request pending. **Race-proven
    on staging** (two-thread concurrent approval → exactly one wins, deducted once) + sequential tests.
-   Suite **541**. **REMAINING F14 (focused continuation, per design "not a tail"):** request-time UI
-   block (don't offer a day already approved) · collision (b) approved-AL-vs-approved-shift-change ·
-   day-off-swap surface · senior **override** to supersede a conflict. Then **Fable red-team the whole
-   AL build before go-live lock** (parked). Honest: ALL behind `attendance_live=OFF` — nothing live
-   changed; prod's legacy rows (no map) keep the daily-job path.
-3. **F14 guard (Stage 5b)** — core atomic same-date AL claim DONE + race-proven; remaining surfaces
-   (request-time block, shift-change collision, swap, senior override) are the focused continuation.
+   Suite **543**. **Collision (b) DONE both directions:** AL-approve rejects a day with an approved
+   shift-change, and `shift_change_approve_claim` (new, same `pg_advisory_xact_lock(911,staff_id)`
+   namespace → cross-flow atomic) rejects a shift-change on an approved-AL day; `_shift_change_callback`
+   handles the conflict. **REMAINING F14 (focused continuation):** request-time UI block (don't offer a
+   day already approved) · day-off-swap surface (deferred even in the 5a detector) · senior **override**
+   to supersede a conflict. Then **Fable red-team the whole AL build before go-live lock** (parked).
+   Honest: ALL behind `attendance_live=OFF` — nothing live changed; prod's legacy rows keep the daily path.
+3. **F14 guard (Stage 5b)** — AL-vs-AL + AL-vs-shift-change (both directions) DONE + race-proven;
+   remaining surfaces (request-time block, swap, senior override) are the focused continuation.
 Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
 keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.
 

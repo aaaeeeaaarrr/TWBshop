@@ -1871,7 +1871,7 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
 async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:sc:yes|no:{id} — staff approves/declines a senior's shift redefine. Approve → the shift is
     active for that day (attendance uses it); decline → nothing changes."""
-    from shared.database import shift_change_get, shift_change_set_status
+    from shared.database import shift_change_get, shift_change_set_status, shift_change_approve_claim
     query = update.callback_query
     await query.answer()
     cid = int(query.data.split(":")[3])
@@ -1910,7 +1910,17 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                                           "persona_id": g["staff_id"]})
             await _ask_reason(query, sen.get("call_name") or sen["canonical_name"])
         return
-    shift_change_set_status(cid, "approved")
+    _scres = shift_change_approve_claim(cid)
+    if _scres == "conflict":
+        # F14: they have approved AL that day — can't also be scheduled to work it
+        if stf0:
+            await _att_send(context, (stf0.get("telegram_ids") or [None])[0], "Staff",
+                stf0.get("call_name") or stf0["canonical_name"],
+                "Couldn't approve — you have approved leave that day.\n"
+                "មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកនៅថ្ងៃនោះ។")
+        return
+    if not _scres:
+        return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     if stf0:   # rebuild → ✅ line + the 👁 toggle stays usable after the decision (owner)
         body0, kb0 = _sc_card(dict(g, status="approved"), stf0, show_cov=False)
         try:

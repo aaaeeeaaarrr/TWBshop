@@ -199,6 +199,31 @@ def test_f14_rejects_al_on_an_approved_shift_change_day():
         _teardown(sid)
 
 
+def test_f14_shift_change_rejected_when_al_that_day():
+    sid = _seed("ZZ_F14_SCSIDE", 5.0)
+    try:
+        r = _pending(sid, ["2099-09-20"])
+        db.al_approve_and_deduct(r, 1.0, {"2099-09-20": 1}, {})   # approved AL that day
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'proposed',FALSE) "
+                        "RETURNING id", (sid, "2099-09-20"))
+            cid = cur.fetchone()["id"]
+        assert db.shift_change_approve_claim(cid) == "conflict"   # can't schedule work on a leave day
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (cid,))
+            assert cur.fetchone()["status"] == "proposed"          # stays proposed
+            cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'proposed',FALSE) "
+                        "RETURNING id", (sid, "2099-09-21"))
+            cid2 = cur.fetchone()["id"]
+        assert db.shift_change_approve_claim(cid2) is True         # a free day approves
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_f14_concurrent_same_date_exactly_one_wins():
     """Real two-thread race on staging: two pending AL for the same day approved at once → the
     advisory xact-lock serializes them so exactly ONE wins and AL is deducted exactly once."""

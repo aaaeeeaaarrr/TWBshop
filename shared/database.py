@@ -3183,6 +3183,36 @@ def shift_change_set_status(change_id: int, status: str) -> None:
                 cur.execute("UPDATE shift_changes SET status=%s WHERE id=%s", (status, change_id))
 
 
+def shift_change_approve_claim(change_id: int):
+    """Atomic approve for a shift redefine (F14 exclusivity, the shift-change side): under the SAME
+    per-staff advisory xact-lock as al_approve_and_deduct, reject if the staffer already has approved
+    AL on that day (on leave vs scheduled to work), else flip proposed→approved. Returns True
+    (approved), "conflict" (AL that day), or False (not proposed / unknown). Sharing the lock namespace
+    means an AL-approval and a shift-approval for the same staff+date can never both win a race."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT staff_id, when_date, is_test, status FROM shift_changes WHERE id=%s",
+                        (change_id,))
+            r = cur.fetchone()
+            if not r or r["status"] != "proposed":
+                return False
+            staff_id, is_test = r["staff_id"], bool(r["is_test"])
+            iso = str(r["when_date"])
+            cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, staff_id))
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s", (staff_id, is_test))
+            for row in cur.fetchall():
+                try:
+                    if iso in _json.loads(row["days"] or "[]"):
+                        return "conflict"
+                except Exception:
+                    pass
+            cur.execute("UPDATE shift_changes SET status='approved', approved_at=NOW() "
+                        "WHERE id=%s AND status='proposed' RETURNING id", (change_id,))
+            return cur.fetchone() is not None
+
+
 def shift_change_active(staff_id: int, when_date: str) -> dict | None:
     """The APPROVED/done redefinition for a staff+date, if any — attendance uses this as that day's
     shift instead of the normal schedule. Latest approved wins (a re-edit replaces). Test-isolated."""
