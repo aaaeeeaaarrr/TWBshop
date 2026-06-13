@@ -100,6 +100,33 @@ def test_swap_off_is_away_and_swap_work_is_working(staff):
     assert d["working"] and d["reason"] == "swap_work" and d["start_min"] == 480
 
 
+def test_compute_day_events_bugs_vanish_integration():
+    """The two bugs vanish in the LIVE scheduler path: a redefine no longer overrides AL, and sick now
+    excludes. Seeds a real TWB staffer (compute_day_events reads the roster) and checks presence."""
+    with db._db() as c, c.cursor() as cur:
+        cur.execute("DELETE FROM staff_registry WHERE canonical_name='ZZ_RESOLVE_CDE'")
+        cur.execute("INSERT INTO staff_registry (canonical_name, status, org, work_start, work_end, "
+                    "day_off) VALUES ('ZZ_RESOLVE_CDE','active','TWB','08:00','17:00',%s) RETURNING id",
+                    (OFF_WD,))
+        sid = cur.fetchone()["id"]
+    d = date.fromisoformat(WORKDAY)
+    try:
+        present = lambda: "ZZ_RESOLVE_CDE" in {n for _m, n, _l, _t, _sd in ui.compute_day_events(d)}
+        assert present()                                  # baseline: a normal working day → scheduled
+        _al(sid, [WORKDAY]); _redefine(sid, WORKDAY)
+        assert not present()                              # BUG 1 gone: AL wins over the redefine → away
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM al_requests WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _sick(sid, WORKDAY)
+        assert not present()                              # BUG 2 gone: sick excludes from the schedule
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            for t in ("al_requests", "sick_cases", "shift_changes"):
+                cur.execute(f"DELETE FROM {t} WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM staff_registry WHERE id=%s", (sid,))
+
+
 def test_special_leave_span_is_away(staff):
     with db._db() as c, c.cursor() as cur:
         cur.execute("INSERT INTO special_leaves (staff_id, kind, who, start_date, days, deducted_amount, "

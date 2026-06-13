@@ -167,71 +167,127 @@ def _decision(working, reason, source_id=None, start_min=None, end_min=None, nor
             "start_min": start_min, "end_min": end_min, "normal_len": normal_len}
 
 
-def resolve_day(p: dict, day_iso: str) -> dict:
-    """THE single source of truth for "what is this person doing on day_iso" — every reader (attendance
-    prompts, no-show sweep, lateness verdict, settle, /audit) must use this ONE resolver so they can't
-    drift (see docs/SCHEDULE_RESOLUTION_MODEL.md). Returns a decision dict
-    {working, reason, source_id, start_min, end_min, normal_len}. is_test-scoped throughout.
-
-    Precedence (highest first):
-      1. approved AL · active sick · special-leave span  → AWAY (leave is PROTECTED — it beats a
-         redefine; a redefine may only take an AL day via the confirmed-revoke path that refunds it,
-         after which the AL is no longer 'approved' and step 2 wins legitimately);
-      2. senior/auto shift-redefine (latest-wins)        → WORKING at the redefined [start,end] (this
-         beats a day-off: a "change-day" moves the shift onto a normally-off day);
-      3. day-off swap override                           → 'off'=AWAY · 'work'=WORKING (normal times);
-      4. weekly day-off                                  → AWAY;
-      5. normal weekly schedule                          → WORKING at [work_start, work_end].
-    """
+def _day_context(iso_days: list[str]) -> dict:
+    """Batch-fetch everything resolve_day needs for the whole roster across `iso_days`, ONE query each,
+    so the per-minute scheduler doesn't fire ~5 queries per staff-day. is_test-scoped. Redefines reuse
+    the existing batch `shift_changes_active_map` (latest-wins per staff-date)."""
     import json as _json
     from datetime import date as _d, timedelta as _td
-    from shared.database import _db, shift_change_active
-    sid, flag = p["id"], att_test_on()
-    d = _d.fromisoformat(day_iso)
+    from shared.database import _db, shift_changes_active_map
+    flag = att_test_on()
+    want = set(iso_days)
+    al: dict = {}
+    sick: dict = {}
+    special: dict = {}
+    overrides: dict = {}
     with _db() as conn:
         with conn.cursor() as cur:
-            # 1) LEAVE (away) — protected above all working events
-            cur.execute("SELECT id, days FROM al_requests WHERE staff_id=%s AND status='approved' "
-                        "AND is_test=%s", (sid, flag))
+            cur.execute("SELECT staff_id, days FROM al_requests WHERE status='approved' AND is_test=%s",
+                        (flag,))
             for r in cur.fetchall():
                 try:
-                    if day_iso in _json.loads(r["days"] or "[]"):
-                        return _decision(False, "al", r["id"])
+                    al.setdefault(r["staff_id"], set()).update(set(_json.loads(r["days"] or "[]")) & want)
                 except Exception:
                     pass
-            cur.execute("SELECT id FROM sick_cases WHERE staff_id=%s AND the_date=%s AND is_test=%s "
-                        "AND status <> 'cancelled' LIMIT 1", (sid, day_iso, flag))
-            r = cur.fetchone()
-            if r:
-                return _decision(False, "sick", r["id"])
-            cur.execute("SELECT id, start_date, days FROM special_leaves WHERE staff_id=%s AND is_test=%s",
-                        (sid, flag))
+            cur.execute("SELECT staff_id, the_date FROM sick_cases WHERE the_date = ANY(%s::date[]) "
+                        "AND is_test=%s AND status <> 'cancelled'", (iso_days, flag))
+            for r in cur.fetchall():
+                sick.setdefault(r["staff_id"], set()).add(str(r["the_date"]))
+            cur.execute("SELECT staff_id, start_date, days FROM special_leaves WHERE is_test=%s", (flag,))
             for r in cur.fetchall():
                 try:
                     base = _d.fromisoformat(str(r["start_date"]))
-                    if base <= d < base + _td(days=max(int(r["days"] or 1), 1)):
-                        return _decision(False, "special", r["id"])
+                    for i in range(max(int(r["days"] or 1), 1)):
+                        iso = (base + _td(days=i)).isoformat()
+                        if iso in want:
+                            special.setdefault(r["staff_id"], set()).add(iso)
                 except Exception:
                     pass
-            # 3-prep) swap override (read here, applied after the redefine check)
-            cur.execute("SELECT kind FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s AND is_test=%s",
-                        (sid, day_iso, flag))
-            ovr = cur.fetchone()
-            ov = ovr["kind"] if ovr else None
-    # 2) REDEFINE (working, retimed) — beats day-off + swap
-    sc = shift_change_active(sid, day_iso)
+            cur.execute("SELECT staff_id, the_date, kind FROM dayoff_overrides "
+                        "WHERE the_date = ANY(%s::date[]) AND is_test=%s", (iso_days, flag))
+            for r in cur.fetchall():
+                overrides[(r["staff_id"], str(r["the_date"]))] = r["kind"]
+    return {"al": al, "sick": sick, "special": special, "overrides": overrides,
+            "redefines": shift_changes_active_map(iso_days)}
+
+
+def resolve_day(p: dict, day_iso: str, ctx: dict | None = None) -> dict:
+    """THE single source of truth for "what is this person doing on day_iso" — every reader (attendance
+    prompts, no-show sweep, lateness verdict, settle, /audit) must use this ONE resolver so they can't
+    drift (see docs/SCHEDULE_RESOLUTION_MODEL.md). Returns {working, reason, source_id, start_min,
+    end_min, normal_len}. Pass `ctx` (from `_day_context`) to batch; else it self-fetches. is_test-scoped.
+
+    Precedence (highest first):
+      1. approved AL · active sick · special-leave span → AWAY (leave is PROTECTED — beats a redefine;
+         a redefine takes an AL day only via the confirmed-revoke path that refunds it, after which the
+         AL is no longer 'approved' and step 2 wins legitimately);
+      2. senior/auto shift-redefine (latest-wins)       → WORKING at the redefined [start,end] (beats a
+         day-off — a "change-day" moves the shift onto a normally-off day);
+      3. day-off swap override                          → 'off'=AWAY · 'work'=WORKING (normal times);
+      4. weekly day-off                                 → AWAY;  5. normal schedule → WORKING.
+    """
+    import json as _json
+    from datetime import date as _d, timedelta as _td
+    sid = p["id"]
+    d = _d.fromisoformat(day_iso)
+    al_id = sick_id = special_id = None
+    if ctx is not None:
+        al_hit = day_iso in ctx["al"].get(sid, set())
+        sick_hit = day_iso in ctx["sick"].get(sid, set())
+        special_hit = day_iso in ctx["special"].get(sid, set())
+        rd = ctx["redefines"].get((sid, day_iso))
+        sc = {"start_min": rd[0], "end_min": rd[1], "normal_len": None, "id": None} if rd else None
+        ov = ctx["overrides"].get((sid, day_iso))
+    else:
+        from shared.database import _db, shift_change_active
+        flag = att_test_on()
+        al_hit = sick_hit = special_hit = False
+        ov = None
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                            "AND is_test=%s", (sid, flag))
+                for r in cur.fetchall():
+                    try:
+                        if day_iso in _json.loads(r["days"] or "[]"):
+                            al_hit, al_id = True, r["id"]
+                    except Exception:
+                        pass
+                cur.execute("SELECT id FROM sick_cases WHERE staff_id=%s AND the_date=%s AND is_test=%s "
+                            "AND status <> 'cancelled' LIMIT 1", (sid, day_iso, flag))
+                r = cur.fetchone()
+                if r:
+                    sick_hit, sick_id = True, r["id"]
+                cur.execute("SELECT id, start_date, days FROM special_leaves WHERE staff_id=%s "
+                            "AND is_test=%s", (sid, flag))
+                for r in cur.fetchall():
+                    try:
+                        base = _d.fromisoformat(str(r["start_date"]))
+                        if base <= d < base + _td(days=max(int(r["days"] or 1), 1)):
+                            special_hit, special_id = True, r["id"]
+                    except Exception:
+                        pass
+                cur.execute("SELECT kind FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
+                            "AND is_test=%s", (sid, day_iso, flag))
+                ovr = cur.fetchone()
+                ov = ovr["kind"] if ovr else None
+        sc = shift_change_active(sid, day_iso)
+    # ── single precedence block (both modes) ──
+    if al_hit:
+        return _decision(False, "al", al_id)
+    if sick_hit:
+        return _decision(False, "sick", sick_id)
+    if special_hit:
+        return _decision(False, "special", special_id)
     if sc:
-        return _decision(True, "redefine", sc["id"], sc.get("start_min"), sc.get("end_min"),
+        return _decision(True, "redefine", sc.get("id"), sc.get("start_min"), sc.get("end_min"),
                          sc.get("normal_len"))
-    # 3) swap override
     if ov == "off":
         return _decision(False, "swap_off")
     if ov == "work":
         return _decision(True, "swap_work", None, to_min(p.get("work_start")), to_min(p.get("work_end")))
-    # 4) weekly day-off
     if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == d.weekday():
         return _decision(False, "day_off")
-    # 5) normal schedule
     return _decision(True, "normal", None, to_min(p.get("work_start")), to_min(p.get("work_end")))
 
 
@@ -243,38 +299,12 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str, str]]:
     Returns (minute_of_day, staff_name, label, message_text, shift_start_iso) — the last is the
     date the shift STARTED, which is the attendance_sessions / shift_changes key: an overnight
     checkout fires today but must be written under yesterday's session (bakers are 9pm–6am)."""
-    import json as _json
-
-    from shared.database import _db
-    al_days: dict[int, set[str]] = {}
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT staff_id, days FROM al_requests WHERE status='approved'")
-            for r in cur.fetchall():
-                try:
-                    al_days.setdefault(r["staff_id"], set()).update(_json.loads(r["days"] or "[]"))
-                except Exception:
-                    pass
-
-    from shared.database import dayoff_override_for, shift_changes_active_map
-
-    def works_on(p: dict, day: date) -> bool:
-        # dated day-off override (a swap) wins over the normal weekday rule
-        ov = dayoff_override_for(p["id"], day.isoformat())
-        if ov == "off":
-            return False
-        if ov == "work":
-            return day.isoformat() not in al_days.get(p["id"], set())
-        if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == day.weekday():
-            return False
-        return day.isoformat() not in al_days.get(p["id"], set())
-
-    # A shift's events can land on `target` only if its START date is target−1 (overnight tail),
-    # target (same day) or target+1 (a pre-midnight T−10). Resolve any redefine per (staff, start day):
-    # an APPROVED redefine fires the day's prompts at the REDEFINED [start,end] and makes the person
-    # "work" that day even if it's normally their day-off (a change-day moved the shift there).
+    # ONE resolver (resolve_day) decides who's working each day — leave (AL/sick/special) is PROTECTED
+    # above a redefine, sick is honoured, and reads are is_test-scoped (docs/SCHEDULE_RESOLUTION_MODEL).
+    # A shift's events land on `target` only if its START date is target−1 (overnight tail), target, or
+    # target+1 (a pre-midnight T−10). Batch the whole roster's context once for the per-minute scheduler.
     cand_days = [target - timedelta(days=1), target, target + timedelta(days=1)]
-    redefines = shift_changes_active_map([d.isoformat() for d in cand_days])
+    ctx = _day_context([d.isoformat() for d in cand_days])
 
     events = []
     for p in staff_all("active"):
@@ -282,11 +312,15 @@ def compute_day_events(target: date) -> list[tuple[int, str, str, str, str]]:
             continue
         name = p.get("call_name") or p["canonical_name"]
         for shift_start_day in cand_days:
-            ov = redefines.get((p["id"], shift_start_day.isoformat()))
-            if not works_on(p, shift_start_day) and ov is None:
-                continue
-            ws_ov = ov[0] if ov else None
-            len_ov = (ov[1] - ov[0]) if ov else None
+            dec = resolve_day(p, shift_start_day.isoformat(), ctx=ctx)
+            if not dec["working"]:
+                continue   # away (AL / sick / special / swap-off / day-off) → no shift events
+            # a redefine retimes the prompts; normal/swap-work keep the staffer's own times (as before)
+            if dec["reason"] == "redefine":
+                ws_ov = dec["start_min"]
+                len_ov = (dec["end_min"] - dec["start_min"]) % 1440
+            else:
+                ws_ov = len_ov = None
             for day_offset, minute, label in staff_day_events(p, ws_ov, len_ov):
                 if shift_start_day + timedelta(days=day_offset) != target:
                     continue
