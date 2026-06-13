@@ -83,6 +83,16 @@
 - **AL go-live prep (owner-driven):** owner re-walk of the new deduct-at-approval + Cancel-AL flows in
   /test → `/testreset` → backfill `special_leaves.deducted_amount` on prod → flip `attendance_live`.
 
+- **Shift-redefine asymmetry (pre-existing, flagged Jun 13 — low/rare).** The PAYBACK picker skips
+  dates that already have an approved redefine (`_sc_taken_dates`), but the SENIOR redefine picker
+  (`sc_day_pick`) does NOT skip payback-slotted dates. So a senior redefine + a payback slot can co-exist
+  as two approved rows on one day; latest-wins makes attendance/settle pick one, which can leave a
+  payback booking paired to the now-shadowed slot (debt may not clear via its row → `v_booking_redefine_pair`
+  flags it). Safe-ish (no double-bank; supersession now spares the payback slot so it isn't orphaned) but
+  untidy. Clean fix = make the senior picker skip payback-slotted dates too (symmetric `_sc_taken_dates`),
+  OR reconcile the payback booking when a senior redefine lands on its day. Owner: worth a focused pass
+  before go-live if payback + same-day senior redefines are realistic.
+
 ## Done (with proof)
 
 - **2026-06-13 — staging DB stood up (Phase A+B).** `twbshop_staging` CREATED on the existing DO
