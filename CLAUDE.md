@@ -230,12 +230,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-13 (session 33 — **STAGING DB stood up (Phase A+B)**: `twbshop_staging`
-created on the DO instance, schema cloned with zero prod data via every `init_*_db()` + a prod↔staging
-column diff (closed 1 real drift — staff_registry pay columns now canonical). `TWBSHOP_ENV` switch in
-`shared/database.py` (default prod = zero behavior change). Fixed a latent init-ordering bug that
-blocked fresh-DB bootstrap. `setup_staging.py` re-clones anytime. Owner adds 1 secrets line
-(`STAGING_DATABASE_URL`) next; then the AL overhaul builds on staging. attendance_live=OFF.)
+**Last updated:** 2026-06-13 (session 33 — **STAGING DB stood up (Phase A+B)** + **AL overhaul Steps
+1–2 built & proven on staging**. Staging: `twbshop_staging` created on the DO instance, schema cloned
+with zero prod data via every `init_*_db()` + a prod↔staging column diff (closed 1 real drift — pay
+columns now canonical); `TWBSHOP_ENV` switch in `shared/database.py` (default prod = zero behavior
+change); latent init-ordering bug fixed; owner added the `STAGING_DATABASE_URL` secret (real path
+verified → lands on twbshop_staging). AL overhaul: Step 1 columns + Step 2 atomic approve/cancel
+functions + isolation fixes, real before/after proof on staging + permanent regression guard
+(`tests/test_al_atomic.py`). Inert until Step 3 wires them. attendance_live=OFF.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
@@ -270,8 +272,17 @@ state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live
 2. **AL balance overhaul (HIGH-RISK, dormant until go-live)** — owner chose Option (i) deduct-at-
    approval + refund-on-cancel. Fable red-teamed it → **REDESIGNED** to a per-day `{date:amount}` map +
    two atomic CAS functions. FULL BUILD BRIEF + 5 must-hold invariants → **`docs/AL_DEDUCTION_REDESIGN.md`**.
-   Build on the staging DB with real before/after proof. (Also covers points-on-cancel + swap-override
-   S1 gaps + structural PH flag + mechanical v_al.)
+   **PROGRESS (Jun 13, on staging, real before/after proof):** Step 1 columns (deducted_map/points_map/
+   no_deduct/special_leaves.deducted_amount — additive, dormant on prod) `d47c32e`; Step 2 atomic
+   `al_approve_and_deduct` + `al_cancel_and_refund` + isolation fixes (staff_absent_dates exclude_req_id
+   + is_test on it & al_leave_days_set) `abf10a2`, proven + permanent guard `tests/test_al_atomic.py`
+   (4 tests; suite 524 on staging). **NEXT — Step 3 (the live-relevant wiring):** rewire `_al_finalize`
+   (compute deducted_map via `staff_absent_dates(exclude_req_id=req)`, call the atomic approve, record
+   short-notice points PER-DAY into points_map) + the Cancel-AL handler (call the atomic refund, drop
+   the flat −1, verify ownership) + the no_deduct structural PH flag at grant time. Then Step 6
+   (partition daily job `WHERE deducted_map IS NULL` + mechanical `v_al` + `v_special`) → **Fable
+   red-team the finished build before lock** → F14 (#3 below). Honest: Steps 1–2 are inert until Step 3
+   wires them; attendance_live=OFF so nothing live changes yet.
 3. **F14 guard (Stage 5b)** — atomic same-date collision claim, on the corrected AL base.
 Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
 keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.
