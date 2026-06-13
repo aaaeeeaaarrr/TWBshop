@@ -301,11 +301,11 @@ def test_shift_change_approve_supersedes_prior_for_same_day():
     # a senior re-editing a shift multiple times must leave exactly ONE live (approved) row, not a pile
     sid = _seed("ZZ_SC_SUPERSEDE", 5.0)
     try:
-        def mk(start, end):
+        def mk(start, end):  # a SENIOR redefine (senior_id set)
             with db._db() as c, c.cursor() as cur:
-                cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
-                            "normal_len, status, is_test) VALUES (%s,'2099-08-01',%s,%s,540,'proposed',"
-                            "FALSE) RETURNING id", (sid, start, end))
+                cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, "
+                            "end_min, normal_len, status, is_test) VALUES (%s,%s,'2099-08-01',%s,%s,540,"
+                            "'proposed',FALSE) RETURNING id", (sid, sid, start, end))
                 return cur.fetchone()["id"]
         a = mk(480, 1020)
         assert db.shift_change_approve_claim(a) is True       # first redefine approved
@@ -317,6 +317,29 @@ def test_shift_change_approve_supersedes_prior_for_same_day():
         assert rows[a] == "cancelled" and rows[c2] == "approved"   # exactly one live row, no pile-up
         act = db.shift_change_active(sid, "2099-08-01")
         assert act and act["id"] == c2                         # latest is the active shift
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_shift_change_supersede_spares_payback_slot():
+    # a payback/OT-rest slot (auto-approved, senior_id NULL, paired with a booking) must NOT be
+    # cancelled when a senior redefines the same day — only senior redefines supersede each other.
+    sid = _seed("ZZ_SC_PB_SPARE", 5.0)
+    try:
+        pb = db.shift_change_autoapprove(sid, "2099-08-02", 480, 540, 0, "payback")  # senior_id NULL
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,'2099-08-02',540,1080,540,'proposed',"
+                        "FALSE) RETURNING id", (sid, sid))
+            sc = cur.fetchone()["id"]
+        assert db.shift_change_approve_claim(sc) is True
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT id, status FROM shift_changes WHERE staff_id=%s", (sid,))
+            rows = {r["id"]: r["status"] for r in cur.fetchall()}
+        assert rows[pb] == "approved"      # payback slot SURVIVES (not orphaned)
+        assert rows[sc] == "approved"      # the senior redefine is also approved
     finally:
         with db._db() as c, c.cursor() as cur:
             cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))

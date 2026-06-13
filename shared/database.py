@@ -3212,12 +3212,14 @@ def shift_change_approve_claim(change_id: int):
                         "WHERE id=%s AND status='proposed' RETURNING id", (change_id,))
             if cur.fetchone() is None:
                 return False
-            # make "latest wins" CONCRETE: supersede every OTHER still-live redefine for this
+            # make "latest wins" CONCRETE: supersede every OTHER still-live SENIOR redefine for this
             # staff+date so dead rows don't pile up (and don't trip the audit's never-settled law).
-            # 'done' rows (already settled history) are left untouched.
+            # ONLY senior redefines (senior_id IS NOT NULL) — a payback/OT-rest slot (auto-approved,
+            # senior_id NULL) is paired with a booking and must NOT be cancelled here. 'done' rows
+            # (settled history) are left untouched.
             cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s "
                         "AND when_date=%s AND is_test=%s AND id<>%s "
-                        "AND status IN ('proposed','approved')",
+                        "AND status IN ('proposed','approved') AND senior_id IS NOT NULL",
                         (staff_id, iso, is_test, change_id))
             return True
 
