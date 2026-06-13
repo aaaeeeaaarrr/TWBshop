@@ -148,6 +148,15 @@ Example flow:
 No giant single files. Small, focused modules so Claude Code can load only what's
 relevant in future sessions without hitting context limits.
 
+### 6. Balance/State Changes — Apply the State-Integrity Laws (TRIPWIRE)
+Writing or changing any code that moves a **balance or persistent state** (leave days, debt, OT bank,
+points, a booking, a status, a claimed resource) → **read `docs/STATE_INTEGRITY_LAWS.md` FIRST.**
+S1 reversible-by-construction (apply once + one clean inverse: deduct↔refund, claim↔release — never
+reconstruct across job+read+write; prefer "commit + reverse on undo" over "defer the effect"); S2
+idempotent/apply-once (flip status first); S3 atomic claim-or-reject for a shared resource (CAS, not
+check-then-write); S4 the shown number = the true number. Universal (not project-specific). HIGH-RISK
+money/leave/payroll work earns real before/after proof on a real row (staging DB) + a second-opinion pass.
+
 ### 5. Stateful Menus — Apply the Menu Patterns Law (TRIPWIRE)
 Building or editing **any** menu, picker, wizard, or multi-step flow that stashes selection state
 between taps (Telegram inline menus today; also any future web / Messenger / WhatsApp flow, or any UI
