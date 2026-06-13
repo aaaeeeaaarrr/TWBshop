@@ -20,7 +20,9 @@
   payroll/AL, so exposure is bounded. CLOSE-AT-GUARD is owner-only (Claude can't edit `.claude/hooks/`):
   add a CMD pattern for `python\s+\S*migrat`/`\.connect(` in a run-script, OR (better, parked) route
   `hire_bot/*` + run-scripts through the `_db()` wrapper so they honor the staging switch too (already a
-  parked staging item). Decide: tune the guard, or accept (these are hiring/test tooling, not payroll).
+  parked staging item). **DECIDED (owner, Jun 14): LEAVE the guard (don't tune); fix properly by routing
+  these through `_db()` at the staging cutover — closes the bypass AND the staging-switch gap in one move,
+  and it's a code change Claude CAN do (vs a guard edit it can't). Folded into the staging work.**
 
 - **🛑 2026-06-13 (CRITICAL BALANCE BUG — found by Fable's pre-guard review, NOT yet fixed, awaiting
   owner decision): AL deduction is split-brained; HOURS-AL is never deducted at all.** `_al_finalize`
@@ -112,6 +114,10 @@
     candidate collapses as QUESTIONS (incl. the advisor warning: don't force-merge S1/S2/S3/S5 — lean the
     redundancies, not the invariants). The lean-set decision stays here in the advisor lane (owner +
     advisors); the builder only installs the ratified result. This inventory is the INPUT to this item.
+    **▶ DECIDED (owner, Jun 14): the 8 prose collapses are DECLINED — cosmetic, zero functional change,
+    constitution-churn not worth it ("stop polishing wording, build"). The LOAD-BEARING outcomes were taken
+    instead: the `.githooks/pre-push` surfacing gate · secret-guard wiring · the DB write-path audit.
+    Lean/unify is effectively CLOSED — reopen only if the rules actually cause a problem. Don't re-raise.**
 
 
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
