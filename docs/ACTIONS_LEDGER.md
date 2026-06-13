@@ -9,6 +9,25 @@
 
 ## Open (not yet done)
 
+- **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
+  COMMIT-VERIFIER.** Upgrade of the 60s test-watchdog: instead of polling, verify AT THE MOMENT each
+  state-change commits. **What:** at each balance/state commit, do an INDEPENDENT re-read and assert the
+  action's expected delta; on failure, DM the owner with SPECIFICS — e.g. "🚨 staff X's AL (3 days) was
+  approved but al_left didn't move (still 14)". This is Rule 2 (WRITTEN≠SAVED) made automatic per action:
+  the confirmation says "approved ✓", the verifier independently confirms the number actually changed.
+  **Design:** trigger on the EVENT/commit, NOT the message text; fire ONCE per event (dual staff+owner
+  messages are fine); per-call-site wiring at the state-change points — AL approve/cancel, payback
+  credit/clear, OT settle/bank, shift-change settle, swap apply, no-show, special-leave; reuse the matching
+  `/audit` validator SCOPED to the one affected row for the assertion (so the verifier and /audit can't
+  drift). **Relationship:** does NOT replace `/audit` — /audit stays the backstop for (a) un-wired/future
+  paths, (b) cross-row/cross-feature invariants (S5/F14 collisions, "no day double-deducts"), (c)
+  drift/time-based problems (approved-past-date never-deducted, stale opens), (d) if the verifier itself is
+  bugged/bypassed. Belt (event check) + suspenders (/audit). **Honest ceiling:** verifies the action's own
+  contract (the number moved as the code intended), NOT owner intent (a self-consistent but unintended
+  number won't fire). **Coverage caveat:** only the wired sites are covered → that's exactly why /audit
+  remains. Build AFTER the owner /test walk (touches live write-paths; don't risk them pre-walk). HIGH-RISK
+  (balance paths) → real before/after proof on a staging row + a second-opinion pass.
+
 - **🔓 2026-06-14 (owner-gated — guard blocks Claude from editing `.claude/hooks/`): the command-pattern
   guard has a known BYPASS CLASS.** DB write-path audit (advisor grep, `psycopg2.connect` + raw DDL/DELETE
   across the repo) found: **no script writes payroll / AL / staff_registry / attendance data outside the
