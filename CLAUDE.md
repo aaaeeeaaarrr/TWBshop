@@ -287,11 +287,14 @@ state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live
    screen shows the TRUE refund (S4, fraction/0); the daily job is **partitioned** (`WHERE deducted_map
    IS NULL` — no double-charge as dates pass); `v_al` is **map-aware** (no false alarms); `al_create_request`
    **bridges** a 'PH…' reason into the structural `no_deduct` column. Guards: `tests/test_al_step3.py`
-   (12: v_al map-awareness, daily-job partition, no_deduct bridge, deduction-map invariant). Suite **536
-   on staging** (1 known empty-staging FK fixture for staff#11, not AL). **NEXT — Step 6 + finish:** give
-   special leaves a frozen `deducted_amount` + refund path + `v_special`; optional submit-time/approval
-   over-balance senior warning (Fable M1); then **Fable red-team the finished build before lock** → F14
-   (#3 below). Honest: still all behind `attendance_live=OFF` — nothing live changed; deduct-at-approval
+   (12: v_al map-awareness, daily-job partition, no_deduct bridge, deduction-map invariant). Suite **538
+   on staging** (1 known empty-staging FK fixture for staff#11, not AL). **Special-leave piece DONE
+   (Jun 13):** marriage/death/birth now freeze `deducted_amount` at grant (`special_leave_create`),
+   stay in sync on death-upgrade, and have a clean idempotent test-aware inverse `special_leave_refund`
+   (S1); `v_special` audits status-domain + frozen-amount and is wired into `/audit`. (Prod backfill
+   `UPDATE special_leaves SET deducted_amount=days WHERE deducted_amount IS NULL` needed at go-live —
+   parked.) **NEXT (autonomous run):** over-balance senior warning (Fable M1, non-blocking) → **F14
+   guard** (atomic same-date claim) → then **Fable red-team the finished build before lock** (#3 below). Honest: still all behind `attendance_live=OFF` — nothing live changed; deduct-at-approval
    activates at go-live. Prod still runs the legacy daily-job path (its rows have no map → unaffected).
 3. **F14 guard (Stage 5b)** — atomic same-date collision claim, on the corrected AL base.
 Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);

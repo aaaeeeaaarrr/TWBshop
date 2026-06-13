@@ -127,6 +127,35 @@ def test_daily_job_skips_map_rows_charges_legacy():
         _teardown(sid)
 
 
+def test_special_leave_freezes_amount_and_refunds_idempotently():
+    sid = _seed("ZZ_AL_STEP3_SPECIAL", 10.0)
+    try:
+        lid = db.special_leave_create(sid, "death", "parent", "2099-07-01", 3)
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT deducted_amount FROM special_leaves WHERE id=%s", (lid,))
+            assert float(cur.fetchone()["deducted_amount"]) == 3.0   # frozen == days
+        db.al_deduct(sid, 3)                       # simulate the grant-time deduction (10 -> 7)
+        assert _al_left(sid) == 7.0
+        assert db.special_leave_refund(lid) == 3.0  # S1 inverse: refund the frozen amount (7 -> 10)
+        assert _al_left(sid) == 10.0
+        assert db.special_leave_refund(lid) is None  # idempotent: second refund mints nothing
+        assert _al_left(sid) == 10.0
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM special_leaves WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_v_special_checks_status_and_frozen_amount():
+    staff = {7: {"call_name": "T", "canonical_name": "Tester"}}
+    ok = {"id": 1, "staff_id": 7, "status": "booked", "deducted_amount": 3}
+    assert audit.v_special([ok], staff) == []
+    bad_status = {"id": 2, "staff_id": 7, "status": "weird", "deducted_amount": 3}
+    assert any("unknown status" in m for m in audit.v_special([bad_status], staff))
+    no_amt = {"id": 3, "staff_id": 7, "status": "booked", "deducted_amount": None}
+    assert any("frozen deducted_amount" in m for m in audit.v_special([no_amt], staff))
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:

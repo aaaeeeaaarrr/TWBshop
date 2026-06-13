@@ -92,6 +92,21 @@ def v_al(requests: list[dict], staff: dict, today: date) -> list[str]:
     return out
 
 
+def v_special(leaves: list[dict], staff: dict) -> list[str]:
+    """Special leave (marriage / death / birth): status in a known domain, and every row carries a
+    frozen deducted_amount (so the grant has a clean refundable inverse and is auditable)."""
+    out = []
+    for r in leaves:
+        nm = _nm(staff, r["staff_id"])
+        st = r.get("status")
+        if st not in ("booked", "cancelled"):
+            out.append("SPECIAL: %s leave #%s unknown status '%s'" % (nm, r["id"], st))
+        if r.get("deducted_amount") is None:
+            out.append("SPECIAL: %s leave #%s has no frozen deducted_amount — not refundable/auditable"
+                       % (nm, r["id"]))
+    return out
+
+
 def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
     out = []
     for r in rows:
@@ -474,6 +489,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             pevents = q(cur, "SELECT * FROM points_events WHERE is_test=%s", (flag,))
             buybacks = q(cur, "SELECT * FROM ot_buyback WHERE is_test=%s", (flag,))
             sick = q(cur, "SELECT * FROM sick_cases WHERE is_test=%s", (flag,))
+            specials = q(cur, "SELECT * FROM special_leaves WHERE is_test=%s", (flag,))
             cur.execute("SELECT key, value FROM gm_state WHERE key LIKE 'dead_taps:%%'")
             taps = [(r["key"], r["value"]) for r in cur.fetchall()]
 
@@ -492,10 +508,11 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)
+                + v_special(specials, staff)
                 + v_dead_taps(taps, today)
                 + v_staff_sanity(list(staff.values())))
     stats = {"payback": len(debts), "AL": len(als), "shift-changes": len(scs),
              "sessions": len(sess), "OT banks": len(banks), "no-shows": len(nos),
              "bookings": len(books), "swaps": len(swaps), "point-events": len(pevents),
-             "OT-rests": len(buybacks), "sick": len(sick)}
+             "OT-rests": len(buybacks), "sick": len(sick), "special": len(specials)}
     return problems, stats

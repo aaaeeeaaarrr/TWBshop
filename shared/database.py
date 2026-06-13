@@ -2921,18 +2921,43 @@ def no_show_reverse(staff_id: int, shift_date: str) -> None:
 
 
 def special_leave_create(staff_id, kind, who, start_date, days) -> int:
+    # special leave deducts exactly its `days` from AL at grant — freeze that as deducted_amount so
+    # the grant has a clean, refundable inverse (S1) and is auditable without recomputing.
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO special_leaves (staff_id, kind, who, start_date, days, is_test)
-                           VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
-                        (staff_id, kind, who, start_date, days, _ATT_TEST))
+            cur.execute("""INSERT INTO special_leaves
+                           (staff_id, kind, who, start_date, days, deducted_amount, is_test)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, kind, who, start_date, days, days, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
 def special_leave_set_days(leave_id: int, days: int) -> None:
+    # keep the frozen deducted_amount in step with days (special leave always deducts == days)
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE special_leaves SET days=%s WHERE id=%s", (days, leave_id))
+            cur.execute("UPDATE special_leaves SET days=%s, deducted_amount=%s WHERE id=%s",
+                        (days, days, leave_id))
+
+
+def special_leave_refund(leave_id: int) -> float | None:
+    """Atomic inverse of a special-leave grant (S1): refund the FROZEN deducted_amount and mark the
+    leave cancelled, in ONE transaction. Returns the refunded amount, or None if there was nothing to
+    refund (already cancelled / unknown id). Idempotent via the status guard; test-aware (a test row
+    is cancelled but the real al_left is never moved)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE special_leaves SET status='cancelled'
+                           WHERE id=%s AND status <> 'cancelled'
+                           RETURNING staff_id, deducted_amount, is_test""", (leave_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            amt = float(row["deducted_amount"] or 0)
+            if not row["is_test"] and amt:
+                cur.execute("UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW() "
+                            "WHERE id=%s", (amt, row["staff_id"]))
+            return amt
 
 
 def special_leave_get(leave_id: int) -> dict | None:
