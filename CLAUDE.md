@@ -286,6 +286,17 @@ strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវស�
 the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
 relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
+**(Jun 14) KH vetting + DONE-CLAIM GATE.** Standard bumped to **v2026-06-14-A** (Rule 4 = the
+DONE-CLAIM GATE: named trigger + per-arc SYSTEM sweep + WALK-READINESS — don't hand the owner an
+incomplete/untranslated test); applied with a self-critique pass, advisor lean/unify still parked.
+Vetted ChatGPT's KH batch against the live code and WIRED the accepted SM/MM strings (suite 573):
+terminology unified to bare **AL** for the counted balance (generic ការឈប់សម្រាក only for any-leave
+conflicts), refund wording → **ដាក់ត្រឡប់ចូលវិញ** (SM8/SM9/SM10, matches P12), MM7 KEPT over
+ChatGPT's (its "Done/Cancel" referenced labels that aren't on the buttons), SM5 left as-is
+(re-read proved no doubling). Full record → `docs/KH_REVIEW.md` "VETTING OUTCOME". Still behind
+`attendance_live=OFF`, NOT deployed. Codex-vs-ClaudeCode question parked (finding: process problem,
+portable to any tool — not a capability gap); governance-inventory next step NOT started (owner deciding).
+
 **▶▶ RESUME HERE (Jun 13, end of a very long session 33 — the whole arc, for when we return):**
 
 **WHERE THIS STARTED (the initial problems that drove everything below):**

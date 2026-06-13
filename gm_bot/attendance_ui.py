@@ -879,7 +879,7 @@ def _supersede_prev_pend(context, update) -> None:
             try:
                 await context.bot.edit_message_text(
                     "↩ Replaced — answer the newer prompt below\n"
-                    "↩ បានជំនួស — សូមឆ្លើយសំណួរថ្មីខាងក្រោម",
+                    "↩ បានជំនួសហើយ — សូមឆ្លើយសំណួរថ្មីខាងក្រោម",
                     chat_id=pc, message_id=pm)
             except Exception:
                 pass
@@ -2294,7 +2294,7 @@ async def _menu_claim(context, msg) -> None:
     if old and tuple(old) != new:
         try:
             await context.bot.edit_message_text(
-                "⤵ Menu continues below · ម៉ឺនុយនៅខាងក្រោម",
+                "⤵ Menu continues below · menu បន្តនៅខាងក្រោម",
                 chat_id=old[0], message_id=old[1])
         except Exception:
             pass   # too old / already a prompt / deleted → dead-tap guard is the backstop
@@ -2359,7 +2359,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # F12: when the master switch is OFF (e.g. a rollback), every staff tap used to die
             # silently → "boss it's broken". Tell them it's paused, don't leave a dead button.
             await query.answer("🔧 Attendance is paused for maintenance — please talk to your senior."
-                               " · ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។", show_alert=True)
+                               " · ប្រព័ន្ធវត្តមានកំពុងផ្អាកដើម្បីថែទាំ — សូមនិយាយជាមួយបងៗ។", show_alert=True)
             return
         rec = staff_get_by_uid(uid)
         if not rec or rec.get("status") != "active" or rec.get("org") != "TWB":

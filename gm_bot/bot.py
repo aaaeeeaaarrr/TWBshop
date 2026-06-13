@@ -1118,7 +1118,7 @@ async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TY
         return False
     await msg.reply_text(
         "🎤 I can't read a voice note / photo here — please type your reason in one line.\n"
-        "🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបភាពនៅទីនេះបានទេ — សូមវាយមូលហេតុជាអក្សរ ១បន្ទាត់។")
+        "🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបថតនៅទីនេះបានទេ — សូមវាយមូលហេតុជា 1 បន្ទាត់។")
     return True
 
 
@@ -1905,7 +1905,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                 sen.get("call_name") or sen["canonical_name"],
                 "%s kept their approved leave on %s — the shift change was not approved.\n"
-                "%s រក្សាច្បាប់ឈប់សម្រាកនៅ %s — ការប្តូរវេនមិនបានអនុម័តទេ។"
+                "%s បានរក្សាការឈប់សម្រាកដែលបានអនុម័តនៅ %s — ការប្តូរវេនមិនបានអនុម័តទេ។"
                 % ((stf0 or {}).get("call_name") or (stf0 or {}).get("canonical_name", "Staff"),
                    g["when_date"], (stf0 or {}).get("call_name") or
                    (stf0 or {}).get("canonical_name", "Staff"), g["when_date"]))
@@ -1970,16 +1970,16 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             dl = str(g["when_date"])
         win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Yes — cancel my leave & work · បាទ/ចាស — បោះបង់ច្បាប់ ធ្វើការ",
+            [InlineKeyboardButton("✅ Yes — cancel my leave & work · បាទ/ចាស — បោះបង់ AL ធ្វើការ",
                                   callback_data="att:sc:rev:%d" % cid)],
-            [InlineKeyboardButton("✋ Keep my leave · រក្សាច្បាប់ឈប់សម្រាក",
+            [InlineKeyboardButton("✋ Keep my leave · រក្សា AL",
                                   callback_data="att:sc:keep:%d" % cid)]])
         try:
             await query.edit_message_text(
                 "⚠ You have approved AL on %s. Approving this shift change (%s) will CANCEL that leave "
                 "(your AL is refunded) and schedule you to work. Confirm?\n"
-                "⚠ ប្អូនមានច្បាប់ឈប់សម្រាក (AL) ដែលអនុម័តនៅ %s។ ការអនុម័តការប្តូរវេននេះ (%s) "
-                "នឹងបោះបង់ច្បាប់ឈប់នោះ (AL បង្វិលសងវិញ) ហើយកំណត់ឱ្យប្អូនធ្វើការ។ បញ្ជាក់ទេ?"
+                "⚠ ប្អូនមាន AL ដែលបានអនុម័តនៅ %s។ បើប្អូនអនុម័តការប្តូរវេននេះ (%s) "
+                "វានឹងបោះបង់ AL នោះ (AL នឹងដាក់ត្រឡប់ចូលវិញ) ហើយកំណត់ឱ្យប្អូនមកធ្វើការ។ បញ្ជាក់មែនទេ?"
                 % (dl, win, dl, win), reply_markup=kb)
         except Exception:
             pass
@@ -2393,7 +2393,7 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
                 await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
                     s.get("call_name") or s["canonical_name"],
                     "Couldn't approve the swap — one of you has approved leave on a day it needs worked.\n"
-                    "មិនអាចអនុម័តការប្តូរបានទេ — ម្នាក់ក្នុងចំណោមអ្នកមានច្បាប់ឈប់សម្រាកនៅថ្ងៃដែលត្រូវធ្វើការ។")
+                    "មិនអាចអនុម័តការប្តូរថ្ងៃឈប់បានទេ — ម្នាក់ក្នុងចំណោមប្អូនទាំង 2 មានការឈប់សម្រាកដែលបានអនុម័តរួច នៅថ្ងៃដែលត្រូវមកធ្វើការ។")
             return
         if not res:
             return   # lost the claim / not in a claimable state
@@ -2568,7 +2568,7 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
             requester.get("call_name") or requester["canonical_name"],
             "⚠ You already have approved leave or a scheduled shift change on: %s.\n"
             "Pick other day(s).\n"
-            "⚠ ប្អូនមានច្បាប់ឈប់សម្រាក ឬការប្តូរវេនដែលអនុម័តរួចនៅ៖ %s។ សូមជ្រើសថ្ងៃផ្សេង។"
+            "⚠ ប្អូនមានការឈប់សម្រាកដែលបានអនុម័តរួច ឬការប្តូរវេនដែលបានកំណត់រួច នៅ៖ %s។ សូមជ្រើសថ្ងៃផ្សេង។"
             % (", ".join(conflicts), ", ".join(conflicts)))
         return None
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
@@ -2683,8 +2683,8 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
                 times = " (%s–%s)" % (_fmt_min(d["start_min"]), _fmt_min(d["end_min"]))
             line = ("🔁 %s %s on %s — the shift change set for them%s no longer applies. "
                     "Please re-arrange cover if needed.\n"
-                    "🔁 %s អវត្តមាននៅ %s — ការប្តូរវេនដែលបានកំណត់ឱ្យ%s លែងប្រើទៀតហើយ។ "
-                    "សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    "🔁 %s អវត្តមាននៅ %s — ការប្តូរវេនដែលបានកំណត់ឱ្យគាត់%s លែងអនុវត្តទៀតហើយ។ "
+                    "សូមរៀបចំអ្នកជំនួស បើចាំបាច់។"
                     % (name, away_reason, dlabel, times, name, dlabel, times))
             sen = next((s for s in allstaff if s["id"] == d.get("senior_id")), None)
             if sen:
@@ -2694,7 +2694,7 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
         elif d.get("kind") == "al":
             refunded = d.get("refunded") or 0
             line = ("🔁 %s is now away on %s — the AL approved for that day was returned (+%g AL).\n"
-                    "🔁 %s ឥឡូវអវត្តមាននៅ %s — AL ដែលអនុម័តសម្រាប់ថ្ងៃនោះត្រូវបានបង្វិលសងវិញ (+%g AL)។"
+                    "🔁 %s ឥឡូវអវត្តមាននៅ %s — AL ដែលបានអនុម័តសម្រាប់ថ្ងៃនោះ ត្រូវបានដាក់ត្រឡប់ចូលវិញ (+%g AL)។"
                     % (name, dlabel, refunded, name, dlabel, refunded))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
@@ -2703,8 +2703,8 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
             refunded = d.get("refunded") or 0
             line = ("🔁 %s's approved AL on %s was cancelled — a shift change for that day was approved "
                     "instead. The AL is refunded (+%g AL).\n"
-                    "🔁 ច្បាប់ឈប់សម្រាក (AL) របស់ %s នៅ %s ត្រូវបានបោះបង់ — បានអនុម័តការប្តូរវេនជំនួសវិញ។ "
-                    "AL ត្រូវបានបង្វិលសង (+%g AL)។"
+                    "🔁 AL របស់ %s ដែលបានអនុម័តនៅ %s ត្រូវបានបោះបង់ — ព្រោះបានអនុម័តការប្តូរវេនសម្រាប់ថ្ងៃនោះជំនួសវិញ។ "
+                    "AL ត្រូវបានដាក់ត្រឡប់ចូលវិញ (+%g AL)។"
                     % (name, dlabel, refunded, name, dlabel, refunded))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
@@ -2717,8 +2717,8 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
             pn = (par_s or {}).get("call_name") or (par_s or {}).get("canonical_name", "?")
             line = ("🔁 The day-off swap between %s and %s is off — %s is now away. Both are back to "
                     "their normal days; please arrange cover if needed.\n"
-                    "🔁 ការប្តូរថ្ងៃឈប់រវាង %s និង %s ត្រូវបានលុបចោល — %s អវត្តមាន។ "
-                    "ទាំងពីរនាក់ត្រឡប់ទៅថ្ងៃធម្មតាវិញ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    "🔁 ការប្តូរថ្ងៃឈប់រវាង %s និង %s ត្រូវបានបោះបង់ — %s ឥឡូវអវត្តមាន។ "
+                    "ទាំង 2 នាក់ត្រឡប់ទៅថ្ងៃឈប់ធម្មតារបស់ខ្លួនវិញ។ សូមរៀបចំអ្នកជំនួស បើចាំបាច់។"
                     % (rn, pn, name, rn, pn, name))
             for s in (req_s, par_s):
                 if s:
@@ -2772,7 +2772,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             # Leave the request pending (it's not a senior 'no'); just tell the requester why.
             await _att_send(context, runc[0] if runc else None, "Requester", name,
                 "Couldn't approve — you already have approved leave on one of those days.\n"
-                "មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកដែលអនុម័តរួចនៅថ្ងៃនោះ។")
+                "មិនអាចអនុម័តបានទេ — ប្អូនមានការឈប់សម្រាកដែលបានអនុម័តរួច នៅថ្ងៃមួយក្នុងចំណោមថ្ងៃទាំងនោះ។")
             return
         if new_bal is None:
             return  # lost the claim — another finalize already decided this request
@@ -5302,7 +5302,7 @@ async def _att_paused(query, uid) -> bool:
     if uid != config.OWNER_TELEGRAM_ID and not _attendance_live():
         try:
             await query.answer("🔧 Attendance is paused for maintenance — please talk to your senior."
-                               " · ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។", show_alert=True)
+                               " · ប្រព័ន្ធវត្តមានកំពុងផ្អាកដើម្បីថែទាំ — សូមនិយាយជាមួយបងៗ។", show_alert=True)
         except Exception:
             pass
         return True

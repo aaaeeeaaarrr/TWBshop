@@ -432,3 +432,145 @@ VARS: `{name}`, `{date}`.
 `_announce_supersessions` "swap" kind. VARS: `{rn}`=requester, `{pn}`=partner, `{name}`=the away one.
 - EN: `🔁 The day-off swap between {rn} and {pn} is off — {name} is now away. Both are back to their normal days; please arrange cover if needed.`
 - KH (my draft): `🔁 ការប្តូរថ្ងៃឈប់រវាង {rn} និង {pn} ត្រូវបានលុបចោល — {name} អវត្តមាន។ ទាំងពីរនាក់ត្រឡប់ទៅថ្ងៃធម្មតាវិញ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។`
+
+You gave a new batch: MM1–MM8 plus SM1–SM12. I’m treating the older P10–P15 as already wired/final and only polishing the pending section from the latest upload.
+## MM1 — prompt superseded
+
+↩ Replaced — answer the newer prompt below
+↩ បានជំនួសហើយ — សូមឆ្លើយសំណួរថ្មីខាងក្រោម
+
+## MM2 — Cancel button on armed prompts
+
+✕ Cancel · បោះបង់
+
+## MM3 — voice/photo refused on a reason prompt
+
+🎤 I can't read a voice note / photo here — please type your reason in one line.
+🎤 ខ្ញុំមិនអាចអានសារសំឡេង/រូបថតនៅទីនេះបានទេ — សូមវាយមូលហេតុជា 1 បន្ទាត់។
+
+## MM4 — expiry / dead-tap nudge
+
+❗ NOT CONFIRMED — TRY AGAIN
+❗ **មិនទាន់បានបញ្ជាក់ — សូមធ្វើម្ដងទៀត**
+
+📋 Open menu · បើក menu
+
+## MM5 — stale screen guard
+
+⏳ This screen is old — please open the menu to start again.
+⏳ ផ្ទាំងនេះចាស់ហើយ — សូមបើក menu ដើម្បីចាប់ផ្តើមម្តងទៀត។
+
+📋 Open menu · បើក menu
+
+## MM6 — maintenance toast
+
+🔧 Attendance is paused for maintenance — please talk to your senior.
+🔧 ប្រព័ន្ធវត្តមានកំពុងផ្អាកដើម្បីថែទាំ — សូមនិយាយជាមួយបងៗ។
+
+## MM8 — collapsed old menu
+
+⤵ Menu continues below
+⤵ menu បន្តនៅខាងក្រោម
+
+## MM7 — mid-pick typing guard
+
+You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above.
+ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ Done ឬ ✕ Cancel នៅសារខាងលើ។
+
+## SM1 — AL approval blocked by same-day conflict
+
+Couldn't approve — you already have approved leave on one of those days.
+មិនអាចអនុម័តបានទេ — ប្អូនមានការឈប់សម្រាកដែលបានអនុម័តរួច នៅថ្ងៃមួយក្នុងចំណោមថ្ងៃទាំងនោះ។
+
+## SM2 — shift-change approval blocked by AL that day
+
+Couldn't approve — you have approved leave that day.
+មិនអាចអនុម័តបានទេ — ប្អូនមានការឈប់សម្រាកដែលបានអនុម័តរួចនៅថ្ងៃនោះ។
+
+## SM3 — day-off swap approval blocked
+
+Couldn't approve the swap — one of you has approved leave on a day it needs worked.
+មិនអាចអនុម័តការប្តូរថ្ងៃឈប់បានទេ — ម្នាក់ក្នុងចំណោមប្អូនទាំង 2 មានការឈប់សម្រាកដែលបានអនុម័តរួច នៅថ្ងៃដែលត្រូវមកធ្វើការ។
+
+## SM4 — request-side block
+
+⚠ You already have approved leave or a scheduled shift change on: %s.
+⚠ ប្អូនមានការឈប់សម្រាកដែលបានអនុម័តរួច ឬការប្តូរវេនដែលបានកំណត់រួច នៅ៖ %s។
+
+Pick other day(s).
+សូមជ្រើសថ្ងៃផ្សេង។
+
+## SM5 — Cancel-AL confirm, exact refund label
+
+1 day
+AL 1 ថ្ងៃ
+
+no AL (this day costs none)
+មិនដក AL (ថ្ងៃនេះមិនអស់ AL)
+
+%g AL
+AL %g
+
+## SM6 — future “new replaced old”
+
+🔁 {new — date · times · who} replaces {old — date · times · who}
+🔁 {new — date · times · who} ជំនួស {old — date · times · who}
+
+## SM7 — AWAY event stood down a senior redefine
+
+🔁 {name} {away} on {date} — the shift change set for them{times} no longer applies. Please re-arrange cover if needed.
+🔁 {name} អវត្តមាននៅ {date} — ការប្តូរវេនដែលបានកំណត់ឱ្យគាត់{times} លែងអនុវត្តទៀតហើយ។ សូមរៀបចំអ្នកជំនួស បើចាំបាច់។
+
+## SM8 — sick day refunded planned AL
+
+🔁 {name} is now away on {date} — the AL approved for that day was returned (+{n} AL).
+🔁 {name} ឥឡូវអវត្តមាននៅ {date} — AL ដែលបានអនុម័តសម្រាប់ថ្ងៃនោះ ត្រូវបានដាក់ត្រឡប់ចូលវិញ (+{n} AL)។
+
+## SM9 — AL cancelled because shift change approved
+
+🔁 {name}'s approved AL on {date} was cancelled — a shift change for that day was approved instead. The AL is refunded (+{n} AL).
+🔁 AL របស់ {name} ដែលបានអនុម័តនៅ {date} ត្រូវបានបោះបង់ — ព្រោះបានអនុម័តការប្តូរវេនសម្រាប់ថ្ងៃនោះជំនួសវិញ។ AL ត្រូវបានដាក់ត្រឡប់ចូលវិញ (+{n} AL)។
+
+## SM10 — confirm-revoke card
+
+⚠ You have approved AL on {date}. Approving this shift change ({win}) will CANCEL that leave (your AL is refunded) and schedule you to work. Confirm?
+⚠ ប្អូនមាន AL ដែលបានអនុម័តនៅ {date}។ បើប្អូនអនុម័តការប្តូរវេននេះ ({win}) វានឹងបោះបង់ AL នោះ (AL នឹងដាក់ត្រឡប់ចូលវិញ) ហើយកំណត់ឱ្យប្អូនមកធ្វើការ។ បញ្ជាក់មែនទេ?
+
+✅ Yes — cancel my leave & work · ✅ បាទ/ចាស — បោះបង់ AL ហើយមកធ្វើការ
+
+✋ Keep my leave · ✋ រក្សា AL របស់ខ្ញុំ
+
+## SM11 — staffer kept leave, shift change not approved
+
+{name} kept their approved leave on {date} — the shift change was not approved.
+{name} បានរក្សាការឈប់សម្រាកដែលបានអនុម័តនៅ {date} — ការប្តូរវេនមិនបានអនុម័តទេ។
+
+## SM12 — day-off swap voided because one party is now away
+
+🔁 The day-off swap between {rn} and {pn} is off — {name} is now away. Both are back to their normal days; please arrange cover if needed.
+🔁 ការប្តូរថ្ងៃឈប់រវាង {rn} និង {pn} ត្រូវបានបោះបង់ — {name} ឥឡូវអវត្តមាន។ ទាំង 2 នាក់ត្រឡប់ទៅថ្ងៃឈប់ធម្មតារបស់ខ្លួនវិញ។ សូមរៀបចំអ្នកជំនួស បើចាំបាច់។
+Key corrections I made: avoided ច្បាប់ឈប់សម្រាក where it becomes stiff or too legalistic, changed refund language from បង្វិលសង to ដាក់ត្រឡប់ចូលវិញ because this is AL balance not money, and kept Done, Cancel, menu, AL, points, and all numbers/times in Latin where the app convention needs consistency.
+
+---
+
+## VETTING OUTCOME — owner-reviewed, WIRED 2026-06-14 (suite 573 green)
+
+Vetted ChatGPT's batch against the live code before wiring (real-path read, not blind trust):
+
+- **WIRED as polished:** MM1, MM3, MM6 (both toasts — bot.py + attendance_ui.py), MM8, SM1, SM3,
+  SM4, SM7 (+គាត់, លែងអនុវត្ត), SM8, SM9, SM10 (body + both buttons), SM11, SM12.
+- **REJECTED — MM7:** ChatGPT's version referenced the buttons as English "Done/Cancel", but the
+  actual buttons render Khmer (`✅ រួចរាល់` / `✕ បោះបង់`, attendance_ui.py:1606/1032). Kept the live
+  wired KH (`✅ រួចរាល់ ឬ ✕ បោះបង់`) so staff are told to tap labels that actually exist.
+- **SM5 — UNCHANGED (my earlier doubling concern was wrong):** real-path read of
+  attendance_ui.py:2156-2168 shows `{detail}` is the DATE and `"AL 1 ថ្ងៃ"` lands in a separate clause
+  (`វានឹងដាក់ AL 1 ថ្ងៃ ត្រឡប់ចូល balance`) — reads correctly, no "AL AL".
+- **TERMINOLOGY decision (owner):** use bare **`AL`** where it means the counted balance (SM8/SM9/SM10
+  + the SM10 buttons → `បោះបង់ AL` / `រក្សា AL`); keep generic **`ការឈប់សម្រាក`** only where the
+  conflict could be any leave type (SM1/SM3/SM4). Replaced the old mixed `ច្បាប់ឈប់សម្រាក`.
+- **REFUND wording:** adopted `ដាក់ត្រឡប់ចូលវិញ` (AL is a balance, not money) consistently — updated
+  the already-wired SM8/SM9/SM10 (were `បង្វិលសង`) to match the existing P12 `…ត្រឡប់ចូល balance`.
+- **SM6** stays future/unwired (its `{new — …}` is a description, not a template) — redraft at Phase 4.
+- **SM2** has no live string (the flat block was replaced by the SM10 confirm-revoke flow) — nothing to wire.
+
+All behind `attendance_live=OFF`; NOT deployed (batch gm-deploy at go-live prep).
