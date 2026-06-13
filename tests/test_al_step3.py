@@ -282,6 +282,44 @@ def test_f14_concurrent_cross_flow_al_vs_shift_change_one_wins():
         _teardown(sid)
 
 
+def test_al_end_to_end_multiday_with_dayoff():
+    """All the pieces together on a realistic multi-day AL spanning a day-off: the frozen map zeros the
+    day-off, the deduction is exact, a partial cancel refunds exactly, the audit stays clean, and the
+    daily job never touches the map row."""
+    from gm_bot import al as alm
+    from gm_bot import audit
+    sid = _seed("ZZ_AL_E2E", 10.0)
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET day_off='Sun', work_start='08:00', work_end='17:00' "
+                        "WHERE id=%s", (sid,))
+        days = ["2099-12-04", "2099-12-05", "2099-12-06", "2099-12-07"]
+        # set day_off to whichever weekday days[2] falls on, so days[2] is the excluded (0-cost) day
+        off = date.fromisoformat(days[2]).strftime("%a")
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET day_off=%s WHERE id=%s", (off, sid))
+        dmap, total = alm.al_deduction_map(days, "days", day_off=off, non_working=set())
+        assert dmap == {days[0]: 1, days[1]: 1, days[2]: 0, days[3]: 1} and total == 3.0
+        r = _pending(sid, days)
+        assert db.al_approve_and_deduct(r, total, dmap, {}) == 7.0      # 10 - 3 charged days
+        # partial cancel: a charged day refunds 1, the day-off day refunds 0
+        assert db.al_cancel_and_refund(r, sid, days[0], today_iso="2026-06-13") == (1.0, 3)
+        assert _al_left(sid) == 8.0
+        assert db.al_cancel_and_refund(r, sid, days[2], today_iso="2026-06-13") == (0.0, 2)
+        assert _al_left(sid) == 8.0                                     # day-off cancel moves nothing
+        # audit clean on the still-approved (partially-cancelled) row: keys still == remaining days
+        staff = {sid: {"call_name": "E2E", "canonical_name": "E2E"}}
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT * FROM al_requests WHERE id=%s", (r,))
+            row = dict(cur.fetchone())
+        assert audit.v_al([row], staff, date(2026, 6, 13)) == []
+        # daily job must NOT touch this map row (no extra deduction)
+        db.al_apply_due_deductions("2099-12-31")
+        assert _al_left(sid) == 8.0
+    finally:
+        _teardown(sid)
+
+
 def test_al_date_conflict_detects_approved_al_and_shift_change():
     sid = _seed("ZZ_AL_CONFLICT", 5.0)
     try:
