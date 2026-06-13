@@ -31,6 +31,13 @@
   deduct-at-approval model + cover hours-AL. Rationale (owner): "just 2 things, eliminates overbooking."
   Still HIGH-RISK/auto-bedrock: implement with real before/after proof on a real row, ideally after the
   staging-DB lock. Then build the F14 guard on top.
+  **→ DESIGN REDONE (2026-06-13) after Fable red-team:** my first design (reorder + mark deducted_days
+  + daily-job backstop) shipped 2 Criticals on paper (daily-job double-charge of excluded days;
+  cancel double-refund/mint via stale buttons) + a crash window. **REPLACED** with a per-day
+  `{date: amount}` map on the row + two atomic functions (`al_approve_and_deduct` /
+  `al_cancel_and_refund`, each one CAS transaction) — fewer parts, mechanically auditable. Full build
+  brief + the 5 must-hold invariants + my added checks → **`docs/AL_DEDUCTION_REDESIGN.md`**. Build on
+  staging, then the F14 guard on the corrected base.
 
 - **⏰ Jul 1 (AUTOMATED · MUTED · SELF-DESTRUCT — owner: no redundancy): Kimying full-split
   restore.** `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42`
