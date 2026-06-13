@@ -3950,16 +3950,21 @@ def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) ->
     for aid in al_ids:
         res = al_cancel_and_refund(aid, staff_id, date_iso, today_iso)
         if res is not None:
-            out.append({"kind": "al", "id": aid, "refunded": float(res[0])})
+            out.append({"kind": "al", "id": aid, "date": date_iso, "refunded": float(res[0])})
     # 2) SENIOR shift-redefine(s) on this date → stand down (no balance pre-settle); spare payback/OT-rest
-    #    slots (senior_id NULL, paired with a booking) and 'done' rows (settled history)
+    #    slots (senior_id NULL, paired with a booking) and 'done' rows (settled history). Descriptors
+    #    carry date + senior + old times so the notify-all can name what changed (same shape as the
+    #    in-txn AL-approval supersede path).
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s AND when_date=%s "
                         "AND is_test=%s AND status IN ('proposed','approved') AND senior_id IS NOT NULL "
-                        "RETURNING id", (staff_id, date_iso, _ATT_TEST))
+                        "RETURNING id, when_date, senior_id, start_min, end_min",
+                        (staff_id, date_iso, _ATT_TEST))
             for r in cur.fetchall():
-                out.append({"kind": "redefine", "id": r["id"]})
+                out.append({"kind": "redefine", "id": r["id"], "date": str(r["when_date"]),
+                            "senior_id": r["senior_id"], "start_min": r["start_min"],
+                            "end_min": r["end_min"]})
     return out
 
 

@@ -122,6 +122,11 @@
       `shift_changes`; if a day has BOTH, which wins in `compute_day_events`/`works_on`? Not yet traced —
       verify the resolver consults both consistently (one source of truth).
   (d) **OT-rest picker** symmetry (same as (a)) not verified.
+  (e) **Sick→AL reverse-order race (Phase 3b-ii residual, Jun 13).** A sick day logged in the sub-second
+      *before* a same-day PENDING AL is approved leaves that AL charged — the AL-approval path doesn't yet
+      refuse/supersede on a pre-existing sick day. Rare, recoverable (visible + Cancel-able), and a strict
+      improvement (sick NEVER refunded AL before). Fix = an AL-approval-side sick guard, or the planned
+      `v_supersede_reversed` audit catching the un-reversed charge.
 
 ## Done (with proof)
 

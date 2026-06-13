@@ -140,6 +140,19 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
     `..._concurrent_vs_senior_redefine_al_always_wins` (race, ×8), `..._blocks_when_payback_slot_shares…`.
   - **Sick creation** (the sick flow): make sick an AWAY event (resolver already honours `sick_cases`) +
     `supersede_day` the sick day(s) to stand down a working event; reverse balances; announce.
+    **DONE (Phase 3b-ii).** A `_sick_supersede(staff, date)` helper calls the proven, idempotent
+    `supersede_day` (refunds a planned AL on that day so a sick day never also burns AL — owner's corner;
+    stands down a senior redefine; payback/OT-rest slots spared) and announces via `_announce_supersessions`
+    (away_reason="is out sick"). Wired into ALL THREE creation routes — `_sickme_book` (own provisional),
+    `_sfam_book` (family extension), the `sick_fam` dispatch (family today) — which between them also cover
+    the 30-min auto-resolve + the typed-reason dispatch. `supersede_day` descriptors enriched (date +
+    senior + old times) so one notify helper serves both this and the AL-approval path.
+    **RESIDUAL (rare, recoverable, strictly better than before):** the reverse-order race — a sick day
+    logged in the sub-second *before* a same-day pending AL gets approved — leaves that AL charged (the
+    AL-approval path doesn't yet refuse/supersede on a pre-existing sick day). Before this change sick
+    NEVER refunded AL, so this is a strict improvement; the leftover charge is visible + Cancel-able and
+    a future AL-approval-side sick guard (or the `v_supersede_reversed` audit) closes it. Logged in
+    ACTIONS_LEDGER Parked.
   - **Special-leave creation** (marriage/death/birth): `supersede_day` across the span (extend the engine
     to special-leave reversal — currently AL+senior-redefine only).
   - **Redefine approval** (`shift_change_approve_claim`): the SENSITIVE working-over-AWAY case — route

@@ -2587,37 +2587,52 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _al_finalize(context, req, approved=True)
 
 
-async def _announce_supersessions(context, victim_name: str, superseded: list) -> None:
-    """Schedule-model notify-all (docs/SCHEDULE_RESOLUTION_MODEL.md, Phase 4 seed): when a newer
-    decision stood older ones down, tell the senior who owned each + the Supervisors group, so a human
-    re-covers (the machine owns balances+truth+telling; humans own coverage). Best-effort + bilingual;
-    never blocks the state change that already committed. Today it handles a stood-down SENIOR redefine
-    (the AL-supersedes-redefine path); other kinds are added as their creation paths get wired."""
+async def _announce_supersessions(context, victim_staff: dict, superseded: list,
+                                  away_reason: str = "took approved AL") -> None:
+    """Schedule-model notify-all (docs/SCHEDULE_RESOLUTION_MODEL.md, Phase 4 seed): when a newer AWAY
+    decision stood older ones down on a day, tell everyone affected so a human re-covers (the machine
+    owns balances+truth+telling; humans own coverage). Best-effort + bilingual; never blocks the state
+    change that already committed.
+      • a stood-down SENIOR redefine → the senior who set it + the Supervisors group (coverage broke);
+      • a refunded approved AL (e.g. a sick day supersedes a planned AL) → the staffer (balance back) +
+        the Supervisors group.
+    `away_reason` (EN) describes WHY the person is now away ('took approved AL', 'is out sick', …)."""
     if not superseded:
         return
     from datetime import date as _date
     allstaff = staff_all("active")
-    for d in superseded:
-        if d.get("kind") != "redefine":
-            continue
-        iso = d.get("date") or ""
+    name = victim_staff.get("call_name") or victim_staff["canonical_name"]
+    vuid = (victim_staff.get("telegram_ids") or [None])[0]
+
+    def _dlabel(d):
         try:
-            dlabel = _date.fromisoformat(iso).strftime("%a %d/%m")
+            return _date.fromisoformat(d.get("date") or "").strftime("%a %d/%m")
         except Exception:
-            dlabel = iso
-        times = ""
-        if d.get("start_min") is not None and d.get("end_min") is not None:
-            times = " (%s–%s)" % (_fmt_min(d["start_min"]), _fmt_min(d["end_min"]))
-        line = ("🔁 %s took approved AL on %s — the shift change set for them%s no longer applies. "
-                "Please re-arrange cover if needed.\n"
-                "🔁 %s បានយក AL ដែលអនុម័តនៅ %s — ការប្តូរវេនដែលបានកំណត់ឱ្យ%s លែងប្រើទៀតហើយ។ "
-                "សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
-                % (victim_name, dlabel, times, victim_name, dlabel, times))
-        sen = next((s for s in allstaff if s["id"] == d.get("senior_id")), None)
-        if sen:
-            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
-                            sen.get("call_name") or sen["canonical_name"], line)
-        await _att_send(context, None, "Supervisors group", "", line, group=True)
+            return d.get("date") or ""
+
+    for d in superseded:
+        dlabel = _dlabel(d)
+        if d.get("kind") == "redefine":
+            times = ""
+            if d.get("start_min") is not None and d.get("end_min") is not None:
+                times = " (%s–%s)" % (_fmt_min(d["start_min"]), _fmt_min(d["end_min"]))
+            line = ("🔁 %s %s on %s — the shift change set for them%s no longer applies. "
+                    "Please re-arrange cover if needed.\n"
+                    "🔁 %s អវត្តមាននៅ %s — ការប្តូរវេនដែលបានកំណត់ឱ្យ%s លែងប្រើទៀតហើយ។ "
+                    "សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    % (name, away_reason, dlabel, times, name, dlabel, times))
+            sen = next((s for s in allstaff if s["id"] == d.get("senior_id")), None)
+            if sen:
+                await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                                sen.get("call_name") or sen["canonical_name"], line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "al":
+            refunded = d.get("refunded") or 0
+            line = ("🔁 %s is now away on %s — the AL approved for that day was returned (+%g AL).\n"
+                    "🔁 %s ឥឡូវអវត្តមាននៅ %s — AL ដែលអនុម័តសម្រាប់ថ្ងៃនោះត្រូវបានបង្វិលសងវិញ (+%g AL)។"
+                    % (name, dlabel, refunded, name, dlabel, refunded))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
 
 
 async def _al_finalize(context, req: dict, approved: bool) -> None:
@@ -2729,7 +2744,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True)
         # schedule model: if this AL stood down a senior shift-redefine, tell that senior + supervisors
         # so coverage is re-arranged by a human (never a silent revoke). Best-effort, after the verdict.
-        await _announce_supersessions(context, name, superseded)
+        await _announce_supersessions(context, requester, superseded)
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,
@@ -3324,6 +3339,24 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             % (who, _who_kh(who)), kb=kb)
 
 
+async def _sick_supersede(context, staff: dict, date_iso: str) -> None:
+    """A sick day is an AWAY event (schedule model): stand down any SENIOR redefine on that date and
+    refund a planned AL there (a sick day must not also burn AL — owner's corner in
+    docs/SCHEDULE_RESOLUTION_MODEL.md), then announce to the senior / staffer + Supervisors so a human
+    re-covers. Reuses the proven, idempotent `supersede_day` (payback/OT-rest slots are spared). Best
+    effort, after the sick row is recorded — a crash here leaves a benign un-reversed state the
+    idempotent retry/audit heals, never a double-charge."""
+    if not staff:
+        return
+    try:
+        from shared.database import supersede_day
+        out = supersede_day(staff["id"], date_iso, today_iso=_today_pp().isoformat())
+        if out:
+            await _announce_supersessions(context, staff, out, away_reason="is out sick")
+    except Exception:
+        pass
+
+
 async def _sfam_book(context, case: dict, reason: str) -> None:
     """Book TOMORROW as a continued family-sick day (status-first) + the Supervisors read the
     reason. Shared by the typed-reason dispatch and the 30-min auto-resolve."""
@@ -3331,6 +3364,7 @@ async def _sfam_book(context, case: dict, reason: str) -> None:
     tmr = (_today_pp() + timedelta(days=1)).isoformat()
     sick_create(case["staff_id"], case.get("who") or "family", tmr, "open")
     stf = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
+    await _sick_supersede(context, stf, tmr)   # away tomorrow → stand down any redefine/AL that day
     nm = (stf or {}).get("call_name") or (stf or {}).get("canonical_name", "Staff")
     await _att_send(context, None, "Supervisors group", "",
         "FYI: %s's family-sick continues tomorrow (%s).\n"
@@ -3344,6 +3378,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     """Day-1 own-sick booking (provisional case + paperless payback + rest-well + the FYI with
     the reason). Shared by the typed-reason dispatch and the 30-min auto-resolve."""
     sick_create(persona["id"], "me", date_iso, "provisional")
+    await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
     from gm_bot.attendance import to_min
     ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
     shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
@@ -5438,6 +5473,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "doctor-papers → owner-card → accept/part-duty flow. /testreset to wipe.")
     elif flow == "sick_fam":
         sick_create(persona["id"], pend["who"], pend["date"], "open")
+        await _sick_supersede(context, persona, pend["date"])   # away → stand down redefine/AL that day
         nm = persona.get("call_name") or persona["canonical_name"]
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s takes sick leave for their %s today.\n"

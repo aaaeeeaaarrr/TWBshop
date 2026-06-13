@@ -341,8 +341,19 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    downstream reader ignores cancelled rows + resolve_day protects AL above redefine (belt+suspenders);
    the reverse-direction guard (`shift_change_approve_claim`) untouched. Suite **569**, /audit unchanged
    (cleaner). **NOT yet deployed** (gm; attendance_live=OFF → zero live behavior change; batch-deploy at
-   go-live prep / quiet window). NEXT 3b sub-paths: sick · special-leave · the SENSITIVE redefine-approval
-   (senior confirm-revoke) · swap (Phase 6).
+   go-live prep / quiet window).
+   **▶ Phase 3b-ii DONE (Jun 13)** — **sick is now an AWAY event that supersedes.** `_sick_supersede(staff,
+   date)` calls the proven idempotent `supersede_day` (refunds a planned AL that day so a sick day never
+   also burns AL — owner's corner; stands down a senior redefine; payback slots spared) + announces via
+   `_announce_supersessions` (extended to handle the AL-refund kind → tells the staffer + Supervisors;
+   away_reason="is out sick"). Wired into ALL 3 sick-creation routes (`_sickme_book`, `_sfam_book`,
+   `sick_fam` dispatch — which also cover the auto-resolve + typed-reason paths). `supersede_day`
+   descriptors enriched (date+senior+old times) so one notify helper serves both this & the AL path. Suite
+   **569** (supersede test now asserts the enriched descriptor shape). Re-swept: every sick route covered;
+   resolve_day already treats sick as away (belt+suspenders). RESIDUAL (rare/recoverable/strictly-better,
+   ledger Parked (e)): a sick logged in the sub-second before a same-day pending AL is approved leaves that
+   AL charged — AL-approval-side sick guard or `v_supersede_reversed` audit closes it. NEXT 3b: special-leave ·
+   the SENSITIVE redefine-approval (senior confirm-revoke — kills the silent override) · swap (Phase 6).
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill

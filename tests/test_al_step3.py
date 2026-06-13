@@ -653,6 +653,12 @@ def test_supersede_day_reverses_al_and_spares_payback():
         pb_id = db.shift_change_autoapprove(sid, day, 480, 540, 0, "payback")   # senior_id NULL → spared
         out = db.supersede_day(sid, day, today_iso="2026-06-13")
         assert {o["kind"] for o in out} == {"al", "redefine"}
+        # descriptors carry what the notify-all needs (same shape as the in-txn AL-approval path)
+        al_d = next(o for o in out if o["kind"] == "al")
+        rd_d = next(o for o in out if o["kind"] == "redefine")
+        assert al_d["date"] == day and al_d["refunded"] == 1.0
+        assert rd_d["date"] == day and rd_d["senior_id"] == sid
+        assert rd_d["start_min"] == 480 and rd_d["end_min"] == 1020
         assert _al_left(sid) == 5.0                                            # AL refunded
         with db._db() as c, c.cursor() as cur:
             cur.execute("SELECT status FROM shift_changes WHERE id=%s", (sc_id,))
