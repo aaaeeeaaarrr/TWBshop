@@ -3698,6 +3698,11 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                             (staff_id, is_test, list(dates)))
                 if cur.fetchone():
                     return "conflict"             # an approved shift-change schedules them to WORK that day
+                cur.execute("SELECT 1 FROM dayoff_overrides WHERE staff_id=%s AND kind='work' "
+                            "AND is_test=%s AND the_date = ANY(%s::date[]) LIMIT 1",
+                            (staff_id, is_test, list(dates)))
+                if cur.fetchone():
+                    return "conflict"             # a day-off SWAP scheduled them to WORK that day
             cur.execute("""UPDATE al_requests
                            SET status='approved', deducted_map=%s, points_map=%s, decided_at=NOW()
                            WHERE id=%s AND status='pending'
@@ -3762,6 +3767,10 @@ def al_date_conflict(staff_id: int, dates, exclude_req_id: int | None = None) ->
                         (staff_id, _ATT_TEST, list(want)))
             for r in cur.fetchall():
                 hit.add(str(r["when_date"]))
+            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND kind='work' "
+                        "AND is_test=%s AND the_date = ANY(%s::date[])", (staff_id, _ATT_TEST, list(want)))
+            for r in cur.fetchall():
+                hit.add(str(r["the_date"]))
     return sorted(hit)
 
 
