@@ -282,6 +282,24 @@ def test_f14_concurrent_cross_flow_al_vs_shift_change_one_wins():
         _teardown(sid)
 
 
+def test_al_date_conflict_detects_approved_al_and_shift_change():
+    sid = _seed("ZZ_AL_CONFLICT", 5.0)
+    try:
+        r = _pending(sid, ["2099-11-01"])
+        db.al_approve_and_deduct(r, 1.0, {"2099-11-01": 1}, {})       # approved AL on day A
+        with db._db() as c, c.cursor() as cur:                        # approved shift-change on day B
+            cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'approved',FALSE)",
+                        (sid, "2099-11-02"))
+        assert db.al_date_conflict(sid, ["2099-11-01", "2099-11-02", "2099-11-03"]) == \
+            ["2099-11-01", "2099-11-02"]
+        assert db.al_date_conflict(sid, ["2099-11-03"]) == []          # a free day is clear
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_approve_writes_forward_points_in_same_txn():
     # red-team #2: the forward short-notice points must be written by al_approve_and_deduct itself
     # (atomic with the deduct), not by a separate call that a crash could skip.

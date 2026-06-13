@@ -2477,8 +2477,21 @@ async def _al_coverage_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def submit_al_request(context, requester: dict, kind: str, days: list[str],
                             hours_start: str | None, hours_end: str | None, reason: str,
                             requested_by_uid: int) -> int:
-    """Create the AL request and DM every senior an approval card (gated by caller)."""
+    """Create the AL request and DM every senior an approval card (gated by caller).
+    Returns the new request id, or None if blocked (a day is already approved leave / a scheduled
+    shift change — F14 request-side: don't waste a senior's decision on a day that can only conflict)."""
     import html
+    from shared.database import al_date_conflict
+    conflicts = al_date_conflict(requester["id"], days)
+    if conflicts:
+        runc = requester.get("telegram_ids") or []
+        await _att_send(context, runc[0] if runc else None, "Requester",
+            requester.get("call_name") or requester["canonical_name"],
+            "⚠ You already have approved leave or a scheduled shift change on: %s.\n"
+            "Pick other day(s).\n"
+            "⚠ ប្អូនមានច្បាប់ឈប់សម្រាក ឬការប្តូរវេនដែលអនុម័តរួចនៅ៖ %s។ សូមជ្រើសថ្ងៃផ្សេង។"
+            % (", ".join(conflicts), ", ".join(conflicts)))
+        return None
     req_id = al_create_request(requester["id"], kind, days, hours_start, hours_end,
                                reason, requested_by_uid)
     # AL cards are English-only (owner request); COMPACT by default — request + BOLD from→to dates +
@@ -5220,6 +5233,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 return
         req_id = await submit_al_request(context, persona, pend["kind"], pend["days"],
                                          pend.get("hours_start"), pend.get("hours_end"), reason, req_uid)
+        if req_id is None:
+            return   # blocked: a day is already approved leave / a scheduled change (requester told)
         # the requester's OWN card: rich (carries the persistent 👁 Show-who's-working toggle), edited
         # in place over the reason prompt + registered so _al_finalize can flip it to 'decided'.
         pc, pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")

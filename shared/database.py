@@ -3737,6 +3737,34 @@ def al_reject(req_id: int) -> bool:
             return cur.fetchone() is not None
 
 
+def al_date_conflict(staff_id: int, dates, exclude_req_id: int | None = None) -> list:
+    """The subset of `dates` the staff is ALREADY committed on — an approved AL day, or an
+    approved/done shift-change day. Used to BLOCK an AL request at SUBMIT time (F14 request-side, so a
+    staffer isn't sent to seniors for a day that can only be rejected). is_test-scoped. Returns a
+    sorted list of the colliding ISO dates (empty = clear)."""
+    import json as _json
+    want = set(dates)
+    if not want:
+        return []
+    hit = set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s AND (%s::int IS NULL OR id<>%s)",
+                        (staff_id, _ATT_TEST, exclude_req_id, exclude_req_id))
+            for r in cur.fetchall():
+                try:
+                    hit |= set(_json.loads(r["days"] or "[]")) & want
+                except Exception:
+                    pass
+            cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s "
+                        "AND status IN ('approved','done') AND is_test=%s AND when_date = ANY(%s::date[])",
+                        (staff_id, _ATT_TEST, list(want)))
+            for r in cur.fetchall():
+                hit.add(str(r["when_date"]))
+    return sorted(hit)
+
+
 def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | None = None):
     """Atomic inverse of approve (S1): pop ONE day `iso` from an APPROVED request this staff owns,
     refund the EXACT frozen amount, reverse that day's frozen points, and keep `days`/status
