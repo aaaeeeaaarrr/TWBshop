@@ -2644,9 +2644,14 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             bd = alm.back_at_work_date(days, requester.get("day_off"), nw)
             back = "%s, %s" % (bd.strftime("%a %d/%m"),
                                _fmt_min(to_min(requester.get("work_start")) or 0))
+        # over-balance heads-up (Fable M1): two requests can each pass the submit-time gate against
+        # the same balance, so an approval can still take them negative — make it VISIBLE to the
+        # deciding seniors (non-blocking; the deduction stands and the number is honest, S4).
+        warn = ("\n⚠ This puts %s at %g AL — over their balance." % (name, new_bal)) \
+            if (new_bal is not None and new_bal < 0) else ""
         await _att_send(context, None, "Supervisors group", "",
-            "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s."
-            % (name, span_note, req.get("reason") or "—", day_off, back), group=True)
+            "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s.%s"
+            % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True)
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,
