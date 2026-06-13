@@ -61,7 +61,8 @@ def v_al(requests: list[dict], staff: dict, today: date) -> list[str]:
         bad = [d for d in ded if d not in days]
         if bad:
             out.append("AL: %s req #%s deducted days not in the request: %s" % (nm, r["id"], bad))
-        if st == "approved" and r.get("kind") == "days":
+        is_ph = (r.get("reason") or "").upper().startswith("PH")   # PH-comp is NEVER deducted
+        if st == "approved" and r.get("kind") == "days" and not is_ph:
             missed = [d for d in days if d < today.isoformat() and d not in ded]
             if missed:
                 out.append("AL: %s req #%s approved, dates passed but NOT deducted: %s"

@@ -1839,6 +1839,10 @@ def test_audit_validators():
     assert any("refund missing" in p for p in probs)
     assert au.v_al([mk(status="approved", days='["2026-06-01"]',
                        deducted_days='["2026-06-01"]')], staff, today) == []
+    # PH-compensation is NEVER deducted → must NOT be flagged as "passed but not deducted" (the
+    # Jun-13 daily-audit false positive on real req #18).
+    assert au.v_al([mk(status="approved", days='["2026-06-01"]', deducted_days="[]",
+                       reason="PH compensation (April) — DO NOT DEDUCT")], staff, today) == []
 
     # shift changes: approved-but-never-settled (the silent-money case), done without banked
     probs = au.v_shift_changes([
