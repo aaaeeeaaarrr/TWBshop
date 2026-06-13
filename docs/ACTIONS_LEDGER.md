@@ -79,7 +79,19 @@
     "ask" permission). A pre-push hook could SURFACE the checklist but cannot VERIFY a judgment, so the
     lever is the mandatory populated section, not a new wire. Question for advisors: is this the "definition
     of done" for SHIPPABLE/HIGH-RISK, and does it belong in Rule 6's closing evidence block as a required
-    line? (Held from unilateral edit — standing-rule change = advisor + second-opinion pass.)
+    line?
+    **▶ UPDATE (Jun 14) — the STRENGTHENING is now APPLIED (owner-directed); only the LEAN/UNIFY stays held.**
+    Owner asked "isn't 'don't make me walk an incomplete test' a rule? where are your laws — anything to
+    update?" → codified Rule 4 as the **DONE-CLAIM GATE** (Standard bumped to **v2026-06-14-A**, project +
+    global): named trigger (done/complete/shipped claim · HIGH-RISK push · ANY invite to walk/test/review)
+    + populated report (per-change + per-arc SYSTEM sweep) + a **WALK-READINESS** line (built · pushed ·
+    deployed-verified · NO draft/placeholder content in the path they'll touch incl. untranslated strings ·
+    per-arc sweep done · invariant check clean). Done with the required self-critique pass (it tightened
+    scope to SHIPPABLE/HIGH-RISK + walk invites, and generalized "/audit"→"project invariant check" in the
+    global copy). **What REMAINS for the advisors = only the LEAN/UNIFY** (can Rule 4 + Rule 5 + S5 +
+    breadth memory collapse into ONE universal principle without weakening precision?) + the **S5
+    balance-semantics extension** ("supersession reverses the loser's balance in-txn + announces"). Those
+    are the optimization / irreversible-logic parts; the strengthening above did not wait for them.
 
 
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any

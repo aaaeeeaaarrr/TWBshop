@@ -3,7 +3,7 @@
 ---
 
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
-REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-13-A
+REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-14-A
 
 > This is a FULL copy (not a pointer) so the project carries its own enforcement even if the global
 > `~/.claude/CLAUDE.md` fails to load, is stale on another machine, bootstrap wasn't run, the secrets
@@ -34,12 +34,23 @@ real work never softens. The user may demand the evidence block at ANY time; its
 3. **FILES ARE TRUTH, CHAT IS DISPOSABLE.** Persist to the repo as you go; prove from git.
 4. **EVERY ACTOR, NO DEAD ENDS.** User-path first and each role's view (backend-only proof is
    insufficient for user-facing work); every control does a real action or faithfully advances through
-   a real path. **WHOLE-PICTURE RE-SWEEP (closing step of SHIPPABLE/HIGH-RISK — proactive, never wait to
-   be asked):** introducing/changing something is done only when you've re-swept the WHOLE it touches —
-   every other reader/writer of the same state, every interaction with what already exists, everywhere
-   the same pattern could live (technical AND human-process), and the system-level invariants/audit. The
-   unit passing is NOT the system being correct. (Trivial/chat edits stay lean — this is the SHIPPABLE/
-   HIGH-RISK closing step, not pre-work ceremony.)
+   a real path.
+   **DONE-CLAIM GATE — the closing step of SHIPPABLE/HIGH-RISK; it fires at a NAMED boundary, never only
+   when prompted.** The moment you would call something done / complete / shipped / ready, OR push
+   HIGH-RISK, OR invite the user to walk / test / review it — STOP and produce a POPULATED report. A bare
+   "✓ done" or a yes/no attestation does NOT count (those get rubber-stamped, exactly like an "ask"
+   prompt the user always approves). It is the trigger that fills Rule 6's evidence block. Two distinct
+   sweeps:
+   - **Per-change (local):** the change itself does what it says.
+   - **Per-arc (SYSTEM) re-sweep:** every OTHER reader/writer of the same state, the cross-module /
+     cross-bot blast radius (GREPPED, not guessed), the system-level invariants/audit, and everywhere the
+     same pattern could live (technical AND human-process). The unit passing is NOT the system being correct.
+   **WALK-READINESS — before you EVER put the user in front of it to test/walk/review:** built ✓ · pushed
+   ✓ · deployed+verified if it runs on a service ✓ · NO draft/placeholder content in the path they'll
+   touch (untranslated/draft strings, TODOs, stubbed buttons) ✓ · the per-arc sweep done ✓ · `/audit`
+   clean ✓. If ANY line is incomplete, SAY SO plainly and DO NOT invite the walk — never let the user
+   discover mid-test that something wasn't built, pushed, deployed, or translated. (Trivial/chat edits
+   stay lean — this whole gate is the SHIPPABLE/HIGH-RISK closing step, not pre-work ceremony.)
 5. **COVER EVERY BRANCH** — success / fail / cancel / invalid / permission / duplicate / edge; one
    harness per workflow. Fixes become permanent guards (regression test or constraint), never symptom
    patches.
