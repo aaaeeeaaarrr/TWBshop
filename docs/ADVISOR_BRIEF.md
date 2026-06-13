@@ -36,6 +36,17 @@ boundary as a *populated artifact*, not a checkbox.
   populated report. So the lever for those is "mandatory populated section," not "a new wire."
 - **Persistence:** for every surviving rule, say WHERE it lives so it can't rot — global `CLAUDE.md`,
   project `CLAUDE.md`, a hook, `/audit`, a test, or a runbook/SOP (NOT a chat turn).
+- **Build on Bedrock, don't reinvent it.** The system already has **Bedrock = Standards + Guards +
+  Ratchet** (`docs/BEDROCK.md`, inventory §7). The **Ratchet** is the existing add/remove policy —
+  every collapse you propose IS a Ratchet "down" move, so cite which removal criterion it meets
+  (never-caught-a-real-problem-in-≥3mo · redundant · repeat-false-positive). The **"one principle"**
+  (anything the agent can produce/edit can't authorize/verify the agent) must be preserved — don't
+  propose anything that lets the builder self-approve. Bedrock is a *floor, not a ceiling*, and its
+  protection-architecture review is **closed** — this pass is compression, not re-architecture; don't
+  reopen guard design. (Open Bedrock item, owner: delta 2 = OS-lock of the global guard files.)
+- **Memory layer:** some standing feedback is machine-local (not in the repo) but **mostly already
+  codified into `CLAUDE.md`** — inventory §7 says which. You don't need the raw memory files; the
+  codified rules + the failure summary above carry it.
 
 ## The questions to answer (candidate collapses — from the inventory)
 1. **Escalation stated 3×** (HtB "only stop if blocked" + Std R6 "don't ask unless needed" + Bedrock

@@ -31,7 +31,8 @@ This inventory can point at where a gate is prose-only; it cannot convert a judg
 | project `CLAUDE.md` | FULL copy of the Standard + Core Architectural Rules 1–6 (Rule 5/6 = tripwires) + Deploy Discipline + Operational-Instructions/Ledger rule | every session, this project |
 | `docs/STATE_INTEGRITY_LAWS.md` | S1–S5 (data integrity) — tripwire target of Core Rule 6 | on demand (when Rule 6 trips) |
 | `docs/STATEFUL_MENU_PATTERNS.md` | Menu Laws 1–9 (UI integrity) + F1–F14 backlog — tripwire target of Core Rule 5 | on demand (when Rule 5 trips) |
-| `docs/BEDROCK.md` | Bedrock deltas (guard hardening history) | on demand |
+| `docs/BEDROCK.md` | **Bedrock = Standards + Guards + Ratchet** + the "one principle" + the 5 deltas (see §7 — it is NOT just history; the Ratchet is the existing lean/remove policy) | on demand |
+| machine-local memory (`~/.claude/.../memory/*.md`) | standing feedback rules (breadth-over-narrowness · precision/deploy · second-opinion · operational-instructions · owner-always-approves) — mostly already CODIFIED into `CLAUDE.md`; NOT in the repo, so advisors can't see them directly (see §7) | every session (this machine only) |
 
 ## 2. Mechanical enforcement reality (what actually FIRES)
 | Artifact | Wired by / trigger | Fires on | Covers | Honest limit |
@@ -74,7 +75,10 @@ moment · **SOP** runbook step · **META** rule-about-rules. ENF: **MECH** auto-
 | **Deploy Discipline** (quiet window · batch · changed-service-only · verify) | SOP | PROSE | prose-only (verify step overlaps R2) |
 | **Operational-Instructions / Ledger** (do real-data writes now or log Open) | SOP/GATE | SURF | the ledger file is the artifact; updating it is judgment |
 | **SOPs**: Push · Pull · New-Machine · New-Project · Secrets · Large-Files · Automatic-Actions | SOP | mixed | Secrets backed by `secret_guard`; rest prose/runbook |
-| **collapse-don't-accumulate** | META | **PROSE** | only in memory `breadth-over-narrowness` + this advisor item; NOT yet a formal standing rule |
+| **collapse-don't-accumulate** | META | SURF(partial) | the REMOVAL side IS formalized — the Bedrock **Ratchet** removal trigger (`docs/BEDROCK.md` §7); the "lean as you go" habit is otherwise prose (memory `breadth-over-narrowness` + this advisor item) |
+| **Bedrock "one principle"** — anything Claude can produce/edit can't authorize/verify Claude | INV/meta | MECH(partial) | drives the no-override guards (delta 1: `#HIGHRISK-OK` marker removed → catastrophic set blocks, owner runs manually); the OS-lock that fully realizes it (delta 2) is PENDING (owner task) |
+| **Bedrock Ratchet** — bidirectional add/remove trigger | META | SURF | `docs/BEDROCK.md`; **the formal home of "remove/compress a rule"** — add needs a real incident/drill; remove at review when a guard/rule never-once-caught-a-real-problem in ≥3mo, or is redundant, or repeat-false-positives. The lean pass should USE this, not reinvent it |
+| **Bedrock deltas 2 + 4** | — | PENDING | delta 2 = OWNER OS-lock of the global guard files (`~/.claude/hooks/*` + settings) — NOT done, the only step that turns soft self-protection into a hard OS boundary; delta 4 = native-permissions direction (no build) |
 
 ## 4. Overlaps / candidate collapses (QUESTIONS for the advisor pass — not decisions)
 1. **Escalation stated in 3 places** — HtB "only stop if truly blocked" + Std R6 "don't ask unless needed"
@@ -104,3 +108,32 @@ advisor preamble: owner + advisors decide the lean standard from this evidence; 
 builder install the ratified result + wire whatever surfacing is agreed. The Codex/tool-switch question
 stays in its own ledger note (finding on record: the failures here are process-enforcement, portable to
 any tool — not a capability gap).
+
+## 7. Bedrock + the memory layer (added Jun 14 — were under-represented above)
+**Bedrock (`docs/BEDROCK.md`) is the meta-framework these rules grew from — Standards + Guards + Ratchet.**
+- **Standards** = the Real-Path Precision Standard + How-to-Behave — already inventoried (§3); Bedrock
+  doesn't duplicate them (single source, no drift).
+- **Guards** = the two hooks — already inventoried (§2).
+- **Ratchet** = the bidirectional add/remove policy — **this is the existing answer to "keep rules lean."**
+  Add a rule/guard only on a real incident or failed drill; REMOVE/compress at review when it (a) never
+  once caught a real problem in ≥3 months, (b) is redundant with a broader guard, or (c) repeat-false-
+  positives on legit work. **The lean/unify pass should run THROUGH this policy, not around it** — every
+  collapse the advisors propose is a Ratchet "down" move and should cite which criterion it meets.
+- **The one principle** (drives every guard): *anything Claude can produce or edit cannot be the thing
+  that authorizes or verifies Claude.* Delta 1 realized it (the self-typed override marker is gone →
+  catastrophic actions block, owner runs them). **Delta 2 (PENDING, owner)** is the OS-lock of the global
+  guard files — until done, a future session could still rewrite the guards; it's the one piece that turns
+  soft self-protection into a hard boundary. Delta 4 = native-permissions direction (recorded, not built).
+- Bedrock is explicitly a **floor, not a ceiling** (prevents known bad classes; judgment produces good
+  work) and its **architecture review is CLOSED** — changes come from a real incident/failed drill, not
+  another abstract review. A lean/unify pass is legitimate (it's compression, not re-architecture), but it
+  should not reopen the closed protection-design debate.
+
+**Memory layer (machine-local, not in the repo):** standing feedback rules live in
+`~/.claude/.../memory/*.md` — `breadth-over-narrowness` (the universal lessons from higher-model reviews,
+incl. the re-sweep-didn't-self-trigger diagnosis that motivated this pass), `precision/deploy`,
+`second-opinion`, `operational-instructions`, `owner-always-approves`. **Most are already codified into
+`CLAUDE.md`** (precision/deploy → the Standard; second-opinion → How-to-Behave; operational-instructions →
+the Ledger rule), so the inventory's §3 covers their codified form. The one not fully codified is the
+re-sweep diagnosis — which is exactly the input the Advisor Brief summarizes. Advisors don't need the raw
+memory files; the codified rules + the brief's failure summary carry the content.
