@@ -17,6 +17,14 @@
 | `/testclock +0d` or e.g. `tomorrow 06:00` | set a pretend "now" (only in test) | lets you reach time-gated steps (check-in window, nudges) |
 | `/test` | opens the role-play shell → **persona picker** | pick which staffer you ARE; then their menu + the 7 dry-runs |
 
+**🚨 WATCHDOG IS LIVE (deployed Jun 14).** While `test_mode` is ON, a background check audits your test
+rows **every 60s** and **DMs you instantly** the moment any number goes inconsistent — de-duped (one ping
+per new problem, a ✅ when it clears). You don't have to check after every action. For an on-demand
+confirm: **`/teststatus`** now shows a **Consistency** line (✅ or the problem list), and **`/audit`** gives
+the full check. *Honest limit:* it catches **wrong / inconsistent** updates (the silent dangerous class —
+a number that didn't update or updated wrong), NOT **intent** — a self-consistent-but-unintended number
+won't ping, so you still eyeball "is this the value I wanted."
+
 Two ways to test, use both:
 - **Dry-runs (1–7):** canned previews of *every message* in a flow, in order — fast read-through to check wording/Khmer. No state changes.
 - **Live role-play:** pick a persona → drive their real menu → real `is_test` rows move (a real, reversible rehearsal). This is where you catch behavior, not just wording.
