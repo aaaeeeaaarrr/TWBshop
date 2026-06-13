@@ -249,7 +249,37 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-13 (session 33 — **STAGING DB stood up (Phase A+B)** + **AL overhaul Steps
+**Last updated:** 2026-06-14 (session 34 — **OWNER GO-LIVE /test WALK in progress + swap redesign
+decided**). The owner is role-playing the attendance flows as **PISEY** before flipping
+`attendance_live` (still **OFF**; `attendance_test_mode` **ON**). Walk so far: Check-in skipped (not at
+location, known-good); Late + Sick + Swap walked; **Step 8 (F14 collision layer) NOT yet walked** — that
+is the resume point of the walk.
+**▶ PUNCH-LIST captured in `docs/WALK_FINDINGS.md` — build as ONE batch, then a single gm redeploy in a
+quiet window (owner chose: finish the walk first, then batch-fix):**
+- **WF1** Late: drop the staffer-facing "Supervisors notified ✓" line (`attendance_ui.py:2624`) — go
+  straight to "Type your reason". Group heads-up (`:2616`) stays.
+- **WF2** Family-sick **times** path has NO confirm (full-day does) → add a confirm before booking
+  (`attendance_ui.py:2526` `famtt`; mirror `famf` at 2514). Real-flow bug, not just the dry-run.
+- **WF3** Remove ALL **family-sick nightly nudges** (`bot.py:3410-3431` + `_sick_family_nudge_callback`
+  3512 + `att:sfam:` reg 6404 + dry-run steps). Staff re-request a day/time themselves; no bot message.
+  OWN-sick papers return-check (3400-3409) STAYS.
+- **WF5 (design LOCKED)** Rework "Change day off" into a clean **partner-swap**: pick PARTNER (not an
+  arbitrary day) → trade each person's REAL upcoming day-off dates → **show ALL pairings ≤ 6 days apart,
+  staffer picks one** → card states cover both ways. Coverage-neutral by construction; kills today's
+  "arbitrary day → not neutral → partner gets 2 days off" bug. `swap_approve_claim` engine UNCHANGED
+  (writes 4 overrides from 2 dates) — this is date-derivation (use BOTH `day_off`s) + picker UI + card +
+  ≤6-day check replacing same-week. Flaw: `attendance_ui.py:2737-2758` derives the 2nd date from the
+  *requester's* weekday + ignores the partner's real day off.
+- **WF4 (note)** Dry-runs are read-only previews — use the LIVE persona menu to see behavior/balances.
+**Real DB state (done last session, verified, `/audit` clean):** call-name renames (PISEY / PISEY-CHUCH),
+PB+AL reset to today's reality (PISEY 29m, Por 120m, Chantrea −1 AL), Sony sick papered for the 15th
+(nudge disarmed), PISEY↔Heng swap applied. The 4 imported approved ALs left as `approved` (they were
+taken — deductions stand). Additive owner-correction helpers in `shared/database.py` (committed 3a4de7b,
+not bot-called → no deploy). **Nothing new deployed this session (docs only); gm server unchanged.**
+NEXT: finish Step 8 of the walk → build WF1+WF2+WF3+WF5 batch → gm redeploy (quiet window) → re-walk
+swap+Step 8 → `/audit` → `/testreset` → flip `attendance_live`.
+
+**(prev) 2026-06-13 (session 33 — **STAGING DB stood up (Phase A+B)** + **AL overhaul Steps
 1–3 built & proven on staging**. Staging: `twbshop_staging` created on the DO instance, schema cloned
 with zero prod data via every `init_*_db()` + a prod↔staging column diff (closed 1 real drift — pay
 columns now canonical); `TWBSHOP_ENV` switch in `shared/database.py` (default prod = zero behavior
