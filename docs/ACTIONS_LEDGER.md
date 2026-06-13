@@ -9,6 +9,17 @@
 
 ## Open (not yet done)
 
+- **🔒 2026-06-14 (owner-action — guard blocks Claude from editing it): wire `secret_guard.py` into the
+  PROJECT `.claude/settings.json`.** Found by the governance inventory: the repo-committed project
+  settings wires only `highrisk_guard.py`; the secret-leak scanner fires solely via the GLOBAL
+  `~/.claude/settings.json`. So on a machine with stale/missing global config the dangerous-command
+  guard runs but secret-scanning silently does NOT (asymmetry). Current real exposure LOW (bootstrap
+  installs global on every machine; this machine fires it) — defense-in-depth, not a live hole. FIX
+  (owner pastes; the highrisk guard hard-blocks Claude from touching `.claude/settings.json`): add a
+  second hook object under the existing PreToolUse matcher —
+  `{ "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret_guard.py\"" }`.
+  Harmless if it also runs via global (a duplicate block is still a block). Once done: delete this entry.
+
 - **🛑 2026-06-13 (CRITICAL BALANCE BUG — found by Fable's pre-guard review, NOT yet fixed, awaiting
   owner decision): AL deduction is split-brained; HOURS-AL is never deducted at all.** `_al_finalize`
   flips the request to `status='approved'` (bot.py:2550) BEFORE computing `nw = staff_absent_dates()`
