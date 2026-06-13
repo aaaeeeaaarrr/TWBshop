@@ -293,9 +293,16 @@ Vetted ChatGPT's KH batch against the live code and WIRED the accepted SM/MM str
 terminology unified to bare **AL** for the counted balance (generic ការឈប់សម្រាក only for any-leave
 conflicts), refund wording → **ដាក់ត្រឡប់ចូលវិញ** (SM8/SM9/SM10, matches P12), MM7 KEPT over
 ChatGPT's (its "Done/Cancel" referenced labels that aren't on the buttons), SM5 left as-is
-(re-read proved no doubling). Full record → `docs/KH_REVIEW.md` "VETTING OUTCOME". Still behind
-`attendance_live=OFF`, NOT deployed. Codex-vs-ClaudeCode question parked (finding: process problem,
-portable to any tool — not a capability gap); governance-inventory next step NOT started (owner deciding).
+(re-read proved no doubling). Full record → `docs/KH_REVIEW.md` "VETTING OUTCOME".
+**▶ DEPLOYED to gm Jun 14** — the whole session-33 arc + today's work shipped to the server
+(`6bf828e→43110f5`, gm-only restart in the 02:2x PP dead window; verified HEAD==origin, gm active +
+clean startup, on-disk grep carries the change, other 4 bots untouched). **`attendance_live` still OFF
+(None) — nothing live for real staff; `attendance_test_mode`=ON (owner role-play surface).** Next =
+owner `/test` re-walk (test mode already on) → `/testreset` → flip `attendance_live` when signed off.
+Codex-vs-ClaudeCode question parked (finding: process problem, portable to any tool — not a capability
+gap); governance inventory FILED (`docs/GOVERNANCE_INVENTORY.md`) as input to the advisor lean/unify;
+`secret_guard` now wired in project settings (proven). gm now 1 docs-commit behind origin after this
+status edit — docs-only, no redeploy needed.
 
 **▶▶ RESUME HERE (Jun 13, end of a very long session 33 — the whole arc, for when we return):**
 
