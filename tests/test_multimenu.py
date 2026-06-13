@@ -560,6 +560,97 @@ def test_dispatch_clears_selection_stashes(monkeypatch):
     assert ud["att_al_picked"] == set() and "att_do_day" not in ud and "att_al_from" not in ud
 
 
+# ── A2/A3: att:go nonce (double-tap + stale card) ──
+def test_att_go_double_tap_says_already_confirmed(monkeypatch):
+    """A2: a 2nd tap on an already-confirmed card (no pend, text shows ✅ Confirmed) gets a calm
+    'already confirmed' toast — NOT the scary NOT-CONFIRMED nudge that invited a duplicate request."""
+    from gm_bot import bot
+    import config
+    answers, sends, deletes = [], [], []
+
+    async def _ans(text=None, show_alert=False, **k):
+        answers.append(text)
+
+    async def _send(*a, **k):
+        sends.append(a)
+
+    async def _del(*a, **k):
+        deletes.append(a)
+
+    q = SimpleNamespace(data="att:go:5", answer=_ans,
+                        message=SimpleNamespace(text="Death leave\n\n✅ Confirmed.", chat_id=7, message_id=9))
+    update = SimpleNamespace(callback_query=q, effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=7))
+    ctx = SimpleNamespace(bot=SimpleNamespace(send_message=_send, delete_message=_del), user_data={})
+    asyncio.run(bot._att_go_callback(update, ctx))
+    assert any("Already confirmed" in (a or "") for a in answers)
+    assert sends == [] and deletes == []   # no nudge, no delete of the confirmed card
+
+
+def test_att_go_stale_card_does_not_submit(monkeypatch):
+    """A3: a stale card whose nonce ≠ the current pend must NOT submit that pend."""
+    from gm_bot import bot
+    import config
+    answers, dispatched = [], []
+
+    async def _ans(text=None, show_alert=False, **k):
+        answers.append(text)
+
+    async def _disp(*a, **k):
+        dispatched.append(1)
+
+    monkeypatch.setattr(bot, "_att_dispatch", _disp)
+    q = SimpleNamespace(data="att:go:3", answer=_ans,
+                        message=SimpleNamespace(text="Sick", chat_id=7, message_id=9))
+    update = SimpleNamespace(callback_query=q, effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=7))
+    ud = {"att_test_pending": {"flow": "sick_me", "_go_nonce": "9"}}
+    asyncio.run(bot._att_go_callback(update, SimpleNamespace(bot=SimpleNamespace(), user_data=ud)))
+    assert any("Replaced" in (a or "") for a in answers)
+    assert dispatched == [] and ud.get("att_test_pending")   # not submitted, pend intact
+
+
+# ── A5: maintenance toast across staff handlers ──
+def test_att_paused_toasts_staff_not_owner(monkeypatch):
+    from gm_bot import bot
+    import config
+    monkeypatch.setattr(bot, "_attendance_live", lambda: False)
+    answers = []
+
+    async def _ans(text=None, show_alert=False, **k):
+        answers.append((text, show_alert))
+
+    assert asyncio.run(bot._att_paused(SimpleNamespace(answer=_ans), 99999)) is True
+    assert answers and answers[0][1] is True and "paused" in (answers[0][0] or "")
+    assert asyncio.run(bot._att_paused(SimpleNamespace(answer=_ans),
+                                       config.OWNER_TELEGRAM_ID)) is False
+
+
+# ── A6: media after expiry fires the honest nudge ──
+def test_voice_after_expiry_fires_nudge(monkeypatch):
+    from gm_bot import bot
+    import shared.database as db
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
+    monkeypatch.setattr(bot, "_attendance_live", lambda: True)
+    monkeypatch.setattr(db, "flow_load_or_expired",
+                        lambda uid: (None, {"flow": "att_pending",
+                                            "data": {"_summary": "AL", "_prompt_chat": 7, "_prompt_msg": 9}}))
+    nudged = []
+
+    async def _nudge(context, chat_id, detail="", old_chat=None, old_msg=None):
+        nudged.append((chat_id, detail))
+
+    monkeypatch.setattr(bot, "_expiry_nudge", _nudge)
+
+    async def _reply(t):
+        pass
+
+    msg = SimpleNamespace(voice=True, photo=None, sticker=None, reply_text=_reply, chat_id=7, message_id=2)
+    update = SimpleNamespace(message=msg, effective_user=SimpleNamespace(id=9))
+    assert asyncio.run(bot._capture_voice_reason(update, SimpleNamespace(user_data={}))) is True
+    assert nudged and nudged[0][1] == "AL"
+
+
 def test_split_late_branches_for_points_display():
     """The 3 branches the test-sim points display reflects (declare-first credits the informed rate)."""
     from gm_bot.points import split_late

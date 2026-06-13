@@ -807,6 +807,13 @@ def _arm_pending(context, update, pend: dict) -> None:
         ttl = 35
     else:
         ttl = 30   # owner Jun 13: lifted 15→30 so busy hands rarely hit expiry (F3)
+    # A2/A3 (Fable): tag this pend with a per-user monotonic nonce so a tap-confirm card carries the
+    # identity of the flow it was built for — a stale/superseded card (different nonce) can't submit
+    # the current pend, and a double-tap (no pend) is recognised. _confirm_prompt reads att_go_nonce.
+    _seq = int(context.user_data.get("att_go_seq", 0)) + 1
+    context.user_data["att_go_seq"] = _seq
+    pend["_go_nonce"] = str(_seq)
+    context.user_data["att_go_nonce"] = str(_seq)
     if att_test_on():
         context.user_data["att_test_pending"] = pend
     else:
@@ -892,8 +899,9 @@ def _confirm_prompt(p: dict, context, base: str, back: str):
     line = base
     if att_test_on():
         line += "\n🧪 (test — routes to you; /testreset to wipe.)"
+    _nonce = context.user_data.get("att_go_nonce", "")   # A2/A3: ties this card to its pend
     return _hdr(p, line), InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ I confirm · ខ្ញុំបញ្ជាក់", callback_data="att:go")],
+        [InlineKeyboardButton("✅ I confirm · ខ្ញុំបញ្ជាក់", callback_data="att:go:%s" % _nonce)],
         _cancel_row(),   # armed confirm → Cancel disarms (a plain Back would leave a ghost pend)
     ])
 

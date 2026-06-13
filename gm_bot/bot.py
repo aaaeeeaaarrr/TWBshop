@@ -1103,10 +1103,16 @@ async def _capture_voice_reason(update: Update, context: ContextTypes.DEFAULT_TY
     if _att_test_mode() and context.user_data.get("att_test_pending"):
         armed = True
     elif _attendance_live():
-        from shared.database import flow_load
-        fs = flow_load(user.id)
-        if fs and str(fs.get("step", "")).endswith("reason"):
+        from shared.database import flow_load_or_expired
+        active, expired = flow_load_or_expired(user.id)
+        if active and str(active.get("step", "")).endswith("reason"):
             armed = True
+        elif expired and expired.get("flow") == "att_pending":
+            # A6: the media arrived AFTER the prompt expired — don't let it (and the F3 honesty) vanish.
+            ep = expired.get("data") or {}
+            await _expiry_nudge(context, msg.chat_id, ep.get("_summary") or "",
+                                old_chat=ep.get("_prompt_chat"), old_msg=ep.get("_prompt_msg"))
+            return True
     if not armed:
         return False
     await msg.reply_text(
@@ -2640,6 +2646,8 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     user = update.effective_user
+    if user and await _att_paused(query, user.id):   # A5: don't book during a maintenance pause
+        return
     if _att_test_mode() and user.id == config.OWNER_TELEGRAM_ID:
         # test shell: the owner taps AS the persona (the callback data carries no staff id) —
         # without this branch every payback button was DEAD in /test (owner find, Jun 11)
@@ -5041,29 +5049,58 @@ async def _ci_simcheckout_callback(update: Update, context: ContextTypes.DEFAULT
         await _offer_buyback(context, persona, new_bal, suid, banked)
 
 
+async def _att_paused(query, uid) -> bool:
+    """A5/F12: ANY staff-reachable att:* handler — if attendance is paused (live OFF) and the tapper
+    isn't the owner, tell them it's paused instead of acting. Returns True if paused (caller returns)."""
+    if uid != config.OWNER_TELEGRAM_ID and not _attendance_live():
+        try:
+            await query.answer("🔧 Attendance is paused for maintenance — please talk to your senior."
+                               " · ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។", show_alert=True)
+        except Exception:
+            pass
+        return True
+    return False
+
+
 async def _att_go_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """att:go — tap-to-confirm for the no-reason flows (replaces typing 'go'). Owner test uses the
     user_data pending; a live staffer uses flow_state. Fires the real submit_* via _att_dispatch."""
     query = update.callback_query
     await query.answer()
     uid = update.effective_user.id
-    pend, live = None, False
-    if uid == config.OWNER_TELEGRAM_ID:
-        pend = context.user_data.pop("att_test_pending", None)
+    if await _att_paused(query, uid):
+        return
+    btn_nonce = (query.data or "").split(":")[2] if len((query.data or "").split(":")) > 2 else None
+    # PEEK the current pend (don't consume yet) so a stale/cross-flow tap can't eat a live pend (A3).
+    pend, live, is_owner = None, False, (uid == config.OWNER_TELEGRAM_ID)
+    if is_owner:
+        pend = context.user_data.get("att_test_pending")
     elif _attendance_live():
-        from shared.database import flow_load, flow_clear
+        from shared.database import flow_load
         fs = flow_load(uid)
         if fs and fs.get("flow") == "att_pending":
             pend = fs.get("data") or {}
-            flow_clear(uid)
             live = True
+    # A3: a stale confirm card whose nonce ≠ the CURRENT pend must NOT submit that pend.
+    if pend and btn_nonce is not None and pend.get("_go_nonce") and str(pend["_go_nonce"]) != btn_nonce:
+        await query.answer("↩ Replaced — please use the newest message.\n↩ សូមប្រើសារថ្មីបំផុត។",
+                           show_alert=True)
+        return
     if not pend:
-        # F2/Law 6: an expired/dead tap-confirm used to die silently here. Push an honest
-        # 'NOT CONFIRMED — TRY AGAIN' carrying the card's own details, and remove the stale card.
-        detail = (query.message.text or "").strip()
-        await _expiry_nudge(context, update.effective_chat.id, detail,
+        # A2: a double-tap of an ALREADY-confirmed card → say so calmly, don't push a scary nudge.
+        if "✅ Confirmed" in (query.message.text or ""):
+            await query.answer("Already confirmed ✓ · បានបញ្ជាក់រួចហើយ", show_alert=True)
+            return
+        # F2/Law 6: a genuinely expired/dead tap-confirm → honest push + remove the stale card.
+        await _expiry_nudge(context, update.effective_chat.id, (query.message.text or "").strip(),
                             old_chat=query.message.chat_id, old_msg=query.message.message_id)
         return
+    # matched (or a legacy no-nonce button) → CONSUME the pend now, then submit
+    if is_owner:
+        context.user_data.pop("att_test_pending", None)
+    elif live:
+        from shared.database import flow_clear
+        flow_clear(uid)
     try:
         await query.edit_message_text((query.message.text or "") + "\n\n✅ Confirmed.")
     except Exception:
@@ -6070,14 +6107,15 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))
     app.add_handler(CallbackQueryHandler(_death_upgrade_callback, pattern=r"^att:dth:"))
-    app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go$"))
+    app.add_handler(CallbackQueryHandler(_att_go_callback, pattern=r"^att:go"))  # att:go or att:go:{nonce}
     app.add_handler(CallbackQueryHandler(_late_simarr_callback, pattern=r"^att:simarr:"))
     app.add_handler(CallbackQueryHandler(_ci_simcheckout_callback, pattern=r"^att:cisco:"))
     # private photo from staff → reason capture / sick papers (gated); harmless otherwise
     app.add_handler(MessageHandler(
         filters.ChatType.PRIVATE & filters.PHOTO, _private_photo_router))
     app.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & (filters.VOICE | filters.Sticker.ALL | filters.VIDEO_NOTE),
+        filters.ChatType.PRIVATE & (filters.VOICE | filters.Sticker.ALL | filters.VIDEO_NOTE
+                                    | filters.VIDEO | filters.AUDIO | filters.ANIMATION),  # A7: widen
         _private_voice_router))
     app.add_handler(CallbackQueryHandler(attendance_ui.callback, pattern=r"^att:"))
     # private location router: real staff check-in first (gated by attendance_live),
