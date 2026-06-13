@@ -359,10 +359,24 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    span via the idempotent `supersede_day` (refund AL / stand down redefine / spare payback slots) +
    announces. Helper tolerates a DB date object (str()). Suite **569**. Engine gap noted (ledger): a
    special-leave as the LOSER isn't reversed yet (rare; refund is whole-leave not per-day).
-   **NEXT 3b: the SENSITIVE redefine-approval** (senior confirm-revoke — replaces today's F14 block + the
-   silent override; needs a confirm UI — owner may want to weigh the UX) · then swap (Phase 6) · then
-   Phase 4 unified notify polish · Phase 5 retire silent path · laws + /audit (v_one_active_decision,
-   v_supersede_reversed). All behind attendance_live=OFF, NOT yet deployed (batch at go-live prep).
+   **▶ Phase 3b-iv DONE (Jun 13) — the SILENT-OVERRIDE KILLER.** The SENSITIVE working-over-AWAY case:
+   the staffer approving their own redefine on a day they hold approved AL no longer dead-ends at F14
+   "conflict" — the card edits into an explicit CONFIRM ("⚠ approving cancels your AL that day, AL
+   refunded — confirm?") with `att:sc:rev` (yes) / `att:sc:keep` (decline → leave stands, proposing
+   senior told). On confirm, NEW atomic `shift_change_approve_revoking_al(cid)` (same advisory lock)
+   CLAIMS the redefine first (CAS), THEN refunds every approved AL that day via the shared `_al_refund_day`
+   inverse (extracted from `al_cancel_and_refund` so cancel + revoke share ONE proven inverse, S1), THEN
+   supersedes other senior redefines. Claim-first ⇒ a lost claim moves NO balance (no partial action,
+   verified since `_db()` commits on normal exit). Announce via `_announce_supersessions` "al_revoked"
+   kind. `shift_change_approve_claim`'s "conflict" contract UNCHANGED → auto-approve still blocks, only the
+   explicit confirm revokes (F14 backstop intact + all race tests hold). +2 tests (refund+approve+
+   idempotent · atomic-no-partial). Suite **571**. Re-swept: post-revoke resolve_day→WORKING so settle/OT
+   correct; al_cancel_and_refund refactor preserved (its tests pass); multi-day AL pops only the one day.
+   **ALL FOUR Phase 3b creation paths now DONE** (AL · sick · special-leave · redefine-revoke).
+   **NEXT:** swap (Phase 6 — two-party reversal + coverage-gap alert) · Phase 4 unified notify polish ·
+   Phase 5 retire any silent path · laws + /audit (S5 extension · v_one_active_decision ·
+   v_supersede_reversed). All behind attendance_live=OFF, NOT yet deployed (batch at go-live prep / owner
+   /test re-walk first).
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill

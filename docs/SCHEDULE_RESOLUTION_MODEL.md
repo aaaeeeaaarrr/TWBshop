@@ -165,8 +165,22 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
     LOSER (if a newer away event lands on a special-leave day) — rare, special-leave is a planned block;
     `special_leave_refund` is whole-leave not per-day, so that direction needs design. Ledger Parked.
   - **Redefine approval** (`shift_change_approve_claim`): the SENSITIVE working-over-AWAY case — route
-    through a **senior confirm** ("this cancels {name}'s approved leave that day — confirm?") that then
-    `supersede_day`s the AL (refund) before approving. Replaces today's F14 block + the silent override.
+    through a confirm ("this cancels {name}'s approved leave that day — confirm?") that then refunds the
+    AL before approving. Replaces today's F14 block + the silent override.
+    **DONE (Phase 3b-iv).** The affected staffer approves their own redefine; on a day they hold approved
+    AL, `shift_change_approve_claim` still returns "conflict" but the callback no longer dead-ends — it
+    edits the card into an explicit CONFIRM ("⚠ You have approved AL on {date}. Approving this shift
+    change CANCELS that leave (AL refunded) and schedules you to work. Confirm?") with
+    `att:sc:rev` (yes) / `att:sc:keep` (decline, leave stands → proposing senior told). On confirm, the
+    NEW atomic `shift_change_approve_revoking_al(cid)` — under the same advisory lock — CLAIMS the
+    redefine FIRST (CAS), then refunds every approved AL on that day via the shared `_al_refund_day`
+    inverse (extracted so the cancel + revoke share ONE proven inverse, S1), then supersedes other senior
+    redefines. Claim-first ordering means a lost claim moves NO balance (no partial action). Announce via
+    `_announce_supersessions` "al_revoked" kind (staffer + Supervisors). Proven on staging:
+    `test_shift_change_approve_revoking_al_refunds_and_approves` (refund+approve+idempotent) +
+    `test_shift_change_revoke_no_balance_move_if_not_proposed` (atomic guard). The "deliberate confirm"
+    is the affected person consenting to give up their own leave; the senior already made a deliberate
+    proposal; everyone is told. This is the real **silent-override killer** + the override-alternative.
   - **Swap approval** (`swap_approve_claim`): Phase 6 — reverse both parties' overrides on supersede +
     coverage-gap alert; extend `supersede_day` to the swap/booking-release case.
 - **Phase 4 — notify-all:** on every supersession emit "🔁 X (details) replaced Y (details)" to

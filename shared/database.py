@@ -3227,6 +3227,56 @@ def shift_change_approve_claim(change_id: int):
             return True
 
 
+def shift_change_approve_revoking_al(change_id: int):
+    """The SENSITIVE working-over-AWAY supersede (schedule model, docs/SCHEDULE_RESOLUTION_MODEL.md):
+    deliberately approve a senior redefine on a day the staffer has approved AL — invoked ONLY after an
+    explicit human confirm (never silent/automatic). Under the SAME per-staff advisory lock as the
+    normal approve, in ONE transaction: REFUND every approved AL covering that day (the shared proven
+    per-day inverse `_al_refund_day`), THEN flip the redefine proposed→approved and supersede other live
+    SENIOR redefines that day. Atomic — if the claim is lost the refunds roll back too. Returns
+    (True, descriptors) on success (descriptors = the revoked-AL list for the notify-all), or
+    (False, []) (not proposed / lost the claim). Test-aware (refunds touch is_test rows only)."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT staff_id, when_date, is_test, status FROM shift_changes WHERE id=%s",
+                        (change_id,))
+            r = cur.fetchone()
+            if not r or r["status"] != "proposed":
+                return False, []
+            staff_id, is_test = r["staff_id"], bool(r["is_test"])
+            iso = str(r["when_date"])
+            cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, staff_id))
+            # 1) CLAIM the redefine FIRST (CAS) — if lost (a concurrent decline/approve won), return
+            #    before touching ANY balance, so a lost claim never leaves a refund committed.
+            cur.execute("UPDATE shift_changes SET status='approved', approved_at=NOW() "
+                        "WHERE id=%s AND status='proposed' RETURNING id", (change_id,))
+            if cur.fetchone() is None:
+                return False, []
+            # 2) won the claim → refund every approved AL covering this day, in the SAME txn (atomic
+            #    with the approve; the shared proven per-day inverse). A raise here rolls back the claim.
+            descriptors = []
+            cur.execute("SELECT id, days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s", (staff_id, is_test))
+            al_ids = []
+            for a in cur.fetchall():
+                try:
+                    if iso in _json.loads(a["days"] or "[]"):
+                        al_ids.append(a["id"])
+                except Exception:
+                    pass
+            for aid in al_ids:
+                res = _al_refund_day(cur, aid, staff_id, iso)
+                if res is not None:
+                    descriptors.append({"kind": "al_revoked", "id": aid, "date": iso,
+                                        "refunded": float(res[0])})
+            # 3) latest-wins: supersede other live SENIOR redefines that day (spare payback slots)
+            cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s AND when_date=%s "
+                        "AND is_test=%s AND id<>%s AND status IN ('proposed','approved') "
+                        "AND senior_id IS NOT NULL", (staff_id, iso, is_test, change_id))
+            return True, descriptors
+
+
 def shift_change_active(staff_id: int, when_date: str) -> dict | None:
     """The APPROVED/done redefinition for a staff+date, if any — attendance uses this as that day's
     shift instead of the normal schedule. Latest approved wins (a re-edit replaces). Test-isolated."""
@@ -3873,52 +3923,59 @@ def al_date_conflict(staff_id: int, dates, exclude_req_id: int | None = None) ->
     return sorted(hit)
 
 
-def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | None = None):
-    """Atomic inverse of approve (S1): pop ONE day `iso` from an APPROVED request this staff owns,
-    refund the EXACT frozen amount, reverse that day's frozen points, and keep `days`/status
-    consistent — all in ONE transaction. Returns (refunded_amount, remaining_days), or None when
-    there is nothing to refund: lost the claim, wrong owner, not approved, the day isn't in the map
-    (already cancelled / never charged), or the day is already past. Popped-nothing ⇒ refund-nothing,
-    so a double-tap or a never-charged day can never mint AL. Test-aware: an is_test row pops the maps
-    but never moves the real `al_left` column."""
+def _al_refund_day(cur, req_id: int, staff_id: int, iso: str, today_iso: str | None = None):
+    """Core per-day AL refund on an EXISTING cursor — so the SAME proven inverse (S1) can run either
+    standalone (the Cancel-AL flow) OR inside a larger atomic txn (the redefine confirm-revoke flow),
+    never two divergent copies. Pops ONE day `iso` from an APPROVED request this staff owns, refunds
+    the EXACT frozen amount, reverses that day's frozen points, keeps `days`/status consistent. Returns
+    (refunded_amount, remaining_days), or None when there is nothing to refund (lost the claim, wrong
+    owner, not approved, day not in the map, or already past). Popped-nothing ⇒ refund-nothing, so a
+    double-tap or never-charged day can never mint AL. Test-aware: never moves the real `al_left`."""
     import json as _json
     J = psycopg2.extras.Json
     if today_iso and iso < today_iso:
         return None                               # day already taken — never refund (defense in depth)
+    cur.execute("""SELECT days, deducted_map, points_map, is_test FROM al_requests
+                   WHERE id=%s AND staff_id=%s AND status='approved' FOR UPDATE""",
+                (req_id, staff_id))
+    row = cur.fetchone()
+    if not row or not row["deducted_map"]:
+        return None
+    dmap = dict(row["deducted_map"])
+    if iso not in dmap:
+        return None                                # already cancelled this day / never charged
+    amount = float(dmap.pop(iso))
+    pmap = dict(row["points_map"] or {})
+    pts = int(pmap.pop(iso, 0) or 0)
+    is_test = bool(row["is_test"])
+    try:
+        days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
+    except Exception:
+        days = []
+    if dmap:                                       # days remain → keep the request approved
+        cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s WHERE id=%s",
+                    (_json.dumps(days), J(dmap), J(pmap), req_id))
+    else:                                          # last day popped → the whole request is cancelled
+        cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s, "
+                    "status='cancelled', decided_at=NOW() WHERE id=%s",
+                    (_json.dumps(days), J(dmap), J(pmap), req_id))
+    if pts:                                        # reverse the short-notice penalty for this day
+        cur.execute("""INSERT INTO points_events (staff_id, cause, quantity, ref, is_test)
+                       VALUES (%s,'short_notice_al',%s,%s,%s)""",
+                    (staff_id, -pts, "al_cancel:%d:%s" % (req_id, iso), is_test))
+    if not is_test:
+        cur.execute("""UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW()
+                       WHERE id=%s""", (amount, staff_id))
+    return (amount, len(days))
+
+
+def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | None = None):
+    """Atomic inverse of approve (S1): pop ONE day `iso` from an APPROVED request this staff owns and
+    refund it. Thin wrapper over `_al_refund_day` (the shared core). Returns (refunded_amount,
+    remaining_days) or None. Test-aware."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT days, deducted_map, points_map, is_test FROM al_requests
-                           WHERE id=%s AND staff_id=%s AND status='approved' FOR UPDATE""",
-                        (req_id, staff_id))
-            row = cur.fetchone()
-            if not row or not row["deducted_map"]:
-                return None
-            dmap = dict(row["deducted_map"])
-            if iso not in dmap:
-                return None                        # already cancelled this day / never charged
-            amount = float(dmap.pop(iso))
-            pmap = dict(row["points_map"] or {})
-            pts = int(pmap.pop(iso, 0) or 0)
-            is_test = bool(row["is_test"])
-            try:
-                days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
-            except Exception:
-                days = []
-            if dmap:                               # days remain → keep the request approved
-                cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s WHERE id=%s",
-                            (_json.dumps(days), J(dmap), J(pmap), req_id))
-            else:                                  # last day popped → the whole request is cancelled
-                cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s, "
-                            "status='cancelled', decided_at=NOW() WHERE id=%s",
-                            (_json.dumps(days), J(dmap), J(pmap), req_id))
-            if pts:                                # reverse the short-notice penalty for this day
-                cur.execute("""INSERT INTO points_events (staff_id, cause, quantity, ref, is_test)
-                               VALUES (%s,'short_notice_al',%s,%s,%s)""",
-                            (staff_id, -pts, "al_cancel:%d:%s" % (req_id, iso), is_test))
-            if not is_test:
-                cur.execute("""UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW()
-                               WHERE id=%s""", (amount, staff_id))
-            return (amount, len(days))
+            return _al_refund_day(cur, req_id, staff_id, iso, today_iso)
 
 
 def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) -> list:

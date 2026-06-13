@@ -675,6 +675,61 @@ def test_supersede_day_reverses_al_and_spares_payback():
         _teardown(sid)
 
 
+def test_shift_change_approve_revoking_al_refunds_and_approves():
+    # Phase 3b-iv: the SENSITIVE working-over-AWAY confirm-revoke — refund the AL on that day AND
+    # approve the redefine, atomically; idempotent (a second call refunds nothing).
+    sid = _seed("ZZ_SC_REVOKE", 5.0)
+    try:
+        day = "2099-09-25"
+        r = _pending(sid, [day]); db.al_approve_and_deduct(r, 1.0, {day: 1}, {})
+        assert _al_left(sid) == 4.0
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,%s,360,840,540,'proposed',FALSE) "
+                        "RETURNING id", (sid, sid, day))
+            cid = cur.fetchone()["id"]
+        ok, descs = db.shift_change_approve_revoking_al(cid)
+        assert ok is True
+        assert len(descs) == 1 and descs[0]["kind"] == "al_revoked" and descs[0]["refunded"] == 1.0
+        assert _al_left(sid) == 5.0                              # AL refunded
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (cid,))
+            assert cur.fetchone()["status"] == "approved"        # redefine approved
+            cur.execute("SELECT status FROM al_requests WHERE id=%s", (r,))
+            assert cur.fetchone()["status"] == "cancelled"       # AL cancelled
+        ok2, d2 = db.shift_change_approve_revoking_al(cid)       # idempotent — already approved
+        assert ok2 is False and d2 == []
+        assert _al_left(sid) == 5.0                              # no double-refund
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_shift_change_revoke_no_balance_move_if_not_proposed():
+    # atomic guard: a redefine that isn't proposable (already declined) refunds NOTHING and the AL
+    # stays approved — never a partial action (refund without an approve).
+    sid = _seed("ZZ_SC_REVOKE_ATOMIC", 5.0)
+    try:
+        day = "2099-09-26"
+        r = _pending(sid, [day]); db.al_approve_and_deduct(r, 1.0, {day: 1}, {})
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,%s,360,840,540,'declined',FALSE) "
+                        "RETURNING id", (sid, sid, day))
+            cid = cur.fetchone()["id"]
+        ok, descs = db.shift_change_approve_revoking_al(cid)
+        assert ok is False and descs == []
+        assert _al_left(sid) == 4.0                              # AL NOT refunded
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM al_requests WHERE id=%s", (r,))
+            assert cur.fetchone()["status"] == "approved"        # AL untouched
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:

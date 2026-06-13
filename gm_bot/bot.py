@@ -1889,7 +1889,48 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         if not staff or staff["id"] != g["staff_id"]:
             return
     stf0 = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
-    if query.data.split(":")[2] == "no":
+    action = query.data.split(":")[2]
+    if action == "keep":
+        # confirmed-revoke declined: the staffer keeps their approved leave → decline the redefine and
+        # tell the proposing senior the leave stands (the shift change did NOT take).
+        shift_change_set_status(cid, "declined")
+        if stf0:
+            body0, kb0 = _sc_card(dict(g, status="declined"), stf0, show_cov=False)
+            try:
+                await query.edit_message_text(body0, reply_markup=kb0)
+            except Exception:
+                pass
+        sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+        if sen:
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                sen.get("call_name") or sen["canonical_name"],
+                "%s kept their approved leave on %s — the shift change was not approved.\n"
+                "%s រក្សាច្បាប់ឈប់សម្រាកនៅ %s — ការប្តូរវេនមិនបានអនុម័តទេ។"
+                % ((stf0 or {}).get("call_name") or (stf0 or {}).get("canonical_name", "Staff"),
+                   g["when_date"], (stf0 or {}).get("call_name") or
+                   (stf0 or {}).get("canonical_name", "Staff"), g["when_date"]))
+        return
+    if action == "rev":
+        # confirmed-revoke: atomically refund the AL on that day + approve the redefine, then announce
+        from shared.database import shift_change_approve_revoking_al
+        ok, descs = shift_change_approve_revoking_al(cid)
+        if not ok:
+            return await _expired_toast(query, context,
+                                        update.effective_user.id if update.effective_user else None)
+        if stf0:
+            body0, kb0 = _sc_card(dict(g, status="approved"), stf0, show_cov=False)
+            try:
+                await query.edit_message_text(body0, reply_markup=kb0)
+            except Exception:
+                pass
+            await _announce_supersessions(context, stf0, descs)   # al_revoked → staffer + supervisors
+            nm = stf0.get("call_name") or stf0["canonical_name"]
+            win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
+            await _att_send(context, None, "Supervisors group", "",
+                "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
+                % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+        return
+    if action == "no":
         shift_change_set_status(cid, "declined")
         if stf0:   # rebuild the card → decision line shown, the 👁 toggle SURVIVES (owner)
             body0, kb0 = _sc_card(dict(g, status="declined"), stf0, show_cov=False)
@@ -1918,12 +1959,30 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
     _scres = shift_change_approve_claim(cid)
     if _scres == "conflict":
-        # F14: they have approved AL that day — can't also be scheduled to work it
-        if stf0:
-            await _att_send(context, (stf0.get("telegram_ids") or [None])[0], "Staff",
-                stf0.get("call_name") or stf0["canonical_name"],
-                "Couldn't approve — you have approved leave that day.\n"
-                "មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកនៅថ្ងៃនោះ។")
+        # SENSITIVE working-over-AWAY (schedule model): they have approved AL that day. Don't dead-end —
+        # ask them to EXPLICITLY confirm giving up that leave to work the redefined shift. On confirm the
+        # AL is refunded + everyone told (att:sc:rev); on keep, the leave stands (att:sc:keep). Never
+        # silent, never automatic — this replaces the old flat F14 block + the silent-override bug.
+        from datetime import date as _date
+        try:
+            dl = _date.fromisoformat(str(g["when_date"])).strftime("%a %d/%m")
+        except Exception:
+            dl = str(g["when_date"])
+        win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Yes — cancel my leave & work · បាទ/ចាស — បោះបង់ច្បាប់ ធ្វើការ",
+                                  callback_data="att:sc:rev:%d" % cid)],
+            [InlineKeyboardButton("✋ Keep my leave · រក្សាច្បាប់ឈប់សម្រាក",
+                                  callback_data="att:sc:keep:%d" % cid)]])
+        try:
+            await query.edit_message_text(
+                "⚠ You have approved AL on %s. Approving this shift change (%s) will CANCEL that leave "
+                "(your AL is refunded) and schedule you to work. Confirm?\n"
+                "⚠ ប្អូនមានច្បាប់ឈប់សម្រាក (AL) ដែលអនុម័តនៅ %s។ ការអនុម័តការប្តូរវេននេះ (%s) "
+                "នឹងបោះបង់ច្បាប់ឈប់នោះ (AL បង្វិលសងវិញ) ហើយកំណត់ឱ្យប្អូនធ្វើការ។ បញ្ជាក់ទេ?"
+                % (dl, win, dl, win), reply_markup=kb)
+        except Exception:
+            pass
         return
     if not _scres:
         return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
@@ -2636,6 +2695,16 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
             refunded = d.get("refunded") or 0
             line = ("🔁 %s is now away on %s — the AL approved for that day was returned (+%g AL).\n"
                     "🔁 %s ឥឡូវអវត្តមាននៅ %s — AL ដែលអនុម័តសម្រាប់ថ្ងៃនោះត្រូវបានបង្វិលសងវិញ (+%g AL)។"
+                    % (name, dlabel, refunded, name, dlabel, refunded))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "al_revoked":
+            # the staffer gave up their leave to WORK a redefined shift that day (confirmed revoke)
+            refunded = d.get("refunded") or 0
+            line = ("🔁 %s's approved AL on %s was cancelled — a shift change for that day was approved "
+                    "instead. The AL is refunded (+%g AL).\n"
+                    "🔁 ច្បាប់ឈប់សម្រាក (AL) របស់ %s នៅ %s ត្រូវបានបោះបង់ — បានអនុម័តការប្តូរវេនជំនួសវិញ។ "
+                    "AL ត្រូវបានបង្វិលសង (+%g AL)។"
                     % (name, dlabel, refunded, name, dlabel, refunded))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
