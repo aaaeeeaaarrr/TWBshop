@@ -119,17 +119,30 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
 ## Current state → what's needed
 - **Built:** AL deduct/refund (frozen, atomic) · redefine latest-wins + senior supersession · special-leave
   refund · the advisory-lock serialiser · `v_one_active_redefine`.
-- **To build (phased, on staging, each proven + notify-all + audit):**
-  1. `resolve_day(staff, date)` — ONE function returning the single active decision (away/working +
-     times + which row), folding AL · sick · special · redefine · swap · normal with the precedence
-     above. Repoint compute_day_events / no-show / settle / verdict to it.
-  2. Make **sick** an away-event the resolver honours (+ its balance inverse).
-  3. **Supersede engine:** `supersede_day(staff, date, new_event)` — in one txn: mark the loser
-     superseded, reverse its balance (dispatch per type), emit the notify-all. The sensitive
-     working-over-away case routes through a senior confirm first.
-  4. **Notify-all** wiring (Supervisors + staff + senior + partner).
-  5. Retire the silent redefine-overrides-AL path; the confirmed-revoke replaces it.
-  6. Swap-side: reverse both parties' overrides on supersede + coverage-gap alert.
+  - **Phase 1a DONE** — `resolve_day()` (the one resolver, precedence, is_test-scoped) + `_day_context` batch.
+  - **Phase 1b DONE** — `compute_day_events` repointed → the two bugs vanished (redefine no longer
+    overrides AL; sick honoured; is_test bleed closed). no-show rides compute_day_events → also fixed.
+  - **Phase 2 DONE** — lateness verdict repointed; settle gained a `resolve_day` leave-guard.
+  - **Phase 3a DONE** — additive `supersede_day(staff, date, today_iso)`: reverses approved AL (per-day,
+    proven inverse) + stands down SENIOR redefines (spares payback/OT-rest slots), idempotent, returns
+    descriptors for notify-all. NOT yet wired into any creation path.
+- **PHASE 3b — WIRE `supersede_day` into every creation path (the re-sweep map; do each with proof):**
+  - **AL approval** (`_al_finalize`): an approved AL is AWAY-over-working → call `supersede_day` for each
+    AL day to stand down a redefine that day (replaces F14's block for this direction). away-over-working
+    = automatic + announced.
+  - **Sick creation** (the sick flow): make sick an AWAY event (resolver already honours `sick_cases`) +
+    `supersede_day` the sick day(s) to stand down a working event; reverse balances; announce.
+  - **Special-leave creation** (marriage/death/birth): `supersede_day` across the span (extend the engine
+    to special-leave reversal — currently AL+senior-redefine only).
+  - **Redefine approval** (`shift_change_approve_claim`): the SENSITIVE working-over-AWAY case — route
+    through a **senior confirm** ("this cancels {name}'s approved leave that day — confirm?") that then
+    `supersede_day`s the AL (refund) before approving. Replaces today's F14 block + the silent override.
+  - **Swap approval** (`swap_approve_claim`): Phase 6 — reverse both parties' overrides on supersede +
+    coverage-gap alert; extend `supersede_day` to the swap/booking-release case.
+- **Phase 4 — notify-all:** on every supersession emit "🔁 X (details) replaced Y (details)" to
+  Supervisors + the staff + the senior who owned the superseded decision (+ swap partner).
+- **Phase 5** — retire the silent redefine-overrides-AL path (subsumed by the confirmed-revoke above).
+- **Phase 6** — swap-side reversal + coverage-gap alert.
 
 ## WIDER SWEEP — where this SAME class of issue lives across the system (owner directive)
 Tracking every place the same root patterns can bite, so the phases + the eventual law/audit pass cover
