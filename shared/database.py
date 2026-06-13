@@ -2835,6 +2835,33 @@ def staff_set_joined(staff_id: int, joined_iso: str, month_only: bool = False) -
                         "updated_at=NOW() WHERE id=%s", (joined_iso, month_only, staff_id))
 
 
+def staff_set_call_name(staff_id: int, call_name: str) -> None:
+    """Owner correction: set a staffer's call (display short) name."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET call_name=%s, updated_at=NOW() WHERE id=%s",
+                        (call_name, staff_id))
+
+
+def staff_set_day_off(staff_id: int, day_off: str) -> None:
+    """Owner correction: set a staffer's recurring weekly day-off (e.g. 'Mon')."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET day_off=%s, updated_at=NOW() WHERE id=%s",
+                        (day_off, staff_id))
+
+
+def al_adjust_balance(staff_id: int, delta: float) -> float:
+    """Owner correction: move a staffer's AL balance by a RELATIVE delta (negative = deduct).
+    Relative (never an absolute from a possibly-stale read) so it can't clobber a concurrent
+    AL approve/refund. Returns the post-move balance."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW() "
+                        "WHERE id=%s RETURNING al_left", (delta, staff_id))
+            return float(cur.fetchone()["al_left"])
+
+
 def staff_get_by_uid(uid: int) -> dict | None:
     """The staff record that owns this telegram user_id, or None."""
     if uid is None:
@@ -4130,6 +4157,15 @@ def payback_credit(debt_id: int, minutes: int) -> dict:
             if bal <= 0:
                 cur.execute("UPDATE payback_debts SET status='cleared' WHERE id=%s", (debt_id,))
             return {"balance": max(bal, 0), "status": "cleared" if bal <= 0 else "open"}
+
+
+def payback_delete_debt(debt_id: int) -> int:
+    """Owner correction: hard-delete a single payback debt row by id (used to void stale manual
+    entries during a reality reset). Returns the number of rows removed (0 or 1)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM payback_debts WHERE id=%s", (debt_id,))
+            return cur.rowcount
 
 
 def payback_open_bookings(staff_id: int) -> list[dict]:

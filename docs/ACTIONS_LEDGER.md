@@ -204,6 +204,28 @@
 
 ## Done (with proof)
 
+- **2026-06-14 — GO-LIVE REALITY RESET (owner-instructed, HIGH-RISK real data, before/after proof on real
+  rows).** Synced the real DB to the true current state ahead of go-live. **Day-offs:** confirmed all 33
+  active staff vs the owner's latest screenshot — 2 drifts corrected to image (An Davy `Wed→Thu`, Rom
+  Sopheaktra `Thu→Fri`); rest already matched. **Renames:** Khon Visalpisey call `Sey→PISEY`; Chuch Pisey
+  call `Pisey→PISEY-CHUCH`. **Payback:** deleted 3 stale manual-import open debts (Long 80m, Por 240m, Seth
+  300m), set true current → PISEY 29m, Por 120m (final open PB = exactly those two; the 2 already-cleared
+  paid rows Chantrea/Davy kept as history). **AL:** cancelled the 4 stale planned-AL request rows (Long,
+  Sao Visal, Chomreun, Heng) — KEPT all accrued `al_left` balances (owner choice); Chantrea `al_left 2.0→1.0`
+  (−1). **Sick:** logged Yi Sony own-sick (papers seen) for Jun 14; owner then said she's back the 15th →
+  case set `papered` (NOT nudged; proven out of the nightly `provisional/me` queue). **Swap:** approved
+  day-off swap Pisey↔Heng — Pisey off Mon 15 Jun / works Thu 18; Heng off Thu 18 / works Mon 15 (4
+  `dayoff_overrides` written via the real `swap_approve_claim` path; AL-conflict check clean). Proof: a
+  fresh-process independent re-read confirmed every value (call names, day-offs, Chantrea=1.0, open PB =
+  {PISEY:29, Por:120}, 0 approved real AL, Sony papered, all 4 swap overrides off/work correct). Mechanism:
+  added 4 reusable owner-correction primitives to `shared/database.py` (`staff_set_call_name`,
+  `staff_set_day_off`, `al_adjust_balance`, `payback_delete_debt`) — additive, NOT called by the bot (no
+  deploy needed; data is already live on the shared prod DB). One-off driver `golive_reset.py` deleted
+  (teardown). **NOTE:** changes are live on the real DB now (gm reads the same DB) — independent of
+  `attendance_live` (still OFF). Normal own-sick+papers behavior (owner asked): debt auto-made at
+  declaration is WIPED on papers-accept within the 2-day window (→`papered`), papers seen by owner+Tyty
+  only, nightly return-check stops; +15 only if they opt into part-duty.
+
 - **2026-06-14 — DB write-path security audit + surfacing gate (advisor pass, OS-lock deferred by owner).**
   (a) Audited every `psycopg2.connect`/raw-DDL/DELETE in the repo → **no payroll/AL/staff/attendance write
   bypasses `shared/database.py`** (proof: grep classification, sensitive tables touched only by the wrapper
