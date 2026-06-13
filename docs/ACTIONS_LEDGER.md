@@ -210,9 +210,14 @@
   Sopheaktra `Thu→Fri`); rest already matched. **Renames:** Khon Visalpisey call `Sey→PISEY`; Chuch Pisey
   call `Pisey→PISEY-CHUCH`. **Payback:** deleted 3 stale manual-import open debts (Long 80m, Por 240m, Seth
   300m), set true current → PISEY 29m, Por 120m (final open PB = exactly those two; the 2 already-cleared
-  paid rows Chantrea/Davy kept as history). **AL:** cancelled the 4 stale planned-AL request rows (Long,
-  Sao Visal, Chomreun, Heng) — KEPT all accrued `al_left` balances (owner choice); Chantrea `al_left 2.0→1.0`
-  (−1). **Sick:** logged Yi Sony own-sick (papers seen) for Jun 14; owner then said she's back the 15th →
+  paid rows Chantrea/Davy kept as history). **AL:** owner asked to "clear all AL (keep balances)"; I first
+  cancelled the 4 planned rows, but `/audit` caught that 3 of them (Sao Visal Jun9/11/12, Chomreun Jun8,
+  Heng Jun7) already carry REAL deductions and Long's is PH-comp no-deduct covering today — cancelling a
+  deducted row with no refund = a false "missing refund" flag, and refunding was NOT wanted. Resolution:
+  RESTORED all 4 to their truthful `approved` state (real past/today leave; balances untouched; all are
+  past/today dates so none show as upcoming → go-live unaffected; re-audit CLEAN). The only AL balance
+  change is Chantrea `al_left 2.0→1.0` (−1). **OPEN for owner:** if you want those 4 import rows physically
+  gone (irreversible delete, balances still kept) rather than left as approved history, say so. **Sick:** logged Yi Sony own-sick (papers seen) for Jun 14; owner then said she's back the 15th →
   case set `papered` (NOT nudged; proven out of the nightly `provisional/me` queue). **Swap:** approved
   day-off swap Pisey↔Heng — Pisey off Mon 15 Jun / works Thu 18; Heng off Thu 18 / works Mon 15 (4
   `dayoff_overrides` written via the real `swap_approve_claim` path; AL-conflict check clean). Proof: a
