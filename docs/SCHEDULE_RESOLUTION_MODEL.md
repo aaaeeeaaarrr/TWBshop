@@ -138,9 +138,10 @@ them all — from the original AL-deduction bug through everything fixed to the 
   is still read DIRECTLY (not via `resolve_day`) in: `_sc_running` (mid-shift extension), the `/test`
   simulate-checkout, and the payback-booking clash check (`bot.py:2786`). Each can disagree with the
   resolver (e.g., not honour leave). → repoint to `resolve_day` (Phase 2+ continuation).
-- **`is_test` bleed on a balance/schedule read.** Fixed: `compute_day_events` (now scoped). STILL open:
-  `dayoff_override_for` has no `is_test` filter; do a systematic grep of every read on a
-  balance/schedule path for the predicate (the AL overhaul fixed `staff_absent_dates`/`al_leave_days_set`).
+- **`is_test` bleed on a balance/schedule read.** Fixed: `compute_day_events` (now scoped via
+  `_day_context`). `dayoff_override_for` (unscoped) is now **CLOSED** — its only caller `works_on` was
+  removed, so it's dead; the schedule path reads overrides with `is_test` directly. (Still worth a
+  one-time grep of any other balance read for the predicate; the AL overhaul fixed the AL-path reads.)
 - **A balance/state moved but not REVERSED on supersede/undo (S1).** Fixed: AL refund, special-leave
   refund, points-on-AL-cancel, OT bank/payback pairs. STILL open: the silent redefine-over-AL (Phase 5),
   the day-off-swap undo (Phase 6), and any future "new cancels old" path (must dispatch a reversal).
