@@ -131,6 +131,29 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
   5. Retire the silent redefine-overrides-AL path; the confirmed-revoke replaces it.
   6. Swap-side: reverse both parties' overrides on supersede + coverage-gap alert.
 
+## WIDER SWEEP — where this SAME class of issue lives across the system (owner directive)
+Tracking every place the same root patterns can bite, so the phases + the eventual law/audit pass cover
+them all — from the original AL-deduction bug through everything fixed to the end of this model:
+- **Multi-reader drift (many readers resolving the shared schedule differently).** `shift_change_active`
+  is still read DIRECTLY (not via `resolve_day`) in: `_sc_running` (mid-shift extension), the `/test`
+  simulate-checkout, and the payback-booking clash check (`bot.py:2786`). Each can disagree with the
+  resolver (e.g., not honour leave). → repoint to `resolve_day` (Phase 2+ continuation).
+- **`is_test` bleed on a balance/schedule read.** Fixed: `compute_day_events` (now scoped). STILL open:
+  `dayoff_override_for` has no `is_test` filter; do a systematic grep of every read on a
+  balance/schedule path for the predicate (the AL overhaul fixed `staff_absent_dates`/`al_leave_days_set`).
+- **A balance/state moved but not REVERSED on supersede/undo (S1).** Fixed: AL refund, special-leave
+  refund, points-on-AL-cancel, OT bank/payback pairs. STILL open: the silent redefine-over-AL (Phase 5),
+  the day-off-swap undo (Phase 6), and any future "new cancels old" path (must dispatch a reversal).
+- **Implicit precedence between features** (the redefine>AL silent override). Fixed in `resolve_day`.
+  Watch for the same wherever two features write one slot (S5).
+- **The human element (not technical):** a swap partner dropping out → coverage gap (Phase 6 alert,
+  human re-covers); a senior revoking someone's approved leave → must be a CONFIRMED, announced act
+  (Phase 3), never silent; a person booked for a change then sick → newest-away supersedes (Phase 3).
+- **Other shared resources to re-check with the same lens:** the OT bank (settle add vs buyback spend —
+  clean pair today), payback debt (lateness add vs settle credit), `attendance_sessions` (manual vs
+  auto-checkout vs crash-redelivery — guarded by the atomic claim). Confirm each stays single-resolver +
+  reversible as the model lands.
+
 ## Laws + /audit to update (AFTER it's built + proven more accurate than before)
 - **S5 → extend** with: "one resolver for the resource; a supersession REVERSES the loser's balance in the
   same txn AND announces to every party (no silent revoke of a balance/leave)." (The notify-all + reverse
