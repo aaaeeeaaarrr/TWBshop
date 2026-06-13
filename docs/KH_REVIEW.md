@@ -398,8 +398,37 @@ All behind attendance_live=OFF; rare conflict paths. Collected late (the re-swee
 - EN: `🔁 {new — date · times · who} replaces {old — date · times · who}` (to supervisors + staff + senior + partner)
 - KH: (to draft with ChatGPT when Phase 4 lands — the verb "ជំនួស/ផ្លាស់ប្តូរ" + the bilingual card form)
 
-### SM7 (WIRED, Phase 3b-i) — AL stood down a senior redefine → notify the senior + Supervisors group.
-Sent by `_announce_supersessions` when an approved AL supersedes a senior shift-redefine on that day.
-VARS: `{name}` = staffer, `{date}` = `Mon 15/09`, `{times}` = ` (6:00–14:00)` or empty.
-- EN: `🔁 {name} took approved AL on {date} — the shift change set for them{times} no longer applies. Please re-arrange cover if needed.`
-- KH (my draft): `🔁 {name} បានយក AL ដែលអនុម័តនៅ {date} — ការប្តូរវេនដែលបានកំណត់ឱ្យ{times} លែងប្រើទៀតហើយ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។`
+### SM7 (WIRED, Phase 3b-i/ii/iii) — an AWAY event stood down a senior redefine → notify senior + Supervisors.
+Sent by `_announce_supersessions` (redefine kind) when AL / sick / special-leave supersedes a senior
+redefine that day. VARS: `{name}`, `{date}`=`Mon 15/09`, `{times}`=` (6:00–14:00)` or empty,
+`{away}` (EN ONLY — the KH half uses generic អវត្តមាន): `took approved AL` · `is out sick` ·
+`is on bereavement leave` · `is on paternity leave`.
+- EN: `🔁 {name} {away} on {date} — the shift change set for them{times} no longer applies. Please re-arrange cover if needed.`
+- KH (my draft): `🔁 {name} អវត្តមាននៅ {date} — ការប្តូរវេនដែលបានកំណត់ឱ្យ{times} លែងប្រើទៀតហើយ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។`
+
+### SM8 (WIRED, Phase 3b-ii) — a sick day refunded a planned AL → notify the staffer + Supervisors.
+`_announce_supersessions` "al" kind. VARS: `{name}`, `{date}`, `{n}`=AL days back (`%g`).
+- EN: `🔁 {name} is now away on {date} — the AL approved for that day was returned (+{n} AL).`
+- KH (my draft): `🔁 {name} ឥឡូវអវត្តមាននៅ {date} — AL ដែលអនុម័តសម្រាប់ថ្ងៃនោះត្រូវបានបង្វិលសងវិញ (+{n} AL)។`
+
+### SM9 (WIRED, Phase 3b-iv) — confirmed-revoke: AL cancelled because a shift change was approved → staffer + Supervisors.
+`_announce_supersessions` "al_revoked" kind. VARS: `{name}`, `{date}`, `{n}`.
+- EN: `🔁 {name}'s approved AL on {date} was cancelled — a shift change for that day was approved instead. The AL is refunded (+{n} AL).`
+- KH (my draft): `🔁 ច្បាប់ឈប់សម្រាក (AL) របស់ {name} នៅ {date} ត្រូវបានបោះបង់ — បានអនុម័តការប្តូរវេនជំនួសវិញ។ AL ត្រូវបានបង្វិលសង (+{n} AL)។`
+
+### SM10 (WIRED, Phase 3b-iv) — the confirm-revoke CARD the staffer sees (approve a redefine on their own AL day).
+Edited onto the shift-change card when they tap approve. VARS: `{date}`, `{win}`=`6:00-14:00`.
+- EN: `⚠ You have approved AL on {date}. Approving this shift change ({win}) will CANCEL that leave (your AL is refunded) and schedule you to work. Confirm?`
+- KH (my draft): `⚠ ប្អូនមានច្បាប់ឈប់សម្រាក (AL) ដែលអនុម័តនៅ {date}។ ការអនុម័តការប្តូរវេននេះ ({win}) នឹងបោះបង់ច្បាប់ឈប់នោះ (AL បង្វិលសងវិញ) ហើយកំណត់ឱ្យប្អូនធ្វើការ។ បញ្ជាក់ទេ?`
+- BUTTONS — EN: `✅ Yes — cancel my leave & work` · `✋ Keep my leave`
+- BUTTONS — KH (my draft): `✅ បាទ/ចាស — បោះបង់ច្បាប់ ធ្វើការ` · `✋ រក្សាច្បាប់ឈប់សម្រាក`
+
+### SM11 (WIRED, Phase 3b-iv) — "kept my leave": staffer declined the leave-revoking shift change → the proposing senior.
+VARS: `{name}`, `{date}`.
+- EN: `{name} kept their approved leave on {date} — the shift change was not approved.`
+- KH (my draft): `{name} រក្សាច្បាប់ឈប់សម្រាកនៅ {date} — ការប្តូរវេនមិនបានអនុម័តទេ។`
+
+### SM12 (WIRED, Phase 6) — a day-off swap voided because one party is now away → BOTH parties + Supervisors.
+`_announce_supersessions` "swap" kind. VARS: `{rn}`=requester, `{pn}`=partner, `{name}`=the away one.
+- EN: `🔁 The day-off swap between {rn} and {pn} is off — {name} is now away. Both are back to their normal days; please arrange cover if needed.`
+- KH (my draft): `🔁 ការប្តូរថ្ងៃឈប់រវាង {rn} និង {pn} ត្រូវបានលុបចោល — {name} អវត្តមាន។ ទាំងពីរនាក់ត្រឡប់ទៅថ្ងៃធម្មតាវិញ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។`

@@ -43,8 +43,31 @@
 - **Prod backfill** `special_leaves.deducted_amount` at go-live.
 - See `docs/ACTIONS_LEDGER.md` → Parked + `docs/SCHEDULE_RESOLUTION_MODEL.md` → Wider Sweep.
 
+## Whole-system re-sweep — after Phases 3b + 6 + /audit (2026-06-13, owner-requested)
+Ran a system-wide ripple check once the model was functionally complete:
+- **Blast radius contained.** Every function changed this session is in the attendance/AL family
+  (`al_*`, `shift_change_*`, `supersede_day`, `dayoff_*`) — grep-confirmed NONE is imported by the
+  retail/b2b/hire/listener bots; the full suite (573, incl. those bots) is green.
+- **Caller audit clean.** `al_cancel_and_refund` refactor → thin wrapper over the extracted
+  `_al_refund_day`; both real callers (Cancel-AL flow `attendance_ui.py`, `supersede_day`) preserved.
+  `al_approve_and_deduct` (new `superseded_out` kwarg, default None) — only caller `_al_finalize` + the
+  fixed test mock. `al_date_conflict` — only caller `submit_al_request`. `supersede_day` callers
+  (`_sick_supersede`, `_special_leave_supersede`) hold NO advisory lock when calling (its swap step
+  takes its own — no deadlock).
+- **Central reader correct.** `resolve_day` reads only `status='approved'` AL, approved/done redefines
+  (via `shift_change_active`), non-cancelled sick, and live `dayoff_overrides` — so every cancelled/
+  superseded/deleted row a supersession creates is correctly ignored; both parties of a voided swap fall
+  back to normal. No stale-row drift.
+- **Routing correct.** `att:sc:rev`/`att:sc:keep` match the `^att:sc:` handler and don't collide with
+  `att:sccov:`.
+- **Lint.** pyflakes exit 0 on the 3 changed modules (only pre-existing benign unused-import warnings;
+  no undefined-name/shadow errors); the shadow-import AST guard is in the green suite.
+- **KH.** All new bilingual strings collected → `docs/KH_REVIEW.md` SM7–SM12 (await native pass).
+Outcome: **no unexpected ripples.** The model is internally consistent; remaining imprecision is only the
+explicitly-tracked parked residuals.
+
 ## Bottom line
 For everything BUILT, the whole is precise **by construction + proven** (S1–S4 fully, S5 with two named
 gaps), the two original bugs are gone, and `/audit` will catch a regression daily. The remaining
 imprecision is **only** the explicitly-tracked unbuilt phases + flagged gaps — nothing silent. Next
-accuracy gains come from finishing phases 3–6 (each with real-path proof) and the owner's `/test` walk.
+accuracy gains come from the owner's `/test` walk → go-live, and the parked residuals.
