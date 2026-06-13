@@ -3884,6 +3884,48 @@ def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | 
             return (amount, len(days))
 
 
+def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) -> list:
+    """Phase 3a of the schedule model (docs/SCHEDULE_RESOLUTION_MODEL.md): stand down the current
+    balance-moving decision(s) on a staff-date and REVERSE their balance, so a newer "winning" decision
+    can take the day cleanly ("new cancels old", S1/S5). Reuses the PROVEN per-event inverses, so each
+    reversal is individually atomic + idempotent + ownership/not-past-guarded — a partial failure leaves
+    a benign freed-day state (never a double-charge or a mint). Returns a list of descriptors of what was
+    stood down (for the notify-all in Phase 4); empty if the day was already clear. is_test-scoped.
+
+    ADDITIVE — not yet wired into any creation path (zero behaviour change). Scope so far: approved AL
+    (per-day refund) + SENIOR shift-redefines (stood down; payback/OT-rest slots — senior_id NULL — are
+    SPARED, their booking-release is a later sub-step). Special-leave + swap supersession also pending.
+    """
+    import json as _json
+    out = []
+    # 1) approved AL claiming this date → refund the exact frozen day via the proven inverse
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s", (staff_id, _ATT_TEST))
+            al_ids = []
+            for r in cur.fetchall():
+                try:
+                    if date_iso in _json.loads(r["days"] or "[]"):
+                        al_ids.append(r["id"])
+                except Exception:
+                    pass
+    for aid in al_ids:
+        res = al_cancel_and_refund(aid, staff_id, date_iso, today_iso)
+        if res is not None:
+            out.append({"kind": "al", "id": aid, "refunded": float(res[0])})
+    # 2) SENIOR shift-redefine(s) on this date → stand down (no balance pre-settle); spare payback/OT-rest
+    #    slots (senior_id NULL, paired with a booking) and 'done' rows (settled history)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s AND when_date=%s "
+                        "AND is_test=%s AND status IN ('proposed','approved') AND senior_id IS NOT NULL "
+                        "RETURNING id", (staff_id, date_iso, _ATT_TEST))
+            for r in cur.fetchall():
+                out.append({"kind": "redefine", "id": r["id"]})
+    return out
+
+
 def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) -> int:
     """Record a proactive lateness declaration (informed BEFORE = the cheaper points rate)."""
     with _db() as conn:

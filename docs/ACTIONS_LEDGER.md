@@ -48,6 +48,23 @@
 
 ## Parked for owner (autonomous run Jun 13 — answer later, NOT blocking)
 
+- **▶ ADVISOR REVIEW of the Bedrock/rule additions (owner: remind me when we have nothing else to do).**
+  This session added universal rules; take the WHOLE set to the advisors to see if it can be **leaned /
+  unified** (it may already live in parts of Bedrock but not as one awoken whole). The advisors should
+  get the WHYs so they judge it as universally as possible. The additions + why:
+  - **Precision Standard Rule 4 → WHOLE-PICTURE RE-SWEEP** (v2026-06-13-A, project + global). WHY: I kept
+    treating "the new unit passes" as done; owner had to PROMPT the zoom-out each time. Possible overlap
+    to lean: Rule 4 (every actor) + Rule 5 (cover every branch) + the breadth memory already circle this —
+    is it a new clause or a sharpening of one? Is it the "definition of done" for SHIPPABLE/HIGH-RISK?
+  - **State-Integrity Law S5 (multi-feature shared resource)** — WHY: cross-function "spiderweb" risk when
+    many features write one slot (AL/redefine/swap/payback schedule). Possible overlap: S3 (atomic claim)
+    + menu Law 3 (supersession) + Law 7 (exclusivity) — is S5 a unification of those into the data layer,
+    or redundant? Lean question for the advisors.
+  - Ask the advisors: can these collapse into ONE universal principle ("a change isn't done until the
+    whole it touches is re-verified; a resource with many writers needs one resolver + reverse-on-supersede
+    + announce") without weakening the precise/by-construction guarantees? Don't lean if it costs precision.
+
+
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
 > owner-judgment decision here instead of stopping. These are NOT done and NOT urgent — answer when free.
 

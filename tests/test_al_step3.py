@@ -529,6 +529,38 @@ def test_cancel_list_excludes_legacy_no_map_rows(monkeypatch):
         _teardown(sid)
 
 
+def test_supersede_day_reverses_al_and_spares_payback():
+    # Phase 3a: supersede_day stands down the balance-moving decisions on a day + reverses their balance
+    # (reusing the proven inverses), spares payback/OT-rest slots, and is idempotent.
+    sid = _seed("ZZ_SUPERSEDE", 5.0)
+    try:
+        day = "2099-10-15"
+        r = _pending(sid, [day]); db.al_approve_and_deduct(r, 1.0, {day: 1}, {})
+        assert _al_left(sid) == 4.0
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,%s,480,1020,540,'approved',FALSE) "
+                        "RETURNING id", (sid, sid, day))
+            sc_id = cur.fetchone()["id"]
+        pb_id = db.shift_change_autoapprove(sid, day, 480, 540, 0, "payback")   # senior_id NULL → spared
+        out = db.supersede_day(sid, day, today_iso="2026-06-13")
+        assert {o["kind"] for o in out} == {"al", "redefine"}
+        assert _al_left(sid) == 5.0                                            # AL refunded
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (sc_id,))
+            assert cur.fetchone()["status"] == "cancelled"                     # senior redefine stood down
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (pb_id,))
+            assert cur.fetchone()["status"] == "approved"                      # payback slot SPARED
+            cur.execute("SELECT status FROM al_requests WHERE id=%s", (r,))
+            assert cur.fetchone()["status"] == "cancelled"
+        assert db.supersede_day(sid, day, today_iso="2026-06-13") == []        # idempotent
+        assert _al_left(sid) == 5.0                                            # no double-refund
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:
