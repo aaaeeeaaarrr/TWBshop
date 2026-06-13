@@ -65,6 +65,14 @@
   staging). Deliberate, needs a quiet-window deploy. Say when.
 - **hire_bot/* + run_*.py** still bind `secrets.DATABASE_URL` directly (don't honor the switch). Fold in
   before hire/import work moves to staging. Not on the AL path.
+- **F14 remaining surfaces (data guarantee already COMPLETE — these are UX/continuation):** (1)
+  request-time UI block (don't even OFFER a day already approved — touches the menu-law AL picker, left
+  for a focused pass); (2) day-off-swap exclusivity (deferred even in the 5a detector — swap day-off
+  semantics need their own pass); (3) senior **override** to force-approve despite a conflict (UX +
+  policy decision — when/how a senior supersedes). The approval-time atomic claim (both directions,
+  race-proven) already PREVENTS every double-deduction; these only improve UX/coverage.
+- **AL go-live prep (owner-driven):** owner re-walk of the new deduct-at-approval + Cancel-AL flows in
+  /test → `/testreset` → backfill `special_leaves.deducted_amount` on prod → flip `attendance_live`.
 
 ## Done (with proof)
 

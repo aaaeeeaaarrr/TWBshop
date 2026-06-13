@@ -239,9 +239,12 @@ verified → lands on twbshop_staging). AL overhaul: Step 1 columns + Step 2 ato
 isolation fixes + **Step 3 wired** (deduct-at-approval in `_al_finalize`, exact-refund Cancel-AL,
 daily-job partitioned, `v_al` map-aware, PH→`no_deduct` bridge, S4 confirm), real before/after proof
 on staging + permanent guards (`tests/test_al_atomic.py` + `test_al_step3.py`). Suite 541. Plus
-special-leave frozen refund + `v_special`, over-balance heads-up, and **F14 core** (atomic same-date AL
-claim, race-proven via advisory lock). Still behind attendance_live=OFF — nothing live changed; prod's
-legacy rows (no map) unaffected. Next: remaining F14 surfaces, then Fable red-team before go-live.)
+special-leave frozen refund + `v_special`, over-balance heads-up, and **F14 (both directions,
+race-proven)** — AL-vs-AL + AL-vs-shift-change atomic same-date claim via a shared `pg_advisory_xact_lock`,
+proven with real concurrent same-flow AND cross-flow races (deterministic over repeated runs). Suite 544.
+The AL data-integrity guarantee is COMPLETE. Still behind attendance_live=OFF — nothing live changed;
+prod's legacy rows (no map) unaffected. Remaining = UX/continuation (F14 request-time block · swap ·
+senior override) + Fable red-team (parked) + owner re-walk → go-live. See docs/ACTIONS_LEDGER.md parked list.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
