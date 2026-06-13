@@ -270,64 +270,52 @@ strings: បោះបង់ verb for Cancel-AL, ម៉ោងត្រូវស�
 the shared +10 line ×7 + dry-run mirrors, P11a reconciled to the shorter live English, P15g
 relation via _who_kh); KH_REVIEW collapsed to one record (section E), Pending EMPTY.)
 
-**▶▶ RESUME HERE (Jun 13, end of a long session — read this, then the 3 docs named):**
-The menu-laws build is DONE: **Stages 1–6 shipped + deployed** (F1–F12, voice-refuse, Cancel-disarm,
-expiry push-nudge, stale guards, maintenance toast, photos-papers-first, declare-Late-first, points
-display, terminal Main-menu=new-msg, P1 singleton) + **all Fable regressions A1–A7 fixed** + **Stage
-5a `/audit` exclusivity detector** (real-data clean) + the v_al PH-comp false-positive fix. Suite ~523.
-Two universal law sets created: **9 menu laws** (`docs/STATEFUL_MENU_PATTERNS.md`, Rule 5) + **4
-state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live=OFF.
-**NEXT, in order:**
-1. **Staging DB — Phase A+B DONE (Jun 13), owner secret + Phase C pending.** `twbshop_staging`
-   CREATED on the existing DO instance; **schema cloned (zero prod data — only 7 seeded points_rules)**
-   via every `init_*_db()` + a prod↔staging column diff (caught + closed 1 real drift: staff_registry
-   `first_pay_usd`/`second_pay_usd` were ad-hoc on prod, now canonical; hire_bot/secretary tables left
-   out — separate subsystems). **Switch:** `shared/database.py active_database_url()` reads
-   `TWBSHOP_ENV` — default **prod** (zero behavior change everywhere incl. server units);
-   `=staging` → `STAGING_DATABASE_URL` (fail-loud if absent). Fixed a latent init bug (init_attendance_db
-   ALTERed al_requests before CREATEing it — couldn't bootstrap a fresh DB; no-op on prod). Re-clone
-   anytime: `python setup_staging.py`. **OWNER TODO (1 line, guard-blocks me from secrets.py):** add to
-   secrets.py → `STAGING_DATABASE_URL = "<prod DATABASE_URL with db = twbshop_staging>"`. Then dev runs
-   with `TWBSHOP_ENV=staging`. **Phase C (later, deliberate):** pin `TWBSHOP_ENV=prod` on the 5 server
-   units, verify still-prod, THEN flip dev default to staging. KNOWN GAP: hire_bot/* + run_*.py bind
-   `secrets.DATABASE_URL` directly — fold into the switch before hire/import work moves to staging.
-2. **AL balance overhaul (HIGH-RISK, dormant until go-live)** — owner chose Option (i) deduct-at-
-   approval + refund-on-cancel. Fable red-teamed it → **REDESIGNED** to a per-day `{date:amount}` map +
-   two atomic CAS functions. FULL BUILD BRIEF + 5 must-hold invariants → **`docs/AL_DEDUCTION_REDESIGN.md`**.
-   **PROGRESS (Jun 13, on staging, real before/after proof):** Step 1 columns (deducted_map/points_map/
-   no_deduct/special_leaves.deducted_amount — additive, dormant on prod) `d47c32e`; Step 2 atomic
-   `al_approve_and_deduct` + `al_cancel_and_refund` + isolation fixes (staff_absent_dates exclude_req_id
-   + is_test on it & al_leave_days_set) `abf10a2`, proven + permanent guard `tests/test_al_atomic.py`
-   (4 tests; suite 524 on staging). **Step 3 DONE (Jun 13, the live-relevant wiring):** `_al_finalize`
-   now computes the frozen map via a NEW pure `al.al_deduction_map()` + `staff_absent_dates(exclude_req_id
-   =req)`, calls the atomic approve (status flip + deduct in one txn), records short-notice points
-   PER-DAY into points_map, and rejects via atomic `al_reject`; the Cancel-AL handler calls
-   `al_cancel_and_refund` (exact frozen refund, drops the buggy flat −1, ownership-checked); the confirm
-   screen shows the TRUE refund (S4, fraction/0); the daily job is **partitioned** (`WHERE deducted_map
-   IS NULL` — no double-charge as dates pass); `v_al` is **map-aware** (no false alarms); `al_create_request`
-   **bridges** a 'PH…' reason into the structural `no_deduct` column. Guards: `tests/test_al_step3.py`
-   (12: v_al map-awareness, daily-job partition, no_deduct bridge, deduction-map invariant). Suite **538
-   on staging** (1 known empty-staging FK fixture for staff#11, not AL). **Special-leave piece DONE
-   (Jun 13):** marriage/death/birth now freeze `deducted_amount` at grant (`special_leave_create`),
-   stay in sync on death-upgrade, and have a clean idempotent test-aware inverse `special_leave_refund`
-   (S1); `v_special` audits status-domain + frozen-amount and is wired into `/audit`. (Prod backfill
-   `UPDATE special_leaves SET deducted_amount=days WHERE deducted_amount IS NULL` needed at go-live —
-   parked.) **Over-balance heads-up DONE** (Fable M1, non-blocking ⚠ on the Supervisors notice when an
-   approval goes negative). **F14 core DONE (Jun 13):** `al_approve_and_deduct` now serializes per-staff
-   via `pg_advisory_xact_lock(911, staff_id)` and REJECTS (returns `"conflict"`) if another approved AL
-   claims any of the days — `_al_finalize` tells the requester, leaves the request pending. **Race-proven
-   on staging** (two-thread concurrent approval → exactly one wins, deducted once) + sequential tests.
-   Suite **543**. **Collision (b) DONE both directions:** AL-approve rejects a day with an approved
-   shift-change, and `shift_change_approve_claim` (new, same `pg_advisory_xact_lock(911,staff_id)`
-   namespace → cross-flow atomic) rejects a shift-change on an approved-AL day; `_shift_change_callback`
-   handles the conflict. **REMAINING F14 (focused continuation):** request-time UI block (don't offer a
-   day already approved) · day-off-swap surface (deferred even in the 5a detector) · senior **override**
-   to supersede a conflict. Then **Fable red-team the whole AL build before go-live lock** (parked).
-   Honest: ALL behind `attendance_live=OFF` — nothing live changed; prod's legacy rows keep the daily path.
-3. **F14 guard (Stage 5b)** — AL-vs-AL + AL-vs-shift-change (both directions) DONE + race-proven;
-   remaining surfaces (request-time block, swap, senior override) are the focused continuation.
-Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
-keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.
+**▶▶ RESUME HERE (Jun 13, end of a very long session 33 — the whole arc, for when we return):**
+
+**WHERE THIS STARTED (the initial problems that drove everything below):**
+(1) Dev shared the prod DB — every migration/query in dev hit live payroll/leave data (the dated
+2026-06-30 checkpoint). (2) Fable's pre-guard review surfaced a CRITICAL pre-existing balance bug:
+approving AL deducted NOTHING (effect split across a no-op + daily job + stale read) and **hours-AL was
+free** — and staff could over-book. Owner chose **Option (i): deduct-at-approval + refund-on-cancel**;
+Fable red-teamed my first design → reshaped to a per-day `{date:amount}` frozen map + atomic CAS funcs
+(`docs/AL_DEDUCTION_REDESIGN.md`, 5 invariants). That work then expanded into F14 exclusivity + a whole
+cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
+
+**WHAT GOT BUILT & PROVEN (all on staging, behind `attendance_live=OFF`, suite 554, /audit clean):**
+- **Staging DB** `twbshop_staging` on the DO instance + `TWBSHOP_ENV` switch in `shared/database.py`
+  (default prod = zero behavior change). Schema-cloned (zero prod data) via `setup_staging.py`; closed a
+  real drift + a latent init-ordering bug. Owner added `STAGING_DATABASE_URL`. Dev runs `TWBSHOP_ENV=staging`.
+- **AL overhaul (the bug fix):** deduct-at-approval/refund-on-cancel — atomic CAS (`al_approve_and_deduct`
+  / `al_cancel_and_refund`), frozen per-day map (`al.al_deduction_map`), per-day short-notice points
+  (written IN the approve txn), daily job **partitioned** + made **relative**, `v_al` map-aware, PH→
+  `no_deduct` structural bridge, S4 confirm. Special-leave frozen refund + `v_special`. Over-balance ⚠.
+- **F14 exclusivity COMPLETE every direction** (AL-vs-AL · AL-vs-shift-change both ways · AL-vs-swap both
+  ways · request-side `al_date_conflict`), all serialized by a shared `pg_advisory_xact_lock(911,staff_id)`,
+  **race-proven** (concurrent same-flow + cross-flow, deterministic).
+- **Independent red-team** (literal Fable model was unavailable) → fixed forward-points atomicity,
+  legacy-row cancel guard, 0-cost FYI, **+ a PRE-EXISTING `_db` NameError that made the Cancel-AL list
+  always silently empty**.
+- **Shift-redefine multi-writer hardening:** approving supersedes prior SENIOR redefines (spares
+  payback/OT-rest slots via `senior_id`); `/audit v_one_active_redefine` flags >1 live redefine.
+- **Universal law S5** (resource written by MULTIPLE features → one resolver · supersede own rows ·
+  symmetric pickers · an undo · /audit >1-writer) → `docs/STATE_INTEGRITY_LAWS.md` + Rule 6 + memory.
+
+**CONCLUSIONS REACHED (so we don't re-litigate):**
+- **Senior override of an F14 conflict is NOT needed** (a naive one recreates the contradiction; a
+  correct one == cancel-old-then-approve-new the senior can already do). The REAL fix for
+  "AL needed on a redefined day" is a **cancel-an-approved-redefine** path (doesn't exist yet).
+- Re-changing a shift does NOT clear an AL block (still an approved redefine that day).
+
+**NEXT (all rare, behind go-live; in `docs/ACTIONS_LEDGER.md` → Parked = S5 follow-ups):**
+1. **swap ↔ redefine resolution UNVERIFIED** — if a day has BOTH a swap `dayoff_override` and a
+   `shift_change`, which wins in `compute_day_events`/`works_on`? NOT traced — the one place I can't yet
+   promise there's no spiderweb. **Highest-value next check.**
+2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
+   same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill
+   `special_leaves.deducted_amount` at go-live. 5. Optional literal-Fable pass. 6. Owner re-walk in `/test`
+   → `/testreset` → flip `attendance_live`.
+Owner standing notes: accuracy is king; use Fable as 2nd-opinion on HIGH-RISK (see breadth memory);
+keep appending universal lessons. Full decision/history → `docs/ACTIONS_LEDGER.md`.
 
 **(history) MULTI-MENU + MENU-LAWS BUILD (Jun 13) — full 6-stage + regression detail below.**
 Owner-approved full build of the 8 menu laws + Fable's F1–F14 backlog (design in
