@@ -373,10 +373,29 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    idempotent · atomic-no-partial). Suite **571**. Re-swept: post-revoke resolve_day→WORKING so settle/OT
    correct; al_cancel_and_refund refactor preserved (its tests pass); multi-day AL pops only the one day.
    **ALL FOUR Phase 3b creation paths now DONE** (AL · sick · special-leave · redefine-revoke).
-   **NEXT:** swap (Phase 6 — two-party reversal + coverage-gap alert) · Phase 4 unified notify polish ·
-   Phase 5 retire any silent path · laws + /audit (S5 extension · v_one_active_decision ·
-   v_supersede_reversed). All behind attendance_live=OFF, NOT yet deployed (batch at go-live prep / owner
-   /test re-walk first).
+   **▶ Phase 6 (swap) + Phase 4 (notify) + Phase 5 (retire silent) + the /audit guard DONE (Jun 13).**
+   • **Swap:** `supersede_day` step 3 — an away event on a swap-WORK day finds the approved swap, takes
+   BOTH parties' advisory locks (sorted), DELETEs all 4 `reason='swap'` overrides (both back to normal),
+   marks the swap `'superseded'`, returns a descriptor. sick + special-leave get this free (they call
+   supersede_day). AL-approval KEEPS BLOCKING a swap-work day (two-party void unsafe in the single-staff
+   AL txn; documented asymmetry, rare). Machine never auto-rearranges the partner (human boundary).
+   • **Notify (Phase 4):** `_announce_supersessions` now handles all kinds — redefine→senior, al→staffer,
+   al_revoked→staffer, swap→both parties — all +Supervisors, bilingual, best-effort.
+   • **Phase 5:** no silent path remains (resolve_day killed the READ-time override in 1b; 3b-iv replaced
+   the block/silent-override with the explicit confirm). The F14 "conflict" is now just the confirm
+   trigger, not a dead-end.
+   • **/audit guard:** NEW `v_swap_exclusivity` (approved-AL-day still carrying a swap 'work' override =
+   missed supersede; 'superseded' swap with a leftover 'swap' override = incomplete reversal) + loads
+   `dayoff_overrides`. Together with existing `v_exclusivity` (AL↔redefine) + `v_one_active_redefine`,
+   the collision net is complete. Suite **573**. Audit smoke clean. NOT connecting dev→prod to re-audit
+   (staging boundary); the read-only daily auto-audit is its real-path venue + prod can't hold the new
+   flagged states.
+   **THE UNIFIED SCHEDULE MODEL IS NOW FUNCTIONALLY COMPLETE** (every creation path supersedes + reverses
+   + notifies; swap voids two-party; F14 backstop intact; /audit net in place). All behind
+   attendance_live=OFF, NOT yet deployed. **NEXT:** evolve the universal LAWS (S5 + Menu Law 3 cross-link
+   per the design doc) + memory pointers · the parked residuals (sick→AL reverse-order race; special-leave
+   as loser; symmetric pickers; cancel-approved-redefine) · then owner /test re-walk → /testreset → batch
+   gm-deploy → flip attendance_live. Advisor-review of Bedrock additions still parked.
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill

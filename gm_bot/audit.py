@@ -325,6 +325,36 @@ def v_swaps(rows: list[dict], staff: dict, today: date) -> list[str]:
     return out
 
 
+def v_swap_exclusivity(als: list[dict], overrides: list[dict], swaps: list[dict],
+                       staff: dict) -> list[str]:
+    """Schedule-model swap guards (Phase 6 — the net for the supersede wiring). Now that an away event
+    SUPERSEDES a swap (voids it + reverses both parties' overrides), these states should never persist:
+      (a) an approved-AL day that STILL carries a swap 'work' override → on leave AND scheduled to work
+          via a swap (a missed supersede);
+      (b) a 'superseded' swap that STILL has a live 'swap' override on any of its 4 (staff,date) pairs →
+          its reversal didn't complete (S1: a stood-down decision must leave no live trace)."""
+    out = []
+    work_swap = {(o["staff_id"], str(o["the_date"])) for o in overrides
+                 if o.get("kind") == "work" and o.get("reason") == "swap"}
+    for r in als:
+        if r.get("status") == "approved":
+            for d in json.loads(r.get("days") or "[]"):
+                if (r["staff_id"], str(d)) in work_swap:
+                    out.append("SWAP-EXCL: %s is on approved AL for %s but a swap still schedules them "
+                               "to WORK that day — supersede missed" % (_nm(staff, r["staff_id"]), d))
+    live_swap_pairs = {(o["staff_id"], str(o["the_date"])) for o in overrides
+                       if o.get("reason") == "swap"}
+    for s in swaps:
+        if s.get("status") == "superseded":
+            ro, po = str(s.get("req_off_date")), str(s.get("partner_off_date"))
+            rid, pid = s["requester_id"], s["partner_id"]
+            if any((s2, d2) in live_swap_pairs
+                   for s2, d2 in ((rid, ro), (rid, po), (pid, po), (pid, ro))):
+                out.append("SWAP-REV: swap #%s is superseded but a 'swap' override still lives on one of "
+                           "its days — reversal incomplete" % s["id"])
+    return out
+
+
 def v_exclusivity(als: list[dict], scs: list[dict], staff: dict, today: date) -> list[str]:
     """F14 exclusivity law (owner Jun 13): at most one approved leave/redefine may claim a staff-date.
     Flags the two UNAMBIGUOUS, harmful collisions only (so the daily auto-audit stays false-alarm-free):
@@ -504,6 +534,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             nos = q(cur, "SELECT * FROM no_show_records WHERE is_test=%s", (flag,))
             books = q(cur, "SELECT * FROM payback_bookings WHERE is_test=%s", (flag,))
             swaps = q(cur, "SELECT * FROM dayoff_swaps WHERE is_test=%s", (flag,))
+            overrides = q(cur, "SELECT * FROM dayoff_overrides WHERE is_test=%s", (flag,))
             pevents = q(cur, "SELECT * FROM points_events WHERE is_test=%s", (flag,))
             buybacks = q(cur, "SELECT * FROM ot_buyback WHERE is_test=%s", (flag,))
             sick = q(cur, "SELECT * FROM sick_cases WHERE is_test=%s", (flag,))
@@ -523,6 +554,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_buybacks(buybacks, staff, today)
                 + v_sick(sick, staff, today)
                 + v_swaps(swaps, staff, today)
+                + v_swap_exclusivity(als, overrides, swaps, staff)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)

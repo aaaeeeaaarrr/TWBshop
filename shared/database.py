@@ -3986,10 +3986,11 @@ def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) ->
     a benign freed-day state (never a double-charge or a mint). Returns a list of descriptors of what was
     stood down (for the notify-all in Phase 4); empty if the day was already clear. is_test-scoped.
 
-    ADDITIVE — not yet wired into any creation path (zero behaviour change). Scope so far: approved AL
-    (per-day refund) + SENIOR shift-redefines (stood down; payback/OT-rest slots — senior_id NULL — are
-    SPARED, their booking-release is a later sub-step). Special-leave + swap supersession also pending.
-    """
+    Scope: approved AL (per-day refund) + SENIOR shift-redefines (stood down; payback/OT-rest slots —
+    senior_id NULL — are SPARED, their booking-release is a later sub-step) + day-off SWAPS (the trade
+    is voided, BOTH parties' overrides reversed to normal, swap → 'superseded'; humans re-cover — the
+    machine never auto-rearranges the partner). MUST be called with NO advisory lock already held by the
+    caller (the swap step takes its own per-staff locks on its own connection — see callers)."""
     import json as _json
     out = []
     # 1) approved AL claiming this date → refund the exact frozen day via the proven inverse
@@ -4022,6 +4023,34 @@ def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) ->
                 out.append({"kind": "redefine", "id": r["id"], "date": str(r["when_date"]),
                             "senior_id": r["senior_id"], "start_min": r["start_min"],
                             "end_min": r["end_min"]})
+    # 3) a day-off SWAP that put THIS staff to WORK on this date → the trade is now meaningless (they're
+    #    away). Void the whole swap: reverse BOTH parties' 4 overrides back to normal + mark it
+    #    'superseded' + hand back a descriptor for the coverage-gap alert. Two-party → take BOTH advisory
+    #    locks (sorted, deadlock-safe; same namespace as approvals) so a concurrent swap/AL approval on
+    #    either party can't interleave. Humans re-cover — the machine never auto-rearranges the partner.
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, requester_id, partner_id, req_off_date, partner_off_date "
+                        "FROM dayoff_swaps WHERE status='approved' AND is_test=%s AND "
+                        "((requester_id=%s AND partner_off_date=%s) OR "
+                        " (partner_id=%s AND req_off_date=%s))",
+                        (_ATT_TEST, staff_id, date_iso, staff_id, date_iso))
+            sw = cur.fetchone()
+            if sw:
+                rid, pid = sw["requester_id"], sw["partner_id"]
+                for _sid in sorted({rid, pid}):
+                    cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, _sid))
+                cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s FOR UPDATE", (sw["id"],))
+                st = cur.fetchone()
+                if st and st["status"] == "approved":   # still live under the lock → void it
+                    ro, po = str(sw["req_off_date"]), str(sw["partner_off_date"])
+                    for s2, d2 in ((rid, ro), (rid, po), (pid, po), (pid, ro)):
+                        cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
+                                    "AND reason='swap' AND is_test=%s", (s2, d2, _ATT_TEST))
+                    cur.execute("UPDATE dayoff_swaps SET status='superseded' WHERE id=%s", (sw["id"],))
+                    out.append({"kind": "swap", "swap_id": sw["id"], "requester_id": rid,
+                                "partner_id": pid, "req_off": ro, "partner_off": po,
+                                "trigger_date": date_iso})
     return out
 
 

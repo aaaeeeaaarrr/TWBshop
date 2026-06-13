@@ -181,12 +181,27 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
     `test_shift_change_revoke_no_balance_move_if_not_proposed` (atomic guard). The "deliberate confirm"
     is the affected person consenting to give up their own leave; the senior already made a deliberate
     proposal; everyone is told. This is the real **silent-override killer** + the override-alternative.
-  - **Swap approval** (`swap_approve_claim`): Phase 6 — reverse both parties' overrides on supersede +
-    coverage-gap alert; extend `supersede_day` to the swap/booking-release case.
-- **Phase 4 — notify-all:** on every supersession emit "🔁 X (details) replaced Y (details)" to
-  Supervisors + the staff + the senior who owned the superseded decision (+ swap partner).
-- **Phase 5** — retire the silent redefine-overrides-AL path (subsumed by the confirmed-revoke above).
-- **Phase 6** — swap-side reversal + coverage-gap alert.
+  - **Swap** (Phase 6): reverse both parties' overrides on supersede + coverage-gap alert.
+    **DONE.** `supersede_day` extended (step 3): an away event on a swap-WORK day finds the approved
+    `dayoff_swaps` row that put this staff to work that day, takes BOTH parties' advisory locks
+    (sorted, deadlock-safe), re-checks under lock, DELETEs all 4 `reason='swap'` overrides (both back to
+    normal), marks the swap `'superseded'`, returns a descriptor. `_announce_supersessions` "swap" kind
+    tells BOTH parties + Supervisors ("the swap is off — re-cover"). The machine never auto-rearranges
+    the partner (the human boundary). A swap moves no balance, so there's nothing to refund. Because
+    sick + special-leave call `supersede_day`, they get swap-voiding for free. **AL-approval keeps
+    BLOCKING a swap-work day** (returns "conflict") — voiding a two-party swap inside the single-staff
+    AL approve-txn (which holds only one party's lock) isn't safe, and AL-on-a-swap-day is rare/avoidable;
+    documented asymmetry, F14 backstop. Proven: `test_supersede_day_voids_a_swap_and_reverses_both_parties`.
+- **Phase 4 — notify-all:** **DONE (seed, grown across 3b + Phase 6).** `_announce_supersessions(context,
+  victim_staff, descriptors, away_reason)` handles every kind — `redefine` (→ owning senior + Supervisors),
+  `al` (sick refunded a planned AL → staffer + Supervisors), `al_revoked` (confirmed-revoke → staffer +
+  Supervisors), `swap` (→ both parties + Supervisors). Best-effort, bilingual. A unified-line polish pass
+  ("🔁 X replaced Y" single template) is optional; the per-kind lines already cover every party.
+- **Phase 5** — retire the silent redefine-overrides-AL path: **effectively DONE** — `resolve_day` (Phase
+  1b) removed the silent READ-time override (AL protected above redefine), and 3b-iv replaced the
+  block/silent-override with the explicit confirmed-revoke. No silent path remains. (Nothing left to rip
+  out; the F14 "conflict" return is now just the trigger for the confirm UI, not a dead-end.)
+- **Phase 6 — swap-side reversal + coverage-gap alert:** **DONE** (see the Swap bullet above).
 
 ## WIDER SWEEP — where this SAME class of issue lives across the system (owner directive)
 Tracking every place the same root patterns can bite, so the phases + the eventual law/audit pass cover
@@ -218,7 +233,13 @@ them all — from the original AL-deduction bug through everything fixed to the 
   becomes a named sub-rule.)
 - **Menu Law 3 (supersession honesty)** already says "tell the user the old thing was replaced" — this is
   its data+multi-party generalisation; cross-link.
-- **/audit:** `v_one_active_redefine` → generalise to `v_one_active_decision` (one live decision per
-  staff-date across ALL event types); add `v_supersede_reversed` (every `superseded` row that moved a
-  balance has a matching reversal); keep the booking↔redefine pairing law.
+- **/audit:** the collision net is now in place via THREE targeted guards (chosen over one sweeping
+  `v_one_active_decision` to keep the daily auto-audit false-alarm-free on real data): `v_exclusivity`
+  (approved AL vs approved/done redefine — the AL↔redefine collision a missed supersede would leave),
+  `v_one_active_redefine` (>1 live redefine per staff-date), and NEW `v_swap_exclusivity` (approved-AL
+  day still carrying a swap 'work' override = missed supersede; a 'superseded' swap with a leftover live
+  'swap' override = incomplete reversal — the S1 `v_supersede_reversed` idea, scoped to swaps where it's
+  checkable). booking↔redefine pairing law kept. A fully-general `v_one_active_decision` across every
+  event type remains optional (would duplicate the resolver's precedence; the three guards cover the
+  real harmful states).
 - Update `docs/STATE_INTEGRITY_LAWS.md`, CLAUDE.md Rule 6, and the memory pointers once proven.

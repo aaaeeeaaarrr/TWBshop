@@ -730,6 +730,58 @@ def test_shift_change_revoke_no_balance_move_if_not_proposed():
         _teardown(sid)
 
 
+def test_supersede_day_voids_a_swap_and_reverses_both_parties():
+    # Phase 6: an away event on a swap-WORK day voids the whole trade — both parties' 4 overrides
+    # reversed, swap → 'superseded', a descriptor handed back for the coverage alert; idempotent.
+    rid = _seed("ZZ_SWAP_SUP_R", 5.0)
+    pid = _seed("ZZ_SWAP_SUP_P", 5.0)
+    swid = None
+    try:
+        req_off, partner_off = "2099-12-10", "2099-12-11"
+        swid = db.swap_create(rid, pid, req_off, partner_off, "x")
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("UPDATE dayoff_swaps SET status='partner_ok' WHERE id=%s", (swid,))
+        assert db.swap_approve_claim(swid) is True                       # writes the 4 overrides
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT count(*) AS n FROM dayoff_overrides WHERE staff_id IN (%s,%s) "
+                        "AND reason='swap'", (rid, pid))
+            assert cur.fetchone()["n"] == 4
+        # the requester is now away on partner_off (the day the swap put them to WORK) → void it
+        out = db.supersede_day(rid, partner_off, today_iso="2026-06-13")
+        sw_d = next((o for o in out if o["kind"] == "swap"), None)
+        assert sw_d and sw_d["swap_id"] == swid and sw_d["requester_id"] == rid and sw_d["partner_id"] == pid
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s", (swid,))
+            assert cur.fetchone()["status"] == "superseded"
+            cur.execute("SELECT count(*) AS n FROM dayoff_overrides WHERE staff_id IN (%s,%s) "
+                        "AND reason='swap'", (rid, pid))
+            assert cur.fetchone()["n"] == 0                              # all 4 reversed to normal
+        assert db.supersede_day(rid, partner_off, today_iso="2026-06-13") == []   # idempotent
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id IN (%s,%s)", (rid, pid))
+            if swid is not None:
+                cur.execute("DELETE FROM dayoff_swaps WHERE id=%s", (swid,))
+        _teardown(rid)
+        _teardown(pid)
+
+
+def test_v_swap_exclusivity_flags_missed_supersede_and_incomplete_reversal():
+    from gm_bot import audit
+    staff = {1: {"call_name": "A", "canonical_name": "A"}, 2: {"call_name": "B", "canonical_name": "B"}}
+    # (a) approved AL day that still carries a swap 'work' override → a missed supersede
+    als = [{"staff_id": 1, "status": "approved", "days": json.dumps(["2099-12-20"])}]
+    ov_a = [{"staff_id": 1, "the_date": "2099-12-20", "kind": "work", "reason": "swap"}]
+    assert any("SWAP-EXCL" in m for m in audit.v_swap_exclusivity(als, ov_a, [], staff))
+    # (b) superseded swap with a leftover live 'swap' override → reversal incomplete
+    swaps = [{"id": 9, "status": "superseded", "requester_id": 1, "partner_id": 2,
+              "req_off_date": "2099-12-21", "partner_off_date": "2099-12-22"}]
+    ov_b = [{"staff_id": 1, "the_date": "2099-12-21", "kind": "off", "reason": "swap"}]
+    assert any("SWAP-REV" in m for m in audit.v_swap_exclusivity([], ov_b, swaps, staff))
+    # clean: a superseded swap with NO leftover overrides
+    assert audit.v_swap_exclusivity([], [], swaps, staff) == []
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:

@@ -2708,6 +2708,23 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
                     % (name, dlabel, refunded, name, dlabel, refunded))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "swap":
+            # a day-off swap was voided because one party is now away → tell BOTH parties + supervisors;
+            # both are back to their normal days, a human re-covers (the machine never auto-rearranges).
+            req_s = next((s for s in allstaff if s["id"] == d.get("requester_id")), None)
+            par_s = next((s for s in allstaff if s["id"] == d.get("partner_id")), None)
+            rn = (req_s or {}).get("call_name") or (req_s or {}).get("canonical_name", "?")
+            pn = (par_s or {}).get("call_name") or (par_s or {}).get("canonical_name", "?")
+            line = ("🔁 The day-off swap between %s and %s is off — %s is now away. Both are back to "
+                    "their normal days; please arrange cover if needed.\n"
+                    "🔁 ការប្តូរថ្ងៃឈប់រវាង %s និង %s ត្រូវបានលុបចោល — %s អវត្តមាន។ "
+                    "ទាំងពីរនាក់ត្រឡប់ទៅថ្ងៃធម្មតាវិញ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    % (rn, pn, name, rn, pn, name))
+            for s in (req_s, par_s):
+                if s:
+                    await _att_send(context, (s.get("telegram_ids") or [None])[0], "Staff",
+                                    s.get("call_name") or s["canonical_name"], line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
 
 
 async def _al_finalize(context, req: dict, approved: bool) -> None:
