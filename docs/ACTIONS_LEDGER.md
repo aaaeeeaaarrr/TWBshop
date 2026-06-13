@@ -25,6 +25,12 @@
   fix with real-path before/after proof on a real row; ideally after the staging-DB lock. Blocks the F14
   guard (Stage 5b) — the guard's "each approved AL-day deducts once" invariant + override-refund are
   unspecifiable until exactly one thing charges.
+  **→ OWNER DECISION (2026-06-13): Option (i) — DEDUCT-AT-APPROVAL + REFUND-ON-CANCEL.** Finalize
+  computes the amount BEFORE the status flip and deducts (days AND hours); Cancel-AL refunds the same
+  amount; retire/neuter the daily `al_apply_due_deductions` job; update `/audit` (`v_al`) to the
+  deduct-at-approval model + cover hours-AL. Rationale (owner): "just 2 things, eliminates overbooking."
+  Still HIGH-RISK/auto-bedrock: implement with real before/after proof on a real row, ideally after the
+  staging-DB lock. Then build the F14 guard on top.
 
 - **⏰ Jul 1 (AUTOMATED · MUTED · SELF-DESTRUCT — owner: no redundancy): Kimying full-split
   restore.** `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42`
