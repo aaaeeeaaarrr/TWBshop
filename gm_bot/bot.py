@@ -1613,11 +1613,11 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     # find today's (or last night's overnight) shift this check-in belongs to
     shift_date = now_pp.date().isoformat()
     ws = att.to_min(staff.get("work_start"))
-    # a redefined shift (session 31) moves the start → lateness is judged vs the REDEFINED start
-    from shared.database import shift_change_active
-    _sc = shift_change_active(staff["id"], shift_date)
-    if _sc and _sc.get("start_min") is not None:
-        ws = int(_sc["start_min"]) % 1440
+    # the ONE resolver decides the shift start: a redefine moves it (lateness judged vs the REDEFINED
+    # start); leave (AL/sick) yields no redefined start so the normal work_start stands.
+    dec = ui.resolve_day(staff, shift_date)
+    if dec["working"] and dec.get("start_min") is not None:
+        ws = int(dec["start_min"]) % 1440
     if ws is None:
         return True
     # A STOPPED live-share (edited update, live_period gone) is NOT presence proof — record it
@@ -1948,6 +1948,11 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
                                      shift_change_set_banked, shift_change_claim_settle,
                                      payback_booking_mark_done)
         from gm_bot import ot as ot_mod
+        from gm_bot import attendance_ui as ui
+        # leave-guard via the ONE resolver: if the day actually resolves to leave (AL/sick/special wins
+        # over a redefine), NEVER bank OT here — only a day that resolves to a redefine settles.
+        if ui.resolve_day(staff, shift_date)["reason"] != "redefine":
+            return 0, 0
         sc = shift_change_active(staff["id"], shift_date)
         # normal_len=0 is VALID: a day-off payback window — every worked minute is extension,
         # so the engine credits the whole window against the debt. Only None means un-settleable.

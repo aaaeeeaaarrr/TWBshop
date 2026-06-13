@@ -127,6 +127,33 @@ def test_compute_day_events_bugs_vanish_integration():
             cur.execute("DELETE FROM staff_registry WHERE id=%s", (sid,))
 
 
+def test_settle_leave_guard_no_ot_on_al_day():
+    """Phase 2: _settle_redefined_shift must NOT bank OT for a day that resolves to leave (AL wins over
+    a redefine), even if both rows exist — the resolve_day leave-guard short-circuits before any OT math."""
+    from gm_bot import bot, finance
+    import datetime as _dt
+    with db._db() as c, c.cursor() as cur:
+        cur.execute("DELETE FROM staff_registry WHERE canonical_name='ZZ_SETTLE_GUARD'")
+        cur.execute("INSERT INTO staff_registry (canonical_name, status, work_start, work_end, day_off) "
+                    "VALUES ('ZZ_SETTLE_GUARD','active','08:00','17:00',%s) RETURNING id", (OFF_WD,))
+        sid = cur.fetchone()["id"]
+        cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                    "normal_len, status, is_test) VALUES (%s,%s,%s,480,1200,540,'approved',FALSE)",
+                    (sid, sid, WORKDAY))
+        cur.execute("INSERT INTO al_requests (staff_id, kind, days, status, is_test) "
+                    "VALUES (%s,'days',%s,'approved',FALSE)", (sid, json.dumps([WORKDAY])))
+    try:
+        p = {"id": sid, "work_start": "08:00", "work_end": "17:00", "day_off": OFF_WD}
+        now_pp = _dt.datetime(2099, 8, 3, 22, 0, tzinfo=finance.PP_TZ)
+        banked, _bal = bot._settle_redefined_shift(p, WORKDAY, now_pp)
+        assert banked == 0   # leave-guard: AL wins the day → never bank OT despite the redefine
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            for t in ("al_requests", "shift_changes"):
+                cur.execute(f"DELETE FROM {t} WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM staff_registry WHERE id=%s", (sid,))
+
+
 def test_special_leave_span_is_away(staff):
     with db._db() as c, c.cursor() as cur:
         cur.execute("INSERT INTO special_leaves (staff_id, kind, who, start_date, days, deducted_amount, "
