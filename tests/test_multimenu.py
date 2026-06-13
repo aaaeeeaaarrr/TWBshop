@@ -470,6 +470,53 @@ def test_menunew_opens_new_message(monkeypatch):
     assert ud["att_al_picked"] == set()
 
 
+# ── Stage 6: P1 menu singleton ──
+def _claim_ctx(att_menu_msg=None):
+    edits = []
+
+    async def _edit(text, chat_id=None, message_id=None):
+        edits.append((chat_id, message_id, text))
+
+    ud = {}
+    if att_menu_msg is not None:
+        ud["att_menu_msg"] = att_menu_msg
+    return SimpleNamespace(bot=SimpleNamespace(edit_message_text=_edit), user_data=ud), edits
+
+
+def test_menu_claim_collapses_previous():
+    """A new menu (different message) collapses the previously-registered one and becomes current."""
+    from gm_bot import attendance_ui as ui
+    ctx, edits = _claim_ctx(att_menu_msg=(1, 10))
+    asyncio.run(ui._menu_claim(ctx, SimpleNamespace(chat_id=1, message_id=20)))
+    assert len(edits) == 1 and edits[0][0] == 1 and edits[0][1] == 10
+    assert "continues below" in edits[0][2]
+    assert ctx.user_data["att_menu_msg"] == (1, 20)
+
+
+def test_menu_claim_same_message_no_collapse():
+    """Re-claiming the SAME message (in-place nav) must not collapse it."""
+    from gm_bot import attendance_ui as ui
+    ctx, edits = _claim_ctx(att_menu_msg=(1, 20))
+    asyncio.run(ui._menu_claim(ctx, SimpleNamespace(chat_id=1, message_id=20)))
+    assert edits == [] and ctx.user_data["att_menu_msg"] == (1, 20)
+
+
+def test_menu_claim_no_previous_just_registers():
+    """First menu — nothing to collapse, just register it."""
+    from gm_bot import attendance_ui as ui
+    ctx, edits = _claim_ctx()
+    asyncio.run(ui._menu_claim(ctx, SimpleNamespace(chat_id=1, message_id=5)))
+    assert edits == [] and ctx.user_data["att_menu_msg"] == (1, 5)
+
+
+def test_menu_release_unregisters():
+    """When a menu becomes a prompt, release so the singleton never collapses an awaiting message."""
+    from gm_bot import attendance_ui as ui
+    ctx = SimpleNamespace(user_data={"att_menu_msg": (1, 7)})
+    ui._menu_release(ctx)
+    assert "att_menu_msg" not in ctx.user_data
+
+
 def test_split_late_branches_for_points_display():
     """The 3 branches the test-sim points display reflects (declare-first credits the informed rate)."""
     from gm_bot.points import split_late

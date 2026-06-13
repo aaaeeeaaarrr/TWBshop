@@ -357,6 +357,12 @@ Reason · មូលហេតុ៖ {reason}
 - EN: `🔧 Attendance is paused for maintenance — please talk to your senior.`
 - KH: `ប្រព័ន្ធត្រូវបានផ្អាក — សូមនិយាយទៅបងៗ។`
 
+### MM8 — collapsed old menu (Stage 6, P1 singleton)
+- **WHO:** a staffer whose OLDER menu is collapsed when they open a newer one.
+- **WHEN:** the old menu message is edited to this pointer (buttons removed) so two live menus can't
+  share state. **BODY** (no buttons). No vars.
+- EN: `⤵ Menu continues below` · KH: `ម៉ឺនុយនៅខាងក្រោម`
+
 ### MM7 — mid-pick typing guard (Stage 3, F8)
 - **WHO:** a staffer who TYPES while mid-selection (days/time/swap) instead of tapping Done/Cancel.
 - **WHEN:** to stop the typed message wiping their in-progress pick. **BODY.** No vars.

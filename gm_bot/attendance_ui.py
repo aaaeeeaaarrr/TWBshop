@@ -788,6 +788,7 @@ def _arm_pending(context, update, pend: dict) -> None:
     Also captures the reason-PROMPT message coords so the dispatcher can edit it in place into an
     'awaiting approval' card once the reason is typed (only when the flow set pend['_summary'])."""
     _supersede_prev_pend(context, update)   # honesty: relabel any prompt this one overwrites
+    _menu_release(context)   # P1: this menu just became a prompt — don't let the singleton collapse it
     uid = update.effective_user.id
     q = getattr(update, "callback_query", None)
     msg = getattr(q, "message", None) if q is not None else None
@@ -2148,6 +2149,37 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
     await msg.reply_text(_PIN_RESPONSE)
 
 
+async def _menu_claim(context, msg) -> None:
+    """P1 menu singleton: register `msg` as the CURRENT nav menu and collapse the PREVIOUS one (if a
+    different message) to a 'continues below' pointer with its buttons removed — so a staffer can't
+    drive two live menus that share one user_data (the cross-contamination root). Best-effort; the
+    dead-tap guard backs it up. Only NAV menus are ever claimed; the moment a menu becomes a prompt,
+    _menu_release unregisters it, so an awaiting prompt/card is NEVER collapsed."""
+    if msg is None:
+        return
+    new = (getattr(msg, "chat_id", None), getattr(msg, "message_id", None))
+    if new[0] is None or new[1] is None:
+        return
+    old = context.user_data.get("att_menu_msg")
+    if old and tuple(old) != new:
+        try:
+            await context.bot.edit_message_text(
+                "⤵ Menu continues below · ម៉ឺនុយនៅខាងក្រោម",
+                chat_id=old[0], message_id=old[1])
+        except Exception:
+            pass   # too old / already a prompt / deleted → dead-tap guard is the backstop
+    context.user_data["att_menu_msg"] = new
+
+
+def _menu_release(context) -> None:
+    """The current menu message became a prompt/awaiting-card — unregister it so the singleton never
+    collapses a message that's now waiting for input (P1 + Law 2)."""
+    try:
+        context.user_data.pop("att_menu_msg", None)
+    except Exception:
+        pass
+
+
 async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Owner-only: open the role-play shell."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
@@ -2156,7 +2188,8 @@ async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     context.user_data["att_live_self"] = False   # owner is role-playing, not a live staffer
     text, kb = persona_picker(0)
-    await update.message.reply_text(text, reply_markup=kb)
+    sent = await update.message.reply_text(text, reply_markup=kb)
+    await _menu_claim(context, sent)
 
 
 async def open_live_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, rec: dict) -> None:
@@ -2171,7 +2204,8 @@ async def open_live_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, rec
     for _k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
         context.user_data.pop(_k, None)
     text, kb = main_menu(_persona(context))
-    await update.message.reply_text(text, reply_markup=kb)
+    sent = await update.message.reply_text(text, reply_markup=kb)
+    await _menu_claim(context, sent)   # P1: collapse any older menu this one supersedes
 
 
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2287,14 +2321,17 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "menu":
         context.user_data["att_al_picked"] = set()
-        return await show(main_menu(p))
+        await show(main_menu(p))
+        await _menu_claim(context, query.message)   # P1: this edited message is now the current menu
+        return
     if action == "menunew":
         # Law 8 / owner pt#1: a TERMINAL/ended message holds useful details — its "🏠 Main menu" must
         # open a NEW message, never edit OVER the record. (Nav screens keep att:menu = edit in place.)
         context.user_data["att_al_picked"] = set()
         text, kb = main_menu(p)
         try:
-            await query.message.reply_text(text, reply_markup=kb)
+            sent = await query.message.reply_text(text, reply_markup=kb)
+            await _menu_claim(context, sent)   # P1: the new menu collapses any older one
         except Exception:
             await show((text, kb))   # fallback: edit in place if we can't post a new message
         return
