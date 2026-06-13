@@ -83,15 +83,20 @@
 - **AL go-live prep (owner-driven):** owner re-walk of the new deduct-at-approval + Cancel-AL flows in
   /test → `/testreset` → backfill `special_leaves.deducted_amount` on prod → flip `attendance_live`.
 
-- **Shift-redefine asymmetry (pre-existing, flagged Jun 13 — low/rare).** The PAYBACK picker skips
-  dates that already have an approved redefine (`_sc_taken_dates`), but the SENIOR redefine picker
-  (`sc_day_pick`) does NOT skip payback-slotted dates. So a senior redefine + a payback slot can co-exist
-  as two approved rows on one day; latest-wins makes attendance/settle pick one, which can leave a
-  payback booking paired to the now-shadowed slot (debt may not clear via its row → `v_booking_redefine_pair`
-  flags it). Safe-ish (no double-bank; supersession now spares the payback slot so it isn't orphaned) but
-  untidy. Clean fix = make the senior picker skip payback-slotted dates too (symmetric `_sc_taken_dates`),
-  OR reconcile the payback booking when a senior redefine lands on its day. Owner: worth a focused pass
-  before go-live if payback + same-day senior redefines are realistic.
+- **S5 multi-feature follow-ups (cross-function audit, Jun 13 — low/rare, all behind go-live).** The
+  shared "staff-date schedule" is written by 5 features (AL · senior redefine · payback slot · OT-rest ·
+  swap). The AL-centric interactions are guarded (F14 both ways + payback picker skips AL/redefined
+  dates) and `al_left` writes are all relative now; `/audit v_one_active_redefine` catches multi-writer
+  clobbers. REMAINING gaps (each a focused pass):
+  (a) **Asymmetric picker:** senior redefine picker (`sc_day_pick`) does NOT skip payback/OT-rest-slotted
+      dates (payback picker skips redefined dates). Fix = symmetric `_sc_taken_dates` in the senior picker.
+  (b) **No undo:** no senior "cancel an approved redefine" path → a redefined day can't be cleanly freed
+      for AL (you can only supersede, which still occupies the day). This is the real fix for the
+      AL-on-a-redefine-day case (better than an override). Add a cancel-approved-redefine action.
+  (c) **swap ↔ redefine resolution UNVERIFIED:** a swap writes `dayoff_overrides`, a redefine writes
+      `shift_changes`; if a day has BOTH, which wins in `compute_day_events`/`works_on`? Not yet traced —
+      verify the resolver consults both consistently (one source of truth).
+  (d) **OT-rest picker** symmetry (same as (a)) not verified.
 
 ## Done (with proof)
 
