@@ -92,6 +92,13 @@
     breadth memory collapse into ONE universal principle without weakening precision?) + the **S5
     balance-semantics extension** ("supersession reverses the loser's balance in-txn + announces"). Those
     are the optimization / irreversible-logic parts; the strengthening above did not wait for them.
+    **▶ WORKING ARTIFACT (Jun 14) → `docs/GOVERNANCE_INVENTORY.md`.** Owner greenlit the read-only
+    governance-inventory evidence pass. It is FILED there (not chat), clearly marked NOT ratified
+    doctrine, and changed zero rules/code. It classifies every standing rule (KIND × ENFORCEMENT) with
+    a cited artifact + trigger for each "enforced" claim, lists the prose-only rot rules, and poses the
+    candidate collapses as QUESTIONS (incl. the advisor warning: don't force-merge S1/S2/S3/S5 — lean the
+    redundancies, not the invariants). The lean-set decision stays here in the advisor lane (owner +
+    advisors); the builder only installs the ratified result. This inventory is the INPUT to this item.
 
 
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
