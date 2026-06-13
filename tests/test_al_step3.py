@@ -247,6 +247,41 @@ def test_f14_concurrent_same_date_exactly_one_wins():
         _teardown(sid)
 
 
+def test_f14_concurrent_cross_flow_al_vs_shift_change_one_wins():
+    """The shared advisory-lock namespace must make an AL-approval and a shift-change-approval for the
+    same staff+date mutually exclusive under a real race — exactly one commits."""
+    sid = _seed("ZZ_F14_XFLOW", 5.0)
+    try:
+        al = _pending(sid, ["2099-09-30"])
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'proposed',FALSE) "
+                        "RETURNING id", (sid, "2099-09-30"))
+            cid = cur.fetchone()["id"]
+        barrier = threading.Barrier(2)
+        res = {}
+
+        def do_al():
+            barrier.wait()
+            res["al"] = db.al_approve_and_deduct(al, 1.0, {"2099-09-30": 1}, {})
+
+        def do_sc():
+            barrier.wait()
+            res["sc"] = db.shift_change_approve_claim(cid)
+
+        ta, ts = threading.Thread(target=do_al), threading.Thread(target=do_sc)
+        ta.start(); ts.start(); ta.join(); ts.join()
+        # exactly one side won; the other saw the conflict
+        al_won = (res["al"] == 4.0)
+        sc_won = (res["sc"] is True)
+        assert al_won != sc_won                      # exactly one
+        assert (res["al"] == "conflict") or (res["sc"] == "conflict")
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:
