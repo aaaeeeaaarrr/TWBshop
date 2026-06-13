@@ -46,6 +46,26 @@
   auto-cleared by the job itself, the job is GENERIC (serves every future hire — stays), and her
   proration history lives in Done below. Nothing Kimying-specific remains in code after that.
 
+## Parked for owner (autonomous run Jun 13 — answer later, NOT blocking)
+
+> Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
+> owner-judgment decision here instead of stopping. These are NOT done and NOT urgent — answer when free.
+
+- **Fable red-team of the AL overhaul before go-live lock.** Standing arrangement = Fable reviews the
+  finished build. Steps 1–6 + F14 are being built now; recommend a Fable pass before `attendance_live`
+  flips. (Owner: say when — I can spawn it or you run it.)
+- **Marriage/death/birth special-leave timing.** Adding a frozen `deducted_amount` + refund path; these
+  already deduct via `al_deduct` at grant. If I also route them through deduct-at-approval semantics it's
+  a charge-timing change. Default I'm taking: keep their existing grant-time deduction, just ADD a frozen
+  amount + clean refund (no timing change). Flag if you wanted otherwise.
+- **Over-balance at approval.** Deduct-at-approval already stops sequential over-booking (each approval
+  drops the gate). Building a senior "this takes them negative — approve anyway?" warning for the rare
+  simultaneous-approval race (Fable M1). Default: build it as a non-blocking notice, never a hard stop.
+- **Phase C cutover timing** (pin 5 server units to `TWBSHOP_ENV=prod`, then flip dev default to
+  staging). Deliberate, needs a quiet-window deploy. Say when.
+- **hire_bot/* + run_*.py** still bind `secrets.DATABASE_URL` directly (don't honor the switch). Fold in
+  before hire/import work moves to staging. Not on the AL path.
+
 ## Done (with proof)
 
 - **2026-06-13 — staging DB stood up (Phase A+B).** `twbshop_staging` CREATED on the existing DO
