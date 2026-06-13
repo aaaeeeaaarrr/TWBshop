@@ -246,7 +246,12 @@ proven with real concurrent same-flow AND cross-flow races (deterministic over r
 INSIDE the approve txn; legacy no-map rows excluded from the cancel list; 0-cost-day FYI suppressed;
 **+ found & fixed a PRE-EXISTING bug** (`al_cancel_list`/`al_cancel_confirm` `_db` NameError → the
 Cancel-AL list was ALWAYS empty). **F14 request-side done** (`al_date_conflict` blocks submitting a day
-already approved). Suite **547**. The AL data-integrity guarantee is COMPLETE + reviewed. Still behind
+already approved) + **AL-side swap collision done** (AL rejects landing on a `dayoff_overrides kind='work'`
+day). Accuracy pass (Fable out): verified every piece 1-by-1 + interactions (gate↔deduction S4, test-mode
+display no-regression, crash resilience IMPROVED), holistic end-to-end guard, `/audit` clean, suite **549**
+stable over repeated concurrent-race runs. Remaining = **swap-SIDE atomic guard** (focused pass — modelled
+in ACTIONS_LEDGER) · senior **override** (owner policy) · literal-Fable (optional) · owner re-walk → go-live.
+The AL data-integrity guarantee is COMPLETE + reviewed. Still behind
 attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. Remaining = F14 swap
 surface (deferred by design) · senior override (owner decision) · literal-Fable (optional) · owner
 re-walk → go-live. See docs/ACTIONS_LEDGER.md Parked list.)
