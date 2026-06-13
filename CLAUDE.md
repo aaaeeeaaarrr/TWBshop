@@ -241,10 +241,15 @@ daily-job partitioned, `v_al` map-aware, PH→`no_deduct` bridge, S4 confirm), r
 on staging + permanent guards (`tests/test_al_atomic.py` + `test_al_step3.py`). Suite 541. Plus
 special-leave frozen refund + `v_special`, over-balance heads-up, and **F14 (both directions,
 race-proven)** — AL-vs-AL + AL-vs-shift-change atomic same-date claim via a shared `pg_advisory_xact_lock`,
-proven with real concurrent same-flow AND cross-flow races (deterministic over repeated runs). Suite 544.
-The AL data-integrity guarantee is COMPLETE. Still behind attendance_live=OFF — nothing live changed;
-prod's legacy rows (no map) unaffected. Remaining = UX/continuation (F14 request-time block · swap ·
-senior override) + Fable red-team (parked) + owner re-walk → go-live. See docs/ACTIONS_LEDGER.md parked list.)
+proven with real concurrent same-flow AND cross-flow races (deterministic over repeated runs).
+**Independent red-team done** (literal Fable model unavailable in this env) → fixed: forward points now
+INSIDE the approve txn; legacy no-map rows excluded from the cancel list; 0-cost-day FYI suppressed;
+**+ found & fixed a PRE-EXISTING bug** (`al_cancel_list`/`al_cancel_confirm` `_db` NameError → the
+Cancel-AL list was ALWAYS empty). **F14 request-side done** (`al_date_conflict` blocks submitting a day
+already approved). Suite **547**. The AL data-integrity guarantee is COMPLETE + reviewed. Still behind
+attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. Remaining = F14 swap
+surface (deferred by design) · senior override (owner decision) · literal-Fable (optional) · owner
+re-walk → go-live. See docs/ACTIONS_LEDGER.md Parked list.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
