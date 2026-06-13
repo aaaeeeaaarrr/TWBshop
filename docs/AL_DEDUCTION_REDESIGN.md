@@ -5,6 +5,36 @@
 > until go-live (`attendance_live=OFF`), so there is NO urgency — correctness over speed.
 > Governed by `docs/STATE_INTEGRITY_LAWS.md` (S1–S4). Decision + history in `docs/ACTIONS_LEDGER.md`.
 
+## ✅ BUILD STATUS — BUILT & PROVEN ON STAGING (2026-06-13), behind `attendance_live=OFF`
+The five must-hold invariants (bottom of this doc), each satisfied + where:
+1. **One-txn CAS (approve & cancel).** `al_approve_and_deduct` (status flip + maps + relative `al_left`
+   + forward points, ALL one txn) · `al_cancel_and_refund` (pop + refund + reverse points + days/status,
+   one txn) · `al_reject` CAS. Tests: `test_al_atomic.py`, `test_al_step3.py`.
+2. **Amounts frozen at approval; refund/audit read the row, never recompute.** `al.al_deduction_map`
+   freezes the per-day `{date:amount}` (keys==days, 0 for day-off/absent/PH); refund pops the stored
+   amount (float-symmetry proven); `v_al` is mechanical on the map.
+3. **Daily job never touches a map row.** `al_apply_due_deductions … WHERE deducted_map IS NULL`
+   (partition, proven it charges only legacy rows).
+4. **is_test in the same change.** `staff_absent_dates(exclude_req_id)` + `al_leave_days_set` +
+   conflict reads + both atomic functions are all is_test-scoped; test never moves real `al_left`.
+5. **Cancel guards ownership+status+not-past; PH structural.** `al_cancel_and_refund` (ownership +
+   `status='approved'` + `FOR UPDATE` + `iso<today`); `al_create_request` bridges `PH…`→`no_deduct`.
+
+**Plus, beyond the brief:** F14 exclusivity (both directions) via a shared `pg_advisory_xact_lock(911,
+staff_id)` — `al_approve_and_deduct` rejects (`"conflict"`) a same-date collision with another approved
+AL OR an approved shift-change, and `shift_change_approve_claim` rejects the reverse; real concurrent
+same-flow AND cross-flow races proven. Request-side `al_date_conflict` blocks submitting a committed
+day. Special-leave frozen `deducted_amount` + idempotent `special_leave_refund` + `v_special`.
+Over-balance ⚠ to seniors (non-blocking). S4 verified (gate/picker/deduction read the same `al_left`).
+
+**Independent red-team done** (literal Fable model unavailable in-env): hot path clean; fixed forward
+points→in-txn, legacy-row cancel guard, 0-cost FYI, + a PRE-EXISTING `_db` NameError that made the
+Cancel-AL list always empty. Suite **548 on staging**.
+
+**REMAINING (not built):** F14 day-off-SWAP surface (deferred — needs swap-semantics modelling first) ·
+senior **override** to supersede a conflict (owner policy decision) · prod backfill of legacy
+`special_leaves.deducted_amount` at go-live · optional literal-Fable pass · owner re-walk → flip live.
+
 ## The bug (why)
 `_al_finalize` flips status to `approved` BEFORE computing `nw = staff_absent_dates()`, which then
 includes the request's own days → `al_day_count` self-excludes them → `al_deduct(0)`. Days-AL is then
