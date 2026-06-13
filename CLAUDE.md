@@ -3,7 +3,7 @@
 ---
 
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
-REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-09-A
+REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-13-A
 
 > This is a FULL copy (not a pointer) so the project carries its own enforcement even if the global
 > `~/.claude/CLAUDE.md` fails to load, is stale on another machine, bootstrap wasn't run, the secrets
@@ -34,7 +34,12 @@ real work never softens. The user may demand the evidence block at ANY time; its
 3. **FILES ARE TRUTH, CHAT IS DISPOSABLE.** Persist to the repo as you go; prove from git.
 4. **EVERY ACTOR, NO DEAD ENDS.** User-path first and each role's view (backend-only proof is
    insufficient for user-facing work); every control does a real action or faithfully advances through
-   a real path.
+   a real path. **WHOLE-PICTURE RE-SWEEP (closing step of SHIPPABLE/HIGH-RISK — proactive, never wait to
+   be asked):** introducing/changing something is done only when you've re-swept the WHOLE it touches —
+   every other reader/writer of the same state, every interaction with what already exists, everywhere
+   the same pattern could live (technical AND human-process), and the system-level invariants/audit. The
+   unit passing is NOT the system being correct. (Trivial/chat edits stay lean — this is the SHIPPABLE/
+   HIGH-RISK closing step, not pre-work ceremony.)
 5. **COVER EVERY BRANCH** — success / fail / cancel / invalid / permission / duplicate / edge; one
    harness per workflow. Fixes become permanent guards (regression test or constraint), never symptom
    patches.
