@@ -307,9 +307,14 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
 - Re-changing a shift does NOT clear an AL block (still an approved redefine that day).
 
 **NEXT (all rare, behind go-live; in `docs/ACTIONS_LEDGER.md` → Parked = S5 follow-ups):**
-1. **swap ↔ redefine resolution UNVERIFIED** — if a day has BOTH a swap `dayoff_override` and a
-   `shift_change`, which wins in `compute_day_events`/`works_on`? NOT traced — the one place I can't yet
-   promise there's no spiderweb. **Highest-value next check.**
+0. **▶ UNIFIED SCHEDULE-EVENT MODEL designed (Jun 13) → `docs/SCHEDULE_RESOLUTION_MODEL.md`.** Owner's
+   direction: newest decision wins, old stands down, ITS BALANCE REVERSES, and ALL involved are notified
+   ("X replaced Y"); humans re-cover (two-party = human boundary). Subsumes the override + the S5
+   follow-ups below. Traced the resolver: precedence is IMPLICIT today (a redefine SILENTLY overrides AL,
+   no refund/notice — the bug the model kills) and SICK doesn't touch `compute_day_events` at all. First
+   build step = one `resolve_day()` used by every reader. Build phased on staging, F14 stays backstop.
+1. **swap ↔ redefine resolution** — now understood (see the doc): `works_on` yields swap-work to AL, but
+   the main loop fires a redefine REGARDLESS (redefine > AL/swap/day-off, silently). Folded into the model.
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill
    `special_leaves.deducted_amount` at go-live. 5. Optional literal-Fable pass. 6. Owner re-walk in `/test`

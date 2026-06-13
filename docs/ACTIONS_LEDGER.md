@@ -83,6 +83,14 @@
 - **AL go-live prep (owner-driven):** owner re-walk of the new deduct-at-approval + Cancel-AL flows in
   /test → `/testreset` → backfill `special_leaves.deducted_amount` on prod → flip `attendance_live`.
 
+- **▶ UNIFIED SCHEDULE-EVENT MODEL (owner-driven design, Jun 13) → `docs/SCHEDULE_RESOLUTION_MODEL.md`.**
+  Owner's direction: replace block/override with "newest decision wins, old one stands down, its balance
+  is reversed, and ALL involved are told (supervisors + staff + senior + swap-partner: 'X replaced Y'),
+  humans re-cover." Design doc written (precedence, per-event inverse, notify-all, two-party=human
+  boundary, every edge, new-bug discipline, law/audit evolution). Subsumes the S5 follow-ups below + the
+  override question (override NOT needed — a confirmed-revoke + reverse replaces it). Build phased on
+  staging, each proven, F14 stays backstop. NEXT BUILD STEP when resumed: the single `resolve_day()`
+  resolver (kills the implicit redefine-overrides-AL precedence + folds sick in).
 - **S5 multi-feature follow-ups (cross-function audit, Jun 13 — low/rare, all behind go-live).** The
   shared "staff-date schedule" is written by 5 features (AL · senior redefine · payback slot · OT-rest ·
   swap). The AL-centric interactions are guarded (F14 both ways + payback picker skips AL/redefined
