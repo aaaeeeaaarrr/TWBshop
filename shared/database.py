@@ -2872,9 +2872,12 @@ def al_apply_due_deductions(today_iso: str) -> list[dict]:
                 due = days_due(days, deducted, today_iso, r["reason"])
                 if not due:
                     continue
-                new_bal = float(r["al_left"] or 0) - len(due)
-                cur.execute("UPDATE staff_registry SET al_left=%s, updated_at=NOW() WHERE id=%s",
-                            (new_bal, r["staff_id"]))
+                # RELATIVE decrement (S5: every al_left write is relative, never a Python-computed
+                # absolute from a possibly-stale read — so this legacy job can't clobber a concurrent
+                # AL approve/refund). RETURNING gives the post-move balance for the owner note.
+                cur.execute("UPDATE staff_registry SET al_left=COALESCE(al_left,0)-%s, updated_at=NOW() "
+                            "WHERE id=%s RETURNING al_left", (len(due), r["staff_id"]))
+                new_bal = float(cur.fetchone()["al_left"])
                 cur.execute("UPDATE al_requests SET deducted_days=%s WHERE id=%s",
                             (_json.dumps(sorted(deducted + due)), r["id"]))
                 out.append({"name": r["call_name"] or r["canonical_name"],
