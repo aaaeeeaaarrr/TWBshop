@@ -517,6 +517,49 @@ def test_menu_release_unregisters():
     assert "att_menu_msg" not in ctx.user_data
 
 
+# ── A1 regression (Fable): the F8 typed-text trap ──
+def test_reset_selection_clears_all_stashes():
+    """reset_selection wipes EVERY per-flow stash, not just att_al_picked — so a completed/cancelled
+    flow can't leave one behind that makes the F8 mid-pick guard fire forever."""
+    from gm_bot import attendance_ui as ui
+    ud = {"att_al_picked": {"d"}, "att_al_cov": {"x": 1}, "att_do_day": "z", "att_do_cov": {},
+          "att_al_from": 5, "att_al_page": 2, "att_ci_armed": True}
+    ui.reset_selection(SimpleNamespace(user_data=ud))
+    assert ud["att_al_picked"] == set()
+    for k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
+        assert k not in ud, "%s should be cleared" % k
+
+
+def test_dispatch_clears_selection_stashes(monkeypatch):
+    """Submitting a flow clears the stale selection stashes (so later typed text isn't trapped by F8)."""
+    from gm_bot import bot
+    import shared.database as db
+    import config
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 1, "canonical_name": "X", "call_name": "X", "work_start": "07:00"}])
+
+    async def _send(context, suid, role, name, text, group=False, **k):
+        pass
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    monkeypatch.setattr(db, "late_set_reason", lambda *a, **k: None)
+
+    async def _reply(t, reply_markup=None):
+        pass
+
+    async def _del(c, m):
+        pass
+
+    update = SimpleNamespace(message=SimpleNamespace(text="traffic", reply_text=_reply),
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=1))
+    ud = {"att_al_picked": {"2026-06-20"}, "att_do_day": "x", "att_al_from": 5}
+    ctx = SimpleNamespace(bot=SimpleNamespace(delete_message=_del), user_data=ud)
+    asyncio.run(bot._att_dispatch(update, ctx, {"flow": "late", "persona_id": 1, "mins": 30,
+                                                "_declared": True}, live=False))
+    assert ud["att_al_picked"] == set() and "att_do_day" not in ud and "att_al_from" not in ud
+
+
 def test_split_late_branches_for_points_display():
     """The 3 branches the test-sim points display reflects (declare-first credits the informed rate)."""
     from gm_bot.points import split_late

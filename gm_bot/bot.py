@@ -4900,9 +4900,13 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
                 if (context.user_data.get("att_al_picked")
                         or context.user_data.get("att_do_day")
                         or context.user_data.get("att_al_from") is not None):
+                    # in-message exit: a BUTTON bypasses this text guard, so the trap always has a way out
                     await update.message.reply_text(
-                        "You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above.\n"
-                        "ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ រួចរាល់ ឬ ✕ បោះបង់ នៅសារខាងលើ។")
+                        "You're in the middle of picking — tap ✅ Done or ✕ Cancel on the message above,"
+                        " or open a fresh menu below.\n"
+                        "ប្អូនកំពុងជ្រើសរើស — សូមចុច ✅ រួចរាល់ ឬ ✕ បោះបង់ នៅសារខាងលើ ឬបើក menu ថ្មីខាងក្រោម។",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                            "📋 Open a fresh menu · បើក menu ថ្មី", callback_data="att:menu")]]))
                     return
                 await attendance_ui.open_live_menu(update, context, rec)
                 return
@@ -5087,6 +5091,14 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
     for both: the only differences are the actor, the requester uid, the late collapse, and copy."""
     if not pend:
         return
+    # A1 (Fable): a flow is being submitted — the selection is captured in the pend, so the per-flow
+    # selection stashes are now stale. Clear them, or a leftover att_al_picked/att_do_day/att_al_from
+    # makes the F8 mid-pick guard fire forever on the staffer's later typed text.
+    try:
+        from gm_bot.attendance_ui import reset_selection
+        reset_selection(context)
+    except Exception:
+        pass
     if reason is None:   # typed-reason flows read the message; tap-to-confirm flows pass it in
         reason = (((update.message.text or "").strip()) if update.message else "") or "(no reason)"
     if live:

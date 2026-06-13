@@ -2180,6 +2180,19 @@ def _menu_release(context) -> None:
         pass
 
 
+_SELECTION_STASHES = ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page",
+                      "att_ci_armed")
+
+
+def reset_selection(context) -> None:
+    """Clear EVERY per-flow selection stash (not just the AL day-set). Called on a fresh menu AND on
+    flow completion/cancel — otherwise a leftover att_al_picked/att_do_day/att_al_from makes the F8
+    mid-pick guard fire forever on later typed text (Fable A1: a near-every-staffer dead-end loop)."""
+    context.user_data["att_al_picked"] = set()
+    for _k in _SELECTION_STASHES:
+        context.user_data.pop(_k, None)
+
+
 async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Owner-only: open the role-play shell."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
@@ -2198,11 +2211,8 @@ async def open_live_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, rec
     context.user_data["att_persona"] = rec["id"]
     context.user_data["att_live_self"] = True
     # multi-menu fix (piece 3): a fresh menu starts a clean slate. Opening a new menu must not let a
-    # half-done flow's stashes (from an older, now-stale menu sharing this same user_data) leak into
-    # it — reset ALL the per-flow selection stashes, not just the AL day-set.
-    context.user_data["att_al_picked"] = set()
-    for _k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
-        context.user_data.pop(_k, None)
+    # half-done flow's stashes (from an older, now-stale menu sharing this same user_data) leak into it.
+    reset_selection(context)
     text, kb = main_menu(_persona(context))
     sent = await update.message.reply_text(text, reply_markup=kb)
     await _menu_claim(context, sent)   # P1: collapse any older menu this one supersedes
@@ -2312,7 +2322,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(persona_picker(int(data[2])))
     if action == "persona":
         context.user_data["att_persona"] = int(data[2])
-        context.user_data["att_al_picked"] = set()
+        reset_selection(context)
         return await show(main_menu(_persona(context)))
 
     p = _persona(context)
@@ -2320,14 +2330,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(persona_picker(0))
 
     if action == "menu":
-        context.user_data["att_al_picked"] = set()
+        reset_selection(context)   # A1: full reset, not just att_al_picked (else F8 guard traps later text)
         await show(main_menu(p))
         await _menu_claim(context, query.message)   # P1: this edited message is now the current menu
         return
     if action == "menunew":
         # Law 8 / owner pt#1: a TERMINAL/ended message holds useful details — its "🏠 Main menu" must
         # open a NEW message, never edit OVER the record. (Nav screens keep att:menu = edit in place.)
-        context.user_data["att_al_picked"] = set()
+        reset_selection(context)   # A1: full reset
         text, kb = main_menu(p)
         try:
             sent = await query.message.reply_text(text, reply_markup=kb)
@@ -2345,9 +2355,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             flow_clear(uid)
         except Exception:
             pass
-        context.user_data["att_al_picked"] = set()
-        for _k in ("att_al_cov", "att_do_day", "att_do_cov", "att_al_from", "att_al_page", "att_ci_armed"):
-            context.user_data.pop(_k, None)
+        reset_selection(context)
         return await show(main_menu(p))
     if action == "am":
         return await show(about_me_menu(p))

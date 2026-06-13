@@ -9,6 +9,23 @@
 
 ## Open (not yet done)
 
+- **🛑 2026-06-13 (CRITICAL BALANCE BUG — found by Fable's pre-guard review, NOT yet fixed, awaiting
+  owner decision): AL deduction is split-brained; HOURS-AL is never deducted at all.** `_al_finalize`
+  flips the request to `status='approved'` (bot.py:2550) BEFORE computing `nw = staff_absent_dates()`
+  (bot.py:2558), and `staff_absent_dates` returns ALL approved AL days for the staffer (database.py:3704)
+  — so the request's own days are excluded as "already absent" → `al_day_count = 0` → `al_deduct(…, 0)`
+  deducts NOTHING at approval. **Days-AL** is then charged only by the daily job `al_apply_due_deductions`
+  as dates pass. **Hours-AL** (fractional, e.g. "9pm–12am = 0.3 AL") is charged by NEITHER (the job
+  filters `kind='days'`, database.py:2818) → **fractional leave is currently FREE**. Side effects: the
+  approval message shows the uncharged balance, and the request-time over-balance gate reads the unmoved
+  `al_left` → staff can stack approved future AL beyond their balance. **DECISION NEEDED (owner):** which
+  is the ONE canonical deduction path — (i) finalize deducts immediately (compute amount before the
+  status flip; retire the daily job; update /audit), or (ii) the daily job deducts (extend it to hours-AL
+  pro-rata; fix the message + gate to account for approved-but-undeducted). HIGH-RISK / auto-bedrock:
+  fix with real-path before/after proof on a real row; ideally after the staging-DB lock. Blocks the F14
+  guard (Stage 5b) — the guard's "each approved AL-day deducts once" invariant + override-refund are
+  unspecifiable until exactly one thing charges.
+
 - **⏰ Jul 1 (AUTOMATED · MUTED · SELF-DESTRUCT — owner: no redundancy): Kimying full-split
   restore.** `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42`
   record once June passes, and DMs the owner. Do NOT mention in open-loops reports; act ONLY if no
