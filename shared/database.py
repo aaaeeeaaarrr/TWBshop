@@ -3593,6 +3593,86 @@ def al_deduct(staff_id: int, amount: float) -> float:
             return float(r["al_left"]) if r else 0.0
 
 
+def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_map: dict):
+    """Atomic approve (state-integrity S1/S2/S3): in ONE transaction claim pending→approved, FREEZE
+    the per-day `deducted_map`/`points_map` on the row, and decrement `al_left` RELATIVELY. The frozen
+    maps become the single source of truth for the later refund/audit (read back, never recomputed).
+
+    Returns the new `al_left` (float) if THIS call won the pending→approved claim, else None — a
+    second finalize, or an already-decided/cancelled row, finds nothing to do (idempotent).
+    Test-aware: an is_test row flips status + stores the maps but NEVER moves the real `al_left`
+    column (the shown balance overlays the test maps); it returns current − total for display only."""
+    J = psycopg2.extras.Json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE al_requests
+                           SET status='approved', deducted_map=%s, points_map=%s, decided_at=NOW()
+                           WHERE id=%s AND status='pending'
+                           RETURNING staff_id, is_test""",
+                        (J(deducted_map), J(points_map), req_id))
+            row = cur.fetchone()
+            if not row:
+                return None                       # lost the claim (already decided / cancelled)
+            staff_id, is_test = row["staff_id"], bool(row["is_test"])
+            if is_test:
+                cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
+                            (staff_id,))
+                b = cur.fetchone()
+                return (float(b["b"]) - float(total)) if b else 0.0
+            cur.execute("""UPDATE staff_registry SET al_left=COALESCE(al_left,0)-%s, updated_at=NOW()
+                           WHERE id=%s RETURNING al_left""", (total, staff_id))
+            r = cur.fetchone()
+            return float(r["al_left"]) if r else 0.0
+
+
+def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | None = None):
+    """Atomic inverse of approve (S1): pop ONE day `iso` from an APPROVED request this staff owns,
+    refund the EXACT frozen amount, reverse that day's frozen points, and keep `days`/status
+    consistent — all in ONE transaction. Returns (refunded_amount, remaining_days), or None when
+    there is nothing to refund: lost the claim, wrong owner, not approved, the day isn't in the map
+    (already cancelled / never charged), or the day is already past. Popped-nothing ⇒ refund-nothing,
+    so a double-tap or a never-charged day can never mint AL. Test-aware: an is_test row pops the maps
+    but never moves the real `al_left` column."""
+    import json as _json
+    J = psycopg2.extras.Json
+    if today_iso and iso < today_iso:
+        return None                               # day already taken — never refund (defense in depth)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT days, deducted_map, points_map, is_test FROM al_requests
+                           WHERE id=%s AND staff_id=%s AND status='approved' FOR UPDATE""",
+                        (req_id, staff_id))
+            row = cur.fetchone()
+            if not row or not row["deducted_map"]:
+                return None
+            dmap = dict(row["deducted_map"])
+            if iso not in dmap:
+                return None                        # already cancelled this day / never charged
+            amount = float(dmap.pop(iso))
+            pmap = dict(row["points_map"] or {})
+            pts = int(pmap.pop(iso, 0) or 0)
+            is_test = bool(row["is_test"])
+            try:
+                days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
+            except Exception:
+                days = []
+            if dmap:                               # days remain → keep the request approved
+                cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s WHERE id=%s",
+                            (_json.dumps(days), J(dmap), J(pmap), req_id))
+            else:                                  # last day popped → the whole request is cancelled
+                cur.execute("UPDATE al_requests SET days=%s, deducted_map=%s, points_map=%s, "
+                            "status='cancelled', decided_at=NOW() WHERE id=%s",
+                            (_json.dumps(days), J(dmap), J(pmap), req_id))
+            if pts:                                # reverse the short-notice penalty for this day
+                cur.execute("""INSERT INTO points_events (staff_id, cause, quantity, ref, is_test)
+                               VALUES (%s,'short_notice_al',%s,%s,%s)""",
+                            (staff_id, -pts, "al_cancel:%d:%s" % (req_id, iso), is_test))
+            if not is_test:
+                cur.execute("""UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW()
+                               WHERE id=%s""", (amount, staff_id))
+            return (amount, len(days))
+
+
 def late_declare(staff_id: int, for_shift: str, expected_min: int, reason: str) -> int:
     """Record a proactive lateness declaration (informed BEFORE = the cheaper points rate)."""
     with _db() as conn:
@@ -3698,13 +3778,15 @@ def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, en
 
 
 def al_leave_days_set(staff_id: int) -> set:
-    """All approved AL/leave day ISO strings for a staff (to FREEZE the payback ladder on them)."""
+    """All approved AL/leave day ISO strings for a staff (to FREEZE the payback ladder on them).
+    is_test-scoped: only rows of the current mode count, so a test approval never freezes a real
+    ladder (and vice versa)."""
     import json as _json
     out = set()
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved'",
-                        (staff_id,))
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s", (staff_id, _ATT_TEST))
             for r in cur.fetchall():
                 try:
                     out.update(_json.loads(r["days"] or "[]"))
@@ -3735,24 +3817,31 @@ def set_public_holidays(dates) -> None:
     gm_set_state("public_holidays", _json.dumps(sorted(set(dates))))
 
 
-def staff_absent_dates(staff_id: int) -> set:
+def staff_absent_dates(staff_id: int, exclude_req_id: int | None = None) -> set:
     """Every ISO date the staff is already AWAY besides their weekly day-off: approved AL,
     special-leave spans (marriage / family-death / wife-birth / family-sick), swap day-off
     overrides, AND company-wide public holidays. Used so an AL span bridges across ANY absence,
-    not just the weekly day off."""
+    not just the weekly day off.
+
+    Pass `exclude_req_id` to leave OUT one AL request's own days — so a finalize computing THAT
+    request's deduction can never self-exclude them (the deduct-nothing bug). is_test-scoped: in
+    test mode only is_test rows count, in live mode only real rows, so a test approval never bleeds
+    into a real span (or vice versa)."""
     import json as _json
     from datetime import date as _d, timedelta as _td
     out = set(public_holidays())   # PLACEHOLDER source — empty until holidays are added
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved'",
-                        (staff_id,))
+            cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s AND (%s::int IS NULL OR id <> %s)",
+                        (staff_id, _ATT_TEST, exclude_req_id, exclude_req_id))
             for r in cur.fetchall():
                 try:
                     out.update(_json.loads(r["days"] or "[]"))
                 except Exception:
                     pass
-            cur.execute("SELECT start_date, days FROM special_leaves WHERE staff_id=%s", (staff_id,))
+            cur.execute("SELECT start_date, days FROM special_leaves WHERE staff_id=%s AND is_test=%s",
+                        (staff_id, _ATT_TEST))
             for r in cur.fetchall():
                 try:
                     sd = _d.fromisoformat(str(r["start_date"]))
@@ -3760,8 +3849,8 @@ def staff_absent_dates(staff_id: int) -> set:
                     out.update((sd + _td(days=i)).isoformat() for i in range(n))
                 except Exception:
                     pass
-            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND kind='off'",
-                        (staff_id,))
+            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND kind='off' "
+                        "AND is_test=%s", (staff_id, _ATT_TEST))
             for r in cur.fetchall():
                 out.add(str(r["the_date"]))
     return out
