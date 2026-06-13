@@ -48,6 +48,18 @@
 
 ## Done (with proof)
 
+- **2026-06-13 — staging DB stood up (Phase A+B).** `twbshop_staging` CREATED on the existing DO
+  cluster (idempotent — `setup_staging.py`); schema cloned via every `init_*_db()`. Independent
+  re-read proof (`verify_staging.py`, separate connection to twbshop_staging): all key AL-build tables
+  present and **EMPTY — zero prod data leaked** (only the 7 seeded `points_rules` rows, which are rule
+  definitions). prod↔staging column diff surfaced + closed 1 real drift (staff_registry
+  `first_pay_usd`/`second_pay_usd` were ad-hoc on prod → added to the canonical init). `TWBSHOP_ENV`
+  switch in `shared/database.py` defaults to prod (zero behavior change; verified prod/staging/no-secret
+  resolution with no connection opened). Latent init bug fixed (init_attendance_db ALTERed al_requests
+  before CREATEing it — no-op on prod, unblocks fresh-DB bootstrap). hire_bot/secretary tables
+  deliberately omitted (separate subsystems, own connections). OWNER STEP PENDING: add the
+  `STAGING_DATABASE_URL` line to secrets.py (guard blocks Claude from secrets.py). Phase C (pin server
+  units to prod, then flip dev default) is later + deliberate.
 - **2026-06-11 — dead `secretary.service` removed from the server.** The Personal project's bot
   unit (pointed at /root/Personal) was already stopped+disabled by the owner; the unit file was the
   last remnant — deleted + daemon-reload, verified gone ("could not be found"). No cron entries, no

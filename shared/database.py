@@ -2297,14 +2297,15 @@ def init_attendance_db() -> None:
                 -- session 28: payroll (owner-only data — never surfaced in any group) + phone binding
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS salary_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS bonus_usd NUMERIC;
+                -- session 32: the two-part pay split shown in the owner /menu pay views
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS first_pay_usd NUMERIC;
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS second_pay_usd NUMERIC;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS phone TEXT;
                 -- session 32: hire date for the owner's "AL + Joined" view (set via /joined).
                 -- month_only: the owner knows only month/year — stored as the 1st but DISPLAYED as
                 -- mm/yyyy so an unknown day is never shown as a fake "01/".
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_date DATE;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_month_only BOOLEAN DEFAULT FALSE;
-                -- session 28: per-day AL deduction tracking ("take when the dates pass")
-                ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS deducted_days TEXT DEFAULT '[]';
                 -- session 28: flow-state persistence (H1) — one active ladder per uid, survives restart
                 CREATE TABLE IF NOT EXISTS gm_flow_state (
                     uid        BIGINT PRIMARY KEY,
@@ -2328,6 +2329,8 @@ def init_attendance_db() -> None:
                     created_at   TIMESTAMPTZ DEFAULT NOW(),
                     decided_at   TIMESTAMPTZ
                 );
+                -- session 28: per-day AL deduction tracking ("take when the dates pass")
+                ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS deducted_days TEXT DEFAULT '[]';
                 CREATE TABLE IF NOT EXISTS al_approvals (
                     id           SERIAL PRIMARY KEY,
                     request_id   INTEGER REFERENCES al_requests(id),
