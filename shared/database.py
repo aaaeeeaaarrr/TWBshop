@@ -1,6 +1,7 @@
 """PostgreSQL database — all tables and queries."""
 
 import logging
+import os
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -10,15 +11,47 @@ import psycopg2.pool
 
 import config
 
+try:
+    from secrets import STAGING_DATABASE_URL as _STAGING_DATABASE_URL
+except ImportError:
+    _STAGING_DATABASE_URL = ""  # Add to twbshop-secrets to enable the isolated staging DB
+
 logger = logging.getLogger(__name__)
 
 _pool: psycopg2.pool.SimpleConnectionPool | None = None
 
 
+def active_database_url() -> str:
+    """Which database every connection in this module uses.
+
+    Default = prod (behavior UNCHANGED everywhere; the live server's systemd units
+    set nothing → prod). A dev machine sets ``TWBSHOP_ENV=staging`` to route ALL db
+    access through the isolated staging database (requires ``STAGING_DATABASE_URL``
+    in secrets.py), so migrations / payroll / AL work never touches live data.
+
+    This is the single chokepoint for gm_bot / retail / b2b — they all go through
+    ``_db()``. KNOWN GAP: hire_bot/* and run_*.py scripts open their own
+    ``psycopg2.connect(DATABASE_URL)`` directly and do NOT yet honor this switch;
+    fold them in before relying on staging for hiring/import work.
+    """
+    env = os.environ.get("TWBSHOP_ENV", "prod").strip().lower()
+    if env == "staging":
+        if not _STAGING_DATABASE_URL:
+            raise RuntimeError(
+                "TWBSHOP_ENV=staging but STAGING_DATABASE_URL is empty in secrets.py. "
+                "Add the staging connection string, or unset TWBSHOP_ENV to use prod."
+            )
+        return _STAGING_DATABASE_URL
+    return config.DATABASE_URL
+
+
 def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.SimpleConnectionPool(1, 10, config.DATABASE_URL)
+        url = active_database_url()
+        if os.environ.get("TWBSHOP_ENV", "prod").strip().lower() == "staging":
+            logger.warning("DB pool → STAGING database (TWBSHOP_ENV=staging)")
+        _pool = psycopg2.pool.SimpleConnectionPool(1, 10, url)
     return _pool
 
 
