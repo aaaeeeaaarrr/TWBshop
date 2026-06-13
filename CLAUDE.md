@@ -154,7 +154,10 @@ points, a booking, a status, a claimed resource) → **read `docs/STATE_INTEGRIT
 S1 reversible-by-construction (apply once + one clean inverse: deduct↔refund, claim↔release — never
 reconstruct across job+read+write; prefer "commit + reverse on undo" over "defer the effect"); S2
 idempotent/apply-once (flip status first); S3 atomic claim-or-reject for a shared resource (CAS, not
-check-then-write); S4 the shown number = the true number. Universal (not project-specific). HIGH-RISK
+check-then-write); S4 the shown number = the true number; S5 a resource written by MULTIPLE features
+(one slot, many writers) needs ONE resolver for all readers + supersede only your own rows (structural
+marker) + symmetric picker exclusion + an undo on the same resource + /audit flags >1 live writer.
+Universal (not project-specific). HIGH-RISK
 money/leave/payroll work earns real before/after proof on a real row (staging DB) + a second-opinion pass.
 
 ### 5. Stateful Menus — Apply the Menu Patterns Law (TRIPWIRE)

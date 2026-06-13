@@ -297,6 +297,19 @@ def test_f14_concurrent_swap_vs_al_one_wins():
         _teardown(pid)
 
 
+def test_v_one_active_redefine_flags_multiple_live():
+    from gm_bot import audit
+    staff = {7: {"call_name": "T", "canonical_name": "T"}}
+    one = [{"id": 1, "staff_id": 7, "status": "approved", "when_date": "2099-08-01"}]
+    assert audit.v_one_active_redefine(one, staff) == []
+    two = one + [{"id": 2, "staff_id": 7, "status": "approved", "when_date": "2099-08-01"}]
+    assert any("live redefines" in m for m in audit.v_one_active_redefine(two, staff))
+    # a settled ('done') row is history, doesn't count toward "live"
+    mixed = [{"id": 1, "staff_id": 7, "status": "done", "when_date": "2099-08-01"},
+             {"id": 2, "staff_id": 7, "status": "approved", "when_date": "2099-08-01"}]
+    assert audit.v_one_active_redefine(mixed, staff) == []
+
+
 def test_shift_change_approve_supersedes_prior_for_same_day():
     # a senior re-editing a shift multiple times must leave exactly ONE live (approved) row, not a pile
     sid = _seed("ZZ_SC_SUPERSEDE", 5.0)

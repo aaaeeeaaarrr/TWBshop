@@ -356,6 +356,24 @@ def v_exclusivity(als: list[dict], scs: list[dict], staff: dict, today: date) ->
     return out
 
 
+def v_one_active_redefine(scs: list[dict], staff: dict) -> list[str]:
+    """At most ONE live (approved, not yet settled) shift-redefine per staff-date. More than one means a
+    multi-writer clobber — a senior re-edit that didn't supersede, OR a senior redefine landing on a
+    payback / OT-rest slot — which can shadow a booking pairing and trip the never-settled law. ('done'
+    rows are settled history and don't count.)"""
+    out = []
+    by: dict = {}
+    for r in scs:
+        if r.get("status") == "approved" and r.get("when_date"):
+            by.setdefault((r["staff_id"], str(r["when_date"])), []).append(r["id"])
+    for (sid, d), ids in sorted(by.items()):
+        if len(ids) > 1:
+            out.append("REDEFINE: %s has %d live redefines on %s (#%s) — only one may be active; a "
+                       "re-edit must supersede, and a senior redefine must not collide with a payback/"
+                       "OT-rest slot" % (_nm(staff, sid), len(ids), d, ", #".join(str(i) for i in ids)))
+    return out
+
+
 def _hhmm_min(s) -> int | None:
     try:
         h, m = str(s).split(":")[:2]
@@ -508,6 +526,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)
+                + v_one_active_redefine(scs, staff)
                 + v_special(specials, staff)
                 + v_dead_taps(taps, today)
                 + v_staff_sanity(list(staff.values())))

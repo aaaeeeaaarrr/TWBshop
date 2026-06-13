@@ -41,6 +41,28 @@ read-then-write check across separate transactions races. Use a unique constrain
 wins; the rest get an honest "no longer available" + (where a human should override) an explicit,
 balance-aware override. (This is the F14 attendance guard's required shape.)
 
+## S5 — A resource written by MULTIPLE features needs ONE resolver, same-feature supersession, symmetric exclusion, and orphan detection
+When several features write the **same shared slot** — a staff-date's "what are they doing" (AL · senior
+shift-redefine · payback slot · OT-rest slot · day-off swap), a seat, a booking, any "who owns this
+date/resource" — the spiderweb risk isn't in any one feature; it's where they **mix**. Four sub-rules:
+- **One resolver, used by every reader.** Exactly one function decides the live value (latest-wins or
+  explicit supersede); attendance, the verdict, settle, and the audit must ALL call it — never two code
+  paths resolving the shared slot differently (they will disagree). (Here: `shift_change_active`.)
+- **Supersede only your OWN rows.** A feature that collapses duplicates may cancel only rows IT owns —
+  never another feature's paired/auto row, or you orphan it (a booking↔redefine pairing, a settle link).
+  Distinguish with a **structural marker**, not a guess (here: `senior_id IS NULL` = an auto-approved
+  payback/OT-rest slot → spared; a senior re-edit supersedes only other senior re-edits).
+- **Exclusion must be SYMMETRIC.** If feature A's picker skips dates already owned by feature B, then B's
+  picker MUST skip A's — one-directional skipping leaves a coexistence gap (here: the payback picker skips
+  redefined dates, but the senior redefine picker does NOT skip payback-slotted dates → they can collide).
+- **Every forward op needs an undo on the SAME resource.** If feature A can claim the slot, there must be
+  a clean way to release it (here: an approved redefine has no senior "cancel" path, so you can't cleanly
+  free a day for AL — you're forced to supersede, which still occupies the slot).
+- **/audit detects >1 live writer on one slot** (clobber/orphan early-warning; here `v_one_active_redefine`).
+
+This is the data-layer twin of the menu laws' **Law 3** (supersession honesty) + **Law 7** (resource
+exclusivity, first-commit-wins): same idea, applied to a row/balance instead of a screen.
+
 ## S4 — The number you SHOW is the number that's TRUE
 A balance displayed to a human, and the gate that guards it (e.g. "can you afford this?"), must read
 the **same source** the real deduction moves. If "available" is computed differently from "deducted,"
@@ -54,16 +76,24 @@ they drift, and someone is misinformed or over-committed. (S1 makes this automat
 - [ ] Does a double-tap / retry / job re-run apply it **twice**? Status flipped first? → **S2**
 - [ ] Can two actors commit conflicting things to one resource without an **atomic** claim? → **S3**
 - [ ] Does the **shown** balance and the **gate** read the same source as the real move? → **S4**
+- [ ] Is this slot/resource written by **more than one feature**? Then: one shared resolver used by all
+      readers · supersede only your own rows (structural marker) · symmetric picker exclusion · an undo
+      on the same resource · `/audit` flags >1 live writer. → **S5**
 - [ ] HIGH-RISK (money/leave/payroll/staff records): real before/after proof on a real row, ideally on
       a **staging DB**, plus a second-opinion pass, before it's called done.
 
-## Worked example — TWBshop attendance (status)
-- **AL deduction → S1:** owner chose deduct-at-approval + refund-on-cancel (Option i). Build PENDING
-  (HIGH-RISK; do on staging w/ proof). Today's bug: deferred + scattered (the anti-pattern). See
-  `docs/ACTIONS_LEDGER.md`.
-- **Points on a cancelled request → S1 gap:** short-notice-AL penalty points are applied at approval
-  but **not reversed** when the AL is cancelled — a forward op with no inverse. To fix with the AL work.
-- **Day-off swap override → S1 gap:** `dayoff_set_override` on approve has **no clean removal** on
-  swap-undo. To fix with the AL work.
+## Worked example — TWBshop attendance (status, 2026-06-13)
+- **AL deduction → S1/S2/S4 DONE:** deduct-at-approval + refund-on-cancel, atomic, frozen per-day map,
+  shown=gate=deduction. Built + proven on staging.
+- **Points on a cancelled request → S1 DONE:** short-notice points are now frozen per-day at approval
+  and reversed in the cancel transaction.
+- **F14 cross-request/feature guard → S2 + S3 DONE:** atomic same-date claim (AL-vs-AL, AL-vs-shift,
+  AL-vs-swap, both directions) via a shared advisory lock; race-proven.
+- **Shift-redefine multi-writer → S5 (mostly DONE):** one resolver (`shift_change_active`) ✓; senior
+  re-edit supersedes only senior rows, spares payback/OT-rest slots ✓; `/audit` `v_one_active_redefine`
+  ✓. **GAPS (flagged, see ACTIONS_LEDGER):** picker exclusion is ASYMMETRIC (senior picker doesn't skip
+  payback-slotted dates) and there is **no undo** (no senior "cancel an approved redefine") — so a day
+  can't be cleanly freed for AL once redefined. Both are S5 gaps awaiting a focused pass.
+- **Day-off swap override → S1 gap:** `dayoff_set_override` on approve still has no clean removal on
+  swap-undo.
 - **OT bank (add/spend), payback (add/credit) → S1 satisfied.** Clean pairs.
-- **F14 cross-request guard → S2 + S3** (atomic claim; idempotent). Build PENDING on the corrected AL base.
