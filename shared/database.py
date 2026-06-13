@@ -3210,7 +3210,16 @@ def shift_change_approve_claim(change_id: int):
                     pass
             cur.execute("UPDATE shift_changes SET status='approved', approved_at=NOW() "
                         "WHERE id=%s AND status='proposed' RETURNING id", (change_id,))
-            return cur.fetchone() is not None
+            if cur.fetchone() is None:
+                return False
+            # make "latest wins" CONCRETE: supersede every OTHER still-live redefine for this
+            # staff+date so dead rows don't pile up (and don't trip the audit's never-settled law).
+            # 'done' rows (already settled history) are left untouched.
+            cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s "
+                        "AND when_date=%s AND is_test=%s AND id<>%s "
+                        "AND status IN ('proposed','approved')",
+                        (staff_id, iso, is_test, change_id))
+            return True
 
 
 def shift_change_active(staff_id: int, when_date: str) -> dict | None:

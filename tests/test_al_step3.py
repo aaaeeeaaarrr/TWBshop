@@ -297,6 +297,32 @@ def test_f14_concurrent_swap_vs_al_one_wins():
         _teardown(pid)
 
 
+def test_shift_change_approve_supersedes_prior_for_same_day():
+    # a senior re-editing a shift multiple times must leave exactly ONE live (approved) row, not a pile
+    sid = _seed("ZZ_SC_SUPERSEDE", 5.0)
+    try:
+        def mk(start, end):
+            with db._db() as c, c.cursor() as cur:
+                cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
+                            "normal_len, status, is_test) VALUES (%s,'2099-08-01',%s,%s,540,'proposed',"
+                            "FALSE) RETURNING id", (sid, start, end))
+                return cur.fetchone()["id"]
+        a = mk(480, 1020)
+        assert db.shift_change_approve_claim(a) is True       # first redefine approved
+        c2 = mk(540, 1080)                                     # senior re-edits → new proposal
+        assert db.shift_change_approve_claim(c2) is True       # approving it supersedes the first
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT id, status FROM shift_changes WHERE staff_id=%s", (sid,))
+            rows = {r["id"]: r["status"] for r in cur.fetchall()}
+        assert rows[a] == "cancelled" and rows[c2] == "approved"   # exactly one live row, no pile-up
+        act = db.shift_change_active(sid, "2099-08-01")
+        assert act and act["id"] == c2                         # latest is the active shift
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_f14_rejects_al_on_a_swap_work_day():
     # a day-off swap can schedule a staffer to WORK a normally-off day (dayoff_override kind='work');
     # AL must not land on it (scheduled to cover vs on leave). AL-side coverage of the swap collision.
