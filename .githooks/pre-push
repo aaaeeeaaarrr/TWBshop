@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Surfacing gate (advisor pass, 2026-06-14). NOT a verifier — it makes the DONE-CLAIM
+# gate APPEAR at the push boundary when CODE ships, so a judgment rule that "fires only
+# if remembered" at least surfaces at a real moment. It cannot check that the gate was
+# filled truthfully; that stays the agent's job. Design rules:
+#   • ALWAYS exit 0 — never block a push.
+#   • Stay SILENT on docs-only / *.md pushes (no cry-wolf noise on routine doc commits).
+#   • Print a compact reminder (not a wall of text).
+# Delete this file to disable. Covers the push boundary only — a chat "done" with no push
+# is not reachable by any hook (the known ceiling).
+code_changed=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_sha" ] && continue
+  case "$local_sha" in *00000000000000000000*) continue;; esac   # deleting a ref
+  if [ -z "$remote_sha" ] || [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    files=$(git diff-tree --no-commit-id --name-only -r "$local_sha" 2>/dev/null)
+  else
+    files=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)
+  fi
+  # any pushed file that is NOT under docs/ and NOT *.md = code/config is shipping
+  if [ -n "$files" ] && printf '%s\n' "$files" | grep -qvE '^(docs/|.*\.md$)'; then
+    code_changed=1
+  fi
+done
+if [ "$code_changed" = "1" ]; then
+  printf '\n' >&2
+  printf '  +- DONE-CLAIM GATE (surfacing - fill it, do not skip) ---------------\n' >&2
+  printf '  | code is shipping. before calling it done:\n' >&2
+  printf '  |  - retrieved the decision first? (docs / ledger before asking)\n' >&2
+  printf '  |  - evidence: files . commands . INDEPENDENT post-settlement proof\n' >&2
+  printf '  |  - per-arc SYSTEM sweep: other readers/writers, blast radius grepped\n' >&2
+  printf '  |  - walk-ready (if owner will test): built.pushed.deployed.KH.audit\n' >&2
+  printf '  +-------------------------------------------------------------------\n\n' >&2
+fi
+exit 0

@@ -9,6 +9,19 @@
 
 ## Open (not yet done)
 
+- **🔓 2026-06-14 (owner-gated — guard blocks Claude from editing `.claude/hooks/`): the command-pattern
+  guard has a known BYPASS CLASS.** DB write-path audit (advisor grep, `psycopg2.connect` + raw DDL/DELETE
+  across the repo) found: **no script writes payroll / AL / staff_registry / attendance data outside the
+  approved `shared/database.py` wrapper** (those tables are touched only by the wrapper + staging-scoped
+  tests) — the important reassurance. BUT `hire_bot/*` + ~12 `run_*`/import/seed/migration scripts use raw
+  `psycopg2.connect(DATABASE_URL)` and run writes/DELETEs/DDL (hiring/b2b/test tables); `python run_X.py`
+  is NOT matched by the highrisk guard's command patterns (it scans the command string, not the file's
+  contents). `run_scoring_schema_migration.py` is a real DDL tool that dodges the guard. None touch
+  payroll/AL, so exposure is bounded. CLOSE-AT-GUARD is owner-only (Claude can't edit `.claude/hooks/`):
+  add a CMD pattern for `python\s+\S*migrat`/`\.connect(` in a run-script, OR (better, parked) route
+  `hire_bot/*` + run-scripts through the `_db()` wrapper so they honor the staging switch too (already a
+  parked staging item). Decide: tune the guard, or accept (these are hiring/test tooling, not payroll).
+
 - **🛑 2026-06-13 (CRITICAL BALANCE BUG — found by Fable's pre-guard review, NOT yet fixed, awaiting
   owner decision): AL deduction is split-brained; HOURS-AL is never deducted at all.** `_al_finalize`
   flips the request to `status='approved'` (bot.py:2550) BEFORE computing `nw = staff_absent_dates()`
@@ -165,6 +178,14 @@
       `v_supersede_reversed` audit catching the un-reversed charge.
 
 ## Done (with proof)
+
+- **2026-06-14 — DB write-path security audit + surfacing gate (advisor pass, OS-lock deferred by owner).**
+  (a) Audited every `psycopg2.connect`/raw-DDL/DELETE in the repo → **no payroll/AL/staff/attendance write
+  bypasses `shared/database.py`** (proof: grep classification, sensitive tables touched only by the wrapper
+  + staging-scoped tests). Residual guard-bypass class logged in Open above. (b) Added `.githooks/pre-push`
+  — a NON-blocking surfacing gate that prints the DONE-CLAIM skeleton when CODE ships, silent on docs-only;
+  proven (test: silent on a docs range, printed on a gm_bot range, exit 0 both). It surfaces the gate at the
+  push boundary; it does NOT verify (the ceiling). `core.hooksPath=.githooks` already set.
 
 - **2026-06-14 — `secret_guard.py` now wired in the PROJECT `.claude/settings.json`** (owner pasted; the
   highrisk guard blocks Claude from editing that file). Closes the inventory's asymmetry (highrisk was
