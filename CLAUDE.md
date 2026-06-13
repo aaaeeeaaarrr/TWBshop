@@ -319,12 +319,16 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    PROTECTED above a redefine, sick a first-class AWAY event, is_test-scoped) + `compute_day_events`
    repointed to it via a batched `_day_context` (perf preserved; existing redefine/overnight tests green).
    Proven on staging: AL+redefine on a day → excluded; sick → excluded (never mis-flagged no-show); the
-   is_test bleed closed. Suite 563. **NEXT PHASES (staging, each proven, F14 backstop):** 2 = repoint the
-   OTHER readers (`_settle_redefined_shift`, lateness verdict) to `resolve_day`; 3 = the **supersede
-   engine** (`supersede_day` = mark loser superseded + reverse its balance in one txn) + confirmed-revoke
-   for working-over-AWAY; 4 = **notify-all**; 5 = retire the silent redefine-over-AL path; 6 = swap-side
-   reversal + coverage alert. Then evolve laws + /audit (S5 extension · `v_one_active_decision` ·
-   `v_supersede_reversed`).
+   is_test bleed closed. **Phase 2 DONE** — verdict repointed + settle leave-guard (no OT on an AL day).
+   **Phase 3a DONE** — additive `supersede_day(staff,date)` reverses approved AL (proven inverse) + stands
+   down SENIOR redefines (spares payback slots), idempotent, returns notify descriptors; UNWIRED (zero
+   behavior change). Suite **565**. **NEXT = Phase 3b — WIRE `supersede_day` into the creation paths**
+   (map in `docs/SCHEDULE_RESOLUTION_MODEL.md` → Phase 3b): AL-approval (away-over-work, auto), sick,
+   special-leave, redefine-approval (the SENSITIVE working-over-AWAY → senior CONFIRM then supersede+
+   refund — replaces the F14 block + the silent override), swap. Then 4 = **notify-all** ("🔁 X replaced
+   Y" → supervisors+staff+senior+partner); 5 = retire silent path; 6 = swap-side. Then evolve laws +
+   /audit (S5 extension · `v_one_active_decision` · `v_supersede_reversed`). F14 stays the backstop
+   throughout. **Advisor-review of the Bedrock rule additions is parked** (docs/ACTIONS_LEDGER.md).
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill
