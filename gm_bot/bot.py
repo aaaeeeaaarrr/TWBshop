@@ -1702,6 +1702,7 @@ async def book_family_death(context, staff: dict, who: str, start_date: str) -> 
     days = sp.death_default_days(who)
     leave_id = special_leave_create(staff["id"], "death", who, start_date, days)
     al_deduct(staff["id"], days)   # AL may go below zero for death
+    await _special_leave_supersede(context, staff, start_date, days, "is on bereavement leave")
     name = staff.get("call_name") or staff["canonical_name"]
     d0 = _date.fromisoformat(start_date)
     dn = (d0 + _td(days=days - 1)).strftime("%a %d/%m")
@@ -1750,6 +1751,10 @@ async def _death_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_
                 staff.get("call_name") or staff["canonical_name"],
                 "Your leave is extended to %d days 🤍\nច្បាប់សម្រាករបស់អ្នកត្រូវបានបន្ថែមដល់ %d ថ្ងៃហើយ 🤍"
                 % (new_days, new_days))
+            # the extra days now cover new dates → stand down any redefine/AL there (idempotent over
+            # the days already superseded at booking)
+            await _special_leave_supersede(context, staff, leave.get("start_date"), new_days,
+                                           "is on bereavement leave")
     await query.edit_message_text(query.message.text + "\n\n✓ %d day(s)." % new_days)
 
 
@@ -1759,6 +1764,7 @@ async def book_wife_birth(context, staff: dict, start_date: str) -> int:
     from datetime import date as _date, timedelta as _td
     leave_id = special_leave_create(staff["id"], "birth", "wife", start_date, sp.BIRTH_DAYS)
     al_deduct(staff["id"], sp.BIRTH_DAYS)
+    await _special_leave_supersede(context, staff, start_date, sp.BIRTH_DAYS, "is on paternity leave")
     name = staff.get("call_name") or staff["canonical_name"]
     d0 = _date.fromisoformat(start_date)
     dn = (d0 + _td(days=sp.BIRTH_DAYS - 1)).strftime("%a %d/%m")
@@ -3353,6 +3359,30 @@ async def _sick_supersede(context, staff: dict, date_iso: str) -> None:
         out = supersede_day(staff["id"], date_iso, today_iso=_today_pp().isoformat())
         if out:
             await _announce_supersessions(context, staff, out, away_reason="is out sick")
+    except Exception:
+        pass
+
+
+async def _special_leave_supersede(context, staff: dict, start_date: str, days: int,
+                                   away_reason: str) -> None:
+    """Special leave (death/birth — instant, no-approval) is an AWAY block: stand down the working
+    decisions on EVERY day of the span (refund a planned AL there, stand down a senior redefine;
+    payback/OT-rest slots spared) via the proven idempotent `supersede_day`, then announce once.
+    Best-effort, after the leave is booked. The special leave's OWN AL deduction (al_deduct) is a
+    separate balance move and is untouched here — this only reverses the OTHER decisions it overrides.
+    (Marriage leave goes through the AL approval engine, so it's superseded there, not here.)"""
+    if not staff or not days:
+        return
+    try:
+        from datetime import date as _date, timedelta as _td
+        from shared.database import supersede_day
+        today = _today_pp().isoformat()
+        d0 = _date.fromisoformat(str(start_date))   # str() tolerates a DB date object (upgrade path)
+        out = []
+        for i in range(int(days)):
+            out += supersede_day(staff["id"], (d0 + _td(days=i)).isoformat(), today_iso=today)
+        if out:
+            await _announce_supersessions(context, staff, out, away_reason=away_reason)
     except Exception:
         pass
 

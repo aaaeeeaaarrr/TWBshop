@@ -352,8 +352,17 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    **569** (supersede test now asserts the enriched descriptor shape). Re-swept: every sick route covered;
    resolve_day already treats sick as away (belt+suspenders). RESIDUAL (rare/recoverable/strictly-better,
    ledger Parked (e)): a sick logged in the sub-second before a same-day pending AL is approved leaves that
-   AL charged — AL-approval-side sick guard or `v_supersede_reversed` audit closes it. NEXT 3b: special-leave ·
-   the SENSITIVE redefine-approval (senior confirm-revoke — kills the silent override) · swap (Phase 6).
+   AL charged — AL-approval-side sick guard or `v_supersede_reversed` audit closes it.
+   **▶ Phase 3b-iii DONE (Jun 13)** — **special leave supersedes across its span.** Marriage already
+   rides the AL approval engine (covered by 3b-i). Death (`book_family_death`) + birth (`book_wife_birth`)
+   + the owner death-upgrade now call `_special_leave_supersede(staff, start, days, reason)` → loops the
+   span via the idempotent `supersede_day` (refund AL / stand down redefine / spare payback slots) +
+   announces. Helper tolerates a DB date object (str()). Suite **569**. Engine gap noted (ledger): a
+   special-leave as the LOSER isn't reversed yet (rare; refund is whole-leave not per-day).
+   **NEXT 3b: the SENSITIVE redefine-approval** (senior confirm-revoke — replaces today's F14 block + the
+   silent override; needs a confirm UI — owner may want to weigh the UX) · then swap (Phase 6) · then
+   Phase 4 unified notify polish · Phase 5 retire silent path · laws + /audit (v_one_active_decision,
+   v_supersede_reversed). All behind attendance_live=OFF, NOT yet deployed (batch at go-live prep).
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill

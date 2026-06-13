@@ -153,8 +153,17 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
     NEVER refunded AL, so this is a strict improvement; the leftover charge is visible + Cancel-able and
     a future AL-approval-side sick guard (or the `v_supersede_reversed` audit) closes it. Logged in
     ACTIONS_LEDGER Parked.
-  - **Special-leave creation** (marriage/death/birth): `supersede_day` across the span (extend the engine
-    to special-leave reversal — currently AL+senior-redefine only).
+  - **Special-leave creation** (marriage/death/birth): `supersede_day` across the span.
+    **DONE (Phase 3b-iii).** **Marriage** routes through `submit_al_request` → the AL approval engine, so
+    it's already superseded by 3b-i (no separate wire). **Death** (`book_family_death`) + **birth**
+    (`book_wife_birth`) are instant/no-approval → a `_special_leave_supersede(staff, start, days, reason)`
+    helper loops the span calling the idempotent `supersede_day` (refund a planned AL there, stand down a
+    senior redefine, payback slots spared) + announces once (away_reason "is on bereavement/paternity
+    leave"). The owner death-**upgrade** (1→3 days) re-supersedes the full new span (idempotent over the
+    days already done). The special leave's OWN AL deduction (`al_deduct`) is a separate move, untouched.
+    NOTE (engine gap, same as sick's residual): `supersede_day` does not yet reverse a special-leave as the
+    LOSER (if a newer away event lands on a special-leave day) — rare, special-leave is a planned block;
+    `special_leave_refund` is whole-leave not per-day, so that direction needs design. Ledger Parked.
   - **Redefine approval** (`shift_change_approve_claim`): the SENSITIVE working-over-AWAY case — route
     through a **senior confirm** ("this cancels {name}'s approved leave that day — confirm?") that then
     `supersede_day`s the AL (refund) before approving. Replaces today's F14 block + the silent override.
