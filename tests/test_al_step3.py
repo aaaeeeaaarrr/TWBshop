@@ -282,6 +282,46 @@ def test_f14_concurrent_cross_flow_al_vs_shift_change_one_wins():
         _teardown(sid)
 
 
+def test_approve_writes_forward_points_in_same_txn():
+    # red-team #2: the forward short-notice points must be written by al_approve_and_deduct itself
+    # (atomic with the deduct), not by a separate call that a crash could skip.
+    sid = _seed("ZZ_AL_FWDPTS", 5.0)
+    try:
+        r = _pending(sid, ["2099-10-05"])
+        db.al_approve_and_deduct(r, 1.0, {"2099-10-05": 1}, {"2099-10-05": 120})
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT quantity FROM points_events WHERE staff_id=%s AND cause='short_notice_al'",
+                        (sid,))
+            assert [row["quantity"] for row in cur.fetchall()] == [120]
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM points_events WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_cancel_list_excludes_legacy_no_map_rows(monkeypatch):
+    # red-team #1: a legacy (no deducted_map) approved row can't be refunded by al_cancel_and_refund,
+    # so it must NOT be offered a silently-no-op cancel button.
+    from gm_bot import attendance_ui as ui
+    sid = _seed("ZZ_AL_CANCELLIST", 5.0)
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO al_requests (staff_id, kind, days, status, deducted_map, is_test) "
+                        "VALUES (%s,'days',%s,'approved',%s,FALSE)",
+                        (sid, json.dumps(["2099-10-01"]), psycopg2.extras.Json({"2099-10-01": 1})))
+            cur.execute("INSERT INTO al_requests (staff_id, kind, days, status, is_test) "
+                        "VALUES (%s,'days',%s,'approved',FALSE)", (sid, json.dumps(["2099-10-02"])))
+        monkeypatch.setattr(ui, "att_test_on", lambda: False)
+        monkeypatch.setattr(ui, "_shift_running", lambda p: False)
+        p = {"id": sid, "canonical_name": "T", "call_name": "T"}
+        _txt, kb = ui.al_cancel_list(p)
+        cbs = [b.callback_data for row in kb.inline_keyboard for b in row]
+        assert any("2099-10-01" in c for c in cbs)       # map row IS offered
+        assert not any("2099-10-02" in c for c in cbs)   # legacy row is hidden
+    finally:
+        _teardown(sid)
+
+
 def test_create_request_bridges_ph_into_no_deduct():
     sid = _seed("ZZ_AL_STEP3_PH", 5.0)
     try:

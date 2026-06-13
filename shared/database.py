@@ -3707,6 +3707,14 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
             if not row:
                 return None                       # lost the claim (already decided / cancelled)
             staff_id, is_test = row["staff_id"], bool(row["is_test"])
+            # forward short-notice points in the SAME txn as the claim+deduct (invariant 1) — so a
+            # crash can't leave the AL deducted while the penalty silently goes unrecorded. The frozen
+            # points_map drives the per-day reversal in al_cancel_and_refund.
+            for d, q in (points_map or {}).items():
+                if q:
+                    cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref, is_test) "
+                                "VALUES (%s,'short_notice_al',%s,%s,%s)",
+                                (staff_id, int(q), "al:%d:%s" % (req_id, d), is_test))
             if is_test:
                 cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
                             (staff_id,))

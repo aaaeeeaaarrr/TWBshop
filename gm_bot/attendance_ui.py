@@ -1990,13 +1990,17 @@ def al_cancel_list(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """List of upcoming approved AL days the staffer can cancel — one button per day.
     Tapping opens the confirmation screen (att:my:alconfirm)."""
     import json as _json
+    from shared.database import _db   # (was missing in this scope → list silently came back empty)
     today_iso = _today().isoformat()
     cancelable = []
     try:
         with _db() as conn:
             with conn.cursor() as cur:
+                # only deduct-at-approval rows carry a refundable frozen map; a legacy (no-map) row
+                # can't be refunded by al_cancel_and_refund, so never offer it a (silently no-op) ✕
                 cur.execute("""SELECT id, days, kind, hours_start, hours_end FROM al_requests
-                               WHERE staff_id=%s AND status='approved' AND is_test=%s""",
+                               WHERE staff_id=%s AND status='approved' AND is_test=%s
+                               AND deducted_map IS NOT NULL""",
                             (p["id"], att_test_on()))
                 for r in cur.fetchall():
                     for d in _json.loads(r["days"] or "[]"):
@@ -2027,6 +2031,7 @@ def al_cancel_confirm(p: dict, iso: str, rid: int) -> tuple[str, InlineKeyboardM
     """Confirmation screen: shows the day details and asks the staffer to confirm before cancelling.
     Confirm → att:my:cancel (actual cancel). Back → att:my:allist."""
     import json as _json
+    from shared.database import _db   # (was missing in this scope → details silently fell back)
     kind, hs, he, refund = "days", None, None, None
     try:
         with _db() as conn:
@@ -2749,7 +2754,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # per-date cancel: pop ONLY this day + refund the EXACT frozen amount, atomically (S1).
             # None ⇒ nothing to refund (double-tap / not approved / past) → just refresh, no FYI.
             res = al_cancel_and_refund(rid, p["id"], iso, today_iso=today_iso)
-            if res is not None:
+            if res is not None and res[0] > 0:   # >0 only: a 0-cost day-off day = not a "back to work"
                 from gm_bot.bot import _att_send
                 nmx = p.get("call_name") or p["canonical_name"]
                 dlbl = date.fromisoformat(iso).strftime("%a %d/%m")

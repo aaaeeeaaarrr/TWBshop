@@ -2607,11 +2607,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             return
         if new_bal is None:
             return  # lost the claim — another finalize already decided this request
-        for d, q in points_map.items():               # live ledger; the frozen map drives the refund
-            try:
-                points_record(req["staff_id"], "short_notice_al", int(q), "al:%d:%s" % (req["id"], d))
-            except Exception as e:
-                logger.error("short-notice points record failed: %s", e)
+        # (short-notice points are written inside al_approve_and_deduct's transaction — atomic w/ deduct)
     else:
         if not al_reject(req["id"]):
             return  # lost the claim
