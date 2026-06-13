@@ -370,6 +370,10 @@ def test_reason_terminals_format_bilingual(monkeypatch):
     monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [dict(_PERSONA)])
     monkeypatch.setattr(ui, "att_test_on", lambda: True)         # armed (owner test mode)
     monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    # this is a FORMATTING test — the declare-Late-first path records immediately, so stub the DB
+    # write (otherwise it FK-fails on an empty staging DB and writes a real row on prod)
+    import shared.database as _dbmod
+    monkeypatch.setattr(_dbmod, "late_declare", lambda *a, **k: 1)
     cases = [
         ("att:scp:cf:11:0:780:1140", "Shift change"),     # shift redefine 1pm-7pm
         ("att:late:o:30", "30 min"),                       # late ~30 min (2× %d)
