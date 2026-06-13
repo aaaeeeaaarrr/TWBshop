@@ -249,12 +249,14 @@ Cancel-AL list was ALWAYS empty). **F14 request-side done** (`al_date_conflict` 
 already approved) + **AL-side swap collision done** (AL rejects landing on a `dayoff_overrides kind='work'`
 day). Accuracy pass (Fable out): verified every piece 1-by-1 + interactions (gate↔deduction S4, test-mode
 display no-regression, crash resilience IMPROVED), holistic end-to-end guard, `/audit` clean, suite **549**
-stable over repeated concurrent-race runs. Remaining = **swap-SIDE atomic guard** (focused pass — modelled
-in ACTIONS_LEDGER) · senior **override** (owner policy) · literal-Fable (optional) · owner re-walk → go-live.
+stable over repeated concurrent-race runs. **F14 now COMPLETE in EVERY direction** (AL-vs-AL ·
+AL-vs-shift-change both ways · AL-vs-swap both ways via `swap_approve_claim` locking both parties ·
+request-side block) — shared advisory lock, proven with real concurrent same-flow AND cross-flow races
+(AL×AL, AL×shift, AL×swap, deterministic). Suite **551**. Remaining = senior **override** (owner policy
+decision) · literal-Fable (optional) · owner re-walk → go-live.
 The AL data-integrity guarantee is COMPLETE + reviewed. Still behind
-attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. Remaining = F14 swap
-surface (deferred by design) · senior override (owner decision) · literal-Fable (optional) · owner
-re-walk → go-live. See docs/ACTIONS_LEDGER.md Parked list.)
+attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. See
+docs/ACTIONS_LEDGER.md Parked list + docs/AL_DEDUCTION_REDESIGN.md build status.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
