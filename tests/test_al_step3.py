@@ -224,6 +224,79 @@ def test_f14_shift_change_rejected_when_al_that_day():
         _teardown(sid)
 
 
+def test_swap_approve_claim_blocks_when_party_has_al_on_worked_day():
+    # the swap puts the partner to WORK on req_off; if the partner has approved AL there, it must not
+    # approve (and must write NO overrides) — then clearing the AL lets it approve + write all 4.
+    rid = _seed("ZZ_SWAP_REQ", 5.0)
+    pid = _seed("ZZ_SWAP_PAR", 5.0)
+    swid = None
+    try:
+        req_off, partner_off = "2099-12-25", "2099-12-26"
+        ar = _pending(pid, [req_off])
+        db.al_approve_and_deduct(ar, 1.0, {req_off: 1}, {})            # partner has AL on req_off
+        swid = db.swap_create(rid, pid, req_off, partner_off, "x")
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("UPDATE dayoff_swaps SET status='partner_ok' WHERE id=%s", (swid,))
+        assert db.swap_approve_claim(swid) == "conflict"
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s", (swid,))
+            assert cur.fetchone()["status"] == "partner_ok"           # not approved
+            cur.execute("SELECT count(*) AS n FROM dayoff_overrides WHERE staff_id IN (%s,%s)", (rid, pid))
+            assert cur.fetchone()["n"] == 0                            # no overrides written
+        db.al_cancel_and_refund(ar, pid, req_off, today_iso="2026-06-13")   # clear the AL
+        assert db.swap_approve_claim(swid) is True
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s", (swid,))
+            assert cur.fetchone()["status"] == "approved"
+            cur.execute("SELECT count(*) AS n FROM dayoff_overrides WHERE staff_id IN (%s,%s)", (rid, pid))
+            assert cur.fetchone()["n"] == 4                            # all 4 overrides written atomically
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id IN (%s,%s)", (rid, pid))
+            if swid is not None:
+                cur.execute("DELETE FROM dayoff_swaps WHERE id=%s", (swid,))
+            cur.execute("DELETE FROM al_requests WHERE staff_id IN (%s,%s)", (rid, pid))
+        _teardown(rid)
+        _teardown(pid)
+
+
+def test_f14_concurrent_swap_vs_al_one_wins():
+    """A swap-approval and an AL-approval racing on the SAME staff+date (the day the swap would put the
+    partner to work) — the shared advisory-lock namespace makes exactly one win."""
+    rid = _seed("ZZ_SWAP_RACE_R", 5.0)
+    pid = _seed("ZZ_SWAP_RACE_P", 5.0)
+    swid = None
+    try:
+        req_off, partner_off = "2099-12-28", "2099-12-29"
+        ar = _pending(pid, [req_off])                                 # partner pending AL on req_off
+        swid = db.swap_create(rid, pid, req_off, partner_off, "x")
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("UPDATE dayoff_swaps SET status='partner_ok' WHERE id=%s", (swid,))
+        barrier = threading.Barrier(2)
+        res = {}
+
+        def do_swap():
+            barrier.wait(); res["swap"] = db.swap_approve_claim(swid)
+
+        def do_al():
+            barrier.wait(); res["al"] = db.al_approve_and_deduct(ar, 1.0, {req_off: 1}, {})
+
+        ts, ta = threading.Thread(target=do_swap), threading.Thread(target=do_al)
+        ts.start(); ta.start(); ts.join(); ta.join()
+        swap_won = (res["swap"] is True)
+        al_won = (res["al"] == 4.0)
+        assert swap_won != al_won                                     # exactly one
+        assert (res["swap"] == "conflict") or (res["al"] == "conflict")
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id IN (%s,%s)", (rid, pid))
+            if swid is not None:
+                cur.execute("DELETE FROM dayoff_swaps WHERE id=%s", (swid,))
+            cur.execute("DELETE FROM al_requests WHERE staff_id IN (%s,%s)", (rid, pid))
+        _teardown(rid)
+        _teardown(pid)
+
+
 def test_f14_rejects_al_on_a_swap_work_day():
     # a day-off swap can schedule a staffer to WORK a normally-off day (dayoff_override kind='work');
     # AL must not land on it (scheduled to cover vs on leave). AL-side coverage of the swap collision.

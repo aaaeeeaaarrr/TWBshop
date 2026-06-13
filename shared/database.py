@@ -3457,6 +3457,54 @@ def dayoff_override_for(staff_id: int, the_date: str) -> str | None:
             return r["kind"] if r else None
 
 
+def swap_approve_claim(swap_id: int):
+    """Atomic approve for a day-off swap (F14, swap side): under advisory locks on BOTH staff ids
+    (sorted → deadlock-safe; shared (911,staff_id) namespace with AL + shift-change approvals), reject
+    if EITHER party would be scheduled to WORK a day they have approved AL — the swap puts the requester
+    to work `partner_off_date` and the partner to work `req_off_date`. Else flip partner_ok→approved AND
+    write the 4 dayoff_overrides, ALL in one transaction. Returns True | "conflict" | False (not in a
+    claimable state / unknown). So an AL-approval and a swap-approval for the same staff+date can't both
+    win, and a swap can't schedule someone onto their own approved leave."""
+    import json as _json
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT requester_id, partner_id, req_off_date, partner_off_date, status, is_test "
+                        "FROM dayoff_swaps WHERE id=%s", (swap_id,))
+            r = cur.fetchone()
+            if not r or r["status"] != "partner_ok":
+                return False
+            rid, pid, is_test = r["requester_id"], r["partner_id"], bool(r["is_test"])
+            req_off, partner_off = str(r["req_off_date"]), str(r["partner_off_date"])
+            for _sid in sorted({rid, pid}):       # both locks, stable order (no deadlock)
+                cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, _sid))
+
+            def _al_on(staff_id, iso):
+                cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                            "AND is_test=%s", (staff_id, is_test))
+                for rr in cur.fetchall():
+                    try:
+                        if iso in _json.loads(rr["days"] or "[]"):
+                            return True
+                    except Exception:
+                        pass
+                return False
+
+            # the WORKED dates: requester works partner_off, partner works req_off
+            if _al_on(rid, partner_off) or _al_on(pid, req_off):
+                return "conflict"
+            cur.execute("UPDATE dayoff_swaps SET status='approved' WHERE id=%s AND status='partner_ok' "
+                        "RETURNING id", (swap_id,))
+            if not cur.fetchone():
+                return False                      # lost the claim
+            for sid_, the_date, kind in ((rid, req_off, "off"), (rid, partner_off, "work"),
+                                         (pid, partner_off, "off"), (pid, req_off, "work")):
+                cur.execute("INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason, is_test) "
+                            "VALUES (%s,%s,%s,'swap',%s) ON CONFLICT (staff_id, the_date) "
+                            "DO UPDATE SET kind=EXCLUDED.kind, reason='swap'",
+                            (sid_, the_date, kind, is_test))
+            return True
+
+
 def swap_create(requester_id, partner_id, req_off_date, partner_off_date, reason) -> int:
     with _db() as conn:
         with conn.cursor() as cur:

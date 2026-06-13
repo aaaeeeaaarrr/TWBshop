@@ -35,7 +35,7 @@ from shared.database import (
     al_pending_requests, al_deduct, points_record, points_seed_catalogue,
     al_leave_days_set, staff_absent_dates, payback_bookings_due_reminder, payback_mark_reminded,
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
-    swap_add_senior_vote, swap_set_status,
+    swap_add_senior_vote, swap_set_status, swap_approve_claim,
     ot_bank_balance, ot_bank_add, ot_buyback_book,
     sick_create, sick_get, sick_set, sick_provisional_open, sick_family_days_used,
     special_leave_create, special_leave_set_days, special_leave_get,
@@ -2310,11 +2310,25 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def _swap_apply(context, sw: dict, approved: bool) -> None:
     if swap_get(sw["id"])["status"] != "partner_ok":
         return
-    swap_set_status(sw["id"], "approved" if approved else "rejected")
     req = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
     partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
     if not req or not partner:
         return
+    if approved:
+        # F14 (swap side): atomically check NEITHER party has approved AL on the day the swap would put
+        # them to WORK, then flip + write the 4 overrides in ONE txn (shared advisory lock w/ AL/shift).
+        res = swap_approve_claim(sw["id"])
+        if res == "conflict":
+            for s, role in ((req, "Requester"), (partner, "Partner")):
+                await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
+                    s.get("call_name") or s["canonical_name"],
+                    "Couldn't approve the swap — one of you has approved leave on a day it needs worked.\n"
+                    "មិនអាចអនុម័តការប្តូរបានទេ — ម្នាក់ក្នុងចំណោមអ្នកមានច្បាប់ឈប់សម្រាកនៅថ្ងៃដែលត្រូវធ្វើការ។")
+            return
+        if not res:
+            return   # lost the claim / not in a claimable state
+    else:
+        swap_set_status(sw["id"], "rejected")
     # edit the senior cards in place (request stays intact + the verdict) — and KEEP the
     # 👁 Show-who's-working toggle so coverage stays checkable after the decision (like AL).
     sw2 = swap_get(sw["id"])   # status now approved/rejected
@@ -2337,12 +2351,7 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
     await _swap_flip_requester_card(context, sw2, req, partner)
     context.bot_data.get("swap_req_cards", {}).pop(sw["id"], None)
     if approved:
-        # dated overrides: requester off on req_off_date, partner off on partner_off_date; each works
-        # the other's normal day-off date that week (the override 'work' is implied by absence of 'off').
-        dayoff_set_override(req["id"], str(sw["req_off_date"]), "off", "swap")
-        dayoff_set_override(req["id"], str(sw["partner_off_date"]), "work", "swap")
-        dayoff_set_override(partner["id"], str(sw["partner_off_date"]), "off", "swap")
-        dayoff_set_override(partner["id"], str(sw["req_off_date"]), "work", "swap")
+        # the 4 dated overrides were written atomically inside swap_approve_claim (with the F14 check)
         for s, role in ((req, "Requester"), (partner, "Partner")):
             await _att_send(context, (s.get("telegram_ids") or [None])[0], role,
                 s.get("call_name") or s["canonical_name"],

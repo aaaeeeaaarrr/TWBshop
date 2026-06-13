@@ -509,6 +509,9 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
           "partner_off_date": "2026-06-24", "reason": "x", "status": "partner_ok"}
     monkeypatch.setattr(bot, "swap_get", lambda i: sw)
     monkeypatch.setattr(bot, "swap_set_status", lambda i, st: sw.__setitem__("status", st))
+    # approve now goes through the atomic claim (flips status + writes overrides in one txn)
+    monkeypatch.setattr(bot, "swap_approve_claim",
+                        lambda i: sw.__setitem__("status", "approved") or True)
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
         {"id": 1, "canonical_name": "Req", "call_name": "Req", "telegram_ids": [11]},
         {"id": 2, "canonical_name": "Par", "call_name": "Par", "telegram_ids": [22]}])

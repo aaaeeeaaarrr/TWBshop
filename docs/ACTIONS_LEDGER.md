@@ -71,17 +71,15 @@
   staging). Deliberate, needs a quiet-window deploy. Say when.
 - **hire_bot/* + run_*.py** still bind `secrets.DATABASE_URL` directly (don't honor the switch). Fold in
   before hire/import work moves to staging. Not on the AL path.
-- **F14 remaining surfaces (data guarantee COMPLETE — continuation):** request-time UI block DONE
-  (`al_date_conflict`). **Swap collision MODELLED + AL-side DONE:** approving a swap writes
-  `dayoff_overrides` — each party gets a `kind='off'` date and a `kind='work'` date (they cover each
-  other); the collision is **AL on a `kind='work'` date** (scheduled to cover vs on leave). The AL side
-  now rejects it (both `al_approve_and_deduct` and `al_date_conflict` check `dayoff_overrides kind='work'`).
-  **REMAINING = the SWAP-SIDE atomic guard:** `_swap_*` approval (bot.py ~2339-2345) flips status + writes
-  4 overrides + notices NON-atomically across TWO staffers — to reject a swap that would schedule either
-  party to WORK a day they have approved AL needs an atomic `swap_approve_claim` (advisory lock on BOTH
-  staff ids, check both AL sets, then flip+write) mirroring `shift_change_approve_claim`. Focused pass
-  (multi-party + the menu-law swap cards), NOT a tail. (2) senior **override** to force-approve despite a
-  conflict — owner policy decision (who may, does it need a 2nd senior).
+- **F14 — DONE in every direction (data-integrity guarantee complete + race-proven).** AL-vs-AL ·
+  AL-vs-shift-change (both ways) · AL-vs-swap (both ways) · request-side submit block. All serialized by
+  a shared `pg_advisory_xact_lock(911, staff_id)` so no two flows can both claim a staff-date, proven
+  with real concurrent same-flow AND cross-flow races (AL×AL, AL×shift-change, AL×swap — deterministic
+  over repeated runs). `swap_approve_claim` locks BOTH parties' ids (sorted, deadlock-safe), rejects a
+  swap that would put either party to WORK a day they have approved AL, and flips+writes the 4 overrides
+  in one txn. **ONLY remaining F14 piece = senior OVERRIDE** to force-approve despite a conflict — an
+  owner POLICY decision (who may override, does it need a 2nd senior, does it re-check balance). Nothing
+  else in F14 is open.
 - **AL go-live prep (owner-driven):** owner re-walk of the new deduct-at-approval + Cancel-AL flows in
   /test → `/testreset` → backfill `special_leaves.deducted_amount` on prod → flip `attendance_live`.
 
