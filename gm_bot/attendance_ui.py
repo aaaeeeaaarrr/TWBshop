@@ -162,6 +162,79 @@ def staff_day_events(p: dict, ws_override: int | None = None,
     return [(m // 1440, m % 1440, label) for m, label in raw]
 
 
+def _decision(working, reason, source_id=None, start_min=None, end_min=None, normal_len=None) -> dict:
+    return {"working": working, "reason": reason, "source_id": source_id,
+            "start_min": start_min, "end_min": end_min, "normal_len": normal_len}
+
+
+def resolve_day(p: dict, day_iso: str) -> dict:
+    """THE single source of truth for "what is this person doing on day_iso" — every reader (attendance
+    prompts, no-show sweep, lateness verdict, settle, /audit) must use this ONE resolver so they can't
+    drift (see docs/SCHEDULE_RESOLUTION_MODEL.md). Returns a decision dict
+    {working, reason, source_id, start_min, end_min, normal_len}. is_test-scoped throughout.
+
+    Precedence (highest first):
+      1. approved AL · active sick · special-leave span  → AWAY (leave is PROTECTED — it beats a
+         redefine; a redefine may only take an AL day via the confirmed-revoke path that refunds it,
+         after which the AL is no longer 'approved' and step 2 wins legitimately);
+      2. senior/auto shift-redefine (latest-wins)        → WORKING at the redefined [start,end] (this
+         beats a day-off: a "change-day" moves the shift onto a normally-off day);
+      3. day-off swap override                           → 'off'=AWAY · 'work'=WORKING (normal times);
+      4. weekly day-off                                  → AWAY;
+      5. normal weekly schedule                          → WORKING at [work_start, work_end].
+    """
+    import json as _json
+    from datetime import date as _d, timedelta as _td
+    from shared.database import _db, shift_change_active
+    sid, flag = p["id"], att_test_on()
+    d = _d.fromisoformat(day_iso)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            # 1) LEAVE (away) — protected above all working events
+            cur.execute("SELECT id, days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=%s", (sid, flag))
+            for r in cur.fetchall():
+                try:
+                    if day_iso in _json.loads(r["days"] or "[]"):
+                        return _decision(False, "al", r["id"])
+                except Exception:
+                    pass
+            cur.execute("SELECT id FROM sick_cases WHERE staff_id=%s AND the_date=%s AND is_test=%s "
+                        "AND status <> 'cancelled' LIMIT 1", (sid, day_iso, flag))
+            r = cur.fetchone()
+            if r:
+                return _decision(False, "sick", r["id"])
+            cur.execute("SELECT id, start_date, days FROM special_leaves WHERE staff_id=%s AND is_test=%s",
+                        (sid, flag))
+            for r in cur.fetchall():
+                try:
+                    base = _d.fromisoformat(str(r["start_date"]))
+                    if base <= d < base + _td(days=max(int(r["days"] or 1), 1)):
+                        return _decision(False, "special", r["id"])
+                except Exception:
+                    pass
+            # 3-prep) swap override (read here, applied after the redefine check)
+            cur.execute("SELECT kind FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s AND is_test=%s",
+                        (sid, day_iso, flag))
+            ovr = cur.fetchone()
+            ov = ovr["kind"] if ovr else None
+    # 2) REDEFINE (working, retimed) — beats day-off + swap
+    sc = shift_change_active(sid, day_iso)
+    if sc:
+        return _decision(True, "redefine", sc["id"], sc.get("start_min"), sc.get("end_min"),
+                         sc.get("normal_len"))
+    # 3) swap override
+    if ov == "off":
+        return _decision(False, "swap_off")
+    if ov == "work":
+        return _decision(True, "swap_work", None, to_min(p.get("work_start")), to_min(p.get("work_end")))
+    # 4) weekly day-off
+    if _DOW_NAME.get((p.get("day_off") or "")[:3].title()) == d.weekday():
+        return _decision(False, "day_off")
+    # 5) normal schedule
+    return _decision(True, "normal", None, to_min(p.get("work_start")), to_min(p.get("work_end")))
+
+
 def compute_day_events(target: date) -> list[tuple[int, str, str, str, str]]:
     """All would-be check-in messages for one date, whole active TWB roster, chronological.
     Each event is anchored to its SHIFT-START date: it appears on `target` only if the person
