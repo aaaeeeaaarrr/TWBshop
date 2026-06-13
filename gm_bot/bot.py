@@ -4588,8 +4588,19 @@ async def cmd_teststatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     counts = attendance_test_counts()
     mode = "🧪 ON" if _att_test_mode() else "off"
     body = "\n".join("• %s: %d" % (k, v) for k, v in counts.items()) or "• (no test rows)"
-    await update.message.reply_text("Test mode: %s\nLive switch: %s\n\nTest rows:\n%s"
-                                    % (mode, "ON" if _attendance_live() else "off", body))
+    # consistency check — counts only prove a row EXISTS; this proves the numbers are CORRECT
+    # (the silent-class catcher). Same engine as /audit + the background watchdog.
+    from gm_bot.audit import run_audit
+    try:
+        problems, _ = run_audit(_today_pp(), test_rows=True)
+        check = ("✅ All test rows consistent." if not problems
+                 else "❌ %d inconsistency(ies) — copy to Claude:\n%s"
+                 % (len(problems), "\n".join("• " + p for p in problems)))
+    except Exception as e:
+        check = "⚠ consistency check failed: %s" % e
+    await update.message.reply_text(
+        "Test mode: %s\nLive switch: %s\n\nTest rows:\n%s\n\nConsistency:\n%s"
+        % (mode, "ON" if _attendance_live() else "off", body, check))
 
 
 async def cmd_pb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4904,6 +4915,51 @@ async def _auto_audit_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception as e:
             logger.error("auto-audit DM failed: %s", e)
             break
+
+
+async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Test-mode WATCHDOG: while attendance_test_mode is ON, run the invariant audit over the
+    role-play (is_test) rows every 60s and DM the owner the INSTANT a NEW inconsistency appears —
+    de-duped against the previous cycle (one ping per new problem; a ✅ when they clear). Cheap
+    no-op when test mode is off. Catches the SILENT class (a number that didn't update, or updated
+    wrong relative to the buttons pressed). It does NOT know intent — a self-consistent but
+    unintended number won't ping; the owner still eyeballs that."""
+    import json as _json
+    from shared.database import gm_get_state, gm_set_state
+    if not _att_test_mode():
+        if gm_get_state("test_watchdog_last"):
+            gm_set_state("test_watchdog_last", "[]")   # fresh slate for the next walk
+        return
+    from gm_bot.audit import run_audit
+    try:
+        problems, _stats = run_audit(_today_pp(), test_rows=True)
+    except Exception as e:
+        logger.error("test-watchdog audit failed: %s", e)
+        return
+    cur = set(problems)
+    try:
+        prev = set(_json.loads(gm_get_state("test_watchdog_last") or "[]"))
+    except Exception:
+        prev = set()
+    new = cur - prev
+    cleared = prev - cur
+    if new:
+        body = ("🚨 TEST WATCHDOG — %d new inconsistency(ies) just appeared in your test rows "
+                "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in sorted(new))
+        for i in range(0, len(body), 3500):
+            try:
+                await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
+            except Exception:
+                break
+    elif cleared:
+        try:
+            await context.bot.send_message(
+                config.OWNER_TELEGRAM_ID,
+                "✅ Test watchdog: %d issue(s) cleared%s." %
+                (len(cleared), "" if not cur else " (%d still open)" % len(cur)))
+        except Exception:
+            pass
+    gm_set_state("test_watchdog_last", _json.dumps(sorted(cur)))
 
 
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6402,6 +6458,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_auto_audit_job,
                             time=__import__("datetime").time(hour=0, minute=30),
                             name="gm_auto_audit")
+    # test-mode watchdog: every 60s while test mode is ON, audit the role-play rows and DM the owner
+    # the INSTANT a NEW inconsistency appears (de-duped; cheap no-op when test mode is off)
+    app.job_queue.run_repeating(_test_watchdog_job, interval=60, first=20,
+                                name="gm_test_watchdog")
     # bounded reason-nudge ladder (10/20/30): every 5 min, gated
     app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
                                 name="gm_reason_nudge")
