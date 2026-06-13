@@ -51,9 +51,15 @@
 > Owner greenlit an autonomous "next next next" run: do the next best step with no pauses, park any
 > owner-judgment decision here instead of stopping. These are NOT done and NOT urgent — answer when free.
 
-- **Fable red-team of the AL overhaul before go-live lock.** Standing arrangement = Fable reviews the
-  finished build. Steps 1–6 + F14 are being built now; recommend a Fable pass before `attendance_live`
-  flips. (Owner: say when — I can spawn it or you run it.)
+- **Red-team DONE (Jun 13) — but NOT literal Fable.** The `claude-fable-5` model isn't accessible in
+  this environment, so an INDEPENDENT cold-context review (available model) was run instead. Hot path
+  (CAS, advisory-lock races, frozen-map refund, float symmetry, is_test isolation) verified clean.
+  Findings fixed (commit `2763427`): forward short-notice points moved INTO the approve txn (was a
+  crash window); legacy no-map rows excluded from the cancel list (were a silent no-op); 0-cost-day FYI
+  suppressed; **+ a pre-existing bug surfaced & fixed** — `al_cancel_list`/`al_cancel_confirm` had a
+  `_db` NameError (swallowed) so the Cancel-AL list ALWAYS came back empty. Parked low: over-strict
+  same-day hours-AL conflict (#4), non-atomic special-leave grant (#5), PH backfill not needed (#6).
+  **Owner may still want to run the LITERAL Fable** for its broader aperture — say the word.
 - **Marriage/death/birth special-leave timing.** Adding a frozen `deducted_amount` + refund path; these
   already deduct via `al_deduct` at grant. If I also route them through deduct-at-approval semantics it's
   a charge-timing change. Default I'm taking: keep their existing grant-time deduction, just ADD a frozen
