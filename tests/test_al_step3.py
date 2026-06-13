@@ -181,15 +181,16 @@ def test_f14_sequential_same_date_conflict():
         _teardown(sid)
 
 
-def test_f14_rejects_al_on_an_approved_shift_change_day():
+def test_f14_rejects_al_on_a_payback_slot_day():
+    # an approved PAYBACK/OT-rest slot (senior_id NULL, paired with a booking) still BLOCKS AL — its
+    # booking-release isn't auto-safe yet, so AL must not silently strand it (F14 backstop holds here).
     sid = _seed("ZZ_F14_SCDAY", 5.0)
     try:
-        with db._db() as c, c.cursor() as cur:
+        with db._db() as c, c.cursor() as cur:               # senior_id NULL == a payback slot
             cur.execute("INSERT INTO shift_changes (staff_id, when_date, start_min, end_min, "
                         "normal_len, status, is_test) VALUES (%s,%s,480,1020,540,'approved',FALSE)",
                         (sid, "2099-09-10"))
         r = _pending(sid, ["2099-09-10"])
-        # scheduled to WORK that day (approved shift-change) → AL must not approve/deduct
         assert db.al_approve_and_deduct(r, 1.0, {"2099-09-10": 1}, {}) == "conflict"
         assert _al_left(sid) == 5.0
         assert db.al_get_request(r)["status"] == "pending"
@@ -197,6 +198,113 @@ def test_f14_rejects_al_on_an_approved_shift_change_day():
         with db._db() as c, c.cursor() as cur:
             cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
         _teardown(sid)
+
+
+def test_al_approval_supersedes_senior_redefine():
+    # Phase 3b: an approved AL is an AWAY event — it SUPERSEDES a senior WORKING redefine on the same
+    # day (stands it down, no balance pre-settle) instead of conflicting, and hands back a descriptor
+    # for the notify-all.
+    sid = _seed("ZZ_AL_SUPERSEDE_SC", 5.0)
+    try:
+        day = "2099-09-15"
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,%s,360,840,540,'approved',FALSE) "
+                        "RETURNING id", (sid, sid, day))           # a SENIOR redefine (6:00–14:00)
+            sc_id = cur.fetchone()["id"]
+        r = _pending(sid, [day])
+        sup = []
+        new_bal = db.al_approve_and_deduct(r, 1.0, {day: 1}, {}, superseded_out=sup)
+        assert new_bal == 4.0                                      # APPROVED + deducted (not "conflict")
+        assert db.al_get_request(r)["status"] == "approved"
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (sc_id,))
+            assert cur.fetchone()["status"] == "cancelled"         # senior redefine stood down
+        assert len(sup) == 1 and sup[0]["kind"] == "redefine" and sup[0]["id"] == sc_id
+        assert sup[0]["date"] == day and sup[0]["senior_id"] == sid
+        assert sup[0]["start_min"] == 360 and sup[0]["end_min"] == 840   # carries old times for notify
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_al_blocks_when_payback_slot_shares_a_senior_redefine_day():
+    # defensive: a day holding BOTH a senior redefine AND a payback slot still BLOCKS AL (the slot's
+    # booking can't be auto-stranded) — and the senior redefine is left untouched (no partial action).
+    sid = _seed("ZZ_AL_BOTH_DAY", 5.0)
+    try:
+        day = "2099-09-16"
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,%s,360,840,540,'approved',FALSE) "
+                        "RETURNING id", (sid, sid, day))
+            sc_id = cur.fetchone()["id"]
+        db.shift_change_autoapprove(sid, day, 480, 540, 0, "payback")    # senior_id NULL slot
+        r = _pending(sid, [day])
+        assert db.al_approve_and_deduct(r, 1.0, {day: 1}, {}, superseded_out=[]) == "conflict"
+        assert _al_left(sid) == 5.0
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT status FROM shift_changes WHERE id=%s", (sc_id,))
+            assert cur.fetchone()["status"] == "approved"          # senior redefine NOT touched (no partial)
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_al_request_side_allows_senior_redefine_but_blocks_payback():
+    # request-side (al_date_conflict): a SENIOR redefine day is NOT blocked (AL supersedes it at
+    # approval), but a payback slot day IS (paired booking).
+    sid = _seed("ZZ_AL_REQSIDE_SC", 5.0)
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, end_min, "
+                        "normal_len, status, is_test) VALUES (%s,%s,'2099-09-17',360,840,540,'approved',"
+                        "FALSE)", (sid, sid))                       # senior redefine → supersedable
+        db.shift_change_autoapprove(sid, "2099-09-18", 480, 540, 0, "payback")   # payback slot → blocks
+        assert db.al_date_conflict(sid, ["2099-09-17"]) == []       # senior redefine day is free to request
+        assert db.al_date_conflict(sid, ["2099-09-18"]) == ["2099-09-18"]   # payback day blocked
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_al_concurrent_vs_senior_redefine_al_always_wins():
+    """Race an AL-approval against a senior redefine-approval on the SAME staff+date. The shared
+    advisory lock serializes them; AL (AWAY) always wins and the redefine always ends cancelled —
+    whichever ordering the race takes (deterministic over repeats)."""
+    for _ in range(8):
+        sid = _seed("ZZ_AL_RACE_SC", 5.0)
+        try:
+            day = "2099-09-19"
+            with db._db() as c, c.cursor() as cur:
+                cur.execute("INSERT INTO shift_changes (senior_id, staff_id, when_date, start_min, "
+                            "end_min, normal_len, status, is_test) VALUES (%s,%s,%s,360,840,540,"
+                            "'proposed',FALSE) RETURNING id", (sid, sid, day))
+                cid = cur.fetchone()["id"]
+            r = _pending(sid, [day])
+            barrier = threading.Barrier(2)
+            res = {}
+
+            def do_al():
+                barrier.wait(); res["al"] = db.al_approve_and_deduct(r, 1.0, {day: 1}, {}, superseded_out=[])
+
+            def do_sc():
+                barrier.wait(); res["sc"] = db.shift_change_approve_claim(cid)
+
+            ta, ts = threading.Thread(target=do_al), threading.Thread(target=do_sc)
+            ta.start(); ts.start(); ta.join(); ts.join()
+            assert res["al"] == 4.0                                # AL approved + deducted (always wins)
+            assert _al_left(sid) == 4.0
+            with db._db() as c, c.cursor() as cur:
+                cur.execute("SELECT status FROM shift_changes WHERE id=%s", (cid,))
+                assert cur.fetchone()["status"] == "cancelled"     # redefine stood down either ordering
+        finally:
+            with db._db() as c, c.cursor() as cur:
+                cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+            _teardown(sid)
 
 
 def test_f14_shift_change_rejected_when_al_that_day():

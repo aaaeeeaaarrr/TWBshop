@@ -397,3 +397,9 @@ All behind attendance_live=OFF; rare conflict paths. Collected late (the re-swee
 ### SM6 (FUTURE, Phase 4 notify-all — draft only, not yet wired) — "new replaced old".
 - EN: `🔁 {new — date · times · who} replaces {old — date · times · who}` (to supervisors + staff + senior + partner)
 - KH: (to draft with ChatGPT when Phase 4 lands — the verb "ជំនួស/ផ្លាស់ប្តូរ" + the bilingual card form)
+
+### SM7 (WIRED, Phase 3b-i) — AL stood down a senior redefine → notify the senior + Supervisors group.
+Sent by `_announce_supersessions` when an approved AL supersedes a senior shift-redefine on that day.
+VARS: `{name}` = staffer, `{date}` = `Mon 15/09`, `{times}` = ` (6:00–14:00)` or empty.
+- EN: `🔁 {name} took approved AL on {date} — the shift change set for them{times} no longer applies. Please re-arrange cover if needed.`
+- KH (my draft): `🔁 {name} បានយក AL ដែលអនុម័តនៅ {date} — ការប្តូរវេនដែលបានកំណត់ឱ្យ{times} លែងប្រើទៀតហើយ។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។`

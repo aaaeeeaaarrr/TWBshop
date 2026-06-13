@@ -2587,6 +2587,39 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _al_finalize(context, req, approved=True)
 
 
+async def _announce_supersessions(context, victim_name: str, superseded: list) -> None:
+    """Schedule-model notify-all (docs/SCHEDULE_RESOLUTION_MODEL.md, Phase 4 seed): when a newer
+    decision stood older ones down, tell the senior who owned each + the Supervisors group, so a human
+    re-covers (the machine owns balances+truth+telling; humans own coverage). Best-effort + bilingual;
+    never blocks the state change that already committed. Today it handles a stood-down SENIOR redefine
+    (the AL-supersedes-redefine path); other kinds are added as their creation paths get wired."""
+    if not superseded:
+        return
+    from datetime import date as _date
+    allstaff = staff_all("active")
+    for d in superseded:
+        if d.get("kind") != "redefine":
+            continue
+        iso = d.get("date") or ""
+        try:
+            dlabel = _date.fromisoformat(iso).strftime("%a %d/%m")
+        except Exception:
+            dlabel = iso
+        times = ""
+        if d.get("start_min") is not None and d.get("end_min") is not None:
+            times = " (%s–%s)" % (_fmt_min(d["start_min"]), _fmt_min(d["end_min"]))
+        line = ("🔁 %s took approved AL on %s — the shift change set for them%s no longer applies. "
+                "Please re-arrange cover if needed.\n"
+                "🔁 %s បានយក AL ដែលអនុម័តនៅ %s — ការប្តូរវេនដែលបានកំណត់ឱ្យ%s លែងប្រើទៀតហើយ។ "
+                "សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                % (victim_name, dlabel, times, victim_name, dlabel, times))
+        sen = next((s for s in allstaff if s["id"] == d.get("senior_id")), None)
+        if sen:
+            await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                            sen.get("call_name") or sen["canonical_name"], line)
+        await _att_send(context, None, "Supervisors group", "", line, group=True)
+
+
 async def _al_finalize(context, req: dict, approved: bool) -> None:
     """On 2 ✅ or 2 ❌: recap to seniors, notify requester, (if approved) Supervisors notice + deduct."""
     if al_get_request(req["id"])["status"] != "pending":
@@ -2624,7 +2657,9 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         points_map = {} if no_deduct else {
             d: win for d in days
             if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS}
-        new_bal = al_approve_and_deduct(req["id"], total, deducted_map, points_map)
+        superseded: list = []
+        new_bal = al_approve_and_deduct(req["id"], total, deducted_map, points_map,
+                                        superseded_out=superseded)
         if new_bal == "conflict":
             # F14: another approved leave already owns one of these days — never double-book/deduct.
             # Leave the request pending (it's not a senior 'no'); just tell the requester why.
@@ -2692,6 +2727,9 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         await _att_send(context, None, "Supervisors group", "",
             "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s.%s"
             % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True)
+        # schedule model: if this AL stood down a senior shift-redefine, tell that senior + supervisors
+        # so coverage is re-arranged by a human (never a silent revoke). Best-effort, after the verdict.
+        await _announce_supersessions(context, name, superseded)
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,

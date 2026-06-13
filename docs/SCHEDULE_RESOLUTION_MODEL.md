@@ -127,9 +127,17 @@ people**; humans own **coverage**. Auto-rearranging coverage is precisely where 
     proven inverse) + stands down SENIOR redefines (spares payback/OT-rest slots), idempotent, returns
     descriptors for notify-all. NOT yet wired into any creation path.
 - **PHASE 3b — WIRE `supersede_day` into every creation path (the re-sweep map; do each with proof):**
-  - **AL approval** (`_al_finalize`): an approved AL is AWAY-over-working → call `supersede_day` for each
-    AL day to stand down a redefine that day (replaces F14's block for this direction). away-over-working
-    = automatic + announced.
+  - **AL approval** (`_al_finalize`): an approved AL is AWAY-over-working → stand down a senior redefine
+    that day (replaces F14's block for this direction). away-over-working = automatic + announced.
+    **DONE (Phase 3b-i).** Done IN-TXN inside `al_approve_and_deduct` (same advisory lock + claim, so a
+    crash can't deduct-without-superseding), not via the standalone `supersede_day` — a senior redefine
+    pre-settle moves no balance, so the inverse is a pure status flip and belongs in the atomic approve.
+    A payback/OT-rest slot (senior_id NULL) and a swap-work override on the day STILL block (their
+    inverses aren't auto-safe yet); a settled 'done' redefine blocks (locked history). Request-side
+    (`al_date_conflict`) relaxed to match (senior redefine no longer blocks a submit). Notify-all seed
+    `_announce_supersessions` tells the owning senior + Supervisors group ("🔁 X took AL …"). Proven on
+    staging: `test_al_approval_supersedes_senior_redefine`, `..._request_side_allows_senior_redefine…`,
+    `..._concurrent_vs_senior_redefine_al_always_wins` (race, ×8), `..._blocks_when_payback_slot_shares…`.
   - **Sick creation** (the sick flow): make sick an AWAY event (resolver already honours `sick_cases`) +
     `supersede_day` the sick day(s) to stand down a working event; reverse balances; announce.
   - **Special-leave creation** (marriage/death/birth): `supersede_day` across the span (extend the engine

@@ -329,6 +329,20 @@ cross-function "spiderweb" audit (owner asked "is mixing functions safe?").
    Y" → supervisors+staff+senior+partner); 5 = retire silent path; 6 = swap-side. Then evolve laws +
    /audit (S5 extension · `v_one_active_decision` · `v_supersede_reversed`). F14 stays the backstop
    throughout. **Advisor-review of the Bedrock rule additions is parked** (docs/ACTIONS_LEDGER.md).
+   **▶ Phase 3b-i DONE (Jun 13)** — FIRST creation-path wire: **AL approval now SUPERSEDES a senior
+   redefine** (away-over-working, automatic) instead of blocking. Done IN-TXN inside
+   `al_approve_and_deduct` (same advisory lock + claim; a senior redefine moves no balance pre-settle, so
+   its inverse is a pure status flip that belongs in the atomic approve — not the standalone
+   `supersede_day`). A payback/OT-rest slot (senior_id NULL), a swap-work override, and a settled 'done'
+   redefine STILL block (F14 backstop where the inverse isn't auto-safe). `al_date_conflict` (request
+   side) relaxed to match. Notify-all SEED `_announce_supersessions` (`gm_bot/bot.py`) tells the owning
+   senior + Supervisors group ("🔁 X took AL …", KH_REVIEW SM7). Proven on staging: 4 new tests incl. an
+   ×8 race (AL always wins, redefine ends cancelled either ordering). Whole-picture re-swept: every
+   downstream reader ignores cancelled rows + resolve_day protects AL above redefine (belt+suspenders);
+   the reverse-direction guard (`shift_change_approve_claim`) untouched. Suite **569**, /audit unchanged
+   (cleaner). **NOT yet deployed** (gm; attendance_live=OFF → zero live behavior change; batch-deploy at
+   go-live prep / quiet window). NEXT 3b sub-paths: sick · special-leave · the SENSITIVE redefine-approval
+   (senior confirm-revoke) · swap (Phase 6).
 1. **swap ↔ redefine resolution** — folded into the resolver (leave protected; redefine beats day-off/swap).
 2. Senior redefine picker should skip payback/OT-rest-slotted dates (symmetric exclusion); OT-rest picker
    same. 3. Add a **cancel-approved-redefine** action (the real override-alternative). 4. Prod backfill

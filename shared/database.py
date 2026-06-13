@@ -3719,7 +3719,8 @@ def al_deduct(staff_id: int, amount: float) -> float:
             return float(r["al_left"]) if r else 0.0
 
 
-def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_map: dict):
+def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_map: dict,
+                          superseded_out: list | None = None):
     """Atomic approve (state-integrity S1/S2/S3): in ONE transaction claim pending→approved, FREEZE
     the per-day `deducted_map`/`points_map` on the row, and decrement `al_left` RELATIVELY. The frozen
     maps become the single source of truth for the later refund/audit (read back, never recomputed).
@@ -3730,7 +3731,14 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
     NOT approved (no double deduction). The conflict-check + claim are serialized per-staff by an
     advisory xact-lock, so the guarantee holds even under a concurrent-approval race (S3).
     Test-aware: an is_test row flips status + stores the maps but NEVER moves the real `al_left`
-    column (the shown balance overlays the test maps); it returns current − total for display only."""
+    column (the shown balance overlays the test maps); it returns current − total for display only.
+
+    Schedule model (docs/SCHEDULE_RESOLUTION_MODEL.md, Phase 3b): an approved AL is an AWAY event that
+    SUPERSEDES a senior WORKING redefine on the same day — that redefine is stood down in THIS txn (no
+    balance to reverse pre-settle) so exactly one live decision owns the day, and any caller-supplied
+    `superseded_out` list is filled with descriptors for the notify-all. A payback/OT-rest slot
+    (senior_id NULL, paired with a booking), a day-off swap, and a settled 'done' redefine STILL
+    conflict — those inverses aren't auto-safe yet (F14 stays the backstop where unproven)."""
     import json as _json
     J = psycopg2.extras.Json
     dates = set(deducted_map.keys())
@@ -3754,17 +3762,28 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                         pass
                 if claimed & dates:
                     return "conflict"             # another approved AL owns one of these days
-                cur.execute("SELECT 1 FROM shift_changes WHERE staff_id=%s "
-                            "AND status IN ('approved','done') AND is_test=%s "
+                # A SETTLED ('done') redefine is locked history (the day passed) — never re-leave it.
+                cur.execute("SELECT 1 FROM shift_changes WHERE staff_id=%s AND status='done' "
+                            "AND is_test=%s AND when_date = ANY(%s::date[]) LIMIT 1",
+                            (staff_id, is_test, list(dates)))
+                if cur.fetchone():
+                    return "conflict"
+                # A payback/OT-rest SLOT (senior_id NULL, paired with a booking) blocks — releasing the
+                # booking is a separate sub-step, so AL must not silently strand it.
+                cur.execute("SELECT 1 FROM shift_changes WHERE staff_id=%s AND senior_id IS NULL "
+                            "AND status IN ('proposed','approved') AND is_test=%s "
                             "AND when_date = ANY(%s::date[]) LIMIT 1",
                             (staff_id, is_test, list(dates)))
                 if cur.fetchone():
-                    return "conflict"             # an approved shift-change schedules them to WORK that day
+                    return "conflict"             # a booked payback/OT-rest slot owns one of these days
                 cur.execute("SELECT 1 FROM dayoff_overrides WHERE staff_id=%s AND kind='work' "
                             "AND is_test=%s AND the_date = ANY(%s::date[]) LIMIT 1",
                             (staff_id, is_test, list(dates)))
                 if cur.fetchone():
                     return "conflict"             # a day-off SWAP scheduled them to WORK that day
+                # A SENIOR redefine (senior_id set, proposed/approved) is NOT a conflict — AL is an
+                # AWAY event that supersedes a WORKING redefine. It's stood down in THIS txn right after
+                # the claim succeeds (below) and announced, never silently dropped.
             cur.execute("""UPDATE al_requests
                            SET status='approved', deducted_map=%s, points_map=%s, decided_at=NOW()
                            WHERE id=%s AND status='pending'
@@ -3782,6 +3801,20 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                     cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref, is_test) "
                                 "VALUES (%s,'short_notice_al',%s,%s,%s)",
                                 (staff_id, int(q), "al:%d:%s" % (req_id, d), is_test))
+            # AWAY-over-WORKING (schedule model): stand down any SENIOR redefine on these AL days in the
+            # SAME txn (unsettled → no balance to reverse) so exactly one live decision owns the day;
+            # collect descriptors for the notify-all (the senior + supervisors learn coverage changed).
+            if dates:
+                cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s "
+                            "AND when_date = ANY(%s::date[]) AND is_test=%s AND senior_id IS NOT NULL "
+                            "AND status IN ('proposed','approved') "
+                            "RETURNING id, when_date, senior_id, start_min, end_min",
+                            (staff_id, list(dates), is_test))
+                for sc in cur.fetchall():
+                    if superseded_out is not None:
+                        superseded_out.append({"kind": "redefine", "id": sc["id"],
+                                               "date": str(sc["when_date"]), "senior_id": sc["senior_id"],
+                                               "start_min": sc["start_min"], "end_min": sc["end_min"]})
             if is_test:
                 cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
                             (staff_id,))
@@ -3824,8 +3857,12 @@ def al_date_conflict(staff_id: int, dates, exclude_req_id: int | None = None) ->
                     hit |= set(_json.loads(r["days"] or "[]")) & want
                 except Exception:
                     pass
-            cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s "
-                        "AND status IN ('approved','done') AND is_test=%s AND when_date = ANY(%s::date[])",
+            # block a settled 'done' redefine + an approved payback/OT-rest SLOT (senior_id NULL,
+            # paired w/ a booking). A SENIOR redefine (senior_id set) is NOT blocked — AL supersedes it
+            # at approval (schedule model), so the staffer may freely request leave on a redefined day.
+            cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s AND is_test=%s "
+                        "AND when_date = ANY(%s::date[]) "
+                        "AND (status='done' OR (status='approved' AND senior_id IS NULL))",
                         (staff_id, _ATT_TEST, list(want)))
             for r in cur.fetchall():
                 hit.add(str(r["when_date"]))

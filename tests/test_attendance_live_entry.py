@@ -459,7 +459,8 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
         {"decision": "approve", "canonical_name": "B", "call_name": "B"}])
     # finalize now deducts via the atomic approve (flips status + returns new balance)
     monkeypatch.setattr(bot, "al_approve_and_deduct",
-                        lambda i, total, dmap, pmap: g.__setitem__("status", "approved") or 5)
+                        lambda i, total, dmap, pmap, superseded_out=None:
+                        g.__setitem__("status", "approved") or 5)
     monkeypatch.setattr(bot, "_seniors", lambda exclude_staff_id=None: [])
 
     async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
