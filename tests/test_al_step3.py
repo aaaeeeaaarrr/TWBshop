@@ -4,6 +4,7 @@ v_al map-awareness is pure. The daily-job partition and the no_deduct bridge see
 uniquely-named throwaway staff row and tear it down in finally (self-contained, any DB).
 """
 import json
+import threading
 from datetime import date
 
 import psycopg2.extras
@@ -154,6 +155,53 @@ def test_v_special_checks_status_and_frozen_amount():
     assert any("unknown status" in m for m in audit.v_special([bad_status], staff))
     no_amt = {"id": 3, "staff_id": 7, "status": "booked", "deducted_amount": None}
     assert any("frozen deducted_amount" in m for m in audit.v_special([no_amt], staff))
+
+
+def _pending(sid, days):
+    with db._db() as c, c.cursor() as cur:
+        cur.execute("INSERT INTO al_requests (staff_id, kind, days, status, is_test) "
+                    "VALUES (%s,'days',%s,'pending',FALSE) RETURNING id", (sid, json.dumps(days)))
+        return cur.fetchone()["id"]
+
+
+def test_f14_sequential_same_date_conflict():
+    sid = _seed("ZZ_F14_SEQ", 5.0)
+    try:
+        r1 = _pending(sid, ["2099-09-01"])
+        assert db.al_approve_and_deduct(r1, 1.0, {"2099-09-01": 1}, {}) == 4.0
+        # a SECOND AL for the same day must NOT approve or deduct — it stays pending
+        r2 = _pending(sid, ["2099-09-01"])
+        assert db.al_approve_and_deduct(r2, 1.0, {"2099-09-01": 1}, {}) == "conflict"
+        assert _al_left(sid) == 4.0
+        assert db.al_get_request(r2)["status"] == "pending"
+        # a DIFFERENT day still approves fine
+        r3 = _pending(sid, ["2099-09-02"])
+        assert db.al_approve_and_deduct(r3, 1.0, {"2099-09-02": 1}, {}) == 3.0
+    finally:
+        _teardown(sid)
+
+
+def test_f14_concurrent_same_date_exactly_one_wins():
+    """Real two-thread race on staging: two pending AL for the same day approved at once → the
+    advisory xact-lock serializes them so exactly ONE wins and AL is deducted exactly once."""
+    sid = _seed("ZZ_F14_RACE", 5.0)
+    try:
+        r1 = _pending(sid, ["2099-09-03"])
+        r2 = _pending(sid, ["2099-09-03"])
+        barrier = threading.Barrier(2)
+        results = {}
+
+        def go(name, rid):
+            barrier.wait()
+            results[name] = db.al_approve_and_deduct(rid, 1.0, {"2099-09-03": 1}, {})
+
+        t1 = threading.Thread(target=go, args=("a", r1))
+        t2 = threading.Thread(target=go, args=("b", r2))
+        t1.start(); t2.start(); t1.join(); t2.join()
+        assert sorted([str(results["a"]), str(results["b"])]) == ["4.0", "conflict"]
+        assert _al_left(sid) == 4.0   # deducted exactly once despite the race
+    finally:
+        _teardown(sid)
 
 
 def test_create_request_bridges_ph_into_no_deduct():

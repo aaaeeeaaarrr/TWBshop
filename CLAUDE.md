@@ -238,9 +238,10 @@ change); latent init-ordering bug fixed; owner added the `STAGING_DATABASE_URL` 
 verified → lands on twbshop_staging). AL overhaul: Step 1 columns + Step 2 atomic approve/cancel +
 isolation fixes + **Step 3 wired** (deduct-at-approval in `_al_finalize`, exact-refund Cancel-AL,
 daily-job partitioned, `v_al` map-aware, PH→`no_deduct` bridge, S4 confirm), real before/after proof
-on staging + permanent guards (`tests/test_al_atomic.py` + `test_al_step3.py`). Suite 536. Still behind
-attendance_live=OFF — nothing live changed; prod's legacy rows (no map) unaffected. Next: special-leave
-refund path + `v_special`, then Fable red-team before lock.)
+on staging + permanent guards (`tests/test_al_atomic.py` + `test_al_step3.py`). Suite 541. Plus
+special-leave frozen refund + `v_special`, over-balance heads-up, and **F14 core** (atomic same-date AL
+claim, race-proven via advisory lock). Still behind attendance_live=OFF — nothing live changed; prod's
+legacy rows (no map) unaffected. Next: remaining F14 surfaces, then Fable red-team before go-live.)
 
 **(prev) 2026-06-12 (session 32 cont. pt3 — moved Book-payback button to About Me + redesign
 picker (Debt/Booked list); PB booking guard (remaining-only, 15h-day cap, slots never mint OT);
@@ -293,10 +294,18 @@ state-integrity laws** (`docs/STATE_INTEGRITY_LAWS.md`, Rule 6). attendance_live
    stay in sync on death-upgrade, and have a clean idempotent test-aware inverse `special_leave_refund`
    (S1); `v_special` audits status-domain + frozen-amount and is wired into `/audit`. (Prod backfill
    `UPDATE special_leaves SET deducted_amount=days WHERE deducted_amount IS NULL` needed at go-live —
-   parked.) **NEXT (autonomous run):** over-balance senior warning (Fable M1, non-blocking) → **F14
-   guard** (atomic same-date claim) → then **Fable red-team the finished build before lock** (#3 below). Honest: still all behind `attendance_live=OFF` — nothing live changed; deduct-at-approval
-   activates at go-live. Prod still runs the legacy daily-job path (its rows have no map → unaffected).
-3. **F14 guard (Stage 5b)** — atomic same-date collision claim, on the corrected AL base.
+   parked.) **Over-balance heads-up DONE** (Fable M1, non-blocking ⚠ on the Supervisors notice when an
+   approval goes negative). **F14 core DONE (Jun 13):** `al_approve_and_deduct` now serializes per-staff
+   via `pg_advisory_xact_lock(911, staff_id)` and REJECTS (returns `"conflict"`) if another approved AL
+   claims any of the days — `_al_finalize` tells the requester, leaves the request pending. **Race-proven
+   on staging** (two-thread concurrent approval → exactly one wins, deducted once) + sequential tests.
+   Suite **541**. **REMAINING F14 (focused continuation, per design "not a tail"):** request-time UI
+   block (don't offer a day already approved) · collision (b) approved-AL-vs-approved-shift-change ·
+   day-off-swap surface · senior **override** to supersede a conflict. Then **Fable red-team the whole
+   AL build before go-live lock** (parked). Honest: ALL behind `attendance_live=OFF` — nothing live
+   changed; prod's legacy rows (no map) keep the daily-job path.
+3. **F14 guard (Stage 5b)** — core atomic same-date AL claim DONE + race-proven; remaining surfaces
+   (request-time block, shift-change collision, swap, senior override) are the focused continuation.
 Owner standing notes: improve breadth (use Fable as 2nd-opinion on HIGH-RISK; see breadth memory);
 keep appending universal lessons. Decision/history in `docs/ACTIONS_LEDGER.md`.
 

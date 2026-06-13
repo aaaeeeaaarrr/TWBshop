@@ -2588,6 +2588,13 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             d: win for d in days
             if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS}
         new_bal = al_approve_and_deduct(req["id"], total, deducted_map, points_map)
+        if new_bal == "conflict":
+            # F14: another approved leave already owns one of these days — never double-book/deduct.
+            # Leave the request pending (it's not a senior 'no'); just tell the requester why.
+            await _att_send(context, runc[0] if runc else None, "Requester", name,
+                "Couldn't approve — you already have approved leave on one of those days.\n"
+                "មិនអាចអនុម័តបានទេ — ប្អូនមានច្បាប់ឈប់សម្រាកដែលអនុម័តរួចនៅថ្ងៃនោះ។")
+            return
         if new_bal is None:
             return  # lost the claim — another finalize already decided this request
         for d, q in points_map.items():               # live ledger; the frozen map drives the refund

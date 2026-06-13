@@ -3632,13 +3632,36 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
     the per-day `deducted_map`/`points_map` on the row, and decrement `al_left` RELATIVELY. The frozen
     maps become the single source of truth for the later refund/audit (read back, never recomputed).
 
-    Returns the new `al_left` (float) if THIS call won the pending→approved claim, else None — a
-    second finalize, or an already-decided/cancelled row, finds nothing to do (idempotent).
+    Returns the new `al_left` (float) if THIS call won the pending→approved claim; None — a second
+    finalize, or an already-decided/cancelled row, finds nothing to do (idempotent); or the string
+    "conflict" — F14 exclusivity: another approved AL already claims one of these days, so this is
+    NOT approved (no double deduction). The conflict-check + claim are serialized per-staff by an
+    advisory xact-lock, so the guarantee holds even under a concurrent-approval race (S3).
     Test-aware: an is_test row flips status + stores the maps but NEVER moves the real `al_left`
     column (the shown balance overlays the test maps); it returns current − total for display only."""
+    import json as _json
     J = psycopg2.extras.Json
+    dates = set(deducted_map.keys())
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT staff_id, is_test, status FROM al_requests WHERE id=%s", (req_id,))
+            pre = cur.fetchone()
+            if not pre or pre["status"] != "pending":
+                return None                       # lost the claim (already decided / cancelled)
+            staff_id, is_test = pre["staff_id"], bool(pre["is_test"])
+            # serialize concurrent finalizes for THIS staff so the conflict-check + claim is atomic
+            cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, staff_id))
+            if dates:                             # F14: reject a same-date collision before claiming
+                cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
+                            "AND is_test=%s AND id<>%s", (staff_id, is_test, req_id))
+                claimed = set()
+                for r in cur.fetchall():
+                    try:
+                        claimed.update(_json.loads(r["days"] or "[]"))
+                    except Exception:
+                        pass
+                if claimed & dates:
+                    return "conflict"             # another approved AL owns one of these days
             cur.execute("""UPDATE al_requests
                            SET status='approved', deducted_map=%s, points_map=%s, decided_at=NOW()
                            WHERE id=%s AND status='pending'
