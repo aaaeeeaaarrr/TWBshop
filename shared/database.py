@@ -2540,6 +2540,14 @@ def init_attendance_db() -> None:
                 ALTER TABLE points_events      ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
                 ALTER TABLE attendance_sessions ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
                 ALTER TABLE location_pings     ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+                -- session 33: AL deduct-at-approval (Option i). Frozen per-day maps ARE the single
+                -- source of truth for deduct / refund / audit / points-reversal — read back, never
+                -- recomputed. no_deduct = structural PH-comp flag set by the granter (never inferred
+                -- from the reason text). deducted_amount freezes a special leave's charge for refund.
+                ALTER TABLE al_requests   ADD COLUMN IF NOT EXISTS deducted_map JSONB;
+                ALTER TABLE al_requests   ADD COLUMN IF NOT EXISTS points_map JSONB;
+                ALTER TABLE al_requests   ADD COLUMN IF NOT EXISTS no_deduct BOOLEAN DEFAULT FALSE;
+                ALTER TABLE special_leaves ADD COLUMN IF NOT EXISTS deducted_amount NUMERIC;
             """)
 
 
