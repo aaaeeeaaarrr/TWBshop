@@ -899,6 +899,17 @@ def test_sc_card_a2_coverage_both_dates(monkeypatch):
     assert body.count("covers: someone") >= 2                     # X coverage AND Y coverage
 
 
+def test_sc_fyi_text_states_both_dates_for_a2():
+    """1c: the Supervisors FYI for an A2 move states BOTH dates (off X + work Y), not just Y."""
+    import gm_bot.bot as bot
+    a2 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080, "paired_off_date": "2026-07-20"}
+    t = bot._sc_fyi_text(a2, "Anan", "8am-6pm")
+    assert "2026-07-20" in t and "2026-07-22" in t and "OFF" in t
+    a1 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080}    # plain change-time
+    t1 = bot._sc_fyi_text(a1, "Anan", "8am-6pm")
+    assert "2026-07-22" in t1 and "OFF" not in t1
+
+
 def test_a2_cf_arms_shift_with_paired_off(monkeypatch):
     """A2: att:a2:cf arms a 'shift' pending carrying paired_off_date (=X, the new off day) and the
     comp work day Y — so it reuses the whole submit/approve/card machinery."""

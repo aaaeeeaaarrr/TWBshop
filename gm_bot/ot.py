@@ -91,16 +91,25 @@ def rest_redefine(ws_min: int, we_min: int, s_min: int, e_min: int) -> tuple[int
     return None
 
 
+def _fmt_dur(mins: int) -> str:
+    """Compact h/m for a button tag: 75→'1h15', 60→'1h', 45→'45m' (owner, Jun 15: minutes, not decimals
+    like 1.25h)."""
+    h, m = divmod(int(mins), 60)
+    if h and m:
+        return "%dh%02d" % (h, m)
+    return ("%dh" % h) if h else ("%dm" % m)
+
+
 def _ext_tag(pb_cleared: int, ot: int) -> str:
     """Button tag for an extension. Shows BOTH parts when it spans both (owner, Jun 15): an extension
-    that clears 3h of UNBOOKED payback then earns 1h OT reads '+3PB +1OT' — not just the OT half. The
-    caller MUST pass UNBOOKED payback (balance minus already-booked extensions), never the raw debt, or
-    the +PB part is overstated and double-credits."""
+    clearing 1h15 of UNBOOKED payback then earning 45m OT reads '+1h15 PB +45m OT' — not just one half,
+    and in minutes not decimals. The caller MUST pass UNBOOKED payback (balance minus already-booked
+    extensions), never the raw debt, or the +PB part is overstated and double-credits."""
     parts = []
     if pb_cleared > 0:
-        parts.append("+%gPB" % (pb_cleared / 60))
+        parts.append("+%s PB" % _fmt_dur(pb_cleared))
     if ot > 0:
-        parts.append("+%gOT" % (ot / 60))
+        parts.append("+%s OT" % _fmt_dur(ot))
     return " ".join(parts)
 
 

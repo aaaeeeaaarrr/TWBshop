@@ -49,23 +49,25 @@ def test_end_ladder_with_2h_pb():
     got = ot.end_option_tags(780, NORMAL, pb_balance_min=120, step_min=60)
     assert got == [
         (1320, ""),          # 10pm  (normal end)
-        (1380, "+1PB"),      # 11pm  clears 1h debt
-        (1440 % 1440, "+2PB"),  # 12am clears 2h debt  -> minute 0
-        (60, "+2PB +1OT"),   # 1am   2h debt cleared + 1h OT  (combined tag)
-        (120, "+2PB +2OT"),  # 2am   2h debt cleared + 2h OT
+        (1380, "+1h PB"),    # 11pm  clears 1h debt
+        (1440 % 1440, "+2h PB"),  # 12am clears 2h debt  -> minute 0
+        (60, "+2h PB +1h OT"),   # 1am   2h debt cleared + 1h OT  (combined tag, minutes)
+        (120, "+2h PB +2h OT"),  # 2am   2h debt cleared + 2h OT
     ]
 
 
-def test_ext_tag_shows_both_components():
-    # 4h extension over 3h UNBOOKED pb -> "+3PB +1OT" (the owner's example)
-    assert ot._ext_tag(*ot.split_ot_pb(240, 180)) == "+3PB +1OT"
-    assert ot._ext_tag(*ot.split_ot_pb(120, 180)) == "+2PB"      # only PB
-    assert ot._ext_tag(*ot.split_ot_pb(120, 0)) == "+2OT"        # only OT
+def test_ext_tag_shows_both_components_in_minutes():
+    # 4h extension over 3h UNBOOKED pb -> "+3h PB +1h OT"
+    assert ot._ext_tag(*ot.split_ot_pb(240, 180)) == "+3h PB +1h OT"
+    assert ot._ext_tag(*ot.split_ot_pb(120, 180)) == "+2h PB"     # only PB
+    assert ot._ext_tag(*ot.split_ot_pb(120, 0)) == "+2h OT"       # only OT
     assert ot._ext_tag(0, 0) == ""
+    # fractional/odd minutes show as h+m, not decimals (the owner's '1h15' case)
+    assert ot._fmt_dur(75) == "1h15" and ot._fmt_dur(45) == "45m" and ot._fmt_dur(60) == "1h"
 
 def test_end_ladder_no_pb_is_all_ot():
     got = ot.end_option_tags(780, NORMAL, pb_balance_min=0, step_min=60)
-    assert [t for _e, t in got] == ["", "+1OT", "+2OT", "+3OT", "+4OT"]
+    assert [t for _e, t in got] == ["", "+1h OT", "+2h OT", "+3h OT", "+4h OT"]
 
 
 # ---- start options (today clipping) ----

@@ -1887,6 +1887,18 @@ async def _sc_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pass
 
 
+def _sc_fyi_text(g: dict, nm: str, win: str) -> str:
+    """The Supervisors FYI for an approved shift change. For an A2 day-off MOVE (paired_off_date set)
+    it states BOTH dates — OFF X and works Y — never just one (owner, Jun 15: full details to all)."""
+    poff = g.get("paired_off_date")
+    if poff:
+        return ("FYI: %s is now OFF %s and works %s %s.\n"
+                "FYI: %s ឥឡូវឈប់ %s ហើយមកធ្វើការ %s %s។"
+                % (nm, poff, g["when_date"], win, nm, poff, g["when_date"], win))
+    return ("FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
+            % (nm, g["when_date"], win, nm, g["when_date"], win))
+
+
 async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdict: str) -> None:
     """8a-1: replace the proposing senior's '⏳ Awaiting approval' card with the verdict in place, so it
     never sits stale after the staff decides. Best-effort; one-shot (popped)."""
@@ -1894,9 +1906,14 @@ async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdic
     if not coords:
         return
     win = "%s-%s" % (_fmt_min(int(g["start_min"])), _fmt_min(int(g["end_min"])))
-    txt = "🕒 Shift change — %s %s for %s\n%s" % (g["when_date"], win, staff_nm, verdict)
+    poff = g.get("paired_off_date")
+    if poff:   # A2 move — state both dates on the senior's flipped card too
+        head = "🗓 Day-off move — %s OFF %s, works %s %s" % (staff_nm, poff, g["when_date"], win)
+    else:
+        head = "🕒 Shift change — %s %s for %s" % (g["when_date"], win, staff_nm)
     try:
-        await context.bot.edit_message_text(txt, chat_id=coords[0], message_id=coords[1])
+        await context.bot.edit_message_text("%s\n%s" % (head, verdict),
+                                            chat_id=coords[0], message_id=coords[1])
     except Exception:
         pass
 
@@ -1981,8 +1998,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             nm = stf0.get("call_name") or stf0["canonical_name"]
             win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
             await _att_send(context, None, "Supervisors group", "",
-                "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
-                % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+                            _sc_fyi_text(g, nm, win), group=True)
             await _flip_sc_senior_card(context, cid, g, nm,
                 "✅ Approved (AL refunded) · បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)")
         return
@@ -2055,8 +2071,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         nm = staff.get("call_name") or staff["canonical_name"]
         win = "%s-%s" % (_fmt_min(g["start_min"]), _fmt_min(g["end_min"]))
         await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
-            % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+                        _sc_fyi_text(g, nm, win), group=True)
         await _flip_sc_senior_card(context, cid, g, nm, "✅ Approved · បានយល់ព្រម")
 
 
