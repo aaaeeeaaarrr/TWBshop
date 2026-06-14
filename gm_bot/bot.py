@@ -2851,6 +2851,20 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
                 await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                                 sen.get("call_name") or sen["canonical_name"], line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "coexist_move":
+            # 8b (owner): AL landed on an A2 comp-work day — the day-off MOVE stays (she's still off X);
+            # the AL was charged for that work day. Remind her + the Supervisors (full details, both dates).
+            from datetime import date as _date2
+            try:
+                xlabel = _date2.fromisoformat(d.get("paired_off") or "").strftime("%a %d/%m")
+            except Exception:
+                xlabel = d.get("paired_off") or ""
+            line = ("🔁 %s took AL on %s — the day-off move STAYS: they're still OFF on %s. "
+                    "Please re-arrange cover if needed.\n"
+                    "🔁 %s យក AL នៅ %s — ការប្តូរថ្ងៃឈប់នៅដដែល៖ គាត់នៅតែឈប់នៅ %s។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    % (name, dlabel, xlabel, name, dlabel, xlabel))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
         elif d.get("kind") == "al":
             refunded = d.get("refunded") or 0
             line = ("🔁 %s is now away on %s — the AL approved for that day was returned (+%g AL).\n"
@@ -2915,6 +2929,15 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         # frozen per-day charge (keys == days, 0 for day-off/absent/PH-comp) — refund + audit read it
         deducted_map, total = alm.al_deduction_map(days, req["kind"], frac, requester.get("day_off"),
                                                    nw, no_deduct)
+        # 8b (owner, Jun 16): AL on an A2 comp-work day is real leave on a day she WORKS (the move made
+        # her day-off a work day) — CHARGE it even though it's her day-off weekday. The redefine coexists
+        # (not superseded); she stays off X and gets a reminder. PH-comp (no_deduct) never charges.
+        if not no_deduct:
+            from shared.database import al_coexist_days
+            for _cd in al_coexist_days(req["staff_id"], days):
+                if deducted_map.get(_cd) == 0:
+                    deducted_map[_cd] = frac
+            total = round(sum(deducted_map.values()), 2)
         # short-notice penalty FROZEN per day (−0.1/min), judged vs the REQUEST date; none for PH-comp
         from datetime import date as _d
         created = req["created_at"].date() if req.get("created_at") else _today_pp()

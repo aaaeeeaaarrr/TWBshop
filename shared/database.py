@@ -3904,13 +3904,15 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                     cur.execute("INSERT INTO points_events (staff_id, cause, quantity, ref, is_test) "
                                 "VALUES (%s,'short_notice_al',%s,%s,%s)",
                                 (staff_id, int(q), "al:%d:%s" % (req_id, d), is_test))
-            # AWAY-over-WORKING (schedule model): stand down any SENIOR redefine on these AL days in the
-            # SAME txn (unsettled → no balance to reverse) so exactly one live decision owns the day;
-            # collect descriptors for the notify-all (the senior + supervisors learn coverage changed).
+            # Schedule model (owner, Jun 16): an OPTIONAL OT-redefine (NO paired_off_date — work on a
+            # day-off the senior offered) stands DOWN when she takes AL — she's back to her day-off, 0 AL.
+            # An A2 MOVE redefine (paired_off_date set — a committed TRADE) COEXISTS: she takes AL on the
+            # comp day (charged by the caller), stays OFF on X, and gets a reminder. So the supersede here
+            # EXCLUDES paired moves; they're left live and reported as 'coexist_move' for the reminder.
             if dates:
                 cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s "
                             "AND when_date = ANY(%s::date[]) AND is_test=%s AND senior_id IS NOT NULL "
-                            "AND status IN ('proposed','approved') "
+                            "AND paired_off_date IS NULL AND status IN ('proposed','approved') "
                             "RETURNING id, when_date, senior_id, start_min, end_min",
                             (staff_id, list(dates), is_test))
                 for sc in cur.fetchall():
@@ -3918,6 +3920,13 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                         superseded_out.append({"kind": "redefine", "id": sc["id"],
                                                "date": str(sc["when_date"]), "senior_id": sc["senior_id"],
                                                "start_min": sc["start_min"], "end_min": sc["end_min"]})
+                cur.execute("SELECT when_date, paired_off_date FROM shift_changes WHERE staff_id=%s "
+                            "AND when_date = ANY(%s::date[]) AND is_test=%s AND paired_off_date IS NOT NULL "
+                            "AND status IN ('proposed','approved')", (staff_id, list(dates), is_test))
+                for sc in cur.fetchall():
+                    if superseded_out is not None:
+                        superseded_out.append({"kind": "coexist_move", "date": str(sc["when_date"]),
+                                               "paired_off": str(sc["paired_off_date"])})
             if is_test:
                 cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
                             (staff_id,))
@@ -3927,6 +3936,20 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                            WHERE id=%s RETURNING al_left""", (total, staff_id))
             r = cur.fetchone()
             return float(r["al_left"]) if r else 0.0
+
+
+def al_coexist_days(staff_id: int, dates) -> set:
+    """8b (owner, Jun 16): the subset of `dates` that hold a COEXISTING A2 day-off-move redefine
+    (paired_off_date set). AL on these days is real leave on a day she's scheduled to WORK — so it must
+    be CHARGED even though the date is her day-off weekday (the move made it a work day). is_test-scoped."""
+    if not dates:
+        return set()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s AND is_test=%s "
+                        "AND paired_off_date IS NOT NULL AND status IN ('proposed','approved') "
+                        "AND when_date = ANY(%s::date[])", (staff_id, _ATT_TEST, list(dates)))
+            return {str(r["when_date"]) for r in cur.fetchall()}
 
 
 def al_reject(req_id: int) -> bool:

@@ -166,6 +166,46 @@ def test_testseed_clears_children_first_no_fk_crash():
         _teardown(sid)
 
 
+def test_8b_al_on_a2_comp_day_coexists_charges_else_supersedes():
+    """8b (owner): AL on an A2 comp-work day (paired redefine) COEXISTS (redefine kept) + is CHARGED 1
+    + a coexist reminder descriptor; AL on an optional OT-redefine of a day-off SUPERSEDES it + 0 AL."""
+    sid = _seed("ZZ_8B_COEXIST", 10.0)
+    TUE, X = "2026-07-21", "2026-07-23"      # Tuesday = her day-off
+    with db._db() as c, c.cursor() as cur:
+        cur.execute("UPDATE staff_registry SET day_off='Tue', work_start='08:00', work_end='17:00' "
+                    "WHERE id=%s", (sid,))
+
+    def _wipe():
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM al_requests WHERE staff_id=%s", (sid,))
+    try:
+        # A2 move on the Tuesday -> AL coexists + charged 1
+        cidA = db.shift_change_create(sid, sid, TUE, 480, 1020, 540, "move", paired_off_date=X)
+        db.shift_change_approve_claim(cidA)
+        assert db.al_coexist_days(sid, [TUE]) == {TUE}
+        rid = db.al_create_request(sid, "days", [TUE], None, None, "x", None)
+        out = []
+        nb = db.al_approve_and_deduct(rid, 1.0, {TUE: 1.0}, {}, superseded_out=out)
+        assert db.shift_change_get(cidA)["status"] == "approved"          # coexists, not superseded
+        assert any(d["kind"] == "coexist_move" and d["paired_off"] == X for d in out)
+        assert _al_left(sid) == 9.0                                       # charged 1
+        # optional OT redefine (no paired) -> AL supersedes + 0 AL
+        _wipe()
+        cidB = db.shift_change_create(sid, sid, TUE, 480, 1080, 540, "OT", paired_off_date=None)
+        db.shift_change_approve_claim(cidB)
+        assert db.al_coexist_days(sid, [TUE]) == set()
+        rid2 = db.al_create_request(sid, "days", [TUE], None, None, "x", None)
+        out2 = []
+        db.al_approve_and_deduct(rid2, 0.0, {TUE: 0}, {}, superseded_out=out2)
+        assert db.shift_change_get(cidB)["status"] == "cancelled"         # superseded (stood down)
+        assert any(d["kind"] == "redefine" for d in out2) and _al_left(sid) == 9.0
+    finally:
+        _wipe()
+        _teardown(sid)
+
+
 def test_a2_approve_sets_paired_off_atomically():
     """A2 Change-day-off: approving a redefine that carries paired_off_date sets the staffer OFF on X
     in the SAME transaction as the Y redefine approval; an AL on X blocks (conflict)."""
