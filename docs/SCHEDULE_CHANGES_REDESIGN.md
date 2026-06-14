@@ -30,8 +30,8 @@ on purpose — change-time/OT is for *working* days; see the owner's screenshot.
 2. Pick the **day they'll be OFF (X)** within **30 days** (a working day → becomes off).
 3. Pick the **comp work day (Y)** = one of the staff's **day-offs within 7 days before/after X**
    (the day-off they give up to work instead → total days worked unchanged, fair).
-4. Set **Y's hours** start→end, top button **"⏱ Normal times"** (sometimes they cover a *different*
-   window — e.g. what Vannary did — so custom hours must be allowed, not forced normal).
+4. Set **Y's hours** start→end with the **same +PB/+OT end ladder as A1**, top button **"⏱ Normal
+   times"** (custom hours allowed — e.g. what Vannary did — AND they **can extend into OT** to cover).
 5. Reason → submit. **Staff approves**.
 - Card: "Off **X** · works **Y {hours}**" + the **👁 who's-working** toggle on BOTH dates.
 - Coverage: X −1 body, Y +1. A **senior** may decide to accept that shift (authority); the toggle makes
@@ -40,18 +40,36 @@ on purpose — change-time/OT is for *working* days; see the owner's screenshot.
 ### A2 implementation (owner: my chosen approach unless you object)
 - Writes a **shift_change redefine on Y** (carries Y's hours, drives attendance/settle) + a
   **dayoff_override `kind='off'` on X** (the new rest day). resolve_day already handles both kinds.
-- **A2 comp day does NOT mint OT** — it's a fair *move*, normal-length shift (custom hours = retime to
-  cover, same length). If genuine OT is wanted, that's **A1**. (Settle still clamps to real presence.)
+- **A2 comp day CAN extend to OT** (owner, corrected): the end ladder offers +PB/+OT just like A1, so
+  the comp shift can be normal-length OR extended to cover (OT banks at checkout via the redefine).
 
 ## Universal (owner)
 - The **👁 who's-working impact** toggle belongs on **every** schedule-change card — staff AND seniors,
   at every approve/disapprove stage — not just these. (Most already have it; fill any gaps.)
 - A1 and A2 first-step day pickers both extend to **30 days**.
 
-## Parked (come back after the structure)
+## 8a conclusion (so we don't re-litigate)
+- **8a-1 (stale "⏳ Awaiting approval" card):** REAL bug, **folded into this build** — the new A1/A2
+  cards flip the proposer's awaiting card to the verdict in place (no orphan), built correctly from the
+  start. Not a separate task.
+- **8a-2 (incomplete "where did my day off go?"):** **OBSOLETED** by the restructure — A2 makes the
+  day-off move explicit ("Off X · works Y"), so the confusion can't happen. No separate fix.
+
+## Parked (come back after the structure) — ▶ REMIND THE OWNER when we reach 8b
 - **Staff Changes (forever)** approval ladder.
 - **8b leave-vs-commitment refund model** (situations #4–#9: confirm/cancel/refund + notify-all). The new
   A1/A2 plug straight into it later; building the structure first does not lose that work.
+  **Concrete examples to walk through when we build it:**
+  1. *Payback slot:* Chomreun owes 90 min, booked Wed 6–9pm. Requests full-day AL Wed. → Today: blocked.
+     8b: "This AL cancels your payback Wed 6–9pm — 90 min returns to your debt to re-book. Confirm?"
+  2. *OT-rest:* Davy banked 2h, booked it as rest (leave 2h early) Fri. Sick Fri. → 8b: auto-cancel the
+     rest, **+2h back to the bank**, FYI to Davy + Supervisors.
+  3. *Partial hours-AL:* Por has an after-shift payback Thu 6–8pm, takes a 9–11am hours-AL Thu (no time
+     overlap). → 8b "just-cancel" option: still cancel + re-book (with the confirm) — simpler & safe.
+  4. *Swap-work day:* Pisey swapped to work Mon (Heng's off). Requests AL Mon. → 8b: "This AL voids your
+     swap with Heng (you off Mon / Heng off Thu) — Heng is told. Confirm?" → swap voided both ways.
+  5. *Senior OT redefine:* Anan given +2h OT Tue, then takes AL Tue. → AL supersedes it (already happens);
+     the **OT vanishes** (not worked) — the notice states the resulting hours.
 
 ## Build order
 Phase 1 = A1 (mostly restructuring the existing `sc_*` flow). Phase 2 = A2 (new move primitive +

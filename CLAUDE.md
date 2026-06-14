@@ -261,11 +261,16 @@ tested. **DEPLOYED to gm Jun 14 04:50 UTC** (gm-only restart, 11:45 PP safe lull
 gm active + clean startup, on-disk carries the change, other 4 bots untouched). **`attendance_live`=None
 (OFF)** verified post-deploy, `attendance_test_mode`=ON. Test slate **reset + reseeded** (4 AL + 2 debts
 from real), **/audit CLEAN on test AND real rows**. Full punch-list detail → `docs/WALK_FINDINGS.md`.
-**▶ NEXT (owner, interactive — DO NOT flip `attendance_live` until the walk is zero-problems):** re-walk
-in `/test` — **Step 8 collisions** (8a supersede · 8b block on a CLEAN date · 8c confirm-revoke · 8d
-request-side) **+ the NEW swap flow** (pick partner → pick a pairing → reason → partner agree → 2 seniors)
-+ re-check Late/Sick after WF1/2/3. Claude verifies each via DB as you go → `/audit` → `/testreset` →
-THEN flip `attendance_live`.
+**▶ DESIGN PIVOT (Jun 15 brainstorm, locked → `docs/SCHEDULE_CHANGES_REDESIGN.md`):** the Step-8 walk
+surfaced that the old "Give OT / change shift" conflated change-time, work-a-day-off, and full-day. Owner
+redesigned it into **Staff Changes (1 time) → [A1 Change time +OT · A2 Change day off (a real MOVE: off X
+/ work comp-day Y, Y's hours can extend to OT)]** + a parked **Staff Changes (forever)** (all-seniors +
+owner approval). 30-day day pickers, "⏱ Normal times" shortcut (skips end menu), universal 👁 who's-working
+toggle. **8a-1** (stale awaiting card) folds into this build; **8a-2** obsoleted by A2's explicit move.
+**▶ NEXT: BUILD the redesign** — Phase 1 A1, Phase 2 A2 (HIGH-RISK schedule → staging proof + 2nd-opinion),
+then re-walk. **Parked (remind owner):** the **8b leave-vs-commitment refund model** (examples in the spec)
++ Staff-Changes-forever. attendance_live stays OFF until a clean re-walk. *(Earlier Step-8 walk on the OLD
+redefine flow is superseded by this redesign — don't resume that; build A1/A2 instead.)*
 
 **(prev) 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
 no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull
