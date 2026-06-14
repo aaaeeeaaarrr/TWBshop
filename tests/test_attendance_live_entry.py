@@ -875,6 +875,23 @@ def test_flip_sc_senior_card_replaces_awaiting():
     assert 7 not in ctx.bot_data["sc_senior_card"]        # one-shot
 
 
+def test_al_screen_hides_non_working_days(monkeypatch):
+    """8b-1: the AL day picker only offers days she WORKS — her day-offs / swapped-away / already-on-leave
+    days are hidden (kills the pointless '0 AL on an off-day')."""
+    import datetime
+    monkeypatch.setattr(ui, "_today", lambda: datetime.date(2026, 7, 1))
+    monkeypatch.setattr(ui, "_day_context", lambda days: None)
+    monkeypatch.setattr(ui, "al_today_allowed", lambda p: True)
+    # simulate: she WORKS only Wednesdays (weekday 2), away every other day
+    monkeypatch.setattr(ui, "resolve_day",
+                        lambda p, iso, ctx: {"working": datetime.date.fromisoformat(iso).weekday() == 2})
+    p = {"id": 1, "canonical_name": "X", "call_name": "X", "al_left": 5}
+    _, kb = ui.al_screen(p, set(), 0)
+    dates = [b.callback_data.split(":", 3)[3] for row in kb.inline_keyboard for b in row
+             if b.callback_data.startswith("att:al:d:")]
+    assert dates and all(datetime.date.fromisoformat(d).weekday() == 2 for d in dates)
+
+
 def test_sc_card_shows_dayoff_move(monkeypatch):
     """A2: _sc_card with paired_off_date frames it as a MOVE (off X, work Y), not a bare retime."""
     import gm_bot.bot as bot

@@ -1599,11 +1599,22 @@ def al_screen(p: dict, picked: set[str], page: int = 0) -> tuple[str, InlineKeyb
     days = [start + timedelta(days=i) for i in range(28)]
     near_cut = _today() + timedelta(days=6)
     today_iso = _today().isoformat()
+    # 8b-1 (owner, Jun 16): only offer days she ACTUALLY WORKS — hide her real day-offs, swapped-away days,
+    # and days she already has leave. Kills the pointless "0 AL on an off-day". Batched (one _day_context).
+    try:
+        ctx = _day_context([d.isoformat() for d in days])
+    except Exception:
+        ctx = None
     btns = []
     for d in days:
         iso = d.isoformat()
         if iso == today_iso and not al_today_allowed(p):
             continue                     # shift started, never checked in → no AL-today button
+        try:
+            if not resolve_day(p, iso, ctx).get("working"):
+                continue                 # she's away/off that day → not an AL day (fail-open on error)
+        except Exception:
+            pass
         mark = "✅ " if iso in picked else ""
         warn = "⚠ " if d <= near_cut else ""
         btns.append(InlineKeyboardButton(warn + mark + day_label(d), callback_data="att:al:d:%s" % iso))

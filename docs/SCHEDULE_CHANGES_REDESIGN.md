@@ -78,8 +78,34 @@ writes nothing (off only at approval). PROD needs the additive `paired_off_date`
 - Add an /audit backstop: an approved redefine with `paired_off_date` should have a matching `off`
   override on X (catches any partial state — can't happen via the atomic path, but belt+suspenders).
 
+## 8b — LEAVE ON A COMMITTED DAY — DESIGN LOCKED (owner, Jun 16), build next (HIGH-RISK leave/balance)
+Core (owner): **leave is ALWAYS allowed on a day she's scheduled to work — never silently blocked or
+cancelled. Full-detail notices to ALL involved + Supervisors are the DEFAULT (a standing principle, applies
+to future features too).** Pieces:
+1. **AL picker shows only RESOLVED-working days** (hide her real day-offs, swapped-away days, existing
+   leave) — kills "0 AL on an off-day"; lighter code.
+2. **AL deduction is RESOLVE-AWARE** — a day deducts 1 if `resolve_day` says she WORKS it (honouring
+   redefines / overrides / swaps), not by her static day-off weekday. (Today's static `al_day_count` gives
+   0 on a comp-work-day Y that is a day-off weekday — the bug.)
+3. **Behaviour by commitment type** (no one-size supersede):
+   - **A2 move / swap comp-day (a TRADE):** AL → **(A) COEXIST + REMIND** (owner's locked choice). The
+     redefine STAYS, AL deducts 1, X stays off, and she + Supervisors get a reminder: "took AL on Y — still
+     OFF on X." `resolve_day` already protects her as AWAY (no no-show / no stale settle). *(Always-safe,
+     incl. when X already passed. The reverse-the-move option (B) was rejected.)*
+   - **Senior OT-redefine on her DAY-OFF (optional OT, NO paired_off_date):** AL → she's just declining the
+     OT → it **stands down**, she's back to her day-off, **0 AL** (the original 8a — correct HERE). Marker:
+     `paired_off_date IS NULL` + the date is her day-off weekday.
+   - **Payback slot:** AL → **refund** it (returns to unbooked debt, re-bookable) + notify.
+   - **Done/settled day:** still blocked (can't un-work history).
+4. **A2 residuals fold in here:** clear the X off-override when a move reverses; /audit paired↔off backstop.
+Distinguish the trade case from the OT case by `paired_off_date` (A2/swap have it; a plain OT redefine
+doesn't). Build cohesively (picker-filter + resolve-aware deduction are COUPLED) with staging before/after
+proof on a real row + second-opinion. Then the refined step-by-step walk (step 3).
+
 ## Parked (come back after the structure) — ▶ REMIND THE OWNER when we reach 8b
-- **Staff Changes (forever)** approval ladder.
+- **Staff Changes (forever)** approval ladder. The **"view/cancel current changes" senior tool** (=
+  cancel-an-approved-redefine, with N-senior approval) — owner's idea from the walk; also the real way to
+  "revert" a change (not the Normal-times button).
 - **8b leave-vs-commitment refund model** (situations #4–#9: confirm/cancel/refund + notify-all). The new
   A1/A2 plug straight into it later; building the structure first does not lose that work.
   **Concrete examples to walk through when we build it:**
