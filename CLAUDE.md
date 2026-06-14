@@ -249,7 +249,25 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
+**Last updated:** 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
+still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed
+deletes child rows first (no FK crash; staging-proven + regression test) · **WF7** terminal "Booked ✓"
+releases the menu singleton · **WF1** late prompt drops "Supervisors notified ✓" · **WF2** family-sick
+TIMES path confirms AND actually files (was a stub) · **WF3** all family-sick night nudges removed, books
+terminal `'cleared'` · **WF5** partner-swap rebuilt coverage-neutral (pick partner → real-day-off pairings
+≤6 days, override-aware/WF9b; `req_off_date`=partner's day off you take, `partner_off_date`=your day off
+they take; card states cover both ways; engine `swap_approve_claim` unchanged) + pure `payback.swap_pairings`
+tested. **DEPLOYED to gm Jun 14 04:50 UTC** (gm-only restart, 11:45 PP safe lull; HEAD==origin `49ba900`,
+gm active + clean startup, on-disk carries the change, other 4 bots untouched). **`attendance_live`=None
+(OFF)** verified post-deploy, `attendance_test_mode`=ON. Test slate **reset + reseeded** (4 AL + 2 debts
+from real), **/audit CLEAN on test AND real rows**. Full punch-list detail → `docs/WALK_FINDINGS.md`.
+**▶ NEXT (owner, interactive — DO NOT flip `attendance_live` until the walk is zero-problems):** re-walk
+in `/test` — **Step 8 collisions** (8a supersede · 8b block on a CLEAN date · 8c confirm-revoke · 8d
+request-side) **+ the NEW swap flow** (pick partner → pick a pairing → reason → partner agree → 2 seniors)
++ re-check Late/Sick after WF1/2/3. Claude verifies each via DB as you go → `/audit` → `/testreset` →
+THEN flip `attendance_live`.
+
+**(prev) 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
 no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull
 NOT having `STAGING_DATABASE_URL`. Shipped (commits `2cbee41` + `7efc3a9`, pushed, HEAD==origin):
 (1) secrets-sync hole fixed — `bootstrap.py --push-secrets` + a `--sync` guard that won't clobber a
