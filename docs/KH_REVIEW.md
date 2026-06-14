@@ -330,6 +330,17 @@ Reason · មូលហេតុ៖ {reason}
   - `✋ Declined — leave kept` · `បានបដិសេធ — រក្សា AL`
   - `✅ Approved (AL refunded)` · `បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)`
 
+### A2 — Change day off (a real move) — Jun 15
+- **WHO:** seniors (the picker) + the staffer (the move card). **WHEN:** the new A2 flow under Staff
+  Changes; the card is the staffer's approval card. **TONE:** plain, clear. My KH is draft.
+- `Change day off — for whom?` · `ប្តូរថ្ងៃឈប់ — សម្រាប់អ្នកណា?`
+- `{nm} — which day should they be OFF? (next 30 days)` · `{nm} — គួរឈប់សម្រាកថ្ងៃណា? (30 ថ្ងៃខាងមុខ)`
+- `{nm} off {X} — which day-off will they WORK instead? (within 7 days)` · `{nm} ឈប់ {X} — នឹងធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)`
+- `{Y} · their day off` (button) · `{Y} · ថ្ងៃឈប់របស់គេ`
+- `{Y} (their day off) — START time? (or ⏱ Normal times)` · `{Y} — ម៉ោងចាប់ផ្តើម?`
+- prompt `Day-off move — {nm}: OFF {X}, works {Y} {win}{ot}.` · `ប្តូរថ្ងៃឈប់ — {nm}៖ ឈប់ {X}, ធ្វើការ {Y} {win}{ot}។`
+- card `🗓 Day-off move — you're OFF {X}, and you WORK {Y}: {win}` · `🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {X}, ហើយធ្វើការ {Y}៖ {win}`
+
 ### MM1 — prompt superseded (multi-menu fix, piece 2)
 - **WHO reads it:** a staffer who had a reason-prompt open ("type why…") and then started a *second*
   flow that opened its own prompt. The OLD prompt message is edited in place to this line.

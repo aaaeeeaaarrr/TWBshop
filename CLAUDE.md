@@ -274,11 +274,18 @@ one-tap (sets start+end, skips the end menu), end ladder now uses **UNBOOKED** p
 "+3PB +1OT"** tag (fixed `ot._ext_tag` + `sc_end` + `_sc_card`). **8a-1** done: the proposer's "⏳ Awaiting
 approval" card flips to the verdict in place (all 4 branches). Old `sc_mode`/`sc_dayoff_pick` removed. KH
 drafts → `docs/KH_REVIEW.md` (A1 section). Tests added; suite **582**. commits this session.
-**▶ NEXT: BUILD Phase 2 = A2 Change day off** (the real move: off X / work comp-day Y, Y's hours via the
-same start→end ladder incl. OT; writes a redefine on Y + an off-override on X; staff approves) per
-`docs/SCHEDULE_CHANGES_REDESIGN.md`. Then deploy A1+A2 together (quiet window) → owner re-walk → /audit →
-/testreset. **Parked (remind owner):** **8b refund model** (examples in spec) + Staff-Changes-forever.
-attendance_live stays OFF until a clean re-walk.
+**▶ A2 BUILT (Jun 15, NOT deployed):** Change day off — a real MOVE. Senior picks the day to be OFF (X,
+30-day working days) → the comp work day (Y = a day-off within ±7 of X, override-aware) → Y's hours via
+the A1 start→end ladder (Normal-times + OT) → staff approves. Reuses the whole shift_change machinery: the
+Y redefine carries new `paired_off_date=X`; **`shift_change_approve_claim` sets X OFF atomically** with the
+Y approval (`dayoff_overrides kind='off' reason='dayoff_move'`, **staging-proven**). AL on X or Y →
+conflict (refund is parked 8b). Card frames it "Day-off move — OFF X, work Y". Additive `paired_off_date`
+column (on staging; **prod gets it via `init_attendance_db()` at the gm deploy**). Tests added; suite
+**585**. A2 residuals (supersede-cleanup of a move; /audit paired backstop) → folded into 8b/audit, parked.
+**▶ NEXT: DEPLOY A1+A2 together** (gm-only restart, quiet window; the restart runs init → adds the prod
+column) → **verify** → owner **re-walk** the new Staff Changes flow in `/test` → `/audit` → `/testreset`.
+**Parked (remind owner):** **8b refund model** (examples in spec) + Staff-Changes-forever. attendance_live
+stays OFF until a clean re-walk. Spec → `docs/SCHEDULE_CHANGES_REDESIGN.md`.
 
 **(prev) 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
 no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull

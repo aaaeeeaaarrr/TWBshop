@@ -2442,6 +2442,9 @@ def init_attendance_db() -> None:
                     is_test     BOOLEAN DEFAULT FALSE
                 );
                 CREATE INDEX IF NOT EXISTS idx_shift_changes_staff_date ON shift_changes (staff_id, when_date);
+                -- A2 "Change day off" (Jun 15): a redefine on the comp work day Y that is paired with a
+                -- day-off MOVE — on approval the staffer is also set OFF on paired_off_date (X), atomically.
+                ALTER TABLE shift_changes ADD COLUMN IF NOT EXISTS paired_off_date DATE;
                 -- session 28: dated day-off overrides (swaps) — schedule resolvers consult these
                 CREATE TABLE IF NOT EXISTS dayoff_overrides (
                     id        SERIAL PRIMARY KEY,
@@ -3190,15 +3193,19 @@ def ot_buyback_mark_taken(staff_id: int, slot_date: str) -> None:
 
 # ---- session 31: redefine-a-shift lifecycle (see docs/OT_DESIGN.md) ----
 def shift_change_create(senior_id, staff_id, when_date, start_min, end_min,
-                        normal_len, reason) -> int:
+                        normal_len, reason, paired_off_date=None) -> int:
     """A senior PROPOSES a redefined shift for staff on when_date. Status 'proposed' until the staff
-    approves. start_min/end_min are minute-of-day (end_min may exceed 1440 for overnight)."""
+    approves. start_min/end_min are minute-of-day (end_min may exceed 1440 for overnight).
+    `paired_off_date` (A2 Change-day-off): the day the staffer becomes OFF in exchange — set OFF
+    atomically on approval (see shift_change_approve_claim)."""
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO shift_changes
-                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason, is_test)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason, _ATT_TEST))
+                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason,
+                 paired_off_date, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (senior_id, staff_id, when_date, start_min, end_min, normal_len, reason,
+                 paired_off_date, _ATT_TEST))
             return cur.fetchone()["id"]
 
 
@@ -3230,19 +3237,23 @@ def shift_change_approve_claim(change_id: int):
     import json as _json
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT staff_id, when_date, is_test, status FROM shift_changes WHERE id=%s",
-                        (change_id,))
+            cur.execute("SELECT staff_id, when_date, is_test, status, paired_off_date "
+                        "FROM shift_changes WHERE id=%s", (change_id,))
             r = cur.fetchone()
             if not r or r["status"] != "proposed":
                 return False
             staff_id, is_test = r["staff_id"], bool(r["is_test"])
             iso = str(r["when_date"])
+            paired_off = str(r["paired_off_date"]) if r.get("paired_off_date") else None
             cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, staff_id))
+            # A2: an AL on EITHER the comp work day Y or the new off day X means the move can't take
+            # cleanly — treat it as a conflict (the leave-vs-commitment refund is the parked 8b work).
+            conflict_days = {iso} | ({paired_off} if paired_off else set())
             cur.execute("SELECT days FROM al_requests WHERE staff_id=%s AND status='approved' "
                         "AND is_test=%s", (staff_id, is_test))
             for row in cur.fetchall():
                 try:
-                    if iso in _json.loads(row["days"] or "[]"):
+                    if conflict_days & set(_json.loads(row["days"] or "[]")):
                         return "conflict"
                 except Exception:
                     pass
@@ -3250,6 +3261,13 @@ def shift_change_approve_claim(change_id: int):
                         "WHERE id=%s AND status='proposed' RETURNING id", (change_id,))
             if cur.fetchone() is None:
                 return False
+            # A2 (atomic): the move also sets the staffer OFF on X in the SAME transaction, so the
+            # redefine-on-Y and the off-on-X can never half-apply. Idempotent (unique staff_id+date).
+            if paired_off:
+                cur.execute("INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason, is_test) "
+                            "VALUES (%s,%s,'off','dayoff_move',%s) ON CONFLICT (staff_id, the_date) "
+                            "DO UPDATE SET kind='off', reason='dayoff_move'",
+                            (staff_id, paired_off, is_test))
             # make "latest wins" CONCRETE: supersede every OTHER still-live SENIOR redefine for this
             # staff+date so dead rows don't pile up (and don't trip the audit's never-settled law).
             # ONLY senior redefines (senior_id IS NOT NULL) — a payback/OT-rest slot (auto-approved,

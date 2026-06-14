@@ -65,6 +65,19 @@ The +PB/+OT tag on each end-time button MUST be accurate (it's money):
 - **8a-2 (incomplete "where did my day off go?"):** **OBSOLETED** by the restructure — A2 makes the
   day-off move explicit ("Off X · works Y"), so the confusion can't happen. No separate fix.
 
+## A2 BUILD STATUS (Jun 15) — DONE, not deployed
+Built + staging-proven (suite 585). Reuses the whole shift_change submit/approve/card machinery: the
+redefine on Y carries `paired_off_date=X`; `shift_change_approve_claim` sets X OFF (`dayoff_overrides
+kind='off' reason='dayoff_move'`) **atomically** with the Y approval (proven). AL on X or Y → conflict
+(the refund is parked 8b). Card frames it as "Day-off move — OFF X, work Y". `_sc_card` shows it; decline
+writes nothing (off only at approval). PROD needs the additive `paired_off_date` column — added by
+`init_attendance_db()` at the gm deploy (staging already has it).
+**A2 residuals → fold into 8b/audit (parked):**
+- When a leave or another redefine SUPERSEDES the Y redefine, the X off-override should be cleared too
+  (the move reverses). supersede_day doesn't yet know about `paired_off_date`. (Rare; 8b territory.)
+- Add an /audit backstop: an approved redefine with `paired_off_date` should have a matching `off`
+  override on X (catches any partial state — can't happen via the atomic path, but belt+suspenders).
+
 ## Parked (come back after the structure) — ▶ REMIND THE OWNER when we reach 8b
 - **Staff Changes (forever)** approval ladder.
 - **8b leave-vs-commitment refund model** (situations #4–#9: confirm/cancel/refund + notify-all). The new

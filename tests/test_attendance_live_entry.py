@@ -875,6 +875,48 @@ def test_flip_sc_senior_card_replaces_awaiting():
     assert 7 not in ctx.bot_data["sc_senior_card"]        # one-shot
 
 
+def test_sc_card_shows_dayoff_move(monkeypatch):
+    """A2: _sc_card with paired_off_date frames it as a MOVE (off X, work Y), not a bare retime."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    g = {"id": 9, "staff_id": 11, "when_date": "2026-07-22", "start_min": 480, "end_min": 1020,
+         "normal_len": 540, "reason": "cover", "status": "proposed", "paired_off_date": "2026-07-20"}
+    body, _ = bot._sc_card(g, _DAYREC, show_cov=False)
+    assert "Day-off move" in body and "2026-07-20" in body and "2026-07-22" in body
+
+
+def test_a2_cf_arms_shift_with_paired_off(monkeypatch):
+    """A2: att:a2:cf arms a 'shift' pending carrying paired_off_date (=X, the new off day) and the
+    comp work day Y — so it reuses the whole submit/approve/card machinery."""
+    import datetime
+    import config
+    monkeypatch.setattr(ui, "_armed", lambda ctx: True)
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)
+    monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [_DAYREC])
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "S", "call_name": "S"})
+    monkeypatch.setattr(ui, "_today", lambda: datetime.date(2026, 7, 15))
+    edits = []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    q = types.SimpleNamespace(data="att:a2:cf:11:5:7:480:1080", answer=_ans, edit_message_text=_edit,
+                              message=types.SimpleNamespace(message_id=5, chat_id=1))
+    update = types.SimpleNamespace(callback_query=q,
+                                   effective_user=types.SimpleNamespace(id=config.OWNER_TELEGRAM_ID))
+    ud = {"att_persona": 1, "att_live_self": False}
+    asyncio.run(ui.callback(update, types.SimpleNamespace(user_data=ud)))
+    pend = ud.get("att_test_pending", {})
+    assert pend.get("flow") == "shift" and pend.get("staff_id") == 11
+    assert pend.get("paired_off_date") == "2026-07-20"        # X = 2026-07-15 + xidx 5
+    assert pend.get("when_date") == "2026-07-22"              # Y = + yidx 7
+
+
 def test_settle_clamps_to_approved_window(monkeypatch):
     """OT banked at checkout = presence INSIDE the approved [start,end] only. Early arrival /
     lingering past the approved end can't inflate the bank; late arrival still reduces it."""

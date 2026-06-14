@@ -1817,12 +1817,22 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     tag = ot_mod._ext_tag(pb_cleared, ot_min)
     win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
     tagtxt = (" (%s)" % tag) if tag else ""
-    body = ("🕒 Shift change — %s: %s%s\n"
-            "🕒 ប្តូរវេន — %s៖ %s%s\n"
-            "Why · មូលហេតុ៖ %s\n\n"
-            "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
-            "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
-            % (g["when_date"], win, tagtxt, g["when_date"], win, tagtxt, g.get("reason") or "—"))
+    poff = g.get("paired_off_date")
+    if poff:   # A2 Change-day-off: frame it as a MOVE — off X, work Y — not a bare retime
+        body = ("🗓 Day-off move — you're OFF %s, and you WORK %s: %s%s\n"
+                "🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s, ហើយធ្វើការ %s៖ %s%s\n"
+                "Why · មូលហេតុ៖ %s\n\n"
+                "You're paid for the time you work; come early → +10 points ⭐; normal rules apply.\n"
+                "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់ធម្មតានៅតែអនុវត្ត។"
+                % (poff, g["when_date"], win, tagtxt, poff, g["when_date"], win, tagtxt,
+                   g.get("reason") or "—"))
+    else:
+        body = ("🕒 Shift change — %s: %s%s\n"
+                "🕒 ប្តូរវេន — %s៖ %s%s\n"
+                "Why · មូលហេតុ៖ %s\n\n"
+                "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
+                "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
+                % (g["when_date"], win, tagtxt, g["when_date"], win, tagtxt, g.get("reason") or "—"))
     st = g.get("status")
     if st == "approved":
         body += "\n\n✅ Approved · បានយល់ព្រម"
@@ -1879,13 +1889,17 @@ async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdic
 
 
 async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
-                              start_min: int, end_min: int, normal_len: int, reason: str) -> int:
+                              start_min: int, end_min: int, normal_len: int, reason: str,
+                              paired_off_date: str | None = None) -> int:
     """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
     Creates a PROPOSED row and sends the staff an approval card. OT is emergent = worked beyond
     normal_len; normal attendance rules apply to [start,end]. Any extension first clears outstanding
-    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring)."""
+    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring).
+    `paired_off_date` (A2 Change-day-off): the day the staffer becomes OFF in exchange — set OFF
+    atomically on approval inside shift_change_approve_claim."""
     from shared.database import shift_change_create, shift_change_get
-    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len, reason)
+    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len,
+                              reason, paired_off_date=paired_off_date)
     sn = staff.get("call_name") or staff["canonical_name"]
     g = shift_change_get(cid) or {"id": cid, "when_date": when_date, "start_min": start_min,
                                   "end_min": end_min, "normal_len": normal_len, "reason": reason,
@@ -5557,7 +5571,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             await update.message.reply_text("staff not found." if live else "🧪 staff not found.")
             return
         _sc_cid = await submit_shift_change(context, persona, receiver, pend["when_date"],
-                                            pend["start_min"], pend["end_min"], pend["normal_len"], reason)
+                                            pend["start_min"], pend["end_min"], pend["normal_len"], reason,
+                                            paired_off_date=pend.get("paired_off_date"))
         # 8a-1: register the senior's about-to-morph "⏳ Awaiting approval" card so the staff's
         # approve/decline flips it to the verdict in place — no stale "awaiting" left behind.
         _pc, _pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")

@@ -166,6 +166,30 @@ def test_testseed_clears_children_first_no_fk_crash():
         _teardown(sid)
 
 
+def test_a2_approve_sets_paired_off_atomically():
+    """A2 Change-day-off: approving a redefine that carries paired_off_date sets the staffer OFF on X
+    in the SAME transaction as the Y redefine approval; an AL on X blocks (conflict)."""
+    sid = _seed("ZZ_A2_PAIRED", 5.0)
+    X, Y = "2026-07-20", "2026-07-22"
+    try:
+        cid = db.shift_change_create(sid, sid, Y, 480, 1020, 540, "move", paired_off_date=X)
+        assert db.shift_change_approve_claim(cid) is True
+        assert db.shift_change_get(cid)["status"] == "approved"
+        assert db.dayoff_override_for(sid, X) == "off"          # X set off, atomically with Y
+        with db._db() as c, c.cursor() as cur:                  # now an AL on X must conflict
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+            cur.execute("INSERT INTO al_requests (staff_id,kind,days,status,is_test) "
+                        "VALUES (%s,'days',%s,'approved',FALSE)", (sid, json.dumps([X])))
+        cid2 = db.shift_change_create(sid, sid, Y, 480, 1020, 540, "move", paired_off_date=X)
+        assert db.shift_change_approve_claim(cid2) == "conflict"
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM shift_changes WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_special_leave_freezes_amount_and_refunds_idempotently():
     sid = _seed("ZZ_AL_STEP3_SPECIAL", 10.0)
     try:

@@ -1964,6 +1964,100 @@ def _ot_receiver(sid: int, dayidx: int):
     return rec, d, ws, we, is_off, nm
 
 
+# ===== A2: Change day off — a real MOVE (off X · work comp-day Y). docs/SCHEDULE_CHANGES_REDESIGN.md.
+# Reuses the whole shift_change submit/approve/card machinery — it just adds paired_off_date (=X) to the
+# 'shift' pending; on staff approval, X is set OFF atomically with the Y redefine. Callbacks under att:a2:
+def a2_staff_pick(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """A2 step 1 — pick the staffer whose day off is moving."""
+    rows = [_back_row("att:sc1")]
+    rows += [[InlineKeyboardButton(staff_btn_label(r), callback_data="att:a2:x:%d" % r["id"])]
+             for r in staff_sort(_sc_pool())][:35]
+    return _hdr(p, "Change day off — for whom?\nប្តូរថ្ងៃឈប់ — សម្រាប់អ្នកណា?"), \
+        InlineKeyboardMarkup(rows)
+
+
+def a2_offday_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
+    """A2 step 2 — pick the day the staffer will be OFF (X): a working day within 30 days."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    rows = [_back_row("att:sc2")]
+    rows += grid([InlineKeyboardButton(day_label(d), callback_data="att:a2:c:%d:%d" % (sid, i))
+                  for i, d in _sc_workdays(sid)], 2)
+    return _hdr(p, "%s — which day should they be OFF? (next 30 days)\n"
+                   "%s — គួរឈប់សម្រាកថ្ងៃណា? (30 ថ្ងៃខាងមុខ)" % (nm, nm)), InlineKeyboardMarkup(rows)
+
+
+def a2_compday_pick(p: dict, sid: int, xidx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """A2 step 3 — pick the comp WORK day (Y): one of the staffer's day-offs within 7 days of X that
+    they'll work INSTEAD (so total days worked is unchanged). Override-aware (WF9b)."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    nm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "?"
+    X = _today() + timedelta(days=xidx)
+    cands = [d for d in _real_dayoff_dates(rec, X - timedelta(days=7), n_days=15)
+             if abs((d - X).days) <= 7 and d != X and d >= _today()]
+    if not cands:
+        return _hdr(p, "No day off for %s within 7 days of %s (or already changed).\n"
+                       "គ្មានថ្ងៃឈប់សម្រាប់ %s ក្នុង 7 ថ្ងៃនៃ %s ទេ។"
+                    % (nm, day_label(X), nm, day_label(X))), \
+            InlineKeyboardMarkup([_back_row("att:a2:x:%d" % sid)])
+    rows = [_back_row("att:a2:x:%d" % sid)]
+    for y in cands:
+        yidx = (y - _today()).days
+        rows.append([InlineKeyboardButton("%s · their day off" % day_label(y),
+                     callback_data="att:a2:ss:%d:%d:%d" % (sid, xidx, yidx))])
+    return _hdr(p, "%s off %s — which day-off will they WORK instead? (within 7 days)\n"
+                   "%s ឈប់ %s — នឹងធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)"
+                % (nm, day_label(X), nm, day_label(X))), InlineKeyboardMarkup(rows)
+
+
+def a2_start(p: dict, sid: int, xidx: int, yidx: int) -> tuple[str, InlineKeyboardMarkup]:
+    """A2 step 4 — START time for the comp work day Y, with the one-tap Normal-times shortcut."""
+    from gm_bot import ot as ot_mod
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, yidx)
+    normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+    rows = [_back_row("att:a2:c:%d:%d" % (sid, xidx))]
+    if ws is not None and normal_len:
+        end_abs = ws + normal_len
+        rows.append([InlineKeyboardButton(
+            "⏱ Normal times %s–%s · ម៉ោងធម្មតា %s–%s" % (fmt12(ws), fmt12(we % 1440),
+                                                          fmt12(ws), fmt12(we % 1440)),
+            callback_data="att:a2:cf:%d:%d:%d:%d:%d" % (sid, xidx, yidx, ws, end_abs))])
+    rows += grid([InlineKeyboardButton(fmt12(s),
+                  callback_data="att:a2:st:%d:%d:%d:%d" % (sid, xidx, yidx, s))
+                  for s in ot_mod.start_options()], 4)
+    return _hdr(p, "%s (their day off) — START time? (or ⏱ Normal times)\n"
+                   "%s — ម៉ោងចាប់ផ្តើម?" % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
+
+
+def a2_end(p: dict, sid: int, xidx: int, yidx: int, start: int) -> tuple[str, InlineKeyboardMarkup]:
+    """A2 step 5 — END time for Y: the +PB/+OT ladder (UNBOOKED pb, combined tag). Confirm carries
+    BOTH dates (att:a2:cf:{sid}:{xidx}:{yidx}:{start}:{end})."""
+    from gm_bot import ot as ot_mod
+    from gm_bot import payback as pb_mod
+    from shared.database import payback_open_debt, ot_pending_extension_min
+    rec, d, ws, we, is_off, nm = _ot_receiver(sid, yidx)
+    normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+    debt = payback_open_debt(sid)
+    raw = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
+    try:
+        pend = ot_pending_extension_min(sid, d.isoformat())
+    except Exception:
+        pend = 0
+    pbm = pb_mod.unbooked(raw, pend)
+    normal_end = start + normal_len
+    btns = []
+    for extra in range(0, ot_mod.MAX_EXTRA_HOURS * 60 + 1, 60):
+        end_abs = normal_end + extra
+        pb_cleared, ot_m = ot_mod.split_ot_pb(extra, pbm)
+        tag = ot_mod._ext_tag(pb_cleared, ot_m)
+        label = fmt12(end_abs % 1440) + ((" " + tag) if tag else "")
+        btns.append(InlineKeyboardButton(label,
+                    callback_data="att:a2:cf:%d:%d:%d:%d:%d" % (sid, xidx, yidx, start, end_abs)))
+    rows = [_back_row("att:a2:ss:%d:%d:%d" % (sid, xidx, yidx))] + grid(btns, 2)
+    return _hdr(p, "%s — END time? (start %s)\n%s — ម៉ោងបញ្ចប់?"
+                % (day_label(d), fmt12(start), day_label(d))), InlineKeyboardMarkup(rows)
+
+
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / "
                    "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
@@ -2805,8 +2899,44 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(staff_changes_menu(p))
     if action == "scfv":        # Staff Changes (forever) — Phase 2+ (all-senior + owner approval)
         return await show(_coming_soon(p, "Staff Changes (forever)", "att:aw"))
-    if action == "sc2":         # A2 Change day off (a real move) — Phase 2
-        return await show(_coming_soon(p, "Change day off", "att:sc1"))
+    if action == "sc2":         # A2 Change day off (a real move) — pick the staffer
+        return await show(a2_staff_pick(p))
+    if action == "a2":          # A2 Change-day-off picker: x (off-day) → c (comp-day) → ss/st → cf
+        sub = data[2] if len(data) > 2 else ""
+        if sub == "x":
+            return await show(a2_offday_pick(p, int(data[3])))
+        if sub == "c":
+            return await show(a2_compday_pick(p, int(data[3]), int(data[4])))
+        if sub == "ss":
+            return await show(a2_start(p, int(data[3]), int(data[4]), int(data[5])))
+        if sub == "st":
+            return await show(a2_end(p, int(data[3]), int(data[4]), int(data[5]), int(data[6])))
+        if sub == "cf":
+            # att:a2:cf:{sid}:{xidx}:{yidx}:{start}:{end} → arm a 'shift' pending carrying paired_off
+            sid, xidx, yidx, start, end = (int(data[3]), int(data[4]), int(data[5]),
+                                           int(data[6]), int(data[7]))
+            if _armed(context):
+                rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+                normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+                extra = max(0, end - (start + normal_len))
+                X = (_today() + timedelta(days=xidx)).isoformat()
+                Y = (_today() + timedelta(days=yidx)).isoformat()
+                rnm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "the staffer"
+                ot_txt = (" (+%dh OT)" % (extra // 60)) if extra else ""
+                _summ = ("Day-off move — %s: OFF %s, works %s %s-%s%s.\n"
+                         "ប្តូរថ្ងៃឈប់ — %s៖ ឈប់ %s, ធ្វើការ %s %s-%s%s។"
+                         % (rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
+                            fmt12(start), fmt12(end % 1440), ot_txt,
+                            rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
+                            fmt12(start), fmt12(end % 1440), ot_txt))
+                _arm_pending(context, update,
+                    {"flow": "shift", "persona_id": p["id"], "staff_id": sid, "when_date": Y,
+                     "start_min": start, "end_min": end, "normal_len": normal_len,
+                     "paired_off_date": X, "_summary": _summ})
+                return await show(_arm_prompt(p, context, _summ +
+                    "\n\n📝 Type the reason — your next message sends it to them for approval.\n"
+                    "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការយល់ព្រម។", "att:sc2"))
+            return await show(a2_staff_pick(p))
     if action == "scp":   # session 31: unified Give-OT / shift-redefine picker
         sub = data[2] if len(data) > 2 else ""
         if sub == "staff":
