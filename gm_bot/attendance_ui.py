@@ -2958,6 +2958,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
                 extra = max(0, end - (start + normal_len))
                 rnm = (rec or {}).get("call_name") or "the staffer"
+                # 1a (owner): extending the CURRENTLY-running shift (start LOCKED to the running start)
+                # needs no extra senior approval; any other change does. Detect it here.
+                _run = _sc_running(sid)
+                is_ext = bool(_run and _run[0] == tdidx and _run[1] == start)
                 _shift_sum = ("Shift change — %s %s-%s%s for %s."
                               % (day_label(_today() + timedelta(days=tdidx)), fmt12(start),
                                  fmt12(end % 1440), (" (+%dh OT)" % (extra // 60)) if extra else "", rnm))
@@ -2965,7 +2969,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     {"flow": "shift", "persona_id": p["id"], "staff_id": sid,
                      "when_date": (_today() + timedelta(days=tdidx)).isoformat(),
                      "start_min": start, "end_min": end, "normal_len": normal_len,
-                     "_summary": _shift_sum})
+                     "is_extension": is_ext, "_summary": _shift_sum})
                 return await show(_sc_reason_prompt(p, context, sid, tdidx, start, end,
                                                     _shift_sum, show_cov=False))
             return await show(sc_staff_pick(p))

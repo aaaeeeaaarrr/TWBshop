@@ -112,7 +112,7 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
     for r in rows:
         nm = _nm(staff, r["staff_id"])
         st = r["status"]
-        if st not in ("proposed", "approved", "declined", "cancelled", "done"):
+        if st not in ("awaiting_senior", "proposed", "approved", "declined", "cancelled", "done"):
             out.append("OT: %s change #%s unknown status '%s'" % (nm, r["id"], st))
         if st == "done":
             ob = r.get("ot_banked")

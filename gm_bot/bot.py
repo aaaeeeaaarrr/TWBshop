@@ -1918,28 +1918,106 @@ async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdic
         pass
 
 
-async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
-                              start_min: int, end_min: int, normal_len: int, reason: str,
-                              paired_off_date: str | None = None) -> int:
-    """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
-    Creates a PROPOSED row and sends the staff an approval card. OT is emergent = worked beyond
-    normal_len; normal attendance rules apply to [start,end]. Any extension first clears outstanding
-    payback (shown as +PB then +OT). Banking happens at checkout (Phase: completion wiring).
-    `paired_off_date` (A2 Change-day-off): the day the staffer becomes OFF in exchange — set OFF
-    atomically on approval inside shift_change_approve_claim."""
-    from shared.database import shift_change_create, shift_change_get
-    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len,
-                              reason, paired_off_date=paired_off_date)
+async def _sc_send_staff_card(context, cid: int, g: dict, staff: dict) -> None:
+    """Send the staffer their shift-change approval card (and register it so the verdict flips in place)."""
     sn = staff.get("call_name") or staff["canonical_name"]
-    g = shift_change_get(cid) or {"id": cid, "when_date": when_date, "start_min": start_min,
-                                  "end_min": end_min, "normal_len": normal_len, "reason": reason,
-                                  "status": "proposed", "staff_id": staff["id"]}
     body, kb = _sc_card(g, staff, show_cov=False)
-    suid = (staff.get("telegram_ids") or [None])[0]
-    msg = await _att_send(context, suid, "Staff", sn, body, kb=kb)
+    msg = await _att_send(context, (staff.get("telegram_ids") or [None])[0], "Staff", sn, body, kb=kb)
     if msg is not None:
         context.bot_data.setdefault("sc_staff_card", {})[cid] = (msg.chat_id, msg.message_id)
+
+
+def _sc_what(g: dict, sn: str) -> str:
+    win = "%s-%s" % (_fmt_min(int(g["start_min"])), _fmt_min(int(g["end_min"])))
+    poff = g.get("paired_off_date")
+    return (("Day-off move — %s OFF %s, works %s %s" % (sn, poff, g["when_date"], win)) if poff
+            else ("Shift change — %s on %s %s" % (sn, g["when_date"], win)))
+
+
+async def _sc_send_coapprove_card(context, cid: int, g: dict, proposer: dict, staff: dict) -> None:
+    """1a (owner): a SECOND senior must co-approve a schedule change before the staffer is asked. The
+    proposer is excluded; one co-approval moves it to the staff. (Extensions skip this — see caller.)"""
+    sn = staff.get("call_name") or staff["canonical_name"]
+    pn = proposer.get("call_name") or proposer["canonical_name"]
+    what = _sc_what(g, sn)
+    body = ("👀 %s proposes: %s.\nCo-approve? (1 more senior needed before the staffer is asked.)\n"
+            "👀 %s ស្នើ៖ %s។\nយល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)"
+            % (pn, what, pn, what))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Co-approve · យល់ព្រម", callback_data="att:scs:ok:%d" % cid)],
+        [InlineKeyboardButton("❌ No — explain · មិនយល់ព្រម — ពន្យល់", callback_data="att:scs:no:%d" % cid)]])
+    cards = context.bot_data.setdefault("sc_coapprove_cards", {}).setdefault(cid, [])
+    for sen in _seniors(exclude_staff_id=proposer["id"]):
+        m = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
+                            sen.get("call_name") or sen["canonical_name"], body, kb=kb)
+        if m is not None:
+            cards.append((m.chat_id, m.message_id))
+
+
+async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
+                              start_min: int, end_min: int, normal_len: int, reason: str,
+                              paired_off_date: str | None = None, is_extension: bool = False) -> int:
+    """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
+    OT is emergent = worked beyond normal_len. `paired_off_date` (A2): the day the staffer becomes OFF in
+    exchange — set OFF atomically on approval. `is_extension` (owner, Jun 15): extending the CURRENTLY-
+    running shift needs no extra senior approval → straight to the staffer; every OTHER change needs ONE
+    more senior to co-approve first (status 'awaiting_senior' → a senior co-approves → 'proposed' → staff)."""
+    from shared.database import shift_change_create, shift_change_get, shift_change_set_status
+    cid = shift_change_create(senior["id"], staff["id"], when_date, start_min, end_min, normal_len,
+                              reason, paired_off_date=paired_off_date)
+    g = shift_change_get(cid) or {"id": cid, "when_date": when_date, "start_min": start_min,
+                                  "end_min": end_min, "normal_len": normal_len, "reason": reason,
+                                  "status": "proposed", "staff_id": staff["id"],
+                                  "paired_off_date": paired_off_date}
+    if is_extension:
+        await _sc_send_staff_card(context, cid, g, staff)          # no extra approval for a live extension
+    else:
+        shift_change_set_status(cid, "awaiting_senior")
+        await _sc_send_coapprove_card(context, cid, g, senior, staff)
     return cid
+
+
+async def _sc_coapprove_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:scs:ok|no:{cid} — a SECOND senior co-approves (or declines) a schedule change BEFORE the
+    staffer is asked (1a). One co-approval → the staffer gets the card; a 'no' → declined + proposer told.
+    Test: the owner taps as a senior (votes aren't deduped, so one tap suffices)."""
+    from shared.database import shift_change_get, shift_change_set_status
+    query = update.callback_query
+    await query.answer()
+    if not _att_test_mode():
+        sen = staff_get_by_uid(update.effective_user.id)
+        if not sen or not sen.get("is_senior"):
+            return
+    parts = query.data.split(":")
+    act, cid = parts[2], int(parts[3])
+    g = shift_change_get(cid)
+    if not g or g["status"] != "awaiting_senior":
+        return await _expired_toast(query, context,
+                                    update.effective_user.id if update.effective_user else None)
+    staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
+    sn = (staff or {}).get("call_name") or (staff or {}).get("canonical_name", "Staff")
+    proposer = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+    if act == "no":
+        shift_change_set_status(cid, "declined")
+        try:
+            await query.edit_message_text(query.message.text + "\n\n❌ Not co-approved · មិនបានយល់ព្រមរួម")
+        except Exception:
+            pass
+        if proposer:   # tell the proposing senior their change was stopped before the staffer
+            await _att_send(context, (proposer.get("telegram_ids") or [None])[0], "Senior",
+                proposer.get("call_name") or proposer["canonical_name"],
+                "❌ Your change for %s was not co-approved by another senior.\n"
+                "❌ ការផ្លាស់ប្តូររបស់បងសម្រាប់ %s មិនបានយល់ព្រមរួមដោយបងម្នាក់ទៀតទេ។" % (sn, sn))
+        return
+    # co-approved → move to staff
+    shift_change_set_status(cid, "proposed")
+    try:
+        await query.edit_message_text(query.message.text + "\n\n✅ Co-approved — sent to %s · "
+                                      "បានយល់ព្រមរួម — ផ្ញើទៅ %s" % (sn, sn))
+    except Exception:
+        pass
+    if staff:
+        await _sc_send_staff_card(context, cid, shift_change_get(cid), staff)
 
 
 async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5600,7 +5678,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             return
         _sc_cid = await submit_shift_change(context, persona, receiver, pend["when_date"],
                                             pend["start_min"], pend["end_min"], pend["normal_len"], reason,
-                                            paired_off_date=pend.get("paired_off_date"))
+                                            paired_off_date=pend.get("paired_off_date"),
+                                            is_extension=bool(pend.get("is_extension")))
         # 8a-1: register the senior's about-to-morph "⏳ Awaiting approval" card so the staff's
         # approve/decline flips it to the verdict in place — no stale "awaiting" left behind.
         _pc, _pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")
@@ -6436,6 +6515,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_swap_coverage_toggle, pattern=r"^att:swcov:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sc_cov_callback, pattern=r"^att:sccov:"))
+    app.add_handler(CallbackQueryHandler(_sc_coapprove_callback, pattern=r"^att:scs:"))
     app.add_handler(CallbackQueryHandler(_shift_change_callback, pattern=r"^att:sc:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))
     app.add_handler(CallbackQueryHandler(_sick_return_callback, pattern=r"^att:sret:"))

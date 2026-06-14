@@ -899,6 +899,42 @@ def test_sc_card_a2_coverage_both_dates(monkeypatch):
     assert body.count("covers: someone") >= 2                     # X coverage AND Y coverage
 
 
+def test_1a_non_extension_needs_senior_coapproval(monkeypatch):
+    """1a: a normal schedule change goes to 'awaiting_senior' and sends a co-approval card to ANOTHER
+    senior (not the staffer yet); an extension of the running shift goes straight to the staffer."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    staff = {"id": 1, "canonical_name": "X", "call_name": "X", "telegram_ids": [9]}
+    senior = {"id": 2, "canonical_name": "Sen", "call_name": "Sen", "is_senior": True, "telegram_ids": [8]}
+    sen2 = {"id": 3, "canonical_name": "Sen2", "call_name": "Sen2", "is_senior": True, "telegram_ids": [7]}
+    g = {"id": 99, "when_date": "2026-07-22", "start_min": 480, "end_min": 1020, "normal_len": 540,
+         "reason": "x", "status": "proposed", "staff_id": 1, "senior_id": 2, "paired_off_date": None}
+    sets = []
+    monkeypatch.setattr(db, "shift_change_create", lambda *a, **k: 99)
+    monkeypatch.setattr(db, "shift_change_get", lambda cid: dict(g))
+    monkeypatch.setattr(db, "shift_change_set_status", lambda cid, st: (sets.append(st), g.update(status=st)))
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [staff, senior, sen2])
+    monkeypatch.setattr(bot, "_seniors",
+                        lambda exclude_staff_id=None: [s for s in (senior, sen2) if s["id"] != exclude_staff_id])
+    sent = []
+
+    async def _send(context, uid, role, nm, text, group=False, kb=None, **k):
+        sent.append((role, uid))
+        return None
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    ctx = types.SimpleNamespace(bot_data={})
+    # normal change -> awaiting_senior + co-approve card to the OTHER senior (uid 7), NOT the staffer
+    asyncio.run(bot.submit_shift_change(ctx, senior, staff, "2026-07-22", 480, 1020, 540, "x"))
+    assert "awaiting_senior" in sets
+    assert ("Senior", 7) in sent and not any(r == "Staff" for r, _ in sent)
+    # extension -> straight to the staffer, no senior co-approval
+    sent.clear(); sets.clear(); g["status"] = "proposed"
+    asyncio.run(bot.submit_shift_change(ctx, senior, staff, "2026-07-22", 480, 1020, 540, "x",
+                                        is_extension=True))
+    assert "awaiting_senior" not in sets and any(r == "Staff" for r, _ in sent)
+
+
 def test_sc_fyi_text_states_both_dates_for_a2():
     """1c: the Supervisors FYI for an A2 move states BOTH dates (off X + work Y), not just Y."""
     import gm_bot.bot as bot
