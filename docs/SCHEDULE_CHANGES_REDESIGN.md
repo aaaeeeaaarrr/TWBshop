@@ -43,6 +43,16 @@ on purpose — change-time/OT is for *working* days; see the owner's screenshot.
 - **A2 comp day CAN extend to OT** (owner, corrected): the end ladder offers +PB/+OT just like A1, so
   the comp shift can be normal-length OR extended to cover (OT banks at checkout via the redefine).
 
+## END-ladder correctness (A1 + A2 — owner, must-fix during build)
+The +PB/+OT tag on each end-time button MUST be accurate (it's money):
+- **Use UNBOOKED payback, not raw debt.** Today `sc_end` (attendance_ui.py:1941) uses
+  `minutes_owed − minutes_paid` (raw) — it ignores payback already booked elsewhere, so the +PB part can
+  be overstated → double-credit risk. Switch to `pb.unbooked(balance, pending_ext)` (the `_pb_remaining`
+  logic — fresh at the picker).
+- **Show BOTH components when an extension spans both.** Today `ot._ext_tag` returns `+OT` *or* `+PB`,
+  never both. Fix it to render e.g. **"+3PB +1OT"** — 3 unbooked PB hours + 1 OT hour for a 4h extension
+  over 3h unbooked debt. (Verified example from the owner.)
+
 ## Universal (owner)
 - The **👁 who's-working impact** toggle belongs on **every** schedule-change card — staff AND seniors,
   at every approve/disapprove stage — not just these. (Most already have it; fill any gaps.)
@@ -70,6 +80,16 @@ on purpose — change-time/OT is for *working* days; see the owner's screenshot.
      swap with Heng (you off Mon / Heng off Thu) — Heng is told. Confirm?" → swap voided both ways.
   5. *Senior OT redefine:* Anan given +2h OT Tue, then takes AL Tue. → AL supersedes it (already happens);
      the **OT vanishes** (not worked) — the notice states the resulting hours.
+  **Owner refinements (Jun 15) to apply when building 8b:**
+  - **8b.1:** on any cancel of an older commitment, **details ALWAYS go to the Supervisors group** (on top
+    of the involved parties). Supervisors are informed of every change/cancellation.
+  - **8b.3 (hours-AL, refined):** for an *hours*-AL (not a full day) the staffer already knows they kept
+    part of the day, so the message is RESULT-oriented: *"After this change ({details}), you will work
+    only {resulting times} that day — confirm?"* And if the payback/OT slot is **genuinely still extra
+    hours** outside the AL window, it may **stay** (not auto-cancelled) — show that in the resulting
+    picture. (This is smarter than blunt "just cancel everything": keep real extra-hour PB/OT.)
+  - **8b.4:** voiding a swap on a leave tells **the partner AND the Supervisors group** (Supervisors always
+    informed of changes/cancellations).
 
 ## Build order
 Phase 1 = A1 (mostly restructuring the existing `sc_*` flow). Phase 2 = A2 (new move primitive +
