@@ -88,4 +88,54 @@ This is date-derivation (use BOTH people's `day_off`) + the pairing/picker UI + 
   2 senior approvals → Approved → requester + partner + Supervisors notices all routed to owner (test).
   (Earlier confusion: in test mode every party's message routes to the owner — no persona-switch needed;
   the walk instruction was wrong, the build is current.)
-- **Step 8 F14 collision layer:** NOT yet walked (next).
+- **Step 8 F14 collision layer:** PARTIAL — 8a done+verified; 8b mis-fired; 8c/8d not done. Findings WF6–WF9 below.
+
+---
+
+## Step 8 walk (Jun 14) — results + new findings
+
+- **8a Supersede (AWAY beats a planned redefine):** ✅ DONE & DB-VERIFIED. Anan (id 5) took AL on Tue
+  23/06 which carried a senior redefine (9pm–10am). Result on real test rows: `shift_changes` id 19 →
+  **`cancelled`** (superseded ✓); AL request 88 `deducted_map = {'2026-06-23': 0}` → **0 AL deducted**,
+  balance unchanged (7 left). **0 is CORRECT** — 23/06 is Anan's day-off (day_off=Tue), and "Day off =
+  No AL used"; once the redefine stood down, the day reverts to a day-off so no AL is spent. Supersede
+  notices reached the senior (Por) + Supervisors. *(Nuance to remember: superseding a redefine that sat
+  on a day-off costs 0 AL — the number correctly does NOT move.)*
+- **8b Block:** mis-fired — see WF9. The owner tried to book a payback slot on the **redefined** date,
+  which the PB picker excludes by design, so the "PB-slot-blocks-AL" path wasn't exercised. Re-run on a
+  CLEAN (non-redefined, non-day-off) date.
+- **8c Confirm-revoke / 8d Request-side block:** NOT yet walked.
+
+## WF6 — /testseed crashes (FK) once any approval/booking exists — OPEN (real bug, test-harness)
+`attendance_testseed` (`shared/database.py:2627-2628`) deletes `is_test` rows from `al_requests` and
+`payback_debts` **without first deleting their child rows** — `al_approvals` (→al_requests) and
+`payback_bookings` (→payback_debts), neither ON DELETE CASCADE. After any walk that approves an AL (8a)
+or books a PB slot (8b), re-running `/testseed` hits a ForeignKeyViolation and crashes; it keeps
+crashing on every retry (looks "not recognized") until `/testreset`, which deletes child-first via the
+correctly-ordered `_TEST_TABLES`, clears them. **Fix:** seed must delete children first (mirror
+`_TEST_TABLES` order, or `DELETE FROM al_approvals WHERE is_test AND request_id IN (…)` then al_requests;
+same for payback_bookings→payback_debts). **Workaround now:** `/testreset` before `/testseed`.
+
+## WF7 — Terminal "booked ✓" confirmation gets collapsed by the menu singleton — OPEN (real UX bug)
+After booking a PB slot, the harmless terminal confirmation (PB details, no actionable buttons) is the
+edited-in-place picker message, which is STILL registered as the P1 singleton's `att_menu_msg`. The PB
+booking path never calls `_menu_release`, so the next menu-open collapses it to "⤵ Menu continues
+below", destroying the details. Design intent (attendance_ui.py:2304 `_menu_release`) is that terminals
+unregister — the booking paths just don't. **Fix:** call `_menu_release(context)` at terminal
+confirmations (PB booked; audit AL/swap/sick "booked ✓" too). Matches owner's ask: harmless buttonless
+endings must not collapse. *(Owner alt: send terminal as a NEW message that deletes the old menu.)*
+
+## WF8 — (reassurance, NO bug) a senior cannot shorten a shift below normal
+Owner asked: if a senior picks fewer hours, does the staffer owe payback? **No — shortening isn't even
+offered.** `ot.end_option_tags` builds the END ladder starting at `start+normal_len` (the FULL length,
+untagged) and only longer (+PB/+OT). A redefine either MOVES the shift (same length) or EXTENDS it;
+the staffer always works ≥ their normal hours, so a redefine never mints payback debt. No change needed.
+
+## WF9 — PB picker excludes redefined dates (by design) + ignores day-off OVERRIDES (latent) — NOTE/OPEN
+(a) **By design:** `_sc_taken_dates`→`shift_change_upcoming_dates` removes any date holding an approved
+redefine from the PB picker (`bot.py:1465`) — a PB slot IS a redefine and would supersede the existing
+one; the existing extension already pays down debt at checkout. So the owner's "changed date doesn't
+show" is intentional. (b) **Latent gap (deeper):** the picker computes working-days/day-offs from the
+STATIC `staff['day_off']` weekday (`working_days_ahead`/`dayoff_dates_ahead`) and does NOT consult
+`dayoff_overrides` — so after a swap, a traded day-off isn't reflected (could offer a slot on a now-off
+day, or miss a now-working day). Separate from WF1–WF5; fold into the resolver-consistency pass.
