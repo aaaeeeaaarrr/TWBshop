@@ -625,3 +625,117 @@ Vetted ChatGPT's batch against the live code before wiring (real-path read, not 
 - **SM2** has no live string (the flat block was replaced by the SM10 confirm-revoke flow) — nothing to wire.
 
 All behind `attendance_live=OFF`; NOT deployed (batch gm-deploy at go-live prep).
+
+I reviewed the latest uploaded file. The only fresh items needing a native pass are **A1, A2, WF2/WF3, and WF5**; I am not reopening the already-vetted MM/SM block. 
+
+## A1 — Schedule Changes redesign — Change time +OT
+
+🗓 Staff Changes (1 time) · ប្តូរការងារ (1 ដង)
+
+🗓 Staff Changes (forever) · ប្តូរការងារ (រហូត)
+
+⏱ Change time +OT · ប្តូរម៉ោង +OT
+
+📅 Change day off · ប្តូរថ្ងៃឈប់
+
+Staff Changes (1 time) — pick one.
+ប្តូរការងារ (1 ដង) — ជ្រើសមួយ។
+
+Change time +OT — for whom?
+ប្តូរម៉ោង +OT — សម្រាប់អ្នកណា?
+
+Change {nm}'s shift — which work day? (next 30 days)
+ប្តូរវេនរបស់ {nm} — ថ្ងៃធ្វើការណា? (30 ថ្ងៃខាងមុខ)
+
+⏱ Normal times {ws}–{we}
+⏱ ម៉ោងធម្មតា {ws}–{we}
+
+{day} — START time? (or ⏱ Normal times above)
+{day} — ម៉ោងចាប់ផ្តើម? (ឬ ⏱ ម៉ោងធម្មតាខាងលើ)
+
+🚧 {what} — coming next.
+🚧 {what} — នឹងមានពេលក្រោយ។
+
+### Verdict lines
+
+✅ Approved · បានយល់ព្រម
+
+❌ Declined · មិនបានយល់ព្រម
+
+✋ Declined — leave kept · មិនបានយល់ព្រម — រក្សា AL
+
+✅ Approved (AL refunded) · បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)
+
+## A2 — Change day off — real move
+
+Change day off — for whom?
+ប្តូរថ្ងៃឈប់ — សម្រាប់អ្នកណា?
+
+{nm} — which day should they be OFF? (next 30 days)
+{nm} — ត្រូវឱ្យឈប់ថ្ងៃណា? (30 ថ្ងៃខាងមុខ)
+
+{nm} off {X} — which day-off will they WORK instead? (within 7 days)
+{nm} ឈប់ {X} — ត្រូវឱ្យមកធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)
+
+{Y} · their day off
+{Y} · ថ្ងៃឈប់របស់គាត់
+
+{Y} (their day off) — START time? (or ⏱ Normal times)
+{Y} (ថ្ងៃឈប់របស់គាត់) — ម៉ោងចាប់ផ្តើម? (ឬ ⏱ ម៉ោងធម្មតា)
+
+Day-off move — {nm}: OFF {X}, works {Y} {win}{ot}.
+ប្តូរថ្ងៃឈប់ — {nm}៖ ឈប់ {X}, មកធ្វើការ {Y} {win}{ot}។
+
+🗓 Day-off move — you're OFF {X}, and you WORK {Y}: {win}
+🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {X}, ហើយមកធ្វើការ {Y}៖ {win}
+
+OFF {X} — who works (covers)
+ឈប់ {X} — អ្នកធ្វើការជំនួស
+
+WORKS {Y} — who works
+ធ្វើការ {Y} — អ្នកធ្វើការ
+
+## WF2/WF3 — family-sick
+
+Family sick ({who}) — {window}.
+គ្រួសារឈឺ ({who}) — {window}។
+
+FYI: {nm} takes sick leave for their {who} today ({window}).
+FYI: {nm} សុំច្បាប់ឈឺសម្រាប់ {who_kh} ថ្ងៃនេះ ({window})។
+
+FYI: {nm} takes sick leave for their {who} today.
+FYI: {nm} សុំច្បាប់ឈឺសម្រាប់ {who_kh} ថ្ងៃនេះ។
+
+## WF5 — partner-swap redesign
+
+Swap day off — pick WHO to trade with (a different day off, similar shift times). You'll then choose a date-pairing.
+ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្អូនចង់ប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ បន្ទាប់មក ប្អូននឹងជ្រើសគូថ្ងៃ។
+
+Your day off · ថ្ងៃឈប់របស់ប្អូន៖ {day_off}
+
+🔁 you off {their_day} · {partner} off {your_day}
+🔁 ប្អូនឈប់ {their_day} · {partner} ឈប់ {your_day}
+
+Swap with {pn} — pick a pairing. You take their day off, they take yours (≤ 6 days apart, coverage stays even).
+ប្តូរជាមួយ {pn} — ជ្រើសគូថ្ងៃមួយ។ ប្អូនយកថ្ងៃឈប់របស់គាត់ គាត់យកថ្ងៃឈប់របស់ប្អូន (ខុសគ្នាមិនលើស 6 ថ្ងៃ ហើយ coverage នៅស្មើគ្នា)។
+
+No close day-off pairing with {pn} in the next 3 weeks (need ≤6 days apart, a different day off, and neither date already swapped).
+គ្មានគូថ្ងៃឈប់ជិតគ្នាជាមួយ {pn} ក្នុង 3 សប្តាហ៍ខាងមុខទេ (ត្រូវខុសគ្នាមិនលើស 6 ថ្ងៃ, ថ្ងៃឈប់ខុសគ្នា, ហើយថ្ងៃទាំងពីរមិនទាន់បានប្តូររួច)។
+
+Key fixes: I changed **ការផ្លាស់ប្តូរ** to **ប្តូរការងារ** for the menu because it is shorter and more practical for staff. For A2, **“គួរឈប់”** was too soft; **“ត្រូវឱ្យឈប់”** fits a senior-driven schedule change better.
+
+## VETTING OUTCOME — A1/A2/WF2/WF5, WIRED 2026-06-16 (suite 586 green)
+Vetted ChatGPT's batch against the live code + intent (not blind):
+- **REJECTED `ប្តូរការងារ`** for "Staff Changes" — it reads as *change jobs / employment* ("ប្តូរការងារ
+  (រហូត)" = quit/switch jobs forever). Used **`ប្តូរកាលវិភាគ`** ("change schedule") instead — accurate for
+  both sub-options, unambiguous. (Owner-approved.)
+- **WIRED as polished:** `ត្រូវឱ្យឈប់`/`ត្រូវឱ្យមកធ្វើការជំនួស` (senior-directive); the `គាត់` (3rd-person,
+  senior picker) vs `ប្អូន` (staffer card) register split; `អ្នកធ្វើការជំនួស` (who-covers); unified
+  declined → `មិនបានយល់ព្រម`; `មកធ្វើការ`, `នឹងមានពេលក្រោយ`, the START-time `(ឬ ⏱ ម៉ោងធម្មតា…)` suffix;
+  WF5 register → `ប្អូន`/`គាត់`.
+- **CODE FIX (vetting caught a half-English bug):** the family-sick confirms (`famf` + `famtt`) dropped the
+  raw English `{who}` ("child") into the Khmer → now mapped via `_who_kh` (→ `កូន`).
+- **WIDTH RULE:** the WF5 pairing button (date · name · date) + the A2 comp-day button kept **one language**
+  (English) — a bilingual version would overflow phone width.
+- ChatGPT left "coverage" English in a WF5 header; my live code never had it (KH says "ខុសគ្នាមិនលើស 6 ថ្ងៃ")
+  so nothing to change.

@@ -1820,7 +1820,7 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     poff = g.get("paired_off_date")
     if poff:   # A2 Change-day-off: frame it as a MOVE — off X, work Y — not a bare retime
         body = ("🗓 Day-off move — you're OFF %s, and you WORK %s: %s%s\n"
-                "🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s, ហើយធ្វើការ %s៖ %s%s\n"
+                "🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s, ហើយមកធ្វើការ %s៖ %s%s\n"
                 "Why · មូលហេតុ៖ %s\n\n"
                 "You're paid for the time you work; come early → +10 points ⭐; normal rules apply.\n"
                 "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់ធម្មតានៅតែអនុវត្ត។"
@@ -1849,7 +1849,7 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
                 xcov = ""
             parts = []
             if xcov:
-                parts.append("OFF %s — who works (covers) · ឈប់ %s — អ្នកធ្វើការ:\n%s" % (poff, poff, xcov))
+                parts.append("OFF %s — who works (covers) · ឈប់ %s — អ្នកធ្វើការជំនួស:\n%s" % (poff, poff, xcov))
             if cov:
                 parts.append("WORKS %s — who works · ធ្វើការ %s — អ្នកធ្វើការ:\n%s"
                              % (g["when_date"], g["when_date"], cov))
@@ -1953,7 +1953,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 pass
             await _flip_sc_senior_card(context, cid, g,
                 stf0.get("call_name") or stf0["canonical_name"],
-                "✋ Declined — leave kept · បានបដិសេធ — រក្សា AL")
+                "✋ Declined — leave kept · មិនបានយល់ព្រម — រក្សា AL")
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         if sen:
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
@@ -1995,7 +1995,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             except Exception:
                 pass
             await _flip_sc_senior_card(context, cid, g,
-                stf0.get("call_name") or stf0["canonical_name"], "❌ Declined · បានបដិសេធ")
+                stf0.get("call_name") or stf0["canonical_name"], "❌ Declined · មិនបានយល់ព្រម")
         # tell the PROPOSING senior (owner, Jun 11: they were left waiting forever otherwise)
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         stf = stf0

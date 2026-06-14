@@ -1479,9 +1479,9 @@ def about_work_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("📜 Rules · ច្បាប់ហាង", callback_data="att:rules")],
     ]
     if p.get("is_senior"):
-        rows.append([InlineKeyboardButton("🗓 Staff Changes (1 time) · ការផ្លាស់ប្តូរ (1 ដង)",
+        rows.append([InlineKeyboardButton("🗓 Staff Changes (1 time) · ប្តូរកាលវិភាគ (1 ដង)",
                                           callback_data="att:sc1")])
-        rows.append([InlineKeyboardButton("🗓 Staff Changes (forever) · ការផ្លាស់ប្តូរ (រហូត)",
+        rows.append([InlineKeyboardButton("🗓 Staff Changes (forever) · ប្តូរកាលវិភាគ (រហូត)",
                                           callback_data="att:scfv")])
     return _hdr(p, "🧰 About Work"), InlineKeyboardMarkup(rows)
 
@@ -1495,11 +1495,11 @@ def staff_changes_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("📅 Change day off · ប្តូរថ្ងៃឈប់", callback_data="att:sc2")],
     ]
     return _hdr(p, "🗓 Staff Changes (1 time) — pick one.\n"
-                   "ការផ្លាស់ប្តូរ (1 ដង) — ជ្រើសមួយ។"), InlineKeyboardMarkup(rows)
+                   "ប្តូរកាលវិភាគ (1 ដង) — ជ្រើសមួយ។"), InlineKeyboardMarkup(rows)
 
 
 def _coming_soon(p: dict, what: str, back: str) -> tuple[str, InlineKeyboardMarkup]:
-    return _hdr(p, "🚧 %s — coming next.\n🚧 %s — នឹងមកដល់ឆាប់ៗ។" % (what, what)), \
+    return _hdr(p, "🚧 %s — coming next.\n🚧 %s — នឹងមានពេលក្រោយ។" % (what, what)), \
         InlineKeyboardMarkup([_back_row(back)])
 
 
@@ -1720,9 +1720,9 @@ def dayoff_partners(p: dict) -> tuple[str, InlineKeyboardMarkup]:
              for c in staff_sort(cands)[:8]]
     return _hdr(p, "Swap day off — pick WHO to trade with (a different day off, similar shift times). "
                    "You'll then choose a date-pairing.\n"
-                   "ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ "
-                   "បន្ទាប់មកជ្រើសគូកាលបរិច្ឆេទ។\n"
-                   "Your day off · ថ្ងៃឈប់របស់អ្នក៖ %s" % (p.get("day_off") or "?")), \
+                   "ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្អូនចង់ប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ "
+                   "បន្ទាប់មក ប្អូននឹងជ្រើសគូថ្ងៃ។\n"
+                   "Your day off · ថ្ងៃឈប់របស់ប្អូន៖ %s" % (p.get("day_off") or "?")), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1754,8 +1754,8 @@ def dayoff_swap_pairs(p: dict, partner_id: int) -> tuple[str, InlineKeyboardMark
             InlineKeyboardMarkup([_back_row("att:do")])
     return _hdr(p, "Swap with %s — pick a pairing. You take their day off, they take yours "
                    "(≤ 6 days apart, coverage stays even).\n"
-                   "ប្តូរជាមួយ %s — ជ្រើសគូមួយ។ អ្នកយកថ្ងៃឈប់របស់គេ គេយកថ្ងៃឈប់របស់អ្នក "
-                   "(ក្នុង 6 ថ្ងៃ)។" % (pn, pn)), InlineKeyboardMarkup(rows)
+                   "ប្តូរជាមួយ %s — ជ្រើសគូថ្ងៃមួយ។ ប្អូនយកថ្ងៃឈប់របស់គាត់ គាត់យកថ្ងៃឈប់របស់ប្អូន "
+                   "(ខុសគ្នាមិនលើស 6 ថ្ងៃ)។" % (pn, pn)), InlineKeyboardMarkup(rows)
 
 
 def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -1915,7 +1915,7 @@ def sc_start(p: dict, sid: int, tdidx: int) -> tuple[str, InlineKeyboardMarkup]:
     rows += grid([InlineKeyboardButton(fmt12(s), callback_data="att:scp:st:%d:%d:%d" % (sid, tdidx, s))
                   for s in ot_mod.start_options(earliest_min=earliest)], 4)
     return _hdr(p, "%s — START time? (or ⏱ Normal times above)\n"
-                   "%s — ម៉ោងចាប់ផ្តើម?" % (day_label(d), day_label(d))), \
+                   "%s — ម៉ោងចាប់ផ្តើម? (ឬ ⏱ ម៉ោងធម្មតាខាងលើ)" % (day_label(d), day_label(d))), \
         InlineKeyboardMarkup(rows)
 
 
@@ -1984,7 +1984,7 @@ def a2_offday_pick(p: dict, sid: int) -> tuple[str, InlineKeyboardMarkup]:
     rows += grid([InlineKeyboardButton(day_label(d), callback_data="att:a2:c:%d:%d" % (sid, i))
                   for i, d in _sc_workdays(sid)], 2)
     return _hdr(p, "%s — which day should they be OFF? (next 30 days)\n"
-                   "%s — គួរឈប់សម្រាកថ្ងៃណា? (30 ថ្ងៃខាងមុខ)" % (nm, nm)), InlineKeyboardMarkup(rows)
+                   "%s — ត្រូវឱ្យឈប់ថ្ងៃណា? (30 ថ្ងៃខាងមុខ)" % (nm, nm)), InlineKeyboardMarkup(rows)
 
 
 def a2_compday_pick(p: dict, sid: int, xidx: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -2006,7 +2006,7 @@ def a2_compday_pick(p: dict, sid: int, xidx: int) -> tuple[str, InlineKeyboardMa
         rows.append([InlineKeyboardButton("%s · their day off" % day_label(y),
                      callback_data="att:a2:ss:%d:%d:%d" % (sid, xidx, yidx))])
     return _hdr(p, "%s off %s — which day-off will they WORK instead? (within 7 days)\n"
-                   "%s ឈប់ %s — នឹងធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)"
+                   "%s ឈប់ %s — ត្រូវឱ្យមកធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)"
                 % (nm, day_label(X), nm, day_label(X))), InlineKeyboardMarkup(rows)
 
 
@@ -2026,7 +2026,8 @@ def a2_start(p: dict, sid: int, xidx: int, yidx: int) -> tuple[str, InlineKeyboa
                   callback_data="att:a2:st:%d:%d:%d:%d" % (sid, xidx, yidx, s))
                   for s in ot_mod.start_options()], 4)
     return _hdr(p, "%s (their day off) — START time? (or ⏱ Normal times)\n"
-                   "%s — ម៉ោងចាប់ផ្តើម?" % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
+                   "%s (ថ្ងៃឈប់របស់គាត់) — ម៉ោងចាប់ផ្តើម? (ឬ ⏱ ម៉ោងធម្មតា)"
+                % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
 
 
 def a2_end(p: dict, sid: int, xidx: int, yidx: int, start: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -2627,9 +2628,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 _arm_pending(context, update,
                     {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4]})
+                from gm_bot.bot import _who_kh
                 return await show(_confirm_prompt(p, context,
                     "Family sick (%s) — full day. · គ្រួសារឈឺ (%s) ពេញមួយថ្ងៃ។"
-                    % (data[3], data[3]), "att:sp:sick"))
+                    % (data[3], _who_kh(data[3])), "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4]))
         if sub == "famt":
             return await show(sick_family_time_grid(p, data[3], data[4], "from"))
@@ -2644,9 +2646,10 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _arm_pending(context, update,
                     {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4],
                      "window": window})
+                from gm_bot.bot import _who_kh
                 return await show(_confirm_prompt(p, context,
-                    "Family sick (%s) — %s. · គ្រួសារឈឺ (%s) %s។"
-                    % (data[3], window, data[3], window), "att:sp:sick"))
+                    "Family sick (%s) — %s. · គ្រួសារឈឺ (%s) — %s។"
+                    % (data[3], window, _who_kh(data[3]), window), "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4], window))
         if sub == "mar":
             return await show(marriage_menu(p))
@@ -2873,7 +2876,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 ro, po = date.fromisoformat(req_off), date.fromisoformat(partner_off)
                 _swap_sum = ("Day-off swap with %s — you take their day off %s, they take yours %s."
                              % (pn, day_label(ro), day_label(po)))
-                _swap_kh = ("ប្តូរថ្ងៃឈប់ជាមួយ %s — អ្នកយកថ្ងៃឈប់របស់គេ %s, គេយកថ្ងៃឈប់របស់អ្នក %s។"
+                _swap_kh = ("ប្តូរថ្ងៃឈប់ជាមួយ %s — ប្អូនយកថ្ងៃឈប់របស់គាត់ %s, គាត់យកថ្ងៃឈប់របស់ប្អូន %s។"
                             % (pn, day_label(ro), day_label(po)))
                 _arm_pending(context, update,
                     {"flow": "swap", "persona_id": p["id"], "partner_id": partner_id,
@@ -2924,7 +2927,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 rnm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "the staffer"
                 ot_txt = (" (+%dh OT)" % (extra // 60)) if extra else ""
                 _summ = ("Day-off move — %s: OFF %s, works %s %s-%s%s.\n"
-                         "ប្តូរថ្ងៃឈប់ — %s៖ ឈប់ %s, ធ្វើការ %s %s-%s%s។"
+                         "ប្តូរថ្ងៃឈប់ — %s៖ ឈប់ %s, មកធ្វើការ %s %s-%s%s។"
                          % (rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
                             fmt12(start), fmt12(end % 1440), ot_txt,
                             rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
