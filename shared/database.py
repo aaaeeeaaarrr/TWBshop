@@ -2624,6 +2624,14 @@ def attendance_testseed(staff_id: int | None = None) -> dict:
     out = {}
     with _db() as conn:
         with conn.cursor() as cur:
+            # Delete CHILD rows FIRST or the parent DELETE hits a ForeignKeyViolation and crashes the
+            # whole /testseed (al_approvals→al_requests, payback_bookings→payback_debts; created when
+            # the owner approves an AL or books a payback slot during a walk — neither FK cascades).
+            # Match exactly the parents we're about to clear (their is_test + optional staff filter).
+            cur.execute("DELETE FROM al_approvals WHERE is_test=TRUE AND request_id IN "
+                        "(SELECT id FROM al_requests WHERE is_test=TRUE%s)" % sfilt)
+            cur.execute("DELETE FROM payback_bookings WHERE is_test=TRUE AND debt_id IN "
+                        "(SELECT id FROM payback_debts WHERE is_test=TRUE%s)" % sfilt)
             for t in ("al_requests", "payback_debts"):
                 cur.execute("DELETE FROM %s WHERE is_test=TRUE%s" % (t, sfilt))
             out["al_requests"] = _copy_test_rows(cur, "al_requests", "AND status='approved'" + sfilt)

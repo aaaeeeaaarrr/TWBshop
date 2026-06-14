@@ -381,7 +381,9 @@ def test_late_declares_and_notifies_at_pick(monkeypatch):
     assert declares and declares[0][1] == ""              # declared at pick, reason empty
     assert sends and "late" in sends[0].lower()           # heads-up pushed now
     assert ud.get("att_test_pending", {}).get("_declared") is True
-    assert edits and "notified" in edits[0].lower()
+    # WF1: the reason prompt is shown at pick, WITHOUT a staffer-facing "Supervisors notified" line
+    assert edits and "type your reason" in edits[0].lower()
+    assert "notified" not in edits[0].lower()
 
 
 def _dispatch_late(monkeypatch, pend):
@@ -439,6 +441,37 @@ def test_late_dispatch_deletes_stale_prompt(monkeypatch):
         monkeypatch, {"flow": "late", "persona_id": 1, "mins": 30, "_declared": True,
                       "_prompt_chat": 7, "_prompt_msg": 9})
     assert deletes == [(7, 9)]
+
+
+def test_wf2_family_sick_times_arms_confirm(monkeypatch):
+    """WF2: the family-sick TIMES path (famtt) must arm a sick_fam pend (carrying the window) and show
+    a CONFIRM — not the old behaviour where it showed a '✓' stub that never actually filed the case
+    (and gave no mis-tap protection). Mirrors the full-day famf path."""
+    from gm_bot import attendance_ui as ui
+    import config
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)
+    monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    monkeypatch.setattr(ui, "_persona", lambda ctx: {"id": 1, "canonical_name": "X", "call_name": "X",
+                                                     "work_start": "07:00", "work_end": "17:00"})
+    edits = []
+
+    async def _ans(*a, **k):
+        pass
+
+    async def _edit(text, reply_markup=None):
+        edits.append(text)
+
+    q = SimpleNamespace(data="att:sp:famtt:child:2026-06-20:540:720", answer=_ans,
+                        edit_message_text=_edit, message=SimpleNamespace(message_id=5, chat_id=1))
+    update = SimpleNamespace(callback_query=q,
+                             effective_user=SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+                             effective_chat=SimpleNamespace(id=1))
+    ud = {"att_persona": 1, "att_live_self": False}
+    asyncio.run(ui.callback(update, SimpleNamespace(user_data=ud)))
+    pend = ud.get("att_test_pending", {})
+    assert pend.get("flow") == "sick_fam" and pend.get("who") == "child"
+    assert "→" in pend.get("window", "")          # the chosen window is carried for the confirm + FYI
+    assert edits and "Family sick" in edits[0] and "→" in edits[0]   # a CONFIRM, not the silent stub
 
 
 # ── Stage 4d: terminal Main-menu opens a NEW message ──
@@ -515,6 +548,20 @@ def test_menu_release_unregisters():
     ctx = SimpleNamespace(user_data={"att_menu_msg": (1, 7)})
     ui._menu_release(ctx)
     assert "att_menu_msg" not in ctx.user_data
+
+
+def test_wf7_released_terminal_confirmation_survives_next_menu_open():
+    """WF7: a terminal 'Booked ✓' confirmation (the edited menu message) is released from the
+    singleton, so the NEXT menu-open does NOT collapse it to 'continues below' — the booked details
+    stay visible. (PB book + buyback book call _menu_release after their buttonless confirmation.)"""
+    from gm_bot import attendance_ui as ui
+    # the booking confirmation lives on message (1, 30) and was the tracked menu
+    ctx, edits = _claim_ctx(att_menu_msg=(1, 30))
+    ui._menu_release(ctx)                       # what _payback_callback / _ot_buyback_callback now do
+    # owner re-opens the menu → a new message (1, 31)
+    asyncio.run(ui._menu_claim(ctx, SimpleNamespace(chat_id=1, message_id=31)))
+    assert edits == []                          # the terminal confirmation was NOT collapsed
+    assert ctx.user_data["att_menu_msg"] == (1, 31)
 
 
 # ── A1 regression (Fable): the F8 typed-text trap ──

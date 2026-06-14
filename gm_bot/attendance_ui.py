@@ -573,10 +573,6 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     cant_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💪 I can come · ខ្ញុំអាចមក", callback_data="att:drs:noop")],
         [InlineKeyboardButton("🛌 Rest today · សម្រាកថ្ងៃនេះ", callback_data="att:drs:noop")]])
-    nudge_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Coming tomorrow · ស្អែកមកធ្វើការ", callback_data="att:drs:noop")],
-        [InlineKeyboardButton("📝 Can't come — explain · មកមិនបាន — ពន្យល់",
-                              callback_data="att:drs:noop")]])
     return [
         ("① Sick → Me: the anti-fake opener (try to come, see how you feel)",
          "Sorry to hear 😟 Take some medicine and come try — see how you feel at work. "
@@ -616,14 +612,11 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
          _ill(["✅ Coming in tomorrow · ស្អែកមកធ្វើការ"],
               ["📝 Still resting — explain · សម្រាកបន្ត — ពន្យល់"],
               ["⏰ Coming in today at… · ថ្ងៃនេះមកម៉ោង…"])),   # = the real buttons, bilingual
-        ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days)",
+        ("⑩ FAMILY-sick day → SUPERVISORS GROUP informed (no approval gate; burns 1 of 7 yearly days). "
+         "No night nudge — a family-sick entry is one day/window; to add another the staffer re-requests.",
          "FYI: Kimying takes sick leave for their child today.\n"
          "FYI: Kimying សុំច្បាប់ឈឺសម្រាប់កូនថ្ងៃនេះ។", None),
-        ("⑪ FAMILY-sick night nudge — coming is the DEFAULT; staying out costs a typed reason "
-         "the Supervisors read (owner)",
-         "I hope your child is better now 🤍 Are you coming tomorrow?\n"
-         "សង្ឃឹមថា កូន របស់ប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?", nudge_kb),
-        ("⑫ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
+        ("⑪ [→ OWNER] paperless-sick FREQUENCY dossier (pattern, not a single day)",
          "Davy: 3rd paperless sick in 30 days (all Mondays). Pattern flag for your review.\n"
          "(owner-only — English; staff never see this)", None),
     ]
@@ -2525,6 +2518,16 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return await show(sick_family_time_grid(p, data[3], data[4], "to", int(data[5])))
         if sub == "famtt":
             window = "%s → %s" % (fmt12(int(data[5])), fmt12(int(data[6])))
+            # WF2 (owner): the TIMES path must mirror the full-day path — a CONFIRM before booking (a
+            # mis-tapped time button shouldn't book silently), and it must ACTUALLY file the case (the
+            # old famtt only showed a "✓" stub and never booked). Unarmed = preview/walk → stub.
+            if _armed(context):
+                _arm_pending(context, update,
+                    {"flow": "sick_fam", "persona_id": p["id"], "who": data[3], "date": data[4],
+                     "window": window})
+                return await show(_confirm_prompt(p, context,
+                    "Family sick (%s) — %s. · គ្រួសារឈឺ (%s) %s។"
+                    % (data[3], window, data[3], window), "att:sp:sick"))
             return await show(sick_family_stub(p, data[3], data[4], window))
         if sub == "mar":
             return await show(marriage_menu(p))
@@ -2621,13 +2624,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     pass
                 _arm_pending(context, update,
                     {"flow": "late", "persona_id": p["id"], "mins": mins, "_declared": True})
+                # WF1 (owner): no staffer-facing "Supervisors notified ✓" line — go straight to the
+                # reason. The Supervisors GROUP heads-up above still fires; the staffer just doesn't
+                # get told they were reported.
                 return await show(_arm_prompt(p, context,
-                    "Late ~%d min — Supervisors notified ✓ · មកយឺត ~%d នាទី — បានជូនដំណឹងបងៗ ✓\n\n"
                     "📝 Type your reason (added to the heads-up). Share your live location when you "
                     "arrive and I'll work out the payback.\n"
                     "📝 សរសេរមូលហេតុ (បន្ថែមលើដំណឹង)។ ពេលមកដល់ សូមចែករំលែកទីតាំងផ្ទាល់ "
-                    "ខ្ញុំនឹងគណនាម៉ោងសងវិញ។"
-                    % (mins, mins), "att:late"))
+                    "ខ្ញុំនឹងគណនាម៉ោងសងវិញ។",
+                    "att:late"))
             return await show(late_picked(p, mins))
         return await show(late_screen(p))
     if action == "al":

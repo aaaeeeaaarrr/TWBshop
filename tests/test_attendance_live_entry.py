@@ -376,7 +376,7 @@ def test_reason_terminals_format_bilingual(monkeypatch):
     monkeypatch.setattr(_dbmod, "late_declare", lambda *a, **k: 1)
     cases = [
         ("att:scp:cf:11:0:780:1140", "Shift change"),     # shift redefine 1pm-7pm
-        ("att:late:o:30", "30 min"),                       # late ~30 min (2× %d)
+        ("att:late:o:30", "Type your reason"),             # WF1: reason prompt (no minutes line now)
         ("att:sp:mard:2026-06-25", "Marriage leave"),      # marriage 3 days (%d %s %d)
         ("att:sp:famf:mother:2026-06-25", "Family sick"),  # family sick (2× %s)
         ("att:al:full", "AL"),                              # AL full-day suffix
@@ -2072,66 +2072,6 @@ def test_back_at_work_date():
     assert back_at_work_date(days, "Monday", {"2026-06-26"}) == _dt.date(2026, 6, 27)
 
 
-def test_family_sick_nudge_callback(monkeypatch):
-    """The family-sick nudge (built Jun 11, was preview-only): 'again' books tomorrow ONCE
-    (status flips first - a duplicate tap can't double-book) + tells the Supervisors group;
-    'Better' closes the case."""
-    import datetime as _dt
-    import gm_bot.bot as bot
-
-    case = {"id": 7, "staff_id": 1, "who": "child", "status": "open"}
-    created, sets, group_msgs, edits = [], [], [], []
-    monkeypatch.setattr(bot, "sick_get", lambda cid: dict(case))
-    def _set(cid, **kw):
-        sets.append(kw)
-        case.update({k: v for k, v in kw.items() if v is not None})
-    monkeypatch.setattr(bot, "sick_set", _set)
-    monkeypatch.setattr(bot, "sick_create", lambda sid, who, d, st: created.append((sid, who, d, st)))
-    monkeypatch.setattr(bot, "staff_all", lambda st=None: [
-        {"id": 1, "canonical_name": "Sun Kimying", "call_name": "Kimying", "status": "active",
-         "telegram_ids": [9]}])
-    monkeypatch.setattr(bot, "_today_pp", lambda: _dt.date(2026, 6, 11))
-
-    async def _send(ctx, uid, role, nm, text, **k):
-        if k.get("group"):
-            group_msgs.append(text)
-    monkeypatch.setattr(bot, "_att_send", _send)
-
-    class _Q:
-        def __init__(self, data): self.data = data
-        async def answer(self): pass
-        async def edit_message_text(self, t, **k): edits.append(t)
-
-    armed = []
-    monkeypatch.setattr(bot, "_arm_sick_explain",
-                        lambda c, u, fl, cid, sid: armed.append((fl, cid, sid)))
-    staff = {"id": 1, "canonical_name": "Sun Kimying", "call_name": "Kimying",
-             "status": "active", "telegram_ids": [9]}
-    monkeypatch.setattr(bot, "staff_get_by_uid", lambda uid: staff)
-
-    upd = lambda d: types.SimpleNamespace(callback_query=_Q(d),
-                                          effective_user=types.SimpleNamespace(id=9))
-    ctx = types.SimpleNamespace()
-    # owner wording (Jun 11): 'explain' ARMS the typed reason — books NOTHING at tap time
-    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:exp:7"), ctx))
-    assert armed == [("sfam_exp", 7, 1)] and created == []
-    assert any("type the reason" in e for e in edits)
-    # the typed reason (dispatch) books tomorrow + the Supervisors read the reason
-    msg = types.SimpleNamespace(text="grandma can't watch her, doctor again", replies=[])
-    async def _reply(t, **k): msg.replies.append(t)
-    msg.reply_text = _reply
-    dupd = types.SimpleNamespace(message=msg, effective_user=types.SimpleNamespace(id=9))
-    asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
-    assert created == [(1, "child", "2026-06-12", "open")]
-    assert any("grandma" in m for m in group_msgs)   # reason once, after EN+KH lines
-    asyncio.run(bot._att_dispatch(dupd, ctx, {"flow": "sfam_exp", "case_id": 7}, live=True))
-    assert len(created) == 1                                  # status 'extended' → gated
-    # 'Coming tomorrow' → one tap, case cleared
-    case.update(status="open")
-    asyncio.run(bot._sick_family_nudge_callback(upd("att:sfam:ok:7"), ctx))
-    assert case["status"] == "cleared" and any("see you tomorrow" in e for e in edits)
-
-
 def test_rest_redefine_and_buyback_laws():
     """The buyback twin of the mini-shift bug (Jun 11): rest_redefine geometry + the audit laws
     that keep it honest (pairing both ways, stale 'booked', sick chain integrity)."""
@@ -2192,19 +2132,12 @@ def test_reason_nudge_ladder(monkeypatch):
             "nudges": nudges, **extra}}
 
     rows = [at(11, "rej_exp", 0, to_sid=1),                      # -> first nudge
-            at(31, "sfam_exp", 2, case_id=7),                    # -> auto-resolve: book
             at(31, "rej_exp", 2, to_sid=1),                      # -> auto-resolve: drop silently
             at(5, "al", 0)]                                      # not a ladder flow -> untouched
-    saved, cleared, sent_dm, booked = [], [], [], []
+    saved, cleared, sent_dm = [], [], []
     monkeypatch.setattr(db, "flow_pending_reasons", lambda: rows)
     monkeypatch.setattr(db, "flow_save", lambda uid, f, s, d, ttl_min=None: saved.append((uid, d)))
     monkeypatch.setattr(db, "flow_clear", lambda uid: cleared.append(uid))
-    monkeypatch.setattr(bot, "sick_get",
-                        lambda cid: {"id": 7, "staff_id": 1, "who": "child", "status": "open"})
-
-    async def _book(ctx, case, reason):
-        booked.append(reason)
-    monkeypatch.setattr(bot, "_sfam_book", _book)
 
     class _Bot:
         async def send_message(self, chat_id, text, **k):
@@ -2213,8 +2146,7 @@ def test_reason_nudge_ladder(monkeypatch):
     asyncio.run(bot._reason_nudge_job(types.SimpleNamespace(bot=_Bot())))
     assert len(sent_dm) == 1 and sent_dm[0][0] == 111            # exactly one nudge, right uid
     assert saved and saved[0][1]["nudges"] == 1                  # counter persisted
-    assert booked == ["(no reason given — asked 3×)"]            # family books with the marker
-    assert sorted(cleared) == [131, 131] or cleared == [131, 131]  # both 31-min rows cleared
+    assert cleared == [131]                                      # the one 31-min row (rej_exp) cleared
 
 
 def test_rej_exp_relay(monkeypatch):

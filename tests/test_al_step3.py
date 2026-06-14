@@ -128,6 +128,44 @@ def test_daily_job_skips_map_rows_charges_legacy():
         _teardown(sid)
 
 
+def test_testseed_clears_children_first_no_fk_crash():
+    """WF6 regression: /testseed (attendance_testseed) must delete child rows (al_approvals,
+    payback_bookings) BEFORE their parents, or it crashes with a ForeignKeyViolation once a walk
+    has approved an AL or booked a payback slot. Plant the exact shape and assert it survives +
+    is idempotent."""
+    sid = _seed("ZZ_AL_STEP3_TESTSEED", 5.0)
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO al_requests (staff_id, kind, days, status, is_test) "
+                        "VALUES (%s,'days',%s,'approved',TRUE) RETURNING id",
+                        (sid, json.dumps(["2026-06-23"])))
+            rid = cur.fetchone()["id"]
+            cur.execute("INSERT INTO al_approvals (request_id, senior_id, is_test) "
+                        "VALUES (%s,%s,TRUE)", (rid, sid))
+            cur.execute("INSERT INTO payback_debts (staff_id, minutes_owed, minutes_paid, status, "
+                        "is_test) VALUES (%s,60,0,'open',TRUE) RETURNING id", (sid,))
+            did = cur.fetchone()["id"]
+            cur.execute("INSERT INTO payback_bookings (debt_id, staff_id, is_test) "
+                        "VALUES (%s,%s,TRUE)", (did, sid))
+        # would raise ForeignKeyViolation under the old (parent-first) order:
+        db.attendance_testseed(sid)
+        db.attendance_testseed(sid)   # idempotent — the real symptom was repeated crashes
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM al_approvals WHERE is_test=TRUE AND request_id IN "
+                        "(SELECT id FROM al_requests WHERE staff_id=%s)", (sid,))
+            assert cur.fetchone()["n"] == 0
+            cur.execute("SELECT COUNT(*) AS n FROM payback_bookings WHERE is_test=TRUE AND staff_id=%s",
+                        (sid,))
+            assert cur.fetchone()["n"] == 0
+    finally:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM al_approvals WHERE request_id IN "
+                        "(SELECT id FROM al_requests WHERE staff_id=%s)", (sid,))
+            cur.execute("DELETE FROM payback_bookings WHERE staff_id=%s", (sid,))
+            cur.execute("DELETE FROM payback_debts WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
 def test_special_leave_freezes_amount_and_refunds_idempotently():
     sid = _seed("ZZ_AL_STEP3_SPECIAL", 10.0)
     try:
