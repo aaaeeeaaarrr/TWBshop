@@ -286,12 +286,19 @@ column (on staging; **prod gets it via `init_attendance_db()` at the gm deploy**
 `acda3f7`, gm active + clean startup, **`paired_off_date` column PRESENT on prod** (init added it at
 restart), `attendance_live`=None (OFF), test_mode ON, other 4 bots untouched. Test slate **reset +
 reseeded**, **/audit CLEAN** (test + real).
-**▶ NEXT (owner, interactive — DO NOT flip `attendance_live` until zero-problems):** re-walk the **new
-Staff Changes** flow in `/test` — **A1 Change time +OT** (30-day picker, ⏱ Normal-times one-tap, combined
-+PB/+OT tag) + **A2 Change day off** (pick day-to-be-off X → comp work day Y → Y hours → staff approve →
-X set off + Y redefine). Claude DB-verifies each. Then re-check the rest of Step 8 + Late/Sick → `/audit`
-→ `/testreset` → flip `attendance_live`. **Parked (remind owner):** **8b refund model** (examples in
-`docs/SCHEDULE_CHANGES_REDESIGN.md`) + Staff-Changes-forever + A2 supersede-cleanup/audit residuals.
+**▶ KH VETTED + WIRED + DEPLOYED (Jun 16, 5ba1ecd; gm restart 03:3x PP quiet window, verified clean/OFF):**
+the owner's ChatGPT KH pass was vetted against intent (not blind) — **REJECTED `ប្តូរការងារ`** ("change
+jobs") for Staff Changes → **`ប្តូរកាលវិភាគ`** ("change schedule"); wired the genuine improvements (register
+split `គាត់`/`ប្អូន`, `ត្រូវឱ្យឈប់`, `អ្នកធ្វើការជំនួស`, unified `មិនបានយល់ព្រម`, etc.); vetting also CAUGHT a
+half-English bug (family-sick confirms printed English `{who}` → now `_who_kh`). Plus the **A2 both-date 👁
+coverage** on the card. Record → `docs/KH_REVIEW.md` VETTING OUTCOME. **Walk path now has ZERO draft/
+untranslated strings.** Suite 586.
+**▶ NEXT (owner, interactive — DO NOT flip `attendance_live` until zero-problems): RE-WALK now.** The new
+**Staff Changes** flow is live in `/test` — **A1 Change time +OT** (30-day picker, ⏱ Normal-times one-tap,
+combined +PB/+OT tag) + **A2 Change day off** (day-to-be-off X → comp work day Y → Y hours → staff approve
+→ X set off + Y redefine, atomic). Claude DB-verifies each. Then re-check the rest of Step 8 + Late/Sick →
+`/audit` → `/testreset` → flip `attendance_live`. **Parked (remind owner):** **8b refund model** (examples
+in `docs/SCHEDULE_CHANGES_REDESIGN.md`) + Staff-Changes-forever + A2 supersede-cleanup/audit residuals.
 
 **(prev) 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
 no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull
