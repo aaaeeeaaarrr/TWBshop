@@ -3,6 +3,19 @@
 Punch-list from the owner's pre-go-live `/test` role-play as **PISEY**. Behind `attendance_live=OFF`.
 Status legend: **OPEN** (to build) · **DONE** (built+proven) · **NOTE** (no code change).
 
+**▶ BATCH BUILT (not yet deployed) — session, all behind attendance_live=OFF, suite 578 green:**
+WF6·WF7·WF1·WF2·WF3 (commit 8a51a08) + WF5·WF9b. NEXT = one gm redeploy in a quiet window → owner
+re-walk (incl. Step 8 with the new swap) → `/audit` → `/testreset` → flip `attendance_live`.
+- **WF1 DONE** — late prompt drops the "Supervisors notified ✓" line (group heads-up stays).
+- **WF2 DONE** — family-sick TIMES path now confirms AND actually files (was a stub that never booked).
+- **WF3 DONE** — all family-sick night nudges removed; family-sick books terminal `'cleared'`.
+- **WF5 DONE** — partner-swap rebuilt: pick PARTNER → valid date-pairings (both real day-offs ≤6 days
+  apart, override-aware/WF9b) → reason. `req_off_date`=partner's day off (you take), `partner_off_date`=
+  your day off (they take). Coverage-neutral by construction; card states cover on each date both ways.
+  Engine `swap_approve_claim` unchanged. Pure `payback.swap_pairings` + mapping guard tested.
+- **WF6 DONE** — `/testseed` deletes child rows first (no FK crash). **WF7 DONE** — terminal bookings
+  release the menu singleton. **WF8/WF9a** = no build (reassurance / by-design).
+
 ---
 
 ## WF1 — Late: drop the staffer-facing "Supervisors notified ✓" line — OPEN

@@ -16,6 +16,29 @@ def test_dayoff_dates_none_day_off():
     assert pb.dayoff_dates_ahead(None, set(), date(2026, 6, 8), 7) == []
 
 
+def test_swap_pairings_within_gap_true_trade():
+    # requester off Thu (18, 25); partner off Mon (15, 22). ≤6-day pairings only.
+    req = [date(2026, 6, 18), date(2026, 6, 25)]
+    par = [date(2026, 6, 15), date(2026, 6, 22)]
+    got = pb.swap_pairings(req, par, max_gap=6)
+    assert (date(2026, 6, 18), date(2026, 6, 15)) in got          # 3 days apart
+    assert (date(2026, 6, 18), date(2026, 6, 22)) in got          # 4 days apart
+    assert (date(2026, 6, 25), date(2026, 6, 22)) in got          # 3 days apart
+    assert (date(2026, 6, 25), date(2026, 6, 15)) not in got      # 10 days apart — excluded
+    assert got == sorted(got, key=lambda t: (min(t), max(t)))     # soonest-first
+
+
+def test_swap_pairings_same_weekday_nothing_to_trade():
+    same = [date(2026, 6, 15), date(2026, 6, 22)]
+    assert pb.swap_pairings(same, same, max_gap=6) == []          # identical dates → no trade
+
+
+def test_swap_pairings_cap():
+    req = [date(2026, 6, d) for d in (1, 8, 15, 22, 29)]
+    par = [date(2026, 6, d) for d in (2, 9, 16, 23, 30)]          # each 1 day after a req date
+    assert len(pb.swap_pairings(req, par, max_gap=6, cap=3)) == 3
+
+
 def test_dayoff_windows_within_day_shift():
     # 7am-4pm (420-960), pay back 120 → windows slide inside regular hours, 30-min step
     w = pb.dayoff_windows(420, 960, 120)

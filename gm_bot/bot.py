@@ -2184,26 +2184,30 @@ def _swap_card(sw: dict, req: dict, partner: dict, *, audience: str,
     reason = html.escape(sw.get("reason") or "—")
     st = sw.get("status")
     partner_ok = sw.get("partner_ok")
-    # reason appears ONCE after the EN+KH lines (owner, Jun 11 — never duplicate typed text)
+    # reason appears ONCE after the EN+KH lines (owner, Jun 11 — never duplicate typed text).
+    # WF5: state coverage EXPLICITLY on each date — d1 = requester ends up off (partner covers),
+    # d2 = partner ends up off (requester covers). Coverage-neutral, so always one covers the other.
+    ern, epn = html.escape(rn), html.escape(pn)
     if audience == "partner":
-        body = ("%s wants to swap day off: %s takes %s off, you take %s — same week.\n"
-                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយប្អូន៖ %s ឈប់ %s, ប្អូនឈប់ %s — ក្នុងសប្តាហ៍ដដែល។\n"
+        body = ("%s wants to swap days off with you:\n"
+                "%s off %s — you cover · you off %s — %s covers.\n"
+                "%s ស្នើសុំប្តូរថ្ងៃឈប់ជាមួយប្អូន៖\n"
+                "%s ឈប់ %s — ប្អូនជំនួស · ប្អូនឈប់ %s — %s ជំនួស។\n"
                 "Reason · មូលហេតុ៖ %s"
-                % (html.escape(rn), html.escape(rn), d1, d2,
-                   html.escape(rn), html.escape(rn), d1, d2, reason))
+                % (ern, ern, d1, d2, ern,
+                   ern, ern, d1, d2, ern, reason))
     elif audience == "requester":
-        body = ("Day-off swap — your off %s ↔ %s off %s.\n"
-                "ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ %s ឈប់ %s។\n"
+        body = ("Day-off swap with %s:\nyou off %s — %s covers · %s off %s — you cover.\n"
+                "ប្តូរថ្ងៃឈប់ជាមួយ %s៖\nប្អូនឈប់ %s — %s ជំនួស · %s ឈប់ %s — ប្អូនជំនួស។\n"
                 "Reason · មូលហេតុ៖ %s"
-                % (d1, html.escape(pn), d2,
-                   d1, html.escape(pn), d2, reason))
+                % (epn, d1, epn, epn, d2,
+                   epn, d1, epn, epn, d2, reason))
     else:  # senior
-        body = ("Day-off swap: %s ↔ %s\n%s off %s, %s off %s.\n"
-                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s\n%s ឈប់ %s, %s ឈប់ %s។\n"
+        body = ("Day-off swap: %s ↔ %s\n%s off %s — %s covers · %s off %s — %s covers.\n"
+                "ប្តូរថ្ងៃឈប់៖ %s ↔ %s\n%s ឈប់ %s — %s ជំនួស · %s ឈប់ %s — %s ជំនួស។\n"
                 "Reason · មូលហេតុ៖ %s"
-                % (html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
-                   html.escape(rn), html.escape(pn), html.escape(rn), d1, html.escape(pn), d2,
-                   reason))
+                % (ern, epn, ern, d1, epn, epn, d2, ern,
+                   ern, epn, ern, d1, epn, epn, d2, ern, reason))
     status_line = None
     if st == "approved":
         status_line = "✅ Approved · បានអនុម័ត"

@@ -279,12 +279,24 @@ def test_al_time_to_without_from_shows_stale(monkeypatch):
     assert edits and "old" in edits[0].lower()
 
 
-def test_swap_partner_without_day_shows_stale(monkeypatch):
-    """F4: the partner tap with att_do_day missing used to fabricate a swap for TODAY — now stale."""
+def test_wf5_swap_pair_arms_both_real_dates(monkeypatch):
+    """WF5: att:do:pair carries BOTH real day-off dates directly (req_off = the partner's day off you
+    take; partner_off = your day off they take) — not a 2nd date derived from the requester's own
+    weekday (the coverage-non-neutral bug). The arming maps them straight to the engine's two dates."""
     from gm_bot import attendance_ui as ui
     monkeypatch.setattr(ui, "_armed", lambda ctx: True)
-    edits = _owner_cb(monkeypatch, "att:do:p:2", {})
-    assert edits and "old" in edits[0].lower()
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)
+    monkeypatch.setattr(ui, "flow_save", lambda *a, **k: None)
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [
+        {"id": 2, "canonical_name": "Heng", "call_name": "Heng"}])
+    ud = {}
+    # req_off = Mon 15 (Heng's day off, requester takes it) · partner_off = Thu 18 (requester's, Heng takes)
+    edits = _owner_cb(monkeypatch, "att:do:pair:2:2026-06-15:2026-06-18", ud)
+    pend = ud.get("att_test_pending", {})
+    assert pend.get("flow") == "swap" and pend.get("partner_id") == 2
+    assert pend.get("req_off_date") == "2026-06-15"        # the partner's day off, requester takes it
+    assert pend.get("partner_off_date") == "2026-06-18"    # the requester's day off, partner takes it
+    assert edits and "Heng" in edits[0]
 
 
 def test_al_cov_empty_stash_shows_stale(monkeypatch):

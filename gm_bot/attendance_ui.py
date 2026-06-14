@@ -24,7 +24,7 @@ from telegram.ext import ContextTypes
 import config
 from gm_bot.attendance import to_min, overlaps
 from shared.database import (staff_all, att_test_on, staff_get_by_uid, flow_save,
-                             al_leave_days_set, staff_absent_dates)
+                             al_leave_days_set, staff_absent_dates, dayoff_override_for)
 
 _DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 _DOW_NAME = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -1669,44 +1669,73 @@ def al_stub(p: dict, detail: str, walk: str = "al") -> tuple[str, InlineKeyboard
 # session 30. (Short-notice AL — _near_days / SHORT_NOTICE_PT_PER_MIN — is a SEPARATE thing, kept.)
 
 
-def dayoff_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
-    start = _today() + timedelta(days=1)
-    own_off = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
-    btns = []
-    for i in range(30):
-        d = start + timedelta(days=i)
-        if d.weekday() == own_off:
-            continue  # their current day off — nothing to swap there (owner, session 28)
-        btns.append(InlineKeyboardButton(day_label(d), callback_data="att:do:d:%s" % d.isoformat()))
-    rows = [_back_row("att:am")] + grid(btns, 4)
-    return _hdr(p, "Change day off — pick the NEW day you want off (next 30 days, not today).\n"
-                   "ប្តូរថ្ងៃឈប់ — ជ្រើសថ្ងៃឈប់ថ្មីដែលអ្នកចង់បាន (30 ថ្ងៃខាងមុខ មិនមែនថ្ងៃនេះ)។\n"
-                   "Current day off · ថ្ងៃឈប់បច្ចុប្បន្ន៖ %s" % (p.get("day_off") or "?")), \
-        InlineKeyboardMarkup(rows)
+def _real_dayoff_dates(staff: dict, start: date, n_days: int = 21) -> list:
+    """WF5/WF9b: a staff's REAL upcoming day-off occurrences — their weekly day-off weekday, MINUS
+    any date that already carries a dayoff_override (a date already involved in a swap is not free to
+    trade again). Honours overrides instead of trusting the static weekday blindly."""
+    from gm_bot import payback as pb
+    dates = pb.dayoff_dates_ahead(staff.get("day_off"), set(), start, n_days)
+    return [d for d in dates if dayoff_override_for(staff["id"], d.isoformat()) is None]
 
 
-def dayoff_partners(p: dict, iso: str) -> tuple[str, InlineKeyboardMarkup]:
-    """Swap-partner candidates: active TWB staff with overlapping shift hours (shell version —
-    expertise-bottleneck filter lands with the coverage engine)."""
-    ws, we = to_min(p.get("work_start")), to_min(p.get("work_end"))
+def dayoff_partners(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """WF5 partner-swap ENTRY — pick WHO to trade day-offs with FIRST (no arbitrary day). Candidates =
+    active TWB staff with a DIFFERENT day off (something to trade) and similar shift hours."""
+    ws = to_min(p.get("work_start"))
+    my_off = (p.get("day_off") or "")[:3].title()
     cands = []
     for r in staff_all("active"):
         if r["id"] == p["id"] or r.get("org") != "TWB" or r.get("canonical_name") == "Tyty":
             continue
-        rs, re_ = to_min(r.get("work_start")), to_min(r.get("work_end"))
+        if (r.get("day_off") or "")[:3].title() == my_off:
+            continue   # same day off → nothing to trade
+        rs = to_min(r.get("work_start"))
         if rs is None or ws is None:
             continue
-        # overlap on the 24h circle, both directions
         diff = min((rs - ws) % (24 * 60), (ws - rs) % (24 * 60))
         if diff <= 180:  # starts within 3h of each other = "similar/close shift times"
             cands.append(r)
-    rows = [_back_row("att:do")]
+    rows = [_back_row("att:am")]
     rows += [[InlineKeyboardButton(staff_btn_label(c), callback_data="att:do:p:%d" % c["id"])]
              for c in staff_sort(cands)[:8]]
-    d = date.fromisoformat(iso)
-    return _hdr(p, "Swap day-off for %s — with whom? (similar shift times; within 7 days)\n"
-                   "ប្តូរថ្ងៃឈប់ទៅ %s — ជាមួយអ្នកណា? (ម៉ោងវេនប្រហាក់ប្រហែល; ក្នុង 7 ថ្ងៃ)"
-                % (day_label(d), day_label(d))), InlineKeyboardMarkup(rows)
+    return _hdr(p, "Swap day off — pick WHO to trade with (a different day off, similar shift times). "
+                   "You'll then choose a date-pairing.\n"
+                   "ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ "
+                   "បន្ទាប់មកជ្រើសគូកាលបរិច្ឆេទ។\n"
+                   "Your day off · ថ្ងៃឈប់របស់អ្នក៖ %s" % (p.get("day_off") or "?")), \
+        InlineKeyboardMarkup(rows)
+
+
+def dayoff_swap_pairs(p: dict, partner_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    """WF5: the valid day-off swap pairings with the chosen partner. A pairing = (your real upcoming
+    day off, their real upcoming day off) ≤ 6 days apart — a TRUE trade (you take their day off, they
+    take yours), coverage-neutral by construction. Callback encodes the engine's two dates directly:
+    att:do:pair:{partner}:{req_off=their date you take}:{partner_off=your date they take}."""
+    from gm_bot import payback as pb
+    partner = next((s for s in staff_all("active") if s["id"] == partner_id), None)
+    if not partner:
+        return _hdr(p, "That partner isn't available — pick again."), \
+            InlineKeyboardMarkup([_back_row("att:do")])
+    pn = partner.get("call_name") or partner["canonical_name"]
+    start = _today() + timedelta(days=1)
+    my_dates = _real_dayoff_dates(p, start)          # r = your day off (partner ends up off here)
+    par_dates = _real_dayoff_dates(partner, start)   # q = their day off (you end up off here)
+    pairs = pb.swap_pairings(my_dates, par_dates, max_gap=6, cap=6)
+    rows = [_back_row("att:do")]
+    for r, q in pairs:
+        # you take THEIR day off q (you off q) · they take YOURS r (they off r)
+        lbl = "🔁 you off %s · %s off %s" % (day_label(q), pn, day_label(r))
+        rows.append([InlineKeyboardButton(
+            lbl, callback_data="att:do:pair:%d:%s:%s" % (partner_id, q.isoformat(), r.isoformat()))])
+    if not pairs:
+        return _hdr(p, "No close day-off pairing with %s in the next 3 weeks (need ≤6 days apart, a "
+                       "different day off, and neither date already swapped).\n"
+                       "គ្មានគូថ្ងៃឈប់ជិតគ្នាជាមួយ %s ក្នុង 3 សប្តាហ៍ខាងមុខទេ។" % (pn, pn)), \
+            InlineKeyboardMarkup([_back_row("att:do")])
+    return _hdr(p, "Swap with %s — pick a pairing. You take their day off, they take yours "
+                   "(≤ 6 days apart, coverage stays even).\n"
+                   "ប្តូរជាមួយ %s — ជ្រើសគូមួយ។ អ្នកយកថ្ងៃឈប់របស់គេ គេយកថ្ងៃឈប់របស់អ្នក "
+                   "(ក្នុង 6 ថ្ងៃ)។" % (pn, pn)), InlineKeyboardMarkup(rows)
 
 
 def ot_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -2739,33 +2768,34 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             flag = bool(int(data[3])) if len(data) > 3 else False
             return await show(_swap_prompt(p, context, st.get("base", ""), st.get("partner_id"),
                                            st.get("req_off"), st.get("partner_off"), flag))
-        if len(data) > 2 and data[2] == "d":
-            context.user_data["att_do_day"] = data[3]   # remember the chosen new day-off date
-            return await show(dayoff_partners(p, data[3]))
         if len(data) > 2 and data[2] == "p":
+            # WF5: partner picked FIRST → show the valid date-pairings (no arbitrary day anymore)
+            return await show(dayoff_swap_pairs(p, int(data[3])))
+        if len(data) > 2 and data[2] == "pair":
+            # att:do:pair:{partner}:{req_off}:{partner_off} — req_off = THEIR day off you take (you
+            # end up off), partner_off = YOUR day off they take (they end up off). Coverage-neutral.
+            if len(data) < 6:
+                return await show(_stale_screen(p))   # malformed/stale pairing button
+            partner_id, req_off, partner_off = int(data[3]), data[4], data[5]
             if _armed(context):
-                req_off = context.user_data.get("att_do_day")
-                if not req_off:   # F4: stale partner screen → don't fabricate a swap for TODAY
-                    return await show(_stale_screen(p))
-                ro = date.fromisoformat(req_off)
-                off_wd = _DOW_NAME.get((p.get("day_off") or "")[:3].title())
-                partner_off = (ro + timedelta(days=(off_wd - ro.weekday())) if off_wd is not None
-                               else ro + timedelta(days=1)).isoformat()
-                _swap_sum = ("Day-off swap — your off %s ↔ partner off %s."
-                             % (day_label(ro), day_label(date.fromisoformat(partner_off))))
+                partner = next((s for s in staff_all("active") if s["id"] == partner_id), None)
+                pn = (partner or {}).get("call_name") or (partner or {}).get("canonical_name", "partner")
+                ro, po = date.fromisoformat(req_off), date.fromisoformat(partner_off)
+                _swap_sum = ("Day-off swap with %s — you take their day off %s, they take yours %s."
+                             % (pn, day_label(ro), day_label(po)))
+                _swap_kh = ("ប្តូរថ្ងៃឈប់ជាមួយ %s — អ្នកយកថ្ងៃឈប់របស់គេ %s, គេយកថ្ងៃឈប់របស់អ្នក %s។"
+                            % (pn, day_label(ro), day_label(po)))
                 _arm_pending(context, update,
-                    {"flow": "swap", "persona_id": p["id"], "partner_id": int(data[3]),
+                    {"flow": "swap", "persona_id": p["id"], "partner_id": partner_id,
                      "req_off_date": req_off, "partner_off_date": partner_off,
                      "_summary": _swap_sum})
-                _swap_kh = ("ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s ↔ ដៃគូឈប់ %s។"
-                            % (day_label(ro), day_label(date.fromisoformat(partner_off))))
                 return await show(_swap_prompt(p, context, "%s\n%s" % (_swap_sum, _swap_kh),
-                                               int(data[3]), req_off, partner_off, False))
-            return await show(al_stub(p, "Day-off swap partner picked. (Partner approval FIRST, "
-                                         "then 2 seniors — same week rule.)\n"
-                                         "បានជ្រើសអ្នកប្តូរថ្ងៃឈប់ហើយ។ (ត្រូវឱ្យដៃគូយល់ព្រមមុន "
-                                         "បន្ទាប់មកបង 2 នាក់ — ត្រូវនៅសប្តាហ៍ដដែល។)", walk="swap"))
-        return await show(dayoff_screen(p))
+                                               partner_id, req_off, partner_off, False))
+            return await show(al_stub(p, "Day-off swap pairing picked. (Partner agrees FIRST, then "
+                                         "2 seniors approve.)\n"
+                                         "បានជ្រើសគូថ្ងៃឈប់ហើយ។ (ដៃគូយល់ព្រមមុន បន្ទាប់មកបង 2 នាក់។)",
+                                         walk="swap"))
+        return await show(dayoff_partners(p))
     if action == "walk":
         # att:walk:{name}:{idx} — owner steps through the rest of a ladder to the end
         if len(data) > 2 and data[2] == "noop":

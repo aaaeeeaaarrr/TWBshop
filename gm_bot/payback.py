@@ -61,6 +61,27 @@ def dayoff_dates_ahead(day_off: str | None, leave_iso: set[str], start: date,
     return out
 
 
+def swap_pairings(req_dates: list, partner_dates: list,
+                  max_gap: int = 6, cap: int = 6) -> list[tuple]:
+    """Valid day-off SWAP pairings between a requester and a partner (WF5). Each input is that
+    person's REAL upcoming day-off occurrences. A pairing (req_dayoff_date, partner_dayoff_date) is
+    valid when the two dates are within `max_gap` days of each other — a true trade where each ends
+    up working the OTHER's day off, so headcount is unchanged on both dates (coverage-neutral by
+    construction; no arbitrary day, no same-week constraint). Sorted soonest-first, de-duplicated,
+    capped at `cap`. Empty when the two have the same day off (nothing to trade) or no pair is close
+    enough."""
+    pairs, seen = [], set()
+    for r in req_dates:
+        for p in partner_dates:
+            if r == p:
+                continue                              # same calendar date → not a trade
+            if abs((p - r).days) <= max_gap and (r, p) not in seen:
+                seen.add((r, p))
+                pairs.append((r, p))
+    pairs.sort(key=lambda t: (min(t), max(t)))
+    return pairs[:cap]
+
+
 def dayoff_windows(ws_min: int, we_min: int, minutes: int, step_min: int = 30,
                    margin_min: int = 0) -> list[tuple[int, int]]:
     """Candidate day-off windows (for payback OR OT) = a `minutes`-long block placed WITHIN the
