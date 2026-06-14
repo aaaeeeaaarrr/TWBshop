@@ -249,6 +249,16 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
+**▶ SECRETS-SYNC HOLE FIXED (2026-06-14):** the other machine's pull couldn't see `STAGING_DATABASE_URL`
+because `bootstrap.py` could only PULL secrets down, never PUSH them up — a key typed into one machine's
+local `secrets.py` never reached the `twbshop-secrets` repo, so other machines' pulls never got it. Fixed
+in `bootstrap.py`: new **`python bootstrap.py --push-secrets`** (mirrors `--push-global`) uploads the
+local `secrets.py` to the repo; `--sync` now **refuses to overwrite** a local `secrets.py` whose keys the
+repo copy is missing (prevents silently losing a locally-added secret on the next pull). Pushed the
+current `secrets.py` (11 keys) to the repo — verified via the real urllib `fetch_file` path that
+`STAGING_DATABASE_URL` is now there. **RULE: after adding/changing any key in `secrets.py`, run
+`python bootstrap.py --push-secrets`** — editing it locally is not enough.
+
 **Last updated:** 2026-06-14 (session 34 — **OWNER GO-LIVE /test WALK in progress + swap redesign
 decided**). The owner is role-playing the attendance flows as **PISEY** before flipping
 `attendance_live` (still **OFF**; `attendance_test_mode` **ON**). Walk so far: Check-in skipped (not at

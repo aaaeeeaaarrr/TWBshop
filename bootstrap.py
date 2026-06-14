@@ -2,11 +2,16 @@
 bootstrap.py — run on any new machine, or to sync latest secrets after a pull.
 
 Modes:
-  python bootstrap.py               — full setup (first time on a new machine)
-  python bootstrap.py --sync        — refresh secrets + SSH key + global CLAUDE.md (silent)
-  python bootstrap.py --push-global — push ~/.claude/CLAUDE.md to secrets repo via API (no cloning)
+  python bootstrap.py                — full setup (first time on a new machine)
+  python bootstrap.py --sync         — refresh secrets + SSH key + global CLAUDE.md (silent)
+  python bootstrap.py --push-global  — push ~/.claude/CLAUDE.md to secrets repo via API (no cloning)
+  python bootstrap.py --push-secrets — push THIS machine's secrets.py up to the secrets repo so
+                                       every other machine gets it on the next pull. Run this any
+                                       time you add/change a key in secrets.py.
 
 --sync runs automatically on every pull via the post-rewrite git hook.
+--sync REFUSES to overwrite a local secrets.py whose keys are missing from the repo copy
+(prevents silently losing a secret you added locally but forgot to --push-secrets).
 """
 
 import base64
@@ -167,6 +172,13 @@ def _ensure_global_guards():
         pass  # never break a pull
 
 
+def _secret_keys(content):
+    """Top-level assignment names in a secrets.py (bytes) — e.g. {'DATABASE_URL', ...}."""
+    import re
+    text = content.decode("utf-8", "replace")
+    return set(re.findall(r"(?m)^([A-Z_][A-Z0-9_]*)\s*=", text))
+
+
 def sync(silent=False):
     """Download latest secrets, SSH key, and global CLAUDE.md. Fast and always safe to run."""
     token = get_token()
@@ -176,6 +188,19 @@ def sync(silent=False):
         if not silent:
             print(f"  Syncing {filename} ...", end=" ", flush=True)
         content = fetch_file(token, filename)
+        # Guard: never silently clobber a secret this machine has but the repo doesn't.
+        if filename == "secrets.py" and os.path.exists(dest):
+            with open(dest, "rb") as f:
+                local_keys = _secret_keys(f.read())
+            missing = local_keys - _secret_keys(content)
+            if missing:
+                if not silent:
+                    print("SKIPPED")
+                print("\n  ⚠ Local secrets.py has keys the repo copy is MISSING: "
+                      + ", ".join(sorted(missing)))
+                print("    NOT overwriting (would lose them). Run: python bootstrap.py "
+                      "--push-secrets  to upload them first, then pull again.\n")
+                continue
         with open(dest, "wb") as f:
             f.write(content)
         if "twbshop_server" in filename and ".pub" not in filename:
@@ -220,6 +245,25 @@ def full_setup():
 if __name__ == "__main__":
     if "--sync" in sys.argv:
         sync(silent=True)
+    elif "--push-secrets" in sys.argv:
+        local_secrets = os.path.join(PROJECT_DIR, "secrets.py")
+        with open(local_secrets, "rb") as f:
+            raw = f.read()
+        content = base64.b64encode(raw).decode()
+        sha_result = subprocess.run(
+            ["gh", "api", f"/repos/{SECRETS_REPO}/contents/secrets.py", "--jq", ".sha"],
+            capture_output=True, text=True,
+        )
+        sha = sha_result.stdout.strip()
+        args = ["gh", "api", "--method", "PUT",
+                f"/repos/{SECRETS_REPO}/contents/secrets.py",
+                "-f", "message=sync secrets.py",
+                "-f", f"content={content}"]
+        if sha:
+            args += ["-f", f"sha={sha}"]
+        subprocess.check_call(args, stdout=subprocess.DEVNULL)
+        print(f"secrets.py pushed to {SECRETS_REPO} ({len(_secret_keys(raw))} keys). "
+              "Other machines get it on next pull.")
     elif "--push-global" in sys.argv:
         claude_md = os.path.join(CLAUDE_DIR, "CLAUDE.md")
         with open(claude_md, "rb") as f:
