@@ -3275,8 +3275,14 @@ def shift_change_approve_claim(change_id: int):
             # (settled history) are left untouched.
             cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s "
                         "AND when_date=%s AND is_test=%s AND id<>%s "
-                        "AND status IN ('proposed','approved') AND senior_id IS NOT NULL",
+                        "AND status IN ('proposed','approved') AND senior_id IS NOT NULL "
+                        "RETURNING paired_off_date",
                         (staff_id, iso, is_test, change_id))
+            for r in cur.fetchall():   # 8b #3: a superseded A2 MOVE also reverses its OFF on X
+                if r.get("paired_off_date"):
+                    cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
+                                "AND reason='dayoff_move' AND is_test=%s",
+                                (staff_id, str(r["paired_off_date"]), is_test))
             return True
 
 
@@ -3871,19 +3877,11 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                             (staff_id, is_test, list(dates)))
                 if cur.fetchone():
                     return "conflict"
-                # A payback/OT-rest SLOT (senior_id NULL, paired with a booking) blocks — releasing the
-                # booking is a separate sub-step, so AL must not silently strand it.
-                cur.execute("SELECT 1 FROM shift_changes WHERE staff_id=%s AND senior_id IS NULL "
-                            "AND status IN ('proposed','approved') AND is_test=%s "
-                            "AND when_date = ANY(%s::date[]) LIMIT 1",
-                            (staff_id, is_test, list(dates)))
-                if cur.fetchone():
-                    return "conflict"             # a booked payback/OT-rest slot owns one of these days
-                cur.execute("SELECT 1 FROM dayoff_overrides WHERE staff_id=%s AND kind='work' "
-                            "AND is_test=%s AND the_date = ANY(%s::date[]) LIMIT 1",
-                            (staff_id, is_test, list(dates)))
-                if cur.fetchone():
-                    return "conflict"             # a day-off SWAP scheduled them to WORK that day
+                # 8b (owner, Jun 16): a payback/OT-rest SLOT (senior_id NULL) no longer BLOCKS — AL on it
+                # REFUNDS it (she can't work it off / take the rest that day). Done after the claim below.
+                # 8b #2 (owner): a day-off SWAP that scheduled them to WORK this day no longer BLOCKS —
+                # AL VOIDS the swap (both revert, partner told). Two-party, so it's done AFTER this txn
+                # commits (the caller calls swap_void_for_away with both locks) — not inside this lock.
                 # A SENIOR redefine (senior_id set, proposed/approved) is NOT a conflict — AL is an
                 # AWAY event that supersedes a WORKING redefine. It's stood down in THIS txn right after
                 # the claim succeeds (below) and announced, never silently dropped.
@@ -3927,6 +3925,34 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                     if superseded_out is not None:
                         superseded_out.append({"kind": "coexist_move", "date": str(sc["when_date"]),
                                                "paired_off": str(sc["paired_off_date"])})
+                # 8b: REFUND any payback/OT-rest SLOT (senior_id NULL) on these AL days — she can't work it
+                # off / take the rest. payback → cancel the booking (returns to UNBOOKED debt; debt
+                # unchanged). OT-rest → cancel the buyback + RETURN the spent minutes to the bank.
+                cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s AND "
+                            "senior_id IS NULL AND status IN ('proposed','approved') AND is_test=%s "
+                            "AND when_date = ANY(%s::date[]) RETURNING when_date, reason",
+                            (staff_id, is_test, list(dates)))
+                for sc in cur.fetchall():
+                    sd = str(sc["when_date"])
+                    if (sc["reason"] or "") == "OT rest":
+                        cur.execute("UPDATE ot_buyback SET status='cancelled' WHERE staff_id=%s AND "
+                                    "slot_date=%s AND is_test=%s AND status='booked' RETURNING minutes",
+                                    (staff_id, sd, is_test))
+                        bb = cur.fetchone()
+                        mins = int(bb["minutes"]) if bb else 0
+                        if mins and not is_test:    # return the spent rest minutes to the bank (atomic)
+                            cur.execute("UPDATE ot_bank SET balance_min=COALESCE(balance_min,0)+%s "
+                                        "WHERE staff_id=%s", (mins, staff_id))
+                        if superseded_out is not None:
+                            superseded_out.append({"kind": "otrest_refund", "date": sd, "minutes": mins})
+                    else:
+                        cur.execute("UPDATE payback_bookings SET status='cancelled' WHERE staff_id=%s AND "
+                                    "slot_date=%s AND is_test=%s AND status='booked' RETURNING minutes",
+                                    (staff_id, sd, is_test))
+                        bk = cur.fetchone()
+                        if superseded_out is not None:
+                            superseded_out.append({"kind": "pb_refund", "date": sd,
+                                                   "minutes": int(bk["minutes"]) if bk else 0})
             if is_test:
                 cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
                             (staff_id,))
@@ -3983,19 +4009,15 @@ def al_date_conflict(staff_id: int, dates, exclude_req_id: int | None = None) ->
                     hit |= set(_json.loads(r["days"] or "[]")) & want
                 except Exception:
                     pass
-            # block a settled 'done' redefine + an approved payback/OT-rest SLOT (senior_id NULL,
-            # paired w/ a booking). A SENIOR redefine (senior_id set) is NOT blocked — AL supersedes it
-            # at approval (schedule model), so the staffer may freely request leave on a redefined day.
+            # 8b (owner, Jun 16): only a settled 'done' redefine (locked history) still blocks at submit.
+            # A senior redefine SUPERSEDES at approval; a payback/OT-rest slot REFUNDS; a swap-work day
+            # VOIDS the swap — so the staffer may freely REQUEST AL on any of those (handled at approval),
+            # never dead-ended at submit. (Picker already hides days she's away — 8b-1.)
             cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s AND is_test=%s "
-                        "AND when_date = ANY(%s::date[]) "
-                        "AND (status='done' OR (status='approved' AND senior_id IS NULL))",
+                        "AND when_date = ANY(%s::date[]) AND status='done'",
                         (staff_id, _ATT_TEST, list(want)))
             for r in cur.fetchall():
                 hit.add(str(r["when_date"]))
-            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND kind='work' "
-                        "AND is_test=%s AND the_date = ANY(%s::date[])", (staff_id, _ATT_TEST, list(want)))
-            for r in cur.fetchall():
-                hit.add(str(r["the_date"]))
     return sorted(hit)
 
 
@@ -4054,6 +4076,38 @@ def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | 
             return _al_refund_day(cur, req_id, staff_id, iso, today_iso)
 
 
+def swap_void_for_away(staff_id: int, date_iso: str) -> dict | None:
+    """8b #2 (owner, Jun 16): VOID an approved day-off SWAP that put `staff_id` to WORK on `date_iso`
+    (they're now away on leave). Takes BOTH parties' advisory locks (sorted → deadlock-safe; the shared
+    (911,·) namespace), DELETEs the 4 'swap' overrides, marks the swap 'superseded'. Returns a notify
+    descriptor or None. Must be called with NO advisory lock already held (it takes its own) — i.e. AFTER
+    the AL txn commits. The machine never auto-rearranges the partner; a human re-covers. is_test-scoped."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, requester_id, partner_id, req_off_date, partner_off_date "
+                        "FROM dayoff_swaps WHERE status='approved' AND is_test=%s AND "
+                        "((requester_id=%s AND partner_off_date=%s) OR "
+                        " (partner_id=%s AND req_off_date=%s))",
+                        (_ATT_TEST, staff_id, date_iso, staff_id, date_iso))
+            sw = cur.fetchone()
+            if not sw:
+                return None
+            rid, pid = sw["requester_id"], sw["partner_id"]
+            for _sid in sorted({rid, pid}):
+                cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, _sid))
+            cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s FOR UPDATE", (sw["id"],))
+            st = cur.fetchone()
+            if not st or st["status"] != "approved":
+                return None
+            ro, po = str(sw["req_off_date"]), str(sw["partner_off_date"])
+            for s2, d2 in ((rid, ro), (rid, po), (pid, po), (pid, ro)):
+                cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
+                            "AND reason='swap' AND is_test=%s", (s2, d2, _ATT_TEST))
+            cur.execute("UPDATE dayoff_swaps SET status='superseded' WHERE id=%s", (sw["id"],))
+            return {"kind": "swap", "swap_id": sw["id"], "requester_id": rid, "partner_id": pid,
+                    "req_off": ro, "partner_off": po, "trigger_date": date_iso}
+
+
 def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) -> list:
     """Phase 3a of the schedule model (docs/SCHEDULE_RESOLUTION_MODEL.md): stand down the current
     balance-moving decision(s) on a staff-date and REVERSE their balance, so a newer "winning" decision
@@ -4093,12 +4147,18 @@ def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) ->
         with conn.cursor() as cur:
             cur.execute("UPDATE shift_changes SET status='cancelled' WHERE staff_id=%s AND when_date=%s "
                         "AND is_test=%s AND status IN ('proposed','approved') AND senior_id IS NOT NULL "
-                        "RETURNING id, when_date, senior_id, start_min, end_min",
+                        "RETURNING id, when_date, senior_id, start_min, end_min, paired_off_date",
                         (staff_id, date_iso, _ATT_TEST))
             for r in cur.fetchall():
                 out.append({"kind": "redefine", "id": r["id"], "date": str(r["when_date"]),
                             "senior_id": r["senior_id"], "start_min": r["start_min"],
                             "end_min": r["end_min"]})
+                # 8b #3: standing down an A2 MOVE redefine reverses the whole move — also clear the
+                # paired OFF on X, or she'd be left off X with no comp work day.
+                if r.get("paired_off_date"):
+                    cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
+                                "AND reason='dayoff_move' AND is_test=%s",
+                                (staff_id, str(r["paired_off_date"]), _ATT_TEST))
     # 3) a day-off SWAP that put THIS staff to WORK on this date → the trade is now meaningless (they're
     #    away). Void the whole swap: reverse BOTH parties' 4 overrides back to normal + mark it
     #    'superseded' + hand back a descriptor for the coverage-gap alert. Two-party → take BOTH advisory

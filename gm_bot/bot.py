@@ -2825,6 +2825,7 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
     if not superseded:
         return
     from datetime import date as _date
+    from gm_bot.attendance_ui import _hm           # 8b: minutes formatting for pb/OT-rest refund lines
     allstaff = staff_all("active")
     name = victim_staff.get("call_name") or victim_staff["canonical_name"]
     vuid = (victim_staff.get("telegram_ids") or [None])[0]
@@ -2863,6 +2864,22 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
                     "Please re-arrange cover if needed.\n"
                     "🔁 %s យក AL នៅ %s — ការប្តូរថ្ងៃឈប់នៅដដែល៖ គាត់នៅតែឈប់នៅ %s។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
                     % (name, dlabel, xlabel, name, dlabel, xlabel))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "pb_refund":
+            # 8b: AL fell on a payback slot — it's returned to the debt to re-book (she couldn't work it).
+            mins = int(d.get("minutes") or 0)
+            line = ("↩ %s took AL on %s — the payback slot (%s) is returned to their debt to re-book.\n"
+                    "↩ %s យក AL នៅ %s — ម៉ោងសងវិញ (%s) ត្រូវដាក់ត្រឡប់ចូលបំណុលវិញ ដើម្បីកក់ឡើងវិញ។"
+                    % (name, dlabel, _hm(mins), name, dlabel, _hm(mins)))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "otrest_refund":
+            # 8b: AL fell on a booked OT-rest — the rest is cancelled and the minutes go back to the bank.
+            mins = int(d.get("minutes") or 0)
+            line = ("↩ %s took AL on %s — the OT-rest is cancelled, +%s back to their OT bank.\n"
+                    "↩ %s យក AL នៅ %s — ការសម្រាក OT ត្រូវបានលុបចោល, +%s ត្រឡប់ចូល OT bank វិញ។"
+                    % (name, dlabel, _hm(mins), name, dlabel, _hm(mins)))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
         elif d.get("kind") == "al":
@@ -3020,6 +3037,13 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         # schedule model: if this AL stood down a senior shift-redefine, tell that senior + supervisors
         # so coverage is re-arranged by a human (never a silent revoke). Best-effort, after the verdict.
         await _announce_supersessions(context, requester, superseded)
+        # 8b #2: VOID any day-off swap that put her to WORK on an AL day (two-party — done AFTER the AL
+        # txn committed, with both locks). Tell BOTH parties + Supervisors; a human re-covers.
+        from shared.database import swap_void_for_away
+        for _ald in days:
+            _sw = swap_void_for_away(req["staff_id"], _ald)
+            if _sw:
+                await _announce_supersessions(context, requester, [_sw])
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,

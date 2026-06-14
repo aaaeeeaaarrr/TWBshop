@@ -299,11 +299,20 @@ staging before/after proof + 2nd-opinion done):** **8b-1** AL picker shows only 
 **COEXISTS** (the move's redefine is EXCLUDED from the AL supersede) + is **CHARGED 1** (`al_coexist_days`
 + `_al_finalize` override the static day-off 0) + a **reminder** ("took AL on Y, still OFF on X" → her +
 Supervisors, `coexist_move` kind). An optional OT-redefine (no `paired_off_date`) still **stands down**
-(0 AL). Proven on a real staging row (A2→charge 1, redefine stays; OT→0 AL, superseded). **▶ 8b REMAINING
-(the last per-type behaviors, then step 3 walk):** AL on a **payback slot** → refund (currently blocks);
-AL on a **swap-work** day → void+remind (currently blocks); the **A2 supersede-cleanup** (clear X off when
-a move's redefine is otherwise superseded); **/audit** paired↔off backstop. Then the **refined step-by-step
-walk**. Design + decisions → `docs/SCHEDULE_CHANGES_REDESIGN.md` (8b section).
+(0 AL). Proven on a real staging row (A2→charge 1, redefine stays; OT→0 AL, superseded).
+**▶ 8b REMAINING (#1/#2/#3) — DONE (Jun 15, suite 592, /audit CLEAN test+real; HIGH-RISK, staging
+before/after proof on each):** **#1** AL on a **payback / OT-rest slot** no longer blocks — the slot is
+**refunded** (payback_booking cancelled → `pb_refund` notice; OT-rest cancels the ot_buyback + refunds the
+ot_bank → `otrest_refund` notice) inside `al_approve_and_deduct`. **#2** AL on a **swap-work** day no longer
+blocks — `swap_void_for_away` takes both parties' locks, deletes all 4 swap overrides, marks the swap
+`superseded` and reminds both (runs AFTER the AL txn). **#3a** A2 **supersede-cleanup**: when an A2 move's
+Y-redefine is stood down (a newer redefine, or `supersede_day`), the paired **X off is cleared** (the move
+fully reverses). **#3b** `/audit` `v_a2_paired` backstop (an approved paired redefine must carry its X
+off-override). `al_date_conflict` **relaxed** to only block approved-AL + `'done'` redefines (so AL reaches
+the approval-side refund/void instead of dead-ending at submit). Old F14 block-tests updated to the
+refund/void behavior. **NOT yet deployed** (this commit). Design → `docs/SCHEDULE_CHANGES_REDESIGN.md` (8b).
+**▶ NEXT: deploy 8b #1/#2/#3 to gm (quiet window, gm-only, verify, live stays OFF) → write the refined
+step-by-step walk (Parts1+2 style) → owner re-walks → `/testreset` → flip `attendance_live`.**
 
 **(prev) ▶ WALK-FINDINGS BATCH STEP 1 — DONE + DEPLOYED (Jun 16, a3b90d1; gm restart 05:1x PP, verified
 clean/OFF):** from the owner's A1/A2 walk. **1a** A1/A2 changes need a **2nd senior's co-approval** (status

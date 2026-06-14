@@ -355,6 +355,23 @@ def v_swap_exclusivity(als: list[dict], overrides: list[dict], swaps: list[dict]
     return out
 
 
+def v_a2_paired(scs: list[dict], overrides: list[dict], staff: dict) -> list[str]:
+    """8b #3 backstop: an APPROVED A2 day-off-MOVE redefine (paired_off_date set) must have a matching
+    'off' override (reason 'dayoff_move') on its paired day X. The atomic approve writes both together
+    and the supersede paths clear both — so a live redefine without its X off = a leaked/partial state."""
+    out = []
+    off_moves = {(o["staff_id"], str(o["the_date"])) for o in overrides
+                 if o.get("kind") == "off" and o.get("reason") == "dayoff_move"}
+    for r in scs:
+        if r.get("status") == "approved" and r.get("paired_off_date"):
+            if (r["staff_id"], str(r["paired_off_date"])) not in off_moves:
+                out.append("A2: %s approved move redefine #%s (works %s) has NO off-override on its "
+                           "paired day %s — partial/leaked move"
+                           % (_nm(staff, r["staff_id"]), r["id"], r.get("when_date"),
+                              r.get("paired_off_date")))
+    return out
+
+
 def v_exclusivity(als: list[dict], scs: list[dict], staff: dict, today: date) -> list[str]:
     """F14 exclusivity law (owner Jun 13): at most one approved leave/redefine may claim a staff-date.
     Flags the two UNAMBIGUOUS, harmful collisions only (so the daily auto-audit stays false-alarm-free):
@@ -555,6 +572,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_sick(sick, staff, today)
                 + v_swaps(swaps, staff, today)
                 + v_swap_exclusivity(als, overrides, swaps, staff)
+                + v_a2_paired(scs, overrides, staff)
                 + v_late_points(sess, pevents, staff)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)
