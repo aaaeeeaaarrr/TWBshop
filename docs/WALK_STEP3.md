@@ -21,10 +21,11 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
 
 1. **About Work → 🗓 Staff Changes (1 time) → ⏱ Change time +OT.**
 2. **Pick the staffer** (Staff). → 30-day day list appears (her day-offs are hidden — only working days).
-3. **Pick a day.** → start-time screen.
-   - ✅ CHECK: there's a **⏱ Normal times** button. Tap it → it sets her real start+end and **skips
-     straight to the end ladder** (no separate "change day" step — that's gone).
-4. On the **end ladder**, pick an end past her normal end. → the tag should read in **minutes**, combined,
+3. **Pick a day.** → start-time screen. Two ways from here:
+   - **⏱ Normal times** = her normal shift, **no OT** → goes **straight to the reason** (no end menu).
+     This is the quick "just put her on her normal shift that day" path.
+   - **To give OT: do NOT tap Normal times.** Pick a **START** time → the **end ladder** appears.
+4. On the **end ladder**, pick an end past her normal end. → the tag reads in **minutes**, combined,
    e.g. **`+1h15 PB +45m OT`** (not decimals, not two separate lines).
 5. Type a reason → submit.
    - ✅ CHECK (1a co-approval): because A1 *changes* a shift, it does **NOT** go straight to Staff. You

@@ -1920,8 +1920,7 @@ def sc_start(p: dict, sid: int, tdidx: int) -> tuple[str, InlineKeyboardMarkup]:
     if ws is not None and normal_len and ws >= earliest:
         end_abs = ws + normal_len
         rows.append([InlineKeyboardButton(
-            "⏱ Normal times %s–%s · ម៉ោងធម្មតា %s–%s" % (fmt12(ws), fmt12(we % 1440),
-                                                          fmt12(ws), fmt12(we % 1440)),
+            "⏱ Normal times %s–%s · ម៉ោងធម្មតា" % (fmt12(ws), fmt12(we % 1440)),
             callback_data="att:scp:cf:%d:%d:%d:%d" % (sid, tdidx, ws, end_abs))])
     rows += grid([InlineKeyboardButton(fmt12(s), callback_data="att:scp:st:%d:%d:%d" % (sid, tdidx, s))
                   for s in ot_mod.start_options(earliest_min=earliest)], 4)
@@ -2030,8 +2029,7 @@ def a2_start(p: dict, sid: int, xidx: int, yidx: int) -> tuple[str, InlineKeyboa
     if ws is not None and normal_len:
         end_abs = ws + normal_len
         rows.append([InlineKeyboardButton(
-            "⏱ Normal times %s–%s · ម៉ោងធម្មតា %s–%s" % (fmt12(ws), fmt12(we % 1440),
-                                                          fmt12(ws), fmt12(we % 1440)),
+            "⏱ Normal times %s–%s · ម៉ោងធម្មតា" % (fmt12(ws), fmt12(we % 1440)),
             callback_data="att:a2:cf:%d:%d:%d:%d:%d" % (sid, xidx, yidx, ws, end_abs))])
     rows += grid([InlineKeyboardButton(fmt12(s),
                   callback_data="att:a2:st:%d:%d:%d:%d" % (sid, xidx, yidx, s))

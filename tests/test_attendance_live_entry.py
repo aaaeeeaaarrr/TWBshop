@@ -858,21 +858,48 @@ def test_staff_changes_menu_two_options(monkeypatch):
 
 
 def test_flip_sc_senior_card_replaces_awaiting():
-    """8a-1: the proposer's registered '⏳ Awaiting approval' card is replaced by the verdict in place
-    (and the registration is one-shot — popped)."""
+    """8a-1 (owner, Jun 15): on the verdict the proposer's stale awaiting card is DELETED and a fresh
+    message is SENT (nudge + less noise). Registration is one-shot (popped)."""
     import gm_bot.bot as bot
-    edits = []
+    deletes, sends = [], []
 
     class _Bot:
-        async def edit_message_text(self, text, chat_id=None, message_id=None):
-            edits.append((chat_id, message_id, text))
+        async def delete_message(self, chat_id=None, message_id=None):
+            deletes.append((chat_id, message_id))
+
+        async def send_message(self, chat_id, text):
+            sends.append((chat_id, text))
 
     ctx = types.SimpleNamespace(bot=_Bot(), bot_data={"sc_senior_card": {7: (5, 9)}})
     g = {"when_date": "2026-06-16", "start_min": 480, "end_min": 1080}
     asyncio.run(bot._flip_sc_senior_card(ctx, 7, g, "Anan", "✅ Approved · បានយល់ព្រម"))
-    assert edits and edits[0][0] == 5 and edits[0][1] == 9
-    assert "Approved" in edits[0][2] and "Anan" in edits[0][2]
-    assert 7 not in ctx.bot_data["sc_senior_card"]        # one-shot
+    assert deletes == [(5, 9)]                              # stale card removed
+    assert sends and sends[0][0] == 5                       # fresh nudge to the proposer's chat
+    assert "Approved" in sends[0][1] and "Anan" in sends[0][1]
+    assert 7 not in ctx.bot_data["sc_senior_card"]          # one-shot
+
+
+def test_sc_card_extension_drops_come_early_plus10():
+    """Finding 4 (owner, Jun 15): a pure EXTENSION (same start, end pushed out) earns no '+10 come early'
+    — they're already at work; +10 belongs to the shift START. A changed start / A2 move keeps the line."""
+    import gm_bot.bot as bot
+    staff = {"id": 1, "canonical_name": "S", "call_name": "S", "work_start": "08:00", "work_end": "17:00"}
+    # extension: start = normal 08:00 (480), end pushed to 19:00 (1140) → no +10 line
+    g_ext = {"when_date": "2026-07-10", "start_min": 480, "end_min": 1140, "normal_len": 540,
+             "id": 1, "status": "proposed", "staff_id": 1}
+    txt_ext, _ = bot._sc_card(g_ext, staff)
+    assert "+10 points" not in txt_ext
+    assert "extra time" in txt_ext
+    # changed start (come earlier to 07:00) → +10 line stays
+    g_early = {"when_date": "2026-07-10", "start_min": 420, "end_min": 1020, "normal_len": 540,
+               "id": 1, "status": "proposed", "staff_id": 1}
+    txt_early, _ = bot._sc_card(g_early, staff)
+    assert "+10 points" in txt_early
+    # A2 move (fresh day Y) → +10 line stays even if start = normal
+    g_a2 = {"when_date": "2026-07-11", "start_min": 480, "end_min": 1020, "normal_len": 540,
+            "id": 1, "status": "proposed", "staff_id": 1, "paired_off_date": "2026-07-10"}
+    txt_a2, _ = bot._sc_card(g_a2, staff)
+    assert "+10 points" in txt_a2
 
 
 def test_al_screen_hides_non_working_days(monkeypatch):

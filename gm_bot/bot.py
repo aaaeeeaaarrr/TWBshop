@@ -1818,21 +1818,29 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
     tagtxt = (" (%s)" % tag) if tag else ""
     poff = g.get("paired_off_date")
+    # +10 "come early" applies to a SHIFT START you arrive to (A2 = a fresh day Y, or a changed start).
+    # A pure EXTENSION (same start, they're already at work) earns no come-early bonus — the +10 belongs
+    # to the beginning of the shift, not its extension (owner, Jun 15). Drop the line for extensions.
+    from gm_bot.attendance_ui import to_min
+    _nstart = to_min(staff.get("work_start"))
+    _is_ext = (poff is None) and (_nstart is not None) and (start_min == _nstart) and bool(extra)
+    if _is_ext:
+        _rules = ("You're paid for the extra time you work; normal late/no-show rules apply.\n"
+                  "ប្អូនទទួលប្រាក់តាមម៉ោងបន្ថែមដែលប្អូនធ្វើការ; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។")
+    else:
+        _rules = ("You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
+                  "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។")
     if poff:   # A2 Change-day-off: frame it as a MOVE — off X, work Y — not a bare retime
         body = ("🗓 Day-off move — you're OFF %s, and you WORK %s: %s%s\n"
                 "🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ %s, ហើយមកធ្វើការ %s៖ %s%s\n"
-                "Why · មូលហេតុ៖ %s\n\n"
-                "You're paid for the time you work; come early → +10 points ⭐; normal rules apply.\n"
-                "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់ធម្មតានៅតែអនុវត្ត។"
+                "Why · មូលហេតុ៖ %s\n\n%s"
                 % (poff, g["when_date"], win, tagtxt, poff, g["when_date"], win, tagtxt,
-                   g.get("reason") or "—"))
+                   g.get("reason") or "—", _rules))
     else:
         body = ("🕒 Shift change — %s: %s%s\n"
                 "🕒 ប្តូរវេន — %s៖ %s%s\n"
-                "Why · មូលហេតុ៖ %s\n\n"
-                "You're paid for the time you work; come early → +10 points ⭐; normal late/no-show rules apply.\n"
-                "ប្អូនទទួលប្រាក់តាមម៉ោងដែលប្អូនធ្វើការ; មកដល់មុនម៉ោង → +10 points ⭐; ច្បាប់មកយឺត/No-show ធម្មតានៅតែអនុវត្ត។"
-                % (g["when_date"], win, tagtxt, g["when_date"], win, tagtxt, g.get("reason") or "—"))
+                "Why · មូលហេតុ៖ %s\n\n%s"
+                % (g["when_date"], win, tagtxt, g["when_date"], win, tagtxt, g.get("reason") or "—", _rules))
     st = g.get("status")
     if st == "approved":
         body += "\n\n✅ Approved · បានយល់ព្រម"
@@ -1900,20 +1908,24 @@ def _sc_fyi_text(g: dict, nm: str, win: str) -> str:
 
 
 async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdict: str) -> None:
-    """8a-1: replace the proposing senior's '⏳ Awaiting approval' card with the verdict in place, so it
-    never sits stale after the staff decides. Best-effort; one-shot (popped)."""
+    """8a-1 (owner, Jun 15): the proposing senior's '⏳ Awaiting approval' card becomes a NEW message on
+    the verdict — a fresh notification NUDGES them with the outcome, and the now-stale awaiting card is
+    DELETED so their chat stays quiet (less noise). Best-effort; one-shot (popped)."""
     coords = context.bot_data.get("sc_senior_card", {}).pop(cid, None)
     if not coords:
         return
     win = "%s-%s" % (_fmt_min(int(g["start_min"])), _fmt_min(int(g["end_min"])))
     poff = g.get("paired_off_date")
-    if poff:   # A2 move — state both dates on the senior's flipped card too
+    if poff:   # A2 move — state both dates on the senior's nudge too
         head = "🗓 Day-off move — %s OFF %s, works %s %s" % (staff_nm, poff, g["when_date"], win)
     else:
         head = "🕒 Shift change — %s %s for %s" % (g["when_date"], win, staff_nm)
-    try:
-        await context.bot.edit_message_text("%s\n%s" % (head, verdict),
-                                            chat_id=coords[0], message_id=coords[1])
+    try:   # drop the stale awaiting card first
+        await context.bot.delete_message(chat_id=coords[0], message_id=coords[1])
+    except Exception:
+        pass
+    try:   # then a fresh message so the proposing senior is nudged with the result
+        await context.bot.send_message(coords[0], "%s\n%s" % (head, verdict))
     except Exception:
         pass
 
