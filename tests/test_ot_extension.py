@@ -43,7 +43,7 @@ def test_apply_ot_to_pb_nets():
     assert ot.apply_ot_to_pb(90, 0) == (0, 90, 0)
 
 
-# ---- the end-ladder tags (matches the owner's example) ----
+# ---- the end-ladder tags (owner, Jun 15: show BOTH +PB and +OT when an extension spans both) ----
 def test_end_ladder_with_2h_pb():
     # start 1pm (780), 9h normal -> normal end 10pm (1320); 2h PB owed; hourly
     got = ot.end_option_tags(780, NORMAL, pb_balance_min=120, step_min=60)
@@ -51,9 +51,17 @@ def test_end_ladder_with_2h_pb():
         (1320, ""),          # 10pm  (normal end)
         (1380, "+1PB"),      # 11pm  clears 1h debt
         (1440 % 1440, "+2PB"),  # 12am clears 2h debt  -> minute 0
-        (60, "+1OT"),        # 1am   debt cleared, 1h OT
-        (120, "+2OT"),       # 2am   2h OT
+        (60, "+2PB +1OT"),   # 1am   2h debt cleared + 1h OT  (combined tag)
+        (120, "+2PB +2OT"),  # 2am   2h debt cleared + 2h OT
     ]
+
+
+def test_ext_tag_shows_both_components():
+    # 4h extension over 3h UNBOOKED pb -> "+3PB +1OT" (the owner's example)
+    assert ot._ext_tag(*ot.split_ot_pb(240, 180)) == "+3PB +1OT"
+    assert ot._ext_tag(*ot.split_ot_pb(120, 180)) == "+2PB"      # only PB
+    assert ot._ext_tag(*ot.split_ot_pb(120, 0)) == "+2OT"        # only OT
+    assert ot._ext_tag(0, 0) == ""
 
 def test_end_ladder_no_pb_is_all_ot():
     got = ot.end_option_tags(780, NORMAL, pb_balance_min=0, step_min=60)

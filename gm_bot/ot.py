@@ -92,12 +92,16 @@ def rest_redefine(ws_min: int, we_min: int, s_min: int, e_min: int) -> tuple[int
 
 
 def _ext_tag(pb_cleared: int, ot: int) -> str:
-    """Button tag: while the extension only clears debt -> '+NPB'; once it earns OT -> '+MOT'."""
-    if ot > 0:
-        return "+%gOT" % (ot / 60)
+    """Button tag for an extension. Shows BOTH parts when it spans both (owner, Jun 15): an extension
+    that clears 3h of UNBOOKED payback then earns 1h OT reads '+3PB +1OT' — not just the OT half. The
+    caller MUST pass UNBOOKED payback (balance minus already-booked extensions), never the raw debt, or
+    the +PB part is overstated and double-credits."""
+    parts = []
     if pb_cleared > 0:
-        return "+%gPB" % (pb_cleared / 60)
-    return ""
+        parts.append("+%gPB" % (pb_cleared / 60))
+    if ot > 0:
+        parts.append("+%gOT" % (ot / 60))
+    return " ".join(parts)
 
 
 def end_option_tags(start_min: int, normal_len_min: int, pb_balance_min: int = 0,

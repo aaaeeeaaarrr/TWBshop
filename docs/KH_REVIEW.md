@@ -309,6 +309,27 @@ Reason · មូលហេតុ៖ {reason}
 > each {variable} is, the intended TONE, and BUTTON vs body. (See the record sections above for
 > the format.)
 
+### A1 — Schedule Changes redesign (Jun 15) — Change time +OT
+- **WHO reads it:** seniors (the menu/picker) + the staffer (the verdict lines on their card).
+- **WHEN:** the new "Staff Changes" flow under About Work; verdict lines fire when staff approves/declines.
+- **TONE:** plain, clear. BUTTON = the menu/picker labels; the rest are short status lines. My KH is draft.
+- Buttons / headers (EN · KH draft):
+  - `🗓 Staff Changes (1 time)` · `ការផ្លាស់ប្តូរ (1 ដង)`
+  - `🗓 Staff Changes (forever)` · `ការផ្លាស់ប្តូរ (រហូត)`
+  - `⏱ Change time +OT` · `ប្តូរម៉ោង +OT`
+  - `📅 Change day off` · `ប្តូរថ្ងៃឈប់`
+  - menu header `Staff Changes (1 time) — pick one.` · `ការផ្លាស់ប្តូរ (1 ដង) — ជ្រើសមួយ។`
+  - `Change time +OT — for whom?` · `ប្តូរម៉ោង +OT — សម្រាប់អ្នកណា?`
+  - day picker `Change {nm}'s shift — which work day? (next 30 days)` · `ប្តូរវេនរបស់ {nm} — ថ្ងៃធ្វើការណា? (30 ថ្ងៃខាងមុខ)`
+  - `⏱ Normal times {ws}–{we}` · `ម៉ោងធម្មតា {ws}–{we}`
+  - start header `{day} — START time? (or ⏱ Normal times above)` · `{day} — ម៉ោងចាប់ផ្តើម?`
+  - `🚧 {what} — coming next.` · `🚧 {what} — នឹងមកដល់ឆាប់ៗ។`
+- Verdict lines (8a-1, on the senior's card when staff decides):
+  - `✅ Approved` · `បានយល់ព្រម`
+  - `❌ Declined` · `បានបដិសេធ`
+  - `✋ Declined — leave kept` · `បានបដិសេធ — រក្សា AL`
+  - `✅ Approved (AL refunded)` · `បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)`
+
 ### MM1 — prompt superseded (multi-menu fix, piece 2)
 - **WHO reads it:** a staffer who had a reason-prompt open ("type why…") and then started a *second*
   flow that opened its own prompt. The OLD prompt message is edited in place to this line.

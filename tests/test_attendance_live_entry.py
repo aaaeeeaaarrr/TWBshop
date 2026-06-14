@@ -806,30 +806,26 @@ def test_sc_day_pick_offers_running_extension(monkeypatch):
                    (b.callback_data for row in kb2.inline_keyboard for b in row))
 
 
-def test_sc_mode_midshift_locks_start(monkeypatch):
-    """Mid-shift today: 'Change time' is replaced by 'Extend the end' (start LOCKED to the real
-    start, straight to the end ladder); 'Change day' stays for future re-planning."""
+def test_sc_day_pick_goes_straight_to_start_no_mode_step(monkeypatch):
+    """A1 (owner, Jun 15): change-time+OT — picking a work day goes STRAIGHT to the start ladder
+    (att:scp:ss); the old Change-time/Change-day mode step is gone (att:scp:m no longer exists)."""
     _sc_env(monkeypatch, _BAKER, "2026-06-16")
-    monkeypatch.setattr(ui, "_sc_running", lambda sid: (0, 1260, "2026-06-16"))
-    text, kb = ui.sc_mode(_BAKER, 11, 0)
+    monkeypatch.setattr(ui, "_sc_running", lambda sid: None)
+    _, kb = ui.sc_day_pick(_BAKER, 11)
     cds = [b.callback_data for row in kb.inline_keyboard for b in row]
-    assert "MID-SHIFT" in text
-    assert "att:scp:st:11:0:1260" in cds                      # extend-the-end, locked start
-    assert not any(cd.startswith("att:scp:ss:") for cd in cds)  # no start ladder
-    assert "att:scp:cd:11:0" in cds                            # Change day kept
-    # a future day keeps the normal Change time / Change day pair
-    _, kb2 = ui.sc_mode(_BAKER, 11, 2)
-    cds2 = [b.callback_data for row in kb2.inline_keyboard for b in row]
-    assert "att:scp:ss:11:2" in cds2 and "att:scp:cd:11:2" in cds2
+    assert any(cd.startswith("att:scp:ss:11:") for cd in cds)      # work day → start ladder directly
+    assert not any(cd.startswith("att:scp:m:") for cd in cds)      # no mode step anymore
 
 
-def test_sc_start_bounces_to_locked_mode_when_running(monkeypatch):
-    """Any route into today's START ladder while mid-shift (e.g. Back from the end ladder) bounces
-    to the locked mode screen — a start that happened can never be re-picked."""
+def test_sc_start_running_goes_to_end_ladder_locked(monkeypatch):
+    """Mid-shift today: the start is locked — any route into the START ladder while running redirects
+    straight to the END ladder (extend the end), never a re-pickable start (the mode screen is gone)."""
+    from shared import database as db
     _sc_env(monkeypatch, _BAKER, "2026-06-16")
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
     monkeypatch.setattr(ui, "_sc_running", lambda sid: (0, 1260, "2026-06-16"))
     text, _ = ui.sc_start(_BAKER, 11, 0)
-    assert "MID-SHIFT" in text
+    assert "END time" in text                                      # redirected to the end ladder
 
 
 def test_sc_end_back_skips_start_ladder_for_yesterday(monkeypatch):
@@ -840,6 +836,43 @@ def test_sc_end_back_skips_start_ladder_for_yesterday(monkeypatch):
     monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
     _, kb = ui.sc_end(_BAKER, 11, -1, 1260)
     assert kb.inline_keyboard[0][0].callback_data == "att:scp:d:11"
+
+
+def test_sc_start_has_normal_times_button(monkeypatch):
+    """A1 (owner, Jun 15): the start ladder offers a one-tap 'Normal times' that sets start+end to the
+    standard shift and SKIPS the end ladder (straight to confirm att:scp:cf)."""
+    _sc_env(monkeypatch, _DAYREC, "2026-06-16")
+    monkeypatch.setattr(ui, "_now_min", lambda: 0)
+    _, kb = ui.sc_start(_DAYREC, 11, 2)                       # a future day (08:00-17:00 = 480..1020)
+    cds = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "att:scp:cf:11:2:480:1020" in cds                  # normal start 480 + len 540 = end 1020
+
+
+def test_staff_changes_menu_two_options(monkeypatch):
+    """About Work 'Staff Changes (1 time)' offers Change time +OT (A1 → att:scp:staff) and Change day
+    off (A2 → att:sc2)."""
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [_DAYREC])
+    _, kb = ui.staff_changes_menu({"id": 1, "canonical_name": "S", "call_name": "S", "is_senior": True})
+    cds = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert "att:scp:staff" in cds and "att:sc2" in cds
+
+
+def test_flip_sc_senior_card_replaces_awaiting():
+    """8a-1: the proposer's registered '⏳ Awaiting approval' card is replaced by the verdict in place
+    (and the registration is one-shot — popped)."""
+    import gm_bot.bot as bot
+    edits = []
+
+    class _Bot:
+        async def edit_message_text(self, text, chat_id=None, message_id=None):
+            edits.append((chat_id, message_id, text))
+
+    ctx = types.SimpleNamespace(bot=_Bot(), bot_data={"sc_senior_card": {7: (5, 9)}})
+    g = {"when_date": "2026-06-16", "start_min": 480, "end_min": 1080}
+    asyncio.run(bot._flip_sc_senior_card(ctx, 7, g, "Anan", "✅ Approved · បានយល់ព្រម"))
+    assert edits and edits[0][0] == 5 and edits[0][1] == 9
+    assert "Approved" in edits[0][2] and "Anan" in edits[0][2]
+    assert 7 not in ctx.bot_data["sc_senior_card"]        # one-shot
 
 
 def test_settle_clamps_to_approved_window(monkeypatch):

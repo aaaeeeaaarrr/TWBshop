@@ -267,10 +267,18 @@ redesigned it into **Staff Changes (1 time) → [A1 Change time +OT · A2 Change
 / work comp-day Y, Y's hours can extend to OT)]** + a parked **Staff Changes (forever)** (all-seniors +
 owner approval). 30-day day pickers, "⏱ Normal times" shortcut (skips end menu), universal 👁 who's-working
 toggle. **8a-1** (stale awaiting card) folds into this build; **8a-2** obsoleted by A2's explicit move.
-**▶ NEXT: BUILD the redesign** — Phase 1 A1, Phase 2 A2 (HIGH-RISK schedule → staging proof + 2nd-opinion),
-then re-walk. **Parked (remind owner):** the **8b leave-vs-commitment refund model** (examples in the spec)
-+ Staff-Changes-forever. attendance_live stays OFF until a clean re-walk. *(Earlier Step-8 walk on the OLD
-redefine flow is superseded by this redesign — don't resume that; build A1/A2 instead.)*
+**▶ A1 BUILT (Jun 15, NOT deployed — A1+A2 deploy together after the re-walk):** new About Work entry
+**Staff Changes (1 time) → [⏱ Change time +OT · 📅 Change day off (A2 stub)]** + Staff-Changes-forever stub.
+A1 change-time: 30-day working-day picker (day-offs hidden), **no mode/change-day step**, **⏱ Normal times**
+one-tap (sets start+end, skips the end menu), end ladder now uses **UNBOOKED** pb + shows the **combined
+"+3PB +1OT"** tag (fixed `ot._ext_tag` + `sc_end` + `_sc_card`). **8a-1** done: the proposer's "⏳ Awaiting
+approval" card flips to the verdict in place (all 4 branches). Old `sc_mode`/`sc_dayoff_pick` removed. KH
+drafts → `docs/KH_REVIEW.md` (A1 section). Tests added; suite **582**. commits this session.
+**▶ NEXT: BUILD Phase 2 = A2 Change day off** (the real move: off X / work comp-day Y, Y's hours via the
+same start→end ladder incl. OT; writes a redefine on Y + an off-override on X; staff approves) per
+`docs/SCHEDULE_CHANGES_REDESIGN.md`. Then deploy A1+A2 together (quiet window) → owner re-walk → /audit →
+/testreset. **Parked (remind owner):** **8b refund model** (examples in spec) + Staff-Changes-forever.
+attendance_live stays OFF until a clean re-walk.
 
 **(prev) 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
 no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull

@@ -1794,15 +1794,25 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     """The staff's shift-redefine card — Approve/Can't while proposed, the decision line after,
     and a PERSISTENT 👁 who's-working toggle at every stage (owner, Jun 11: both parties must
     see who covers the new times — it helps them decide)."""
-    from shared.database import payback_open_debt
+    from shared.database import payback_open_debt, ot_pending_extension_min
     from gm_bot import ot as ot_mod
+    from gm_bot import payback as pb_mod
     start_min, end_min = int(g["start_min"]), int(g["end_min"])
     normal_len = int(g.get("normal_len") or 0)
     extra = max(0, end_min - (start_min + normal_len))
     pb = 0
     if extra:
         d = payback_open_debt(staff["id"])
-        pb = max(0, (d["minutes_owed"] - d["minutes_paid"])) if d else 0
+        raw = max(0, (d["minutes_owed"] - d["minutes_paid"])) if d else 0
+        # UNBOOKED only (owner, Jun 15) — match the senior's end ladder; never overstate +PB. If this
+        # redefine is itself already counted in pending (approved/done), don't let it subtract itself.
+        try:
+            pend = ot_pending_extension_min(staff["id"], str(g["when_date"]))
+            if g.get("status") in ("approved", "done"):
+                pend = max(0, pend - extra)
+        except Exception:
+            pend = 0
+        pb = pb_mod.unbooked(raw, pend)
     pb_cleared, ot_min = ot_mod.split_ot_pb(extra, pb)
     tag = ot_mod._ext_tag(pb_cleared, ot_min)
     win = "%s-%s" % (_fmt_min(start_min), _fmt_min(end_min))
@@ -1854,6 +1864,20 @@ async def _sc_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pass
 
 
+async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdict: str) -> None:
+    """8a-1: replace the proposing senior's '⏳ Awaiting approval' card with the verdict in place, so it
+    never sits stale after the staff decides. Best-effort; one-shot (popped)."""
+    coords = context.bot_data.get("sc_senior_card", {}).pop(cid, None)
+    if not coords:
+        return
+    win = "%s-%s" % (_fmt_min(int(g["start_min"])), _fmt_min(int(g["end_min"])))
+    txt = "🕒 Shift change — %s %s for %s\n%s" % (g["when_date"], win, staff_nm, verdict)
+    try:
+        await context.bot.edit_message_text(txt, chat_id=coords[0], message_id=coords[1])
+    except Exception:
+        pass
+
+
 async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
                               start_min: int, end_min: int, normal_len: int, reason: str) -> int:
     """A senior REDEFINES staff's shift for when_date (retime / move / extend — see docs/OT_DESIGN.md).
@@ -1900,6 +1924,9 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 await query.edit_message_text(body0, reply_markup=kb0)
             except Exception:
                 pass
+            await _flip_sc_senior_card(context, cid, g,
+                stf0.get("call_name") or stf0["canonical_name"],
+                "✋ Declined — leave kept · បានបដិសេធ — រក្សា AL")
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         if sen:
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
@@ -1929,6 +1956,8 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
             await _att_send(context, None, "Supervisors group", "",
                 "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
                 % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+            await _flip_sc_senior_card(context, cid, g, nm,
+                "✅ Approved (AL refunded) · បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)")
         return
     if action == "no":
         shift_change_set_status(cid, "declined")
@@ -1938,6 +1967,8 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 await query.edit_message_text(body0, reply_markup=kb0)
             except Exception:
                 pass
+            await _flip_sc_senior_card(context, cid, g,
+                stf0.get("call_name") or stf0["canonical_name"], "❌ Declined · បានបដិសេធ")
         # tell the PROPOSING senior (owner, Jun 11: they were left waiting forever otherwise)
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         stf = stf0
@@ -1999,6 +2030,7 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
             % (nm, g["when_date"], win, nm, g["when_date"], win), group=True)
+        await _flip_sc_senior_card(context, cid, g, nm, "✅ Approved · បានយល់ព្រម")
 
 
 def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, int]:
@@ -5524,8 +5556,13 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         if not receiver:
             await update.message.reply_text("staff not found." if live else "🧪 staff not found.")
             return
-        await submit_shift_change(context, persona, receiver, pend["when_date"],
-                                  pend["start_min"], pend["end_min"], pend["normal_len"], reason)
+        _sc_cid = await submit_shift_change(context, persona, receiver, pend["when_date"],
+                                            pend["start_min"], pend["end_min"], pend["normal_len"], reason)
+        # 8a-1: register the senior's about-to-morph "⏳ Awaiting approval" card so the staff's
+        # approve/decline flips it to the verdict in place — no stale "awaiting" left behind.
+        _pc, _pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")
+        if _sc_cid and _pc and _pm:
+            context.bot_data.setdefault("sc_senior_card", {})[_sc_cid] = (_pc, _pm)
         await confirm(
             "✅ Shift change sent — the staff is asked to approve.\n"
             "✅ បានផ្ញើការស្នើប្តូរវេនហើយ — កំពុងរង់ចាំបុគ្គលិកយល់ព្រម។",
