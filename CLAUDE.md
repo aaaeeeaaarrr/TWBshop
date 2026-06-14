@@ -311,8 +311,17 @@ fully reverses). **#3b** `/audit` `v_a2_paired` backstop (an approved paired red
 off-override). `al_date_conflict` **relaxed** to only block approved-AL + `'done'` redefines (so AL reaches
 the approval-side refund/void instead of dead-ending at submit). Old F14 block-tests updated to the
 refund/void behavior. **NOT yet deployed** (this commit). Design → `docs/SCHEDULE_CHANGES_REDESIGN.md` (8b).
-**▶ NEXT: deploy 8b #1/#2/#3 to gm (quiet window, gm-only, verify, live stays OFF) → write the refined
-step-by-step walk (Parts1+2 style) → owner re-walks → `/testreset` → flip `attendance_live`.**
+**▶ DEPLOYED 8b #1/#2/#3 to gm (Jun 15, `d5be60a`; gm-only restart, verified HEAD==origin/active/clean,
+code carries `swap_void_for_away`+`v_a2_paired`, live=None OFF, other 4 bots untouched). Step-3 walk
+written → `docs/WALK_STEP3.md`.**
+**▶ WALK FINDINGS (Jun 15, `e86f0be`, deployed gm; suite 593) — owner started the A1 re-walk:**
+**(1)** Normal-times→reason is correct (no-OT shortcut); walk doc fixed (pick a start for the OT end
+ladder). **(2)** KH Normal-times button no longer repeats the time. **(3)** proposer's awaiting card now
+**deletes + posts a fresh message** on the verdict (nudge + less noise) instead of edit-in-place.
+**(4)** the `+10 come early` line shows only on a real shift START (A2 fresh day / changed start),
+**dropped for a pure extension** (same start, already present) — the bonus is the shift's beginning.
+Tests: `test_sc_card_extension_drops_come_early_plus10` + updated flip test. **▶ NEXT: owner continues
+the walk (Parts 2–4) → `/audit` → `/testreset` → flip `attendance_live`.**
 
 **(prev) ▶ WALK-FINDINGS BATCH STEP 1 — DONE + DEPLOYED (Jun 16, a3b90d1; gm restart 05:1x PP, verified
 clean/OFF):** from the owner's A1/A2 walk. **1a** A1/A2 changes need a **2nd senior's co-approval** (status
