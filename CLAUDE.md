@@ -249,6 +249,24 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
+**Last updated:** 2026-06-14 (session 35 — **CROSS-MACHINE SYNC RELIABILITY**, docs/tooling only;
+no bot code, no service redeploy, `attendance_live` still OFF). Triggered by the other machine's pull
+NOT having `STAGING_DATABASE_URL`. Shipped (commits `2cbee41` + `7efc3a9`, pushed, HEAD==origin):
+(1) secrets-sync hole fixed — `bootstrap.py --push-secrets` + a `--sync` guard that won't clobber a
+locally-added key (▶ block below); (2) Telethon listener session backed up to the secrets repo with
+`--push-session`/`--restore-session` (▶ block below), roundtrip byte-identical, **listener verified
+still active/`NRestarts=0`/no auth errors after the copy**. **Broad pull-propagation audit done** (asked
+"what else breaks on pull?"): all secret keys the code needs are in the repo · `config.py` holds no raw
+secrets · `requirements.txt` fully covers imports (`pytest>=9.0` installable) · guard hooks + git hooks
+safe · staging URL verified-connects to isolated `twbshop_staging` (55 tables). **Only residual finding:**
+3 one-off scripts have hardcoded `C:\Users\Papa\…` paths (`run_import_lyhouy_assessment.py`,
+`run_send_historical_photos.py`, `seed_fake_customer.py`) — standalone, break only if run directly on
+another machine; left as-is (low value). Memory: [[project_secrets_sync_push]].
+**▶ NEXT (unchanged — back to the attendance go-live thread, session 34):** finish **Step 8 of the owner
+`/test` walk** (F14 collision layer — the resume point) → build the **WF1+WF2+WF3+WF5** batch from
+`docs/WALK_FINDINGS.md` → single **gm redeploy** in a quiet window → re-walk swap + Step 8 → `/audit` →
+`/testreset` → flip `attendance_live`.
+
 **▶ TELETHON SESSION BACKED UP (2026-06-14):** the listener's `ops_listener.session` (Telethon auth
 for the user account — `/root/TWBshop/ops_listener.session` on the server) is now backed up in the
 `twbshop-secrets` repo. It is **deliberately NOT in `bootstrap.py --sync`** (two `TelegramClient`s on
@@ -267,8 +285,8 @@ current `secrets.py` (11 keys) to the repo — verified via the real urllib `fet
 `STAGING_DATABASE_URL` is now there. **RULE: after adding/changing any key in `secrets.py`, run
 `python bootstrap.py --push-secrets`** — editing it locally is not enough.
 
-**Last updated:** 2026-06-14 (session 34 — **OWNER GO-LIVE /test WALK in progress + swap redesign
-decided**). The owner is role-playing the attendance flows as **PISEY** before flipping
+**(prev) 2026-06-14 (session 34 — **OWNER GO-LIVE /test WALK in progress + swap redesign
+decided**).** The owner is role-playing the attendance flows as **PISEY** before flipping
 `attendance_live` (still **OFF**; `attendance_test_mode` **ON**). Walk so far: Check-in skipped (not at
 location, known-good); Late + Sick + Swap walked; **Step 8 (F14 collision layer) NOT yet walked** — that
 is the resume point of the walk.
