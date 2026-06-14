@@ -152,3 +152,28 @@ show" is intentional. (b) **Latent gap (deeper):** the picker computes working-d
 STATIC `staff['day_off']` weekday (`working_days_ahead`/`dayoff_dates_ahead`) and does NOT consult
 `dayoff_overrides` — so after a swap, a traded day-off isn't reflected (could offer a slot on a now-off
 day, or miss a now-working day). Separate from WF1–WF5; fold into the resolver-consistency pass.
+
+---
+
+## ▶ RESUME — Step 8 tap-script (refreshed post-batch, deployed `49ba900`, attendance_live OFF)
+Batch is DEPLOYED + verified; test mode ON; slate reset+reseeded; `/audit` clean. Just `/test`. Act as a
+SENIOR (to approve) and as the STAFFER (to request). Strings below are the exact deployed text. After each,
+ask Claude to DB-verify the rows. When 8a–8e clean + Late/Sick re-checked → `/audit` → `/testreset` →
+THEN flip `attendance_live`.
+
+- **8a Supersede (AL beats a planned redefine):** senior redefines a staffer's day D → approve; that
+  staffer AL on D → senior approve. Expect "🔁 {name} … on D — the shift change set for them … no longer
+  applies. Please re-arrange cover if needed." (If D is their day-off, 0 AL deducted = correct.) *DONE/verified.*
+- **8b Block (use a CLEAN date with no redefine):** book a payback slot (or swap-work) on D′ → AL on D′ →
+  approve. Expect "⚠ You already have approved leave or a scheduled shift change on: D′. Pick other day(s)."
+  or "Couldn't approve — you already have approved leave on one of those days." (A redefined date is hidden
+  from the PB picker by design — that's what mis-fired 8b before; use a clean date.)
+- **8c Confirm-revoke:** hold approved AL on D″ → senior approves OWN redefine on D″. Expect "⚠ You have
+  approved AL on D″. Approving this shift change (…) will CANCEL that leave…" + ✅ Yes-cancel / ✋ Keep.
+- **8d Request-side block:** AL on a day you already hold approved leave/shift-change → "⚠ You already have
+  approved leave or a scheduled shift change on: {day}. Pick other day(s)."
+- **8e NEW swap↔AL (WF5 flow):** make a swap the new way — 🔁 Change day off → pick PARTNER → pick a PAIRING
+  → reason → partner agree → 2 seniors. Then: (i) AL onto a swap-WORK day → approve → "Couldn't approve —
+  you already have approved leave on one of those days." (ii) give a party AL, approve a swap needing them
+  to work that day → "Couldn't approve the swap — one of you has approved leave on a day it needs worked."
+- **Re-check** Late (no "Supervisors notified" line now) + family-sick TIMES (asks a confirm now).
