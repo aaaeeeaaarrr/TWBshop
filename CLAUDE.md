@@ -249,6 +249,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
+**▶ TELETHON SESSION BACKED UP (2026-06-14):** the listener's `ops_listener.session` (Telethon auth
+for the user account — `/root/TWBshop/ops_listener.session` on the server) is now backed up in the
+`twbshop-secrets` repo. It is **deliberately NOT in `bootstrap.py --sync`** (two `TelegramClient`s on
+one session log the account out). To re-back-up after the session rotates: `python bootstrap.py
+--push-session [path]`. **On a server rebuild, restore it BEFORE starting twbshop-listener:**
+`python bootstrap.py --restore-session` (writes `ops_listener.session` into the project dir). Roundtrip
+proven byte-identical (sha256 `12a468f64759`).
+
 **▶ SECRETS-SYNC HOLE FIXED (2026-06-14):** the other machine's pull couldn't see `STAGING_DATABASE_URL`
 because `bootstrap.py` could only PULL secrets down, never PUSH them up — a key typed into one machine's
 local `secrets.py` never reached the `twbshop-secrets` repo, so other machines' pulls never got it. Fixed

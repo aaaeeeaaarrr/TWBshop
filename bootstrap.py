@@ -242,9 +242,71 @@ def full_setup():
     print()
 
 
+SESSION_FILENAME = "ops_listener.session"  # Telethon listener auth (backed up, NOT auto-synced)
+
+
+def _gh_put(repo_path, raw_bytes, message):
+    """PUT a binary file to the secrets repo via the GitHub API (create or update).
+
+    Uses urllib (not the gh CLI) so a large base64 body isn't passed on the command line —
+    Windows caps argv length, which fails for files over a few hundred KB (e.g. .session).
+    """
+    token = get_token()
+    url = f"https://api.github.com/repos/{SECRETS_REPO}/contents/{repo_path}"
+    headers = {"Authorization": f"token {token}",
+               "Accept": "application/vnd.github.v3+json"}
+    # Current sha (required to UPDATE an existing file; absent = create).
+    sha = None
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req) as resp:
+            sha = json.loads(resp.read()).get("sha")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    body = {"message": message, "content": base64.b64encode(raw_bytes).decode()}
+    if sha:
+        body["sha"] = sha
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers,
+                                 method="PUT")
+    with urllib.request.urlopen(req) as resp:
+        resp.read()
+
+
 if __name__ == "__main__":
     if "--sync" in sys.argv:
         sync(silent=True)
+    elif "--push-session" in sys.argv:
+        # Back up the Telethon listener session to the secrets repo. Usage:
+        #   python bootstrap.py --push-session [path-to-session]
+        # Default path = ops_listener.session in the project dir (the live file).
+        i = sys.argv.index("--push-session")
+        src = sys.argv[i + 1] if len(sys.argv) > i + 1 and not sys.argv[i + 1].startswith("-") \
+            else os.path.join(PROJECT_DIR, SESSION_FILENAME)
+        if not os.path.exists(src):
+            sys.exit(f"Session file not found: {src}")
+        with open(src, "rb") as f:
+            raw = f.read()
+        import hashlib
+        _gh_put(SESSION_FILENAME, raw, "backup Telethon listener session")
+        print(f"{SESSION_FILENAME} ({len(raw)} bytes, sha256 {hashlib.sha256(raw).hexdigest()[:12]}) "
+              f"backed up to {SECRETS_REPO}.")
+        print("NOTE: not auto-synced. Restore on a server rebuild with: "
+              "python bootstrap.py --restore-session")
+    elif "--restore-session" in sys.argv:
+        # Write the backed-up Telethon session into the live path. ONLY run where the listener
+        # will actually run (the server). Never run a 2nd TelegramClient on this session
+        # concurrently — Telegram will invalidate it and log the account out.
+        i = sys.argv.index("--restore-session")
+        dest = sys.argv[i + 1] if len(sys.argv) > i + 1 and not sys.argv[i + 1].startswith("-") \
+            else os.path.join(PROJECT_DIR, SESSION_FILENAME)
+        token = get_token()
+        data = fetch_file(token, SESSION_FILENAME)
+        with open(dest, "wb") as f:
+            f.write(data)
+        import hashlib
+        print(f"Restored {SESSION_FILENAME} -> {dest} "
+              f"({len(data)} bytes, sha256 {hashlib.sha256(data).hexdigest()[:12]}).")
     elif "--push-secrets" in sys.argv:
         local_secrets = os.path.join(PROJECT_DIR, "secrets.py")
         with open(local_secrets, "rb") as f:
