@@ -340,6 +340,25 @@ Reason · មូលហេតុ៖ {reason}
 - `{Y} (their day off) — START time? (or ⏱ Normal times)` · `{Y} — ម៉ោងចាប់ផ្តើម?`
 - prompt `Day-off move — {nm}: OFF {X}, works {Y} {win}{ot}.` · `ប្តូរថ្ងៃឈប់ — {nm}៖ ឈប់ {X}, ធ្វើការ {Y} {win}{ot}។`
 - card `🗓 Day-off move — you're OFF {X}, and you WORK {Y}: {win}` · `🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {X}, ហើយធ្វើការ {Y}៖ {win}`
+- A2 card 👁 both-date coverage (seniors+staff): `OFF {X} — who works (covers)` · `ឈប់ {X} — អ្នកធ្វើការ` ·
+  `WORKS {Y} — who works` · `ធ្វើការ {Y} — អ្នកធ្វើការ`
+
+### WF2/WF3 — family-sick (Jun 14) — KH draft
+- **WHO:** the staffer (confirm + booked) + Supervisors (FYI). **WHEN:** family-sick TIMES path now asks a confirm; FYI on booking.
+- WF2 confirm `Family sick ({who}) — {window}.` · `គ្រួសារឈឺ ({who}) {window}។`  (window = `9:00am → 12:00pm`)
+- WF3 FYI `FYI: {nm} takes sick leave for their {who} today ({window}).` · `FYI: {nm} សុំច្បាប់ឈឺសម្រាប់{who_kh}ថ្ងៃនេះ ({window})។`
+  (no window = drop the parens: `…today.` · `…ថ្ងៃនេះ។`)
+
+### WF5 — partner-swap redesign (Jun 14) — KH draft
+- **WHO:** the requesting staffer. **WHEN:** the new 🔁 Change day off flow (pick partner → pick a pairing).
+- partner picker `Swap day off — pick WHO to trade with (a different day off, similar shift times). You'll then choose a date-pairing.` ·
+  `ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ បន្ទាប់មកជ្រើសគូកាលបរិច្ឆេទ។`
+- `Your day off · ថ្ងៃឈប់របស់អ្នក៖ {day_off}`
+- pairing button `🔁 you off {their_day} · {partner} off {your_day}` · (KH: `🔁 អ្នកឈប់ {their_day} · {partner} ឈប់ {your_day}`)
+- pairings header `Swap with {pn} — pick a pairing. You take their day off, they take yours (≤ 6 days apart, coverage stays even).` ·
+  `ប្តូរជាមួយ {pn} — ជ្រើសគូមួយ។ អ្នកយកថ្ងៃឈប់របស់គេ គេយកថ្ងៃឈប់របស់អ្នក (ក្នុង 6 ថ្ងៃ)។`
+- no-pairing `No close day-off pairing with {pn} in the next 3 weeks (need ≤6 days apart, a different day off, and neither date already swapped).` ·
+  `គ្មានគូថ្ងៃឈប់ជិតគ្នាជាមួយ {pn} ក្នុង 3 សប្តាហ៍ខាងមុខទេ។`
 
 ### MM1 — prompt superseded (multi-menu fix, piece 2)
 - **WHO reads it:** a staffer who had a reason-prompt open ("type why…") and then started a *second*

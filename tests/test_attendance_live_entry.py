@@ -886,6 +886,19 @@ def test_sc_card_shows_dayoff_move(monkeypatch):
     assert "Day-off move" in body and "2026-07-20" in body and "2026-07-22" in body
 
 
+def test_sc_card_a2_coverage_both_dates(monkeypatch):
+    """A2: the 👁 toggle shows the impact on BOTH dates — who covers X (now off) AND who works Y."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    monkeypatch.setattr(bot, "_al_availability_lines", lambda staff, days, *a: "covers: someone")
+    g = {"id": 9, "staff_id": 11, "when_date": "2026-07-22", "start_min": 480, "end_min": 1020,
+         "normal_len": 540, "reason": "x", "status": "proposed", "paired_off_date": "2026-07-20"}
+    body, _ = bot._sc_card(g, _DAYREC, show_cov=True)
+    assert "2026-07-20" in body and "2026-07-22" in body          # both dates' coverage shown
+    assert body.count("covers: someone") >= 2                     # X coverage AND Y coverage
+
+
 def test_a2_cf_arms_shift_with_paired_off(monkeypatch):
     """A2: att:a2:cf arms a 'shift' pending carrying paired_off_date (=X, the new off day) and the
     comp work day Y — so it reuses the whole submit/approve/card machinery."""

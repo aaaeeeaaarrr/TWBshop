@@ -1842,7 +1842,20 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
         body += "\n\n✅ Done · រួចរាល់"
     if show_cov:
         cov = _sc_coverage_lines(staff, g["when_date"], start_min, end_min)
-        if cov:
+        if poff:   # A2: show the impact on BOTH dates — who covers X (now off) AND who works Y (owner)
+            try:
+                xcov = _al_availability_lines(staff, [str(poff)]) or ""
+            except Exception:
+                xcov = ""
+            parts = []
+            if xcov:
+                parts.append("OFF %s — who works (covers) · ឈប់ %s — អ្នកធ្វើការ:\n%s" % (poff, poff, xcov))
+            if cov:
+                parts.append("WORKS %s — who works · ធ្វើការ %s — អ្នកធ្វើការ:\n%s"
+                             % (g["when_date"], g["when_date"], cov))
+            if parts:
+                body += "\n\n👥 " + "\n\n👥 ".join(parts)
+        elif cov:
             body += "\n\n👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
     rows = []
     if st == "proposed":
