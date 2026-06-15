@@ -1946,8 +1946,11 @@ def sc_end(p: dict, sid: int, tdidx: int, start: int) -> tuple[str, InlineKeyboa
         pend = 0
     pb = pb_mod.unbooked(raw, pend)
     normal_end = start + normal_len
+    # never offer a total beyond the 18h/day cap (owner, Jun 15) — bound the ladder by day_ext_cap so the
+    # picker can't create an over-cap change the audit would flag.
+    max_extra = min(ot_mod.MAX_EXTRA_HOURS * 60, pb_mod.day_ext_cap(normal_len))
     btns = []
-    for extra in range(0, ot_mod.MAX_EXTRA_HOURS * 60 + 1, 60):
+    for extra in range(0, max_extra + 1, 60):
         end_abs = normal_end + extra
         pb_cleared, ot_m = ot_mod.split_ot_pb(extra, pb)
         tag = ot_mod._ext_tag(pb_cleared, ot_m)
@@ -2055,8 +2058,10 @@ def a2_end(p: dict, sid: int, xidx: int, yidx: int, start: int) -> tuple[str, In
         pend = 0
     pbm = pb_mod.unbooked(raw, pend)
     normal_end = start + normal_len
+    # 18h/day cap (owner, Jun 15): bound the ladder so the picker can't create an over-cap change.
+    max_extra = min(ot_mod.MAX_EXTRA_HOURS * 60, pb_mod.day_ext_cap(normal_len))
     btns = []
-    for extra in range(0, ot_mod.MAX_EXTRA_HOURS * 60 + 1, 60):
+    for extra in range(0, max_extra + 1, 60):
         end_abs = normal_end + extra
         pb_cleared, ot_m = ot_mod.split_ot_pb(extra, pbm)
         tag = ot_mod._ext_tag(pb_cleared, ot_m)

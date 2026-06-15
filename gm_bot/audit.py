@@ -15,7 +15,7 @@ import json
 from datetime import date, timedelta
 
 OT_CAP_MIN = 840          # 14h bank cap
-MAX_DAY_TOTAL_MIN = 900   # 15h — one day's total work time cap (owner rule, = payback.MAX_DAY_TOTAL_MIN)
+from gm_bot.payback import MAX_DAY_TOTAL_MIN   # one day's total work-time cap (single source of truth)
 STALE_PENDING_DAYS = 4    # a request nobody decided for this long = stuck ladder
 STALE_OPEN_SESSION_DAYS = 2
 
@@ -131,8 +131,9 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
         if (st in ("approved", "done") and r.get("start_min") is not None
                 and r.get("end_min") is not None
                 and int(r["end_min"]) - int(r["start_min"]) > MAX_DAY_TOTAL_MIN):
-            out.append("OT: %s change #%s spans %dmin — one day's total work time caps at 15h "
-                       "(owner rule)" % (nm, r["id"], int(r["end_min"]) - int(r["start_min"])))
+            out.append("OT: %s change #%s spans %dmin — one day's total work time caps at %dh "
+                       "(owner rule)" % (nm, r["id"], int(r["end_min"]) - int(r["start_min"]),
+                                         MAX_DAY_TOTAL_MIN // 60))
     return out
 
 

@@ -54,14 +54,15 @@ def test_ignore_stage():
     assert payback.ignore_stage(9) == "autobook"
 
 
-def test_day_ext_cap_15h():
-    # 10h normal shift: cap = 15-10 = 5h = 300min
-    assert payback.day_ext_cap(600) == 300
-    # 14h shift: cap = 1h
-    assert payback.day_ext_cap(840) == 60
-    # 15h+ shift: cap = 0 (no room)
-    assert payback.day_ext_cap(900) == 0
-    assert payback.day_ext_cap(960) == 0
+def test_day_ext_cap_18h():
+    # owner (Jun 15): one day's total work time caps at 18h (raised from 15h).
+    # 10h normal shift: cap = 18-10 = 8h = 480min
+    assert payback.day_ext_cap(600) == 480
+    # 14h shift (the work-long-by-choice case): cap = 4h = 240min
+    assert payback.day_ext_cap(840) == 240
+    # 18h+ shift: cap = 0 (no room)
+    assert payback.day_ext_cap(18 * 60) == 0
+    assert payback.day_ext_cap(19 * 60) == 0
 
 
 def test_unbooked_remaining():
@@ -74,9 +75,9 @@ def test_unbooked_remaining():
     assert payback.unbooked(120, 180) == 0
 
 
-def test_slot_keyboard_caps_at_15h(monkeypatch):
-    """A 10h shift with 11h15m debt: the picker slots must be capped at 5h (300min),
-    not 11h15m — the owner's 15h-total-day rule (Jun 11 find)."""
+def test_slot_keyboard_caps_at_18h(monkeypatch):
+    """A 10h shift with 11h15m debt: the picker slots must be capped at 8h (480min),
+    not 11h15m — the owner's 18h-total-day rule (raised from 15h, Jun 15)."""
     from gm_bot import bot
     from datetime import date
 
@@ -94,7 +95,7 @@ def test_slot_keyboard_caps_at_15h(monkeypatch):
         for btn in row:
             if btn.callback_data.startswith("att:pb:book:") and ("🌅" in btn.text or "🌙" in btn.text):
                 mins = int(btn.callback_data.split(":")[-1])
-                assert mins <= 300, "working-day slot %d > 300min cap" % mins
+                assert mins <= 480, "working-day slot %d > 480min cap" % mins
 
 
 def test_slot_keyboard_returns_none_when_fully_booked(monkeypatch):

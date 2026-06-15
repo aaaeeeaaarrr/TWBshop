@@ -848,6 +848,23 @@ def test_sc_start_has_normal_times_button(monkeypatch):
     assert "att:scp:cf:11:2:480:1020" in cds                  # normal start 480 + len 540 = end 1020
 
 
+def test_sc_end_ladder_respects_18h_day_cap(monkeypatch):
+    """Owner (Jun 15): the end ladder never offers a total work window beyond 18h. A 16h normal shift
+    can extend only +2h (→18h), not the blanket +4h — so the picker can't create an over-cap change."""
+    from shared import database as db
+    rec = {"id": 11, "canonical_name": "Long", "call_name": "Long", "org": "TWB",
+           "work_start": "06:00", "work_end": "22:00", "day_off": "Sun"}     # 16h normal shift
+    _sc_env(monkeypatch, rec, "2026-06-16")
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    monkeypatch.setattr(db, "ot_pending_extension_min", lambda sid, iso: 0)
+    _, kb = ui.sc_end(rec, 11, 2, 360)                                        # start 06:00
+    ends = [int(b.callback_data.split(":")[-1]) for row in kb.inline_keyboard for b in row
+            if b.callback_data.startswith("att:scp:cf:")]
+    assert ends                                                              # offers at least normal end
+    assert max(e - 360 for e in ends) <= 18 * 60                             # no window beyond 18h
+    assert max(ends) == 360 + 18 * 60                                        # caps exactly at 18h (16h+2h)
+
+
 def test_staff_changes_menu_two_options(monkeypatch):
     """About Work 'Staff Changes (1 time)' offers Change time +OT (A1 → att:scp:staff) and Change day
     off (A2 → att:sc2)."""

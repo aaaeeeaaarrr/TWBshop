@@ -13,11 +13,12 @@ _DOW = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
 PB_DEADLINE_DAYS = 14   # a debt must be worked off within 14 days (owner spec, session 28)
 
-MAX_DAY_TOTAL_MIN = 15 * 60   # owner rule (Jun 11): one day's TOTAL work time never exceeds 15h
+MAX_DAY_TOTAL_MIN = 18 * 60   # owner rule (Jun 15: raised 15h→18h — some staff work long shifts by
+                              # choice): one day's TOTAL work time (shift + extension) never exceeds 18h
 
 
 def day_ext_cap(normal_len_min: int) -> int:
-    """Max extension minutes bookable onto a working day — normal shift + extension caps at 15h
+    """Max extension minutes bookable onto a working day — normal shift + extension caps at 18h
     total. The remainder of a bigger debt books onto other days instead."""
     return max(0, MAX_DAY_TOTAL_MIN - max(0, normal_len_min or 0))
 

@@ -270,8 +270,14 @@ contradiction: WALK_FINDINGS' Step-8 tap-script marked SUPERSEDED for 8b/8e (now
 co-approve card (2nd senior's DECISION point) + the shift-change Supervisors FYI (+ swap approved FYI as a
 parallel gap). System-wide audit done — AL cards/notice, swap partner+senior cards, late, own-sick FYI all
 already carry it; family-sick shows *who* (no separate reason). Added "Why · មូលហេតុ" to the 3 gaps,
-strengthened 2 tests + walk Part 1/2 checks. Suite 597. **NEXT: owner re-confirms Part 2 + continues
-Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
+strengthened 2 tests + walk Part 1/2 checks. Suite 597.
+**▶ DAY-CAP raised 15h→18h (Jun 15, owner: a staffer works ~14h by choice):** `payback.MAX_DAY_TOTAL_MIN`
+= 18*60 (single source of truth — `audit.py` now IMPORTS it, killing the old hardcoded-900 drift the
+comment warned about); watchdog message made dynamic ("caps at 18h"). Closed the picker gap that let
+Rath's 16h through: the A1/A2 end-ladders (`sc_end`/`a2_end`) now bound `extra` by `day_ext_cap(normal_len)`
+so the picker can never offer an over-cap change (was: only the audit caught it after). OT-bank cap (14h)
+unchanged — different concept. Tests updated to 18h + new ladder-cap guard. Suite 598. **NEXT: owner
+re-confirms Part 2 + continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed
