@@ -289,6 +289,22 @@ the SAME rich style as the senior cards (🔁 + `X ↔ Y` + who COVERS each day 
 off, Y off". +1 regression test (`test_swap_excludes_senior_party_from_coapproval`), suite 606. THIRD gm
 deploy Jun 16. **3c VERIFIED on prod test-rows** (independent read): swaps 52 + 41 stay `approved`; the
 hours-AL on each swap-WORK day charged the fraction (0.21 / 0.2), not 0, not blocked, swap intact.
+**▶ FULL DUE-DILIGENCE SWEEP (Jun 16, owner-requested, hands-off — final pre-go-live pass):**
+**(1) Dead-end inventory** — mapped every `att:` callback vs every handler registration: order safe (specific
+patterns before the `^att:` catch-all, no prefix collisions); the `sp`/`dr` dispatches have graceful menu
+fallbacks; the catch-all calls `query.answer()` unconditionally then no-ops on unknown actions → NO harmful
+dead-ends (no spinning buttons), live-staff F12 maintenance path intact. **(2) Same-day double-work stress**
+— NEW `tests/test_resolve_day_collisions.py` (5 tests) proves `resolve_day` returns exactly ONE coherent
+decision for every overlap (AL>sick>special>redefine>swap>day-off>normal); two senior redefines on a day
+collapse to the latest (supersede in `shift_change_approve_claim` + latest-wins `shift_change_active`); AL
+beats everything, redefine is the single work-source vs a swap. No double-charge/double-work possible at
+read time. **(3) /audit** clean on test + real rows (only flag: one historical dead-tap `att:scs:no:62`
+from the now-fixed co-approve dead-end — clears on `/testreset`; minor: the dead-tap log isn't is_test-
+scoped so it shows in both). **(4) Dead-code removed** (suite green 611): the `go6` dry-run remnant (map
+entry + dispatch branch — dry-run 6 was deleted long ago), the orphaned `_buyback_kb` demo keyboard, and
+its now-unreachable `_DRS["take"]` sample. FLAGGED-NOT-REMOVED: `gm_bot/analyzer.py::_analyze_photo`
+(unused Haiku photo-analysis fn — likely an interface-first stub per Arch-Rule-2; owner to confirm). Suite
+**611**. FOURTH gm deploy Jun 16 (cleanups; dry-run/dead code only — zero live-path change).
 **▶ NEXT: owner
 resumes the walk — re-check 3c with an hours-AL (Date+Time now on all messages) → 3d → Part 4 step 2 →
 `/audit` → `/testreset` → flip `attendance_live`.**

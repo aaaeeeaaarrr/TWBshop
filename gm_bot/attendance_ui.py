@@ -393,10 +393,6 @@ _DRS = {
             "Your AL for Tue 23/06 → Thu 25/06 wasn't approved.\n"
             "AL របស់ប្អូនសម្រាប់ Tue 23/06 → Thu 25/06 មិនបានអនុម័តទេ។\n\n"
             "(requester only — with WHICH request; your typed reason follows; NOTHING to the group)"),
-    "take": ("→ tapping a buyback slot books the rest:",
-             "Booked ✓ — Tue 10/06, 2pm–3pm.\nបានកក់រួច ✓ — Tue 10/06, 2pm–3pm។\n"
-             "OT bank របស់អ្នក៖ 3.5h\n\n"
-             "(then: the 12h-before reminder; no check-in — it's rest, not work)"),
 }
 
 
@@ -622,13 +618,6 @@ def build_catalogue4(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     ]
 
 
-def _buyback_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Tue 10/06 2pm-3pm", callback_data="att:drs:take")],
-        [InlineKeyboardButton("Wed 11/06 8pm-9pm", callback_data="att:drs:take")],
-        [InlineKeyboardButton("Take 1 hour only · សម្រាកតែ 1h", callback_data="att:drs:take")]])
-
-
 def build_catalogue5(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None]]:
     """Dry-run 5: MARRIAGE · FAMILY DEATH (2 tiers) · WIFE BIRTH. All AL-funded, never salary."""
     upgrade_kb = InlineKeyboardMarkup([
@@ -779,7 +768,7 @@ def _dr_events(key: str, sample: dict):
     if key == "go":
         return build_catalogue(sample) + [("📅 schedule summary", schedule_summary(_today()), None)]
     return {"go2": build_catalogue2, "go3": build_catalogue3, "go4": build_catalogue4,
-            "go5": build_catalogue5, "go6": build_catalogue7, "go7": build_catalogue7,
+            "go5": build_catalogue5, "go7": build_catalogue7,
             "go8": build_catalogue8}.get(key, build_catalogue8)(sample)
 
 
@@ -2631,8 +2620,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if action == "dr":
         sub = data[2] if len(data) > 2 else ""
-        if sub in _DR_INTROS or sub == "go6":
-            key = "go7" if sub == "go6" else sub
+        if sub in _DR_INTROS:
+            key = sub
             sample = _dr_sample(context)
             if sample is None:
                 await query.answer("No staff with shifts found")
