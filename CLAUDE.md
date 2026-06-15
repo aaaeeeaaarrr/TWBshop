@@ -280,6 +280,15 @@ card (added s37) rendered the buttonless 'proposed' branch. FIX: sync `g["status
 memory before sending. Also fixed the misleading test/live confirm ("you got the staff's card" → "1 more
 senior must co-approve"). Strengthened `test_1a_non_extension_needs_senior_coapproval` to assert the
 Co-approve button is PRESENT (revert-proven: fails without the fix). Suite 605. SECOND gm deploy Jun 16.
+**▶ SWAP FIXES (Jun 16, from the owner's 3c walk):** **(a)** a senior who is a PARTY to a swap
+(requester OR partner) was being asked TWICE — once as the party, once as a senior co-approver. Now the
+senior cards EXCLUDE both parties (`_swap_partner_callback`) and the quorum drops to 1 when EITHER party
+is a senior (`approvals_needed(party_is_senior)`; was requester-only) — their party-agreement counts. Test
+mode helper texts updated ("1 if a party is a senior"). **(b)** the Supervisors-group swap notice now uses
+the SAME rich style as the senior cards (🔁 + `X ↔ Y` + who COVERS each day + reason), not the bland "X
+off, Y off". +1 regression test (`test_swap_excludes_senior_party_from_coapproval`), suite 606. THIRD gm
+deploy Jun 16. **3c VERIFIED on prod test-rows** (independent read): swaps 52 + 41 stay `approved`; the
+hours-AL on each swap-WORK day charged the fraction (0.21 / 0.2), not 0, not blocked, swap intact.
 **▶ NEXT: owner
 resumes the walk — re-check 3c with an hours-AL (Date+Time now on all messages) → 3d → Part 4 step 2 →
 `/audit` → `/testreset` → flip `attendance_live`.**

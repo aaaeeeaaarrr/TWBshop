@@ -540,6 +540,44 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert any("who's working" in b for b in tog)
 
 
+def test_swap_excludes_senior_party_from_coapproval(monkeypatch):
+    """Owner (Jun 16): a senior who is a PARTY to the swap (here the PARTNER) already agreed as a party —
+    they must NOT also get a senior co-approval card (the 'asked twice' bug). Independent seniors still
+    get the card; the quorum drops to 1 (their party-agreement counts)."""
+    from gm_bot import bot, al as alm
+    sw = {"id": 70, "requester_id": 1, "partner_id": 2, "req_off_date": "2026-07-19",
+          "partner_off_date": "2026-07-18", "reason": "r", "status": "pending", "partner_ok": None}
+    req = {"id": 1, "canonical_name": "Req", "call_name": "Req", "telegram_ids": [11],
+           "is_senior": False, "org": "TWB"}
+    partner = {"id": 2, "canonical_name": "RathSen", "call_name": "RathSen", "telegram_ids": [22],
+               "is_senior": True, "org": "TWB"}
+    sen3 = {"id": 3, "canonical_name": "S3", "call_name": "S3", "telegram_ids": [33],
+            "is_senior": True, "org": "TWB"}
+    sen4 = {"id": 4, "canonical_name": "S4", "call_name": "S4", "telegram_ids": [44],
+            "is_senior": True, "org": "TWB"}
+    monkeypatch.setattr(bot, "swap_get", lambda i: dict(sw))
+    monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [req, partner, sen3, sen4])
+    monkeypatch.setattr(bot, "swap_set_partner",
+                        lambda i, ok: sw.update(status="partner_ok", partner_ok=ok))
+    sent = []
+
+    async def _send(context, uid, role, nm, text, group=False, kb=None, **k):
+        sent.append((role, uid))
+        return None
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+    ctx = _Ctx()
+    ctx.bot_data = {}
+    upd = _CbUpdate(99, "att:swp:70:agree")
+    asyncio.run(bot._swap_partner_callback(upd, ctx))
+    sen_uids = [u for r, u in sent if r == "Senior"]
+    assert 22 not in sen_uids                       # the senior PARTNER is NOT asked again
+    assert 33 in sen_uids and 44 in sen_uids        # independent seniors still get the card
+    # and the quorum reflects the senior party → 1 more senior needed (not 2)
+    assert alm.approvals_needed(True) == 1
+
+
 def test_hours_al_shows_time_in_verdict_and_reminder(monkeypatch):
     """Owner (Jun 16): an HOURS-AL must state Date+Time in EVERY staffer-facing message — the
     approval verdict AND the coexist/swap/refund reminder (which read like a full day off before).

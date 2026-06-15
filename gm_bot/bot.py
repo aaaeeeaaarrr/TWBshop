@@ -2595,9 +2595,12 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
     except Exception:
         pass
     await _swap_flip_requester_card(context, sw, req, partner)   # requester card → awaiting senior
-    # now seniors — the card carries a persistent 👁 Show-who's-working toggle (both affected days)
+    # now seniors — the card carries a persistent 👁 Show-who's-working toggle (both affected days).
+    # Exclude BOTH parties (owner, Jun 16): a senior who is the requester OR the partner already
+    # agreed as a party — don't ask them again as a senior (they can't impartially approve their own
+    # swap). Their party-agreement counts toward the quorum (see approvals_needed in _swap_senior_callback).
     cards = context.bot_data.setdefault("swap_cards", {}).setdefault(sw["id"], [])
-    for sen in _seniors(exclude_staff_id=sw["requester_id"]):
+    for sen in [s for s in _seniors() if s["id"] not in (sw["requester_id"], sw["partner_id"])]:
         body, kb = _swap_card(sw, req, partner, audience="senior", show_cov=False)
         msg = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                               sen.get("call_name") or sen["canonical_name"], body, kb=kb,
@@ -2634,7 +2637,12 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
     from gm_bot import al as alm
     requester = next((s for s in staff_all("active") if s["id"] == sw["requester_id"]), None)
-    needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
+    partner = next((s for s in staff_all("active") if s["id"] == sw["partner_id"]), None)
+    # owner (Jun 16): if EITHER party is a senior, their party-agreement is one approval → 1 other
+    # senior needed (was: only the requester counted; a senior PARTNER got asked twice).
+    party_is_senior = bool((requester and requester.get("is_senior"))
+                           or (partner and partner.get("is_senior")))
+    needed = alm.approvals_needed(party_is_senior)
     votes = swap_add_senior_vote(int(sw["id"]), query.data.split(":")[3])
     await query.edit_message_text(query.message.text + "\n\n✓ voted: %s" % query.data.split(":")[3])
     if query.data.split(":")[3] == "not_approve":
@@ -2711,10 +2719,14 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
         rd2 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
         pd2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
         swhy = (sw.get("reason") or "—")
+        # owner (Jun 16): present it the SAME rich way the seniors see it — ↔ + who COVERS each day +
+        # the 🔁 emoji — not the bland "X off, Y off" the group used to get.
         await _att_send(context, None, "Supervisors group", "",
-            "Day-off swap: %s off %s, %s off %s.\nReason · មូលហេតុ៖ %s\n"
-            "ប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
-            % (rn2, rd2, pn2, pd2, swhy, rn2, rd2, pn2, pd2), group=True)
+            "🔁 Day-off swap: %s ↔ %s\n%s off %s — %s covers · %s off %s — %s covers.\n"
+            "Reason · មូលហេតុ៖ %s\n"
+            "🔁 ប្តូរថ្ងៃឈប់៖ %s ↔ %s\n%s ឈប់ %s — %s ជំនួស · %s ឈប់ %s — %s ជំនួស។"
+            % (rn2, pn2, rn2, rd2, pn2, pn2, pd2, rn2, swhy,
+               rn2, pn2, rn2, rd2, pn2, pn2, pd2, rn2), group=True)
     else:
         from datetime import date as _dr
         rd3 = _dr.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
@@ -5815,7 +5827,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ AL request sent — your seniors will review it. I'll message you when it's decided.\n"
             "✅ បានផ្ញើសំណើ AL — បងៗនឹងពិនិត្យ ហើយខ្ញុំនឹងប្រាប់ពេលមានការសម្រេច។",
             "🧪 AL request submitted (test) — the senior approval cards were routed to you. Tap ✅ to "
-            "reach quorum (2 seniors; 1 if the requester is a senior), then watch the requester + "
+            "reach quorum (2 seniors; 1 if a party is a senior), then watch the requester + "
             "Supervisors messages. /testreset to wipe.")
     elif flow == "late":
         from gm_bot.attendance import to_min
@@ -5925,7 +5937,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ Day-off swap sent — your partner agrees first, then the seniors approve.\n"
             "✅ បានផ្ញើសំណើប្តូរថ្ងៃឈប់ — ដៃគូយល់ព្រមមុន បន្ទាប់មកបងៗអនុម័ត។",
             "🧪 Swap submitted (test) — the partner agree-card was routed to you. Tap ✅ I agree, then "
-            "approve as the seniors (2; or 1 if the requester is a senior), then watch the Supervisors "
+            "approve as the seniors (2; or 1 if a party is a senior), then watch the Supervisors "
             "notice. /testreset to wipe.")
     elif flow == "marriage":
         from datetime import date as _date, timedelta as _td
@@ -5938,7 +5950,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             "✅ Marriage leave sent for senior approval. Congratulations 🎉\n"
             "✅ បានផ្ញើសំណើច្បាប់រៀបការសម្រាប់អនុម័ត។ សូមអបអរសាទរ 🎉",
             "🧪 Marriage leave submitted (test, via the AL approval engine) — senior cards routed to "
-            "you; approve as the seniors (2; or 1 if the requester is a senior). /testreset to wipe.")
+            "you; approve as the seniors (2; or 1 if a party is a senior). /testreset to wipe.")
     elif flow == "death":
         await book_family_death(context, persona, pend["who"], pend["start_date"])
         await confirm(
