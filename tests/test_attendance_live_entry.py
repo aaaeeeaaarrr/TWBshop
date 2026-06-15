@@ -2244,6 +2244,28 @@ def test_audit_exclusivity():
                                          [sc(14, _dt.date(2026, 6, 27))], staff, today))
 
 
+def test_swap_picker_excludes_al_days(monkeypatch):
+    """Option A (owner, Jun 15): the swap pairing picker never OFFERS a pairing landing on a day either
+    party already has approved AL — you can't trade onto a day you're already away/off."""
+    import datetime as _dt
+    p = {"id": 1, "canonical_name": "A", "call_name": "A"}
+    partner = {"id": 2, "canonical_name": "B", "call_name": "B"}
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [p, partner])
+    monkeypatch.setattr(ui, "_today", lambda: _dt.date(2026, 7, 1))
+    monkeypatch.setattr(ui, "_real_dayoff_dates",
+                        lambda rec, start: [_dt.date(2026, 7, 3)] if rec["id"] == 1
+                        else [_dt.date(2026, 7, 5)])
+    # p is on AL on 2026-07-05 (the day p would take OFF in the pairing) → that pairing must be dropped
+    monkeypatch.setattr(ui, "al_leave_days_set", lambda sid: {"2026-07-05"} if sid == 1 else set())
+    _, kb = ui.dayoff_swap_pairs(p, 2)
+    assert [b.callback_data for row in kb.inline_keyboard for b in row
+            if b.callback_data.startswith("att:do:pair")] == []          # excluded
+    monkeypatch.setattr(ui, "al_leave_days_set", lambda sid: set())       # clear AL → it appears
+    _, kb2 = ui.dayoff_swap_pairs(p, 2)
+    assert len([b.callback_data for row in kb2.inline_keyboard for b in row
+                if b.callback_data.startswith("att:do:pair")]) == 1
+
+
 def test_al_picker_charges_a2_comp_day(monkeypatch):
     """8b (owner, Jun 16): the AL picker preview must COUNT an A2 comp-work day (a day-off weekday a move
     turned into a real work day) as charged — matching the real deduction — not show '0 / Day off = No AL

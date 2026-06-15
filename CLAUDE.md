@@ -300,8 +300,21 @@ agree: new `al_effective_left(staff_id)` = real `al_left` − Σ(approved TEST d
 column]; `_persona` overlays it in test (covers My Schedule + the over-balance early gate); and
 `al_approve_and_deduct`'s test return is now CUMULATIVE (real − all approved test deductions incl. this
 one) so the message matches the schedule. Real column still untouched in test (verified). +1 staging test
-(cumulative + real-untouched + live passthrough). Suite 600. **NEXT: owner re-confirms 3a + continues
-3b/3c/3d + Part 4 → `/audit` → `/testreset` → flip `attendance_live`.**
+(cumulative + real-untouched + live passthrough). Suite 600.
+**▶ SWAP × AL REDESIGN (Jun 15, owner directive — HIGH-RISK, staging-proven): AL never cancels a swap.**
+Owner: "taking AL doesn't cancel the swap … fair with owners that pay for time AT work, not off" — i.e.
+the A2-coexist rule extended to swaps. Built: **(1)** removed the swap-VOID on AL approval (deleted dead
+`swap_void_for_away`; sick/special-leave still void via `supersede_day`'s own inline logic). **(2)** AL on a
+swap-WORK day now **COEXISTS + is CHARGED 1** — `al_coexist_days` extended to swap-`work` overrides (drives
+both the deduction and the picker preview), a `swap_coexist` reminder ("took AL on swap day — swap stays,
+please cover"). **(3)** AL on a swap-OFF day = 0 — already handled (the AL picker hides non-working days via
+`resolve_day`, owner's reminder). **(4) Option A:** the swap pairing picker excludes any day EITHER party
+already has approved AL (`dayoff_swap_pairs` filters via `al_leave_days_set`) — fixes the screenshot (a swap
+was offered onto an AL'd day). **(5)** audit `v_swap_exclusivity` no longer flags AL-on-swap-work (it's the
+intended coexist; kept the superseded-leftover reversal check). +3 tests (swap coexist charge on staging ·
+picker exclusion · audit). Suite 602. **NEXT: owner TEST 3c (AL on a swap-work day → charged 1, swap stays)
++ re-test the swap picker no longer offers AL'd days → 3d + Part 4 → `/audit` → `/testreset` → flip
+`attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed

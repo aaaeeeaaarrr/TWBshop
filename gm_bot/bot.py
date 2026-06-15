@@ -2985,6 +2985,15 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
                     % (name, dlabel, xlabel, name, dlabel, xlabel))
             await _att_send(context, vuid, "Staff", name, line)
             await _att_send(context, None, "Supervisors group", "", line, group=True)
+        elif d.get("kind") == "swap_coexist":
+            # owner (Jun 15): AL landed on a day a SWAP put her to WORK — the swap STAYS (the partner
+            # already gave/took their day), she's just away (AL charged for that work day), a human covers.
+            line = ("🔁 %s took AL on %s — the day-off swap STAYS (they were covering that day). "
+                    "Please re-arrange cover if needed.\n"
+                    "🔁 %s យក AL នៅ %s — ការប្តូរថ្ងៃឈប់នៅដដែល (គាត់កំពុងជំនួសថ្ងៃនោះ)។ សូមរៀបចំអ្នកជំនួសបើចាំបាច់។"
+                    % (name, dlabel, name, dlabel))
+            await _att_send(context, vuid, "Staff", name, line)
+            await _att_send(context, None, "Supervisors group", "", line, group=True)
         elif d.get("kind") == "pb_refund":
             # 8b: AL fell on a payback slot — it's returned to the debt to re-book (she couldn't work it).
             mins = int(d.get("minutes") or 0)
@@ -3154,15 +3163,11 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s.%s"
             % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True)
         # schedule model: if this AL stood down a senior shift-redefine, tell that senior + supervisors
-        # so coverage is re-arranged by a human (never a silent revoke). Best-effort, after the verdict.
+        # so coverage is re-arranged by a human (never a silent revoke). For an A2 move OR a day-off SWAP
+        # the AL COEXISTS (owner, Jun 15: AL never cancels a trade — the partner already gave/took their
+        # day; she's just away on her committed work day, charged, a human covers). The 'swap_coexist'
+        # descriptor (from al_approve_and_deduct) drives that reminder. Best-effort, after the verdict.
         await _announce_supersessions(context, requester, superseded)
-        # 8b #2: VOID any day-off swap that put her to WORK on an AL day (two-party — done AFTER the AL
-        # txn committed, with both locks). Tell BOTH parties + Supervisors; a human re-covers.
-        from shared.database import swap_void_for_away
-        for _ald in days:
-            _sw = swap_void_for_away(req["staff_id"], _ald)
-            if _sw:
-                await _announce_supersessions(context, requester, [_sw])
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,

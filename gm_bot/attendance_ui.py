@@ -1774,8 +1774,12 @@ def dayoff_swap_pairs(p: dict, partner_id: int) -> tuple[str, InlineKeyboardMark
             InlineKeyboardMarkup([_back_row("att:do")])
     pn = partner.get("call_name") or partner["canonical_name"]
     start = _today() + timedelta(days=1)
-    my_dates = _real_dayoff_dates(p, start)          # r = your day off (partner ends up off here)
-    par_dates = _real_dayoff_dates(partner, start)   # q = their day off (you end up off here)
+    # option A (owner, Jun 15): never OFFER a pairing landing on a day EITHER party already has approved
+    # AL — you can't trade onto a day you're already away (work-day clash) or already off (pointless +
+    # wastes the AL). Drop those dates before pairing so the picker only shows clean trades.
+    busy = al_leave_days_set(p["id"]) | al_leave_days_set(partner_id)
+    my_dates = [d for d in _real_dayoff_dates(p, start) if d.isoformat() not in busy]   # partner off here
+    par_dates = [d for d in _real_dayoff_dates(partner, start) if d.isoformat() not in busy]  # you off here
     pairs = pb.swap_pairings(my_dates, par_dates, max_gap=6, cap=6)
     rows = [_back_row("att:do")]
     for r, q in pairs:

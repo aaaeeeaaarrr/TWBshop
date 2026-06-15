@@ -328,21 +328,13 @@ def v_swaps(rows: list[dict], staff: dict, today: date) -> list[str]:
 
 def v_swap_exclusivity(als: list[dict], overrides: list[dict], swaps: list[dict],
                        staff: dict) -> list[str]:
-    """Schedule-model swap guards (Phase 6 — the net for the supersede wiring). Now that an away event
-    SUPERSEDES a swap (voids it + reverses both parties' overrides), these states should never persist:
-      (a) an approved-AL day that STILL carries a swap 'work' override → on leave AND scheduled to work
-          via a swap (a missed supersede);
-      (b) a 'superseded' swap that STILL has a live 'swap' override on any of its 4 (staff,date) pairs →
-          its reversal didn't complete (S1: a stood-down decision must leave no live trace)."""
+    """Schedule-model swap guard. NOTE (owner, Jun 15): AL on a swap-WORK day now COEXISTS with the swap
+    (the trade stands, she's just away, charged for the work day, a human covers) — so that is NOT a
+    collision and is no longer flagged. The remaining invariant:
+      a 'superseded' swap that STILL has a live 'swap' override on any of its 4 (staff,date) pairs →
+      its reversal didn't complete (S1: a stood-down decision must leave no live trace). (A swap is only
+      'superseded' by a sick/special-leave away event, which DOES void it; AL never supersedes a swap.)"""
     out = []
-    work_swap = {(o["staff_id"], str(o["the_date"])) for o in overrides
-                 if o.get("kind") == "work" and o.get("reason") == "swap"}
-    for r in als:
-        if r.get("status") == "approved":
-            for d in json.loads(r.get("days") or "[]"):
-                if (r["staff_id"], str(d)) in work_swap:
-                    out.append("SWAP-EXCL: %s is on approved AL for %s but a swap still schedules them "
-                               "to WORK that day — supersede missed" % (_nm(staff, r["staff_id"]), d))
     live_swap_pairs = {(o["staff_id"], str(o["the_date"])) for o in overrides
                        if o.get("reason") == "swap"}
     for s in swaps:

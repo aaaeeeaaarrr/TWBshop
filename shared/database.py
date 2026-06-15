@@ -3900,9 +3900,9 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                     return "conflict"
                 # 8b (owner, Jun 16): a payback/OT-rest SLOT (senior_id NULL) no longer BLOCKS — AL on it
                 # REFUNDS it (she can't work it off / take the rest that day). Done after the claim below.
-                # 8b #2 (owner): a day-off SWAP that scheduled them to WORK this day no longer BLOCKS —
-                # AL VOIDS the swap (both revert, partner told). Two-party, so it's done AFTER this txn
-                # commits (the caller calls swap_void_for_away with both locks) — not inside this lock.
+                # (owner, Jun 15): a day-off SWAP that scheduled them to WORK this day no longer BLOCKS or
+                # VOIDS — AL on a swap-work day COEXISTS (the trade stands, she's away + charged, a human
+                # covers). It's emitted as a 'swap_coexist' reminder right after the claim (below).
                 # A SENIOR redefine (senior_id set, proposed/approved) is NOT a conflict — AL is an
                 # AWAY event that supersedes a WORKING redefine. It's stood down in THIS txn right after
                 # the claim succeeds (below) and announced, never silently dropped.
@@ -3946,6 +3946,16 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                     if superseded_out is not None:
                         superseded_out.append({"kind": "coexist_move", "date": str(sc["when_date"]),
                                                "paired_off": str(sc["paired_off_date"])})
+                # SWAP coexist (owner, Jun 15): AL on a day a swap put her to WORK does NOT cancel the swap
+                # — the trade stands (the partner already gave/took their day), she's just away (charged by
+                # the caller via al_coexist_days), and a human covers. Emit a reminder descriptor; the swap
+                # overrides are left UNTOUCHED.
+                cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND is_test=%s "
+                            "AND kind='work' AND reason='swap' AND the_date = ANY(%s::date[])",
+                            (staff_id, is_test, list(dates)))
+                for sc in cur.fetchall():
+                    if superseded_out is not None:
+                        superseded_out.append({"kind": "swap_coexist", "date": str(sc["the_date"])})
                 # 8b: REFUND any payback/OT-rest SLOT (senior_id NULL) on these AL days — she can't work it
                 # off / take the rest. payback → cancel the booking (returns to UNBOOKED debt; debt
                 # unchanged). OT-rest → cancel the buyback + RETURN the spent minutes to the bank.
@@ -3994,17 +4004,25 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
 
 
 def al_coexist_days(staff_id: int, dates) -> set:
-    """8b (owner, Jun 16): the subset of `dates` that hold a COEXISTING A2 day-off-move redefine
-    (paired_off_date set). AL on these days is real leave on a day she's scheduled to WORK — so it must
-    be CHARGED even though the date is her day-off weekday (the move made it a work day). is_test-scoped."""
+    """The subset of `dates` she's scheduled to WORK via a coexisting trade — so AL there is real leave on
+    a work day and MUST be CHARGED, even though the date is her day-off weekday (owner: the shop pays for
+    time at work). Two kinds, both is_test-scoped: (a) an A2 day-off-MOVE redefine (paired_off_date set);
+    (b) a day-off SWAP that put her to WORK that day (dayoff_overrides kind='work' reason='swap'). Neither
+    is cancelled by the AL — they COEXIST (owner, Jun 15: AL never cancels a trade; a human covers)."""
     if not dates:
         return set()
+    out: set = set()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT when_date FROM shift_changes WHERE staff_id=%s AND is_test=%s "
                         "AND paired_off_date IS NOT NULL AND status IN ('proposed','approved') "
                         "AND when_date = ANY(%s::date[])", (staff_id, _ATT_TEST, list(dates)))
-            return {str(r["when_date"]) for r in cur.fetchall()}
+            out |= {str(r["when_date"]) for r in cur.fetchall()}
+            cur.execute("SELECT the_date FROM dayoff_overrides WHERE staff_id=%s AND is_test=%s "
+                        "AND kind='work' AND reason='swap' AND the_date = ANY(%s::date[])",
+                        (staff_id, _ATT_TEST, list(dates)))
+            out |= {str(r["the_date"]) for r in cur.fetchall()}
+    return out
 
 
 def al_reject(req_id: int) -> bool:
@@ -4105,36 +4123,9 @@ def al_cancel_and_refund(req_id: int, staff_id: int, iso: str, today_iso: str | 
             return _al_refund_day(cur, req_id, staff_id, iso, today_iso)
 
 
-def swap_void_for_away(staff_id: int, date_iso: str) -> dict | None:
-    """8b #2 (owner, Jun 16): VOID an approved day-off SWAP that put `staff_id` to WORK on `date_iso`
-    (they're now away on leave). Takes BOTH parties' advisory locks (sorted → deadlock-safe; the shared
-    (911,·) namespace), DELETEs the 4 'swap' overrides, marks the swap 'superseded'. Returns a notify
-    descriptor or None. Must be called with NO advisory lock already held (it takes its own) — i.e. AFTER
-    the AL txn commits. The machine never auto-rearranges the partner; a human re-covers. is_test-scoped."""
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, requester_id, partner_id, req_off_date, partner_off_date "
-                        "FROM dayoff_swaps WHERE status='approved' AND is_test=%s AND "
-                        "((requester_id=%s AND partner_off_date=%s) OR "
-                        " (partner_id=%s AND req_off_date=%s))",
-                        (_ATT_TEST, staff_id, date_iso, staff_id, date_iso))
-            sw = cur.fetchone()
-            if not sw:
-                return None
-            rid, pid = sw["requester_id"], sw["partner_id"]
-            for _sid in sorted({rid, pid}):
-                cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", (911, _sid))
-            cur.execute("SELECT status FROM dayoff_swaps WHERE id=%s FOR UPDATE", (sw["id"],))
-            st = cur.fetchone()
-            if not st or st["status"] != "approved":
-                return None
-            ro, po = str(sw["req_off_date"]), str(sw["partner_off_date"])
-            for s2, d2 in ((rid, ro), (rid, po), (pid, po), (pid, ro)):
-                cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s "
-                            "AND reason='swap' AND is_test=%s", (s2, d2, _ATT_TEST))
-            cur.execute("UPDATE dayoff_swaps SET status='superseded' WHERE id=%s", (sw["id"],))
-            return {"kind": "swap", "swap_id": sw["id"], "requester_id": rid, "partner_id": pid,
-                    "req_off": ro, "partner_off": po, "trigger_date": date_iso}
+# (removed Jun 15) swap_void_for_away — AL no longer voids a swap; AL on a swap-WORK day now COEXISTS
+# (charged, the trade stands, a human covers — owner). sick/special-leave still void swaps, but via
+# supersede_day's own inline logic, not this helper. Deleted to avoid a dead second path.
 
 
 def supersede_day(staff_id: int, date_iso: str, today_iso: str | None = None) -> list:

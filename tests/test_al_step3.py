@@ -979,14 +979,40 @@ def test_supersede_day_voids_a_swap_and_reverses_both_parties():
         _teardown(pid)
 
 
-def test_v_swap_exclusivity_flags_missed_supersede_and_incomplete_reversal():
+def test_al_on_swap_work_day_coexists_and_charges():
+    """Owner (Jun 15): AL on a day a SWAP put her to WORK COEXISTS — the swap is NOT voided, the day is
+    flagged by al_coexist_days (so it's CHARGED), and a swap_coexist reminder descriptor is emitted."""
+    sid = _seed("ZZ_AL_SWAP_COEXIST", 10.0)
+    db.set_att_test(True)
+    WORKDAY = "2026-07-24"
+    try:
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("INSERT INTO dayoff_overrides (staff_id, the_date, kind, reason, is_test) "
+                        "VALUES (%s,%s,'work','swap',TRUE)", (sid, WORKDAY))
+        assert db.al_coexist_days(sid, [WORKDAY]) == {WORKDAY}     # flagged → charged by the caller
+        rid = db.al_create_request(sid, "days", [WORKDAY], None, None, "x", None)
+        out = []
+        db.al_approve_and_deduct(rid, 1.0, {WORKDAY: 1.0}, {}, superseded_out=out)
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("SELECT kind FROM dayoff_overrides WHERE staff_id=%s AND the_date=%s",
+                        (sid, WORKDAY))
+            assert cur.fetchone()["kind"] == "work"               # swap NOT cancelled — coexists
+        assert any(d["kind"] == "swap_coexist" and d["date"] == WORKDAY for d in out)
+    finally:
+        db.set_att_test(False)
+        with db._db() as c, c.cursor() as cur:
+            cur.execute("DELETE FROM dayoff_overrides WHERE staff_id=%s", (sid,))
+        _teardown(sid)
+
+
+def test_v_swap_exclusivity_flags_incomplete_reversal_only():
     from gm_bot import audit
     staff = {1: {"call_name": "A", "canonical_name": "A"}, 2: {"call_name": "B", "canonical_name": "B"}}
-    # (a) approved AL day that still carries a swap 'work' override → a missed supersede
+    # AL on a swap-WORK day now COEXISTS (owner, Jun 15) — NOT flagged as a missed supersede
     als = [{"staff_id": 1, "status": "approved", "days": json.dumps(["2099-12-20"])}]
     ov_a = [{"staff_id": 1, "the_date": "2099-12-20", "kind": "work", "reason": "swap"}]
-    assert any("SWAP-EXCL" in m for m in audit.v_swap_exclusivity(als, ov_a, [], staff))
-    # (b) superseded swap with a leftover live 'swap' override → reversal incomplete
+    assert audit.v_swap_exclusivity(als, ov_a, [], staff) == []          # coexist is fine, no flag
+    # (b) a superseded swap (sick/special voided it) with a leftover live 'swap' override → incomplete
     swaps = [{"id": 9, "status": "superseded", "requester_id": 1, "partner_id": 2,
               "req_off_date": "2099-12-21", "partner_off_date": "2099-12-22"}]
     ov_b = [{"staff_id": 1, "the_date": "2099-12-21", "kind": "off", "reason": "swap"}]
