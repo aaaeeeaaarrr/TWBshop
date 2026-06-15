@@ -394,7 +394,12 @@ def v_exclusivity(als: list[dict], scs: list[dict], staff: dict, today: date) ->
                                              ", #".join(str(i) for i in ids)))
     sc_days: dict = {}       # (sid, 'YYYY-MM-DD') -> [approved/done shift-change ids]
     for r in scs:
-        if r.get("status") in ("approved", "done") and r.get("when_date"):
+        # 8b (owner, Jun 16): an A2 day-off MOVE (paired_off_date set) is ALLOWED to coexist with AL on the
+        # comp-work day — she takes leave on the moved day, the move STAYS (still off X), AL is charged 1.
+        # That's the design, not a collision, so paired moves are excluded from the 'on leave AND scheduled
+        # to work' flag. A plain redefine sharing an AL day IS still a contradiction and is flagged.
+        if (r.get("status") in ("approved", "done") and r.get("when_date")
+                and not r.get("paired_off_date")):
             sc_days.setdefault((r["staff_id"], str(r["when_date"])), []).append(r["id"])
     for (sid, d), ids in sorted(al_day_reqs.items()):
         if (sid, d) in sc_days:

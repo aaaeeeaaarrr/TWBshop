@@ -284,8 +284,16 @@ proposed → "⏳ awaiting {staff}"; decided → verdict) with the **👁 toggle
 new `_refresh_senior_cards` re-renders ALL senior cards (registry `sc_senior_cards`) on co-approval AND on
 the staffer's decision (wired into all 4 staff-decision branches: approve/no/keep/rev). Replaced the
 sibling-collapse (now every card just re-renders to the live status — no dead buttons). Coverage stays
-computed live at tap-time. Tests: swapped the collapse test for a refresh test. Suite 598. **NEXT: owner
-re-confirms Part 2 + continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
+computed live at tap-time. Tests: swapped the collapse test for a refresh test. Suite 598.
+**▶ 8b-3a DISPLAY + AUDIT fix (Jun 15, from the Part-3 walk):** the AL **deduction** was already correct
+(real test row 165: `deducted_map={'2026-06-19':1.0}` — charged 1 via `al_coexist_days`), but two things
+lied: (1) the AL **picker preview** used the static day-off → showed "0 AL day(s) / Day off = No AL used"
+for an A2 comp-work day → new `_al_charged_with_coexist` adds the coexist day back (both full-day + hours
+branches), so the count + the "Day off" line now match the real charge; (2) the **audit `v_exclusivity`**
+flagged the *intended* coexistence ("on leave AND scheduled to work") → now excludes A2 paired-move
+redefines (a plain redefine sharing an AL day is still flagged). +2 tests (picker helper + audit coexist).
+Suite 599. **NEXT: owner re-confirms 3a + continues 3b/3c/3d + Part 4 → `/audit` → `/testreset` → flip
+`attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed

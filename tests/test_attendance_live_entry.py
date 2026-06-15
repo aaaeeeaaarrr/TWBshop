@@ -2233,6 +2233,31 @@ def test_audit_exclusivity():
     assert au.v_exclusivity([al(5, '["2026-06-24"]', st="pending"),
                              al(6, '["2026-06-24"]', st="pending")], [], staff, today) == []
 
+    # 8b coexist (owner, Jun 16): AL on an A2 day-off MOVE (paired_off_date set) is INTENDED to coexist —
+    # she takes leave on the moved day, the move stays, AL is charged 1. NOT flagged as a collision.
+    sc_move = {"id": 13, "staff_id": 1, "status": "approved", "when_date": _dt.date(2026, 6, 26),
+               "paired_off_date": _dt.date(2026, 6, 25)}
+    assert au.v_exclusivity([al(7, '["2026-06-26"]')], [sc_move], staff, today) == []
+    # but a PLAIN redefine (no paired move) sharing an AL day is STILL a real contradiction
+    assert any("on leave AND scheduled to work" in p
+               for p in au.v_exclusivity([al(8, '["2026-06-27"]')],
+                                         [sc(14, _dt.date(2026, 6, 27))], staff, today))
+
+
+def test_al_picker_charges_a2_comp_day(monkeypatch):
+    """8b (owner, Jun 16): the AL picker preview must COUNT an A2 comp-work day (a day-off weekday a move
+    turned into a real work day) as charged — matching the real deduction — not show '0 / Day off = No AL
+    used'. The static charged-set excludes it; the coexist override adds it back."""
+    from gm_bot import al as alm
+    from shared import database as db
+    monkeypatch.setattr(alm, "al_charged_days", lambda picked, doff, nw: [])     # static: day-off → 0
+    monkeypatch.setattr(db, "al_coexist_days", lambda sid, dates: {"2026-06-19"})
+    out = ui._al_charged_with_coexist({"id": 14}, ["2026-06-19"], "Fri", set())
+    assert out == ["2026-06-19"]                                                  # charged via coexist
+    # no coexisting move → falls back to the plain (empty) charged set
+    monkeypatch.setattr(db, "al_coexist_days", lambda sid, dates: set())
+    assert ui._al_charged_with_coexist({"id": 14}, ["2026-06-19"], "Fri", set()) == []
+
 
 def test_al_today_gate(monkeypatch):
     """OWNER RULE: once today's shift STARTED, the AL-today button exists only after a CHECK-IN —

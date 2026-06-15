@@ -1578,6 +1578,21 @@ def al_today_allowed(p: dict) -> bool:
     return bool(sess.get("checked_in_at"))
 
 
+def _al_charged_with_coexist(p: dict, picked, doff, nw) -> list[str]:
+    """The days an AL request actually CHARGES, for the picker preview: the normal charged set PLUS any
+    A2 comp-work day — a day-off weekday a move turned into a real work day (8b). Makes the picker's
+    count + 'Day off = No AL used' line match the real deduction (which already adds these back). Falls
+    back to the plain charged set if the lookup can't run."""
+    from gm_bot import al as alm
+    charged = set(alm.al_charged_days(picked, doff, nw))
+    try:
+        from shared.database import al_coexist_days
+        charged |= al_coexist_days(p["id"], list(picked))
+    except Exception:
+        pass
+    return sorted(charged)
+
+
 def _al_over_balance(p: dict, amount: float) -> str | None:
     """The owner's EARLY gate (Jun 11): not-enough-AL fires right after the day/time pick —
     BEFORE the reason prompt (the dispatch check stays as the final net). Plain-AL flows only;
@@ -2842,7 +2857,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 from gm_bot import al as alm
                 doff = p.get("day_off")
                 nw = staff_absent_dates(p["id"])                # other AL / special leave / swaps
-                charged = alm.al_charged_days(picked, doff, nw)  # never charge a day they're away
+                charged = _al_charged_with_coexist(p, picked, doff, nw)   # incl. A2 comp-work days (8b)
                 span = alm.al_span_label(picked, doff, nw)       # from → to, bridging ANY absence
                 over = _al_over_balance(p, float(len(charged)))
                 if over:                                          # owner: gate BEFORE the reason
@@ -2880,7 +2895,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 _picked = sorted(picked)
                 _doff, _nw = p.get("day_off"), staff_absent_dates(p["id"])
                 _span = alm.al_span_label(_picked, _doff, _nw)
-                _charged = alm.al_charged_days(_picked, _doff, _nw)
+                _charged = _al_charged_with_coexist(p, _picked, _doff, _nw)   # incl. A2 comp-work (8b)
                 _sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                 _total = round(alm.fractional_al(f, t, _sl) * len(_charged), 2)
                 over = _al_over_balance(p, _total)
