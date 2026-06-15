@@ -2068,6 +2068,49 @@ def a2_end(p: dict, sid: int, xidx: int, yidx: int, start: int) -> tuple[str, In
                 % (day_label(d), fmt12(start), day_label(d))), InlineKeyboardMarkup(rows)
 
 
+def _a2_summ(sid: int, xidx: int, yidx: int, start: int, end: int) -> str:
+    """The 'Day-off move — OFF X, works Y' summary line shared by the A2 reason prompt + its toggle +
+    the armed pend's _summary (so all three stay identical)."""
+    rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+    normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
+    extra = max(0, end - (start + normal_len))
+    X = (_today() + timedelta(days=xidx)).isoformat()
+    Y = (_today() + timedelta(days=yidx)).isoformat()
+    rnm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "the staffer"
+    ot_txt = (" (+%dh OT)" % (extra // 60)) if extra else ""
+    return ("Day-off move — %s: OFF %s, works %s %s-%s%s.\n"
+            "ប្តូរថ្ងៃឈប់ — %s៖ ឈប់ %s, មកធ្វើការ %s %s-%s%s។"
+            % (rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
+               fmt12(start), fmt12(end % 1440), ot_txt,
+               rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
+               fmt12(start), fmt12(end % 1440), ot_txt))
+
+
+def _a2_reason_prompt(p: dict, context, sid: int, xidx: int, yidx: int, start: int, end: int,
+                      show_cov: bool):
+    """A2 day-off-move reason prompt with a BOTH-DAYS 👁 who's-working toggle (owner, Jun 15: the
+    senior moving a day off must see who works the new OFF day X AND the comp day Y before sending)."""
+    line = _a2_summ(sid, xidx, yidx, start, end)
+    if show_cov:
+        try:
+            from gm_bot.bot import _sc_cov_block
+            rec = next((r for r in staff_all("active") if r["id"] == sid), None)
+            X = (_today() + timedelta(days=xidx)).isoformat()
+            Y = (_today() + timedelta(days=yidx)).isoformat()
+            blk = _sc_cov_block(rec, Y, start, end, X) if rec else ""
+        except Exception:
+            blk = ""
+        if blk:
+            line += "\n\n" + blk
+    line += ("\n\n📝 Type the reason — your next message sends it to them for approval.\n"
+             "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការយល់ព្រម។")
+    tog = ("🙈 Hide who's working · លាក់អ្នកធ្វើការ" if show_cov
+           else "👁 Show who's working · បង្ហាញអ្នកធ្វើការ")
+    extra_rows = [[InlineKeyboardButton(tog, callback_data="att:a2:cov:%d:%d:%d:%d:%d:%d"
+                                        % (sid, xidx, yidx, start, end, 0 if show_cov else 1))]]
+    return _arm_prompt(p, context, line, "att:sc2", extra_rows=extra_rows)
+
+
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / "
                    "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
@@ -2930,25 +2973,22 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if _armed(context):
                 rec = next((r for r in staff_all("active") if r["id"] == sid), None)
                 normal_len = (shift_len_min(rec.get("work_start"), rec.get("work_end")) or 0) if rec else 0
-                extra = max(0, end - (start + normal_len))
                 X = (_today() + timedelta(days=xidx)).isoformat()
                 Y = (_today() + timedelta(days=yidx)).isoformat()
-                rnm = (rec or {}).get("call_name") or (rec or {}).get("canonical_name") or "the staffer"
-                ot_txt = (" (+%dh OT)" % (extra // 60)) if extra else ""
-                _summ = ("Day-off move — %s: OFF %s, works %s %s-%s%s.\n"
-                         "ប្តូរថ្ងៃឈប់ — %s៖ ឈប់ %s, មកធ្វើការ %s %s-%s%s។"
-                         % (rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
-                            fmt12(start), fmt12(end % 1440), ot_txt,
-                            rnm, day_label(date.fromisoformat(X)), day_label(date.fromisoformat(Y)),
-                            fmt12(start), fmt12(end % 1440), ot_txt))
                 _arm_pending(context, update,
                     {"flow": "shift", "persona_id": p["id"], "staff_id": sid, "when_date": Y,
                      "start_min": start, "end_min": end, "normal_len": normal_len,
-                     "paired_off_date": X, "_summary": _summ})
-                return await show(_arm_prompt(p, context, _summ +
-                    "\n\n📝 Type the reason — your next message sends it to them for approval.\n"
-                    "📝 សរសេរមូលហេតុ — សារបន្ទាប់នឹងផ្ញើទៅពួកគាត់ ដើម្បីសុំការយល់ព្រម។", "att:sc2"))
+                     "paired_off_date": X, "_summary": _a2_summ(sid, xidx, yidx, start, end)})
+                return await show(_a2_reason_prompt(p, context, sid, xidx, yidx, start, end,
+                                                    show_cov=False))
             return await show(a2_staff_pick(p))
+        if sub == "cov":
+            # att:a2:cov:{sid}:{xidx}:{yidx}:{start}:{end}:{flag} — the A2 reason prompt's both-days
+            # 👁 toggle. The pend is already armed at cf; this only re-renders the prompt.
+            sid, xidx, yidx, start, end, flag = (int(data[3]), int(data[4]), int(data[5]),
+                                                 int(data[6]), int(data[7]), int(data[8]))
+            return await show(_a2_reason_prompt(p, context, sid, xidx, yidx, start, end,
+                                                show_cov=bool(flag)))
     if action == "scp":   # session 31: unified Give-OT / shift-redefine picker
         sub = data[2] if len(data) > 2 else ""
         if sub == "staff":

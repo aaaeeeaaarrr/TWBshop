@@ -249,7 +249,23 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
+**Last updated:** 2026-06-15 (session 37 — **A1/A2 WALK FINDINGS (3) BUILT + DEPLOYED to gm; `attendance_live`
+still OFF**). From the owner's Part-1/2 re-walk. **(F1) co-approve cards now collapse** — when ONE senior
+co-approves/declines, every OTHER senior's co-approve card is rewritten button-less ("Already co-approved
+by another senior" / "Stopped — another declined"), killing the dead-button taps + test-watchdog noise
+(`_collapse_sibling_coapprove_cards`, wired into both branches of `_sc_coapprove_callback`). **(F2) reason
+now mandatory** for EVERY schedule change (A1 time · A2 day-off · extension — all share `flow=="shift"`): a
+blank reason is rejected, the pend re-arms, nothing submits (`_att_dispatch` guard). **(F3) who's-working
+toggle added** where it was missing — the co-approve card (`_sc_coapprove_card` + `att:scscov:`) and the A2
+reason prompt (`_a2_reason_prompt` + `att:a2:cov:`), both via a shared `_sc_cov_block` (BOTH dates for an
+A2 move). Plus a **doc fix**: WALK_STEP3 no longer claims My Schedule shows one-off moves (it's a recurring-
+pattern summary; moves live in `dayoff_overrides`/`resolve_day`). +4 regression tests, suite **597**. KH
+drafts (collapse notes + reason nag) → `docs/KH_REVIEW.md` Pending. **DEPLOYED to gm Jun 15 ~12:3x PP**
+(mid-day lull, gm-only restart, verified HEAD==origin/active/clean, code carries the change, other 4 bots
+untouched; `attendance_live`=OFF). WALK_STEP3 refined with the new checks. **NEXT: owner re-confirms Part 2
++ continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
+
+**(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed
 deletes child rows first (no FK crash; staging-proven + regression test) · **WF7** terminal "Booked ✓"
 releases the menu singleton · **WF1** late prompt drops "Supervisors notified ✓" · **WF2** family-sick

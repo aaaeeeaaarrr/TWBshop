@@ -1790,6 +1790,31 @@ def _sc_coverage_lines(staff: dict, when_date: str, start_min: int, end_min: int
         return ""
 
 
+def _sc_cov_block(staff: dict, when_date: str, start_min: int, end_min: int,
+                  paired_off_date=None) -> str:
+    """The 👥 who's-working block for a shift change. For an A2 move (paired_off_date set) it shows
+    BOTH dates — who covers X (now off) AND who works Y; otherwise the single redefined window.
+    Returns '' when there's nothing to show. Shared by the staff card, the co-approve card, and the
+    A2 reason prompt so all three render coverage identically (owner, Jun 15)."""
+    cov = _sc_coverage_lines(staff, when_date, start_min, end_min)
+    if paired_off_date:   # A2: impact on BOTH dates
+        try:
+            xcov = _al_availability_lines(staff, [str(paired_off_date)]) or ""
+        except Exception:
+            xcov = ""
+        parts = []
+        if xcov:
+            parts.append("OFF %s — who works (covers) · ឈប់ %s — អ្នកធ្វើការជំនួស:\n%s"
+                         % (paired_off_date, paired_off_date, xcov))
+        if cov:
+            parts.append("WORKS %s — who works · ធ្វើការ %s — អ្នកធ្វើការ:\n%s"
+                         % (when_date, when_date, cov))
+        return ("👥 " + "\n\n👥 ".join(parts)) if parts else ""
+    if cov:
+        return "👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
+    return ""
+
+
 def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     """The staff's shift-redefine card — Approve/Can't while proposed, the decision line after,
     and a PERSISTENT 👁 who's-working toggle at every stage (owner, Jun 11: both parties must
@@ -1849,22 +1874,9 @@ def _sc_card(g: dict, staff: dict, show_cov: bool = False) -> tuple[str, InlineK
     elif st == "done":
         body += "\n\n✅ Done · រួចរាល់"
     if show_cov:
-        cov = _sc_coverage_lines(staff, g["when_date"], start_min, end_min)
-        if poff:   # A2: show the impact on BOTH dates — who covers X (now off) AND who works Y (owner)
-            try:
-                xcov = _al_availability_lines(staff, [str(poff)]) or ""
-            except Exception:
-                xcov = ""
-            parts = []
-            if xcov:
-                parts.append("OFF %s — who works (covers) · ឈប់ %s — អ្នកធ្វើការជំនួស:\n%s" % (poff, poff, xcov))
-            if cov:
-                parts.append("WORKS %s — who works · ធ្វើការ %s — អ្នកធ្វើការ:\n%s"
-                             % (g["when_date"], g["when_date"], cov))
-            if parts:
-                body += "\n\n👥 " + "\n\n👥 ".join(parts)
-        elif cov:
-            body += "\n\n👥 Working those hours · អ្នកធ្វើការពេលនោះ:\n" + cov
+        blk = _sc_cov_block(staff, g["when_date"], start_min, end_min, poff)
+        if blk:
+            body += "\n\n" + blk
     rows = []
     if st == "proposed":
         rows = [[InlineKeyboardButton("✅ Approve · យល់ព្រម", callback_data="att:sc:yes:%d" % g["id"])],
@@ -1946,24 +1958,81 @@ def _sc_what(g: dict, sn: str) -> str:
             else ("Shift change — %s on %s %s" % (sn, g["when_date"], win)))
 
 
+def _sc_coapprove_card(g: dict, pn: str, sn: str, staff: dict,
+                       show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    """The co-approve card a SECOND senior sees. Carries a 👁 who's-working toggle (both dates for an
+    A2 move) so the co-approving senior can see coverage before deciding (owner, Jun 15)."""
+    cid = g["id"]
+    what = _sc_what(g, sn)
+    body = ("👀 %s proposes: %s.\nCo-approve? (1 more senior needed before the staffer is asked.)\n"
+            "👀 %s ស្នើ៖ %s។\nយល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)"
+            % (pn, what, pn, what))
+    if show_cov:
+        blk = _sc_cov_block(staff, g["when_date"], int(g["start_min"]), int(g["end_min"]),
+                            g.get("paired_off_date"))
+        if blk:
+            body += "\n\n" + blk
+    cov_btn = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
+               else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Co-approve · យល់ព្រម", callback_data="att:scs:ok:%d" % cid)],
+        [InlineKeyboardButton("❌ No — explain · មិនយល់ព្រម — ពន្យល់", callback_data="att:scs:no:%d" % cid)],
+        [InlineKeyboardButton(cov_btn[0], callback_data="att:scscov:%d:%d" % (cid, cov_btn[1]))]])
+    return body, kb
+
+
 async def _sc_send_coapprove_card(context, cid: int, g: dict, proposer: dict, staff: dict) -> None:
     """1a (owner): a SECOND senior must co-approve a schedule change before the staffer is asked. The
     proposer is excluded; one co-approval moves it to the staff. (Extensions skip this — see caller.)"""
     sn = staff.get("call_name") or staff["canonical_name"]
     pn = proposer.get("call_name") or proposer["canonical_name"]
-    what = _sc_what(g, sn)
-    body = ("👀 %s proposes: %s.\nCo-approve? (1 more senior needed before the staffer is asked.)\n"
-            "👀 %s ស្នើ៖ %s។\nយល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)"
-            % (pn, what, pn, what))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Co-approve · យល់ព្រម", callback_data="att:scs:ok:%d" % cid)],
-        [InlineKeyboardButton("❌ No — explain · មិនយល់ព្រម — ពន្យល់", callback_data="att:scs:no:%d" % cid)]])
+    body, kb = _sc_coapprove_card(g, pn, sn, staff, show_cov=False)
     cards = context.bot_data.setdefault("sc_coapprove_cards", {}).setdefault(cid, [])
     for sen in _seniors(exclude_staff_id=proposer["id"]):
         m = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                             sen.get("call_name") or sen["canonical_name"], body, kb=kb)
         if m is not None:
             cards.append((m.chat_id, m.message_id))
+
+
+async def _sc_coapprove_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """att:scscov:{cid}:{flag} — the co-approve card's who's-working toggle (both dates for an A2 move).
+    Re-renders the card only; the awaiting_senior state is untouched."""
+    from shared.database import shift_change_get
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    g = shift_change_get(int(parts[2]))
+    staff = next((s for s in staff_all("active") if s["id"] == (g or {}).get("staff_id")), None)
+    if not g or not staff:
+        return await _expired_toast(query, context,
+                                    update.effective_user.id if update.effective_user else None)
+    proposer = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+    sn = staff.get("call_name") or staff["canonical_name"]
+    pn = (proposer or {}).get("call_name") or (proposer or {}).get("canonical_name", "A senior")
+    body, kb = _sc_coapprove_card(g, pn, sn, staff, show_cov=bool(int(parts[3])))
+    try:
+        await query.edit_message_text(body, reply_markup=kb)
+    except Exception:
+        pass
+
+
+async def _collapse_sibling_coapprove_cards(context, cid: int, g: dict, sn: str,
+                                            keep_chat, keep_msg, note: str) -> None:
+    """When ONE senior resolves a co-approval (co-approves or declines), the OTHER seniors' co-approve
+    cards must stop being live buttons — else they're dead taps (owner, Jun 15: stale ✅/❌ stayed and
+    threw 'dead button' + test-watchdog noise). Replace each sibling with a terminal one-liner (no
+    buttons); skip the card the resolving senior is looking at (it gets its own edit). One-shot (pop)."""
+    cards = context.bot_data.get("sc_coapprove_cards", {}).pop(cid, [])
+    what = _sc_what(g, sn)
+    for ch, mid in cards:
+        if ch == keep_chat and mid == keep_msg:
+            continue
+        try:
+            await context.bot.edit_message_text("👀 %s\n\n%s" % (what, note),
+                                                chat_id=ch, message_id=mid)
+        except Exception:
+            pass
 
 
 async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
@@ -2009,12 +2078,17 @@ async def _sc_coapprove_callback(update: Update, context: ContextTypes.DEFAULT_T
     staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
     sn = (staff or {}).get("call_name") or (staff or {}).get("canonical_name", "Staff")
     proposer = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+    _kc = query.message.chat_id if query.message else None
+    _km = query.message.message_id if query.message else None
     if act == "no":
         shift_change_set_status(cid, "declined")
         try:
             await query.edit_message_text(query.message.text + "\n\n❌ Not co-approved · មិនបានយល់ព្រមរួម")
         except Exception:
             pass
+        await _collapse_sibling_coapprove_cards(context, cid, g, sn, _kc, _km,
+            "❌ Stopped — another senior declined this change · "
+            "បានបញ្ឈប់ — បងម្នាក់ទៀតមិនបានយល់ព្រម")
         if proposer:   # tell the proposing senior their change was stopped before the staffer
             await _att_send(context, (proposer.get("telegram_ids") or [None])[0], "Senior",
                 proposer.get("call_name") or proposer["canonical_name"],
@@ -2028,6 +2102,9 @@ async def _sc_coapprove_callback(update: Update, context: ContextTypes.DEFAULT_T
                                       "បានយល់ព្រមរួម — ផ្ញើទៅ %s" % (sn, sn))
     except Exception:
         pass
+    await _collapse_sibling_coapprove_cards(context, cid, g, sn, _kc, _km,
+        "✅ Already co-approved by another senior — sent to %s · "
+        "បានយល់ព្រមរួមដោយបងម្នាក់ទៀត — ផ្ញើទៅ %s" % (sn, sn))
     if staff:
         await _sc_send_staff_card(context, cid, shift_change_get(cid), staff)
 
@@ -5603,6 +5680,23 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         pass
     if reason is None:   # typed-reason flows read the message; tap-to-confirm flows pass it in
         reason = (((update.message.text or "").strip()) if update.message else "") or "(no reason)"
+    # owner (Jun 15): EVERY schedule change (A1 time / A2 day-off move / extension) MUST carry a real
+    # reason — a senior is moving someone's day, the staffer deserves the why. Reject a blank reason and
+    # re-arm the SAME pend so they just type it again (no re-picking). Other flows keep their own copy.
+    if pend.get("flow") == "shift" and (not reason or str(reason).strip() in ("", "(no reason)")):
+        uid = update.effective_user.id
+        if uid == config.OWNER_TELEGRAM_ID:
+            context.user_data["att_test_pending"] = pend          # test: re-stash for the next message
+        else:
+            from shared.database import flow_save
+            flow_save(uid, "att_pending", "reason", pend, ttl_min=30)   # live: re-arm (restart-safe)
+        nag = ("📝 A reason is required for a schedule change — please type the reason.\n"
+               "📝 ត្រូវការមូលហេតុសម្រាប់ការប្តូរវេន — សូមសរសេរមូលហេតុ។")
+        if update.message is not None:
+            await update.message.reply_text(nag)
+        else:
+            await context.bot.send_message(update.effective_chat.id, nag)
+        return
     if live:
         persona = staff_get_by_uid(update.effective_user.id)
         if not persona or persona.get("status") != "active":
@@ -6574,6 +6668,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(_swap_coverage_toggle, pattern=r"^att:swcov:"))
     app.add_handler(CallbackQueryHandler(_ot_buyback_callback, pattern=r"^att:otb:"))
     app.add_handler(CallbackQueryHandler(_sc_cov_callback, pattern=r"^att:sccov:"))
+    app.add_handler(CallbackQueryHandler(_sc_coapprove_cov_callback, pattern=r"^att:scscov:"))
     app.add_handler(CallbackQueryHandler(_sc_coapprove_callback, pattern=r"^att:scs:"))
     app.add_handler(CallbackQueryHandler(_shift_change_callback, pattern=r"^att:sc:"))
     app.add_handler(CallbackQueryHandler(_sick_paper_callback, pattern=r"^att:sp:(cov|duty|come|rest):"))

@@ -990,6 +990,96 @@ def test_sc_fyi_text_states_both_dates_for_a2():
     assert "2026-07-22" in t1 and "OFF" not in t1
 
 
+def test_shift_change_requires_reason(monkeypatch):
+    """Finding 2 (owner, Jun 15): a schedule change with a BLANK reason is rejected — the pend is
+    re-armed and NOTHING is submitted; a real reason goes through."""
+    import gm_bot.bot as bot
+    import config
+    called = {"submit": 0}
+
+    async def _no_submit(*a, **k):
+        called["submit"] += 1
+        return 1
+
+    monkeypatch.setattr(bot, "submit_shift_change", _no_submit)
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [_DAYREC])
+    replies = []
+    msg = types.SimpleNamespace(text="   ")          # whitespace-only "reason"
+
+    async def _reply(t, **k):
+        replies.append(t)
+
+    msg.reply_text = _reply
+    upd = types.SimpleNamespace(
+        message=msg, effective_user=types.SimpleNamespace(id=config.OWNER_TELEGRAM_ID),
+        effective_chat=types.SimpleNamespace(id=config.OWNER_TELEGRAM_ID))
+    ctx = types.SimpleNamespace(user_data={}, bot_data={})
+    pend = {"flow": "shift", "persona_id": 11, "staff_id": 11, "when_date": "2026-07-22",
+            "start_min": 480, "end_min": 1020, "normal_len": 540}
+    asyncio.run(bot._att_dispatch(upd, ctx, pend, live=False))
+    assert called["submit"] == 0                                  # blank → nothing submitted
+    assert ctx.user_data.get("att_test_pending") is pend          # pend re-armed for the next message
+    assert replies and "reason" in replies[0].lower()
+    # a real reason DOES submit
+    called["submit"] = 0; ctx.user_data.clear(); replies.clear(); msg.text = "covering for Rath"
+    asyncio.run(bot._att_dispatch(upd, ctx, pend, live=False))
+    assert called["submit"] == 1
+
+
+def test_coapprove_card_has_coverage_toggle(monkeypatch):
+    """Finding 3 (owner, Jun 15): the co-approve card a SECOND senior sees carries a 👁 who's-working
+    toggle, and for an A2 move it shows BOTH dates' coverage."""
+    import gm_bot.bot as bot
+    from shared import database as db
+    monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
+    monkeypatch.setattr(bot, "_al_availability_lines", lambda staff, days, *a: "covers: someone")
+    g = {"id": 9, "staff_id": 11, "senior_id": 2, "when_date": "2026-07-22", "start_min": 480,
+         "end_min": 1020, "normal_len": 540, "reason": "x", "status": "awaiting_senior",
+         "paired_off_date": "2026-07-20"}
+    body, kb = bot._sc_coapprove_card(g, "Sen", "Anan", _DAYREC, show_cov=False)
+    flat = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert any(cd.startswith("att:scscov:9:") for cd in flat)        # the toggle is present
+    assert "att:scs:ok:9" in flat and "att:scs:no:9" in flat          # decision buttons still there
+    body_on, _ = bot._sc_coapprove_card(g, "Sen", "Anan", _DAYREC, show_cov=True)
+    assert "2026-07-20" in body_on and "2026-07-22" in body_on        # both dates' coverage shown
+    assert body_on.count("covers: someone") >= 2
+
+
+def test_coapprove_resolution_collapses_sibling_cards(monkeypatch):
+    """Finding 1 (owner, Jun 15): when ONE senior co-approves, the OTHER seniors' co-approve cards are
+    collapsed to a terminal one-liner (no live buttons left → no dead taps / watchdog noise)."""
+    import gm_bot.bot as bot
+    g = {"id": 9, "staff_id": 11, "senior_id": 2, "when_date": "2026-07-22", "start_min": 480,
+         "end_min": 1020}
+    edits = []
+
+    class _Bot:
+        async def edit_message_text(self, text, chat_id=None, message_id=None, **k):
+            edits.append((chat_id, message_id, text))
+
+    ctx = types.SimpleNamespace(bot=_Bot(),
+                                bot_data={"sc_coapprove_cards": {9: [(100, 1), (100, 2), (100, 3)]}})
+    # senior looking at card (100,2) resolves it; (100,1) and (100,3) must be collapsed, (100,2) kept
+    asyncio.run(bot._collapse_sibling_coapprove_cards(ctx, 9, g, "Anan", 100, 2, "✅ handled"))
+    collapsed = {(c, m) for c, m, _ in edits}
+    assert collapsed == {(100, 1), (100, 3)}                          # siblings only
+    assert all("✅ handled" in t for _, _, t in edits)
+    assert 9 not in ctx.bot_data["sc_coapprove_cards"]                # one-shot (popped)
+
+
+def test_a2_reason_prompt_has_both_days_toggle(monkeypatch):
+    """Finding 3: the A2 (change-day-off) reason prompt the PROPOSING senior sees has a both-days
+    who's-working toggle (it previously had none)."""
+    import datetime
+    monkeypatch.setattr(ui, "staff_all", lambda *a, **k: [_DAYREC])
+    monkeypatch.setattr(ui, "att_test_on", lambda: True)
+    monkeypatch.setattr(ui, "_today", lambda: datetime.date(2026, 7, 15))
+    p = {"id": 1, "canonical_name": "S", "call_name": "S"}
+    _txt, kb = ui._a2_reason_prompt(p, _Ctx(), 11, 3, 5, 480, 1020, show_cov=False)
+    flat = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert any(cd.startswith("att:a2:cov:11:3:5:480:1020:") for cd in flat)
+
+
 def test_a2_cf_arms_shift_with_paired_off(monkeypatch):
     """A2: att:a2:cf arms a 'shift' pending carrying paired_off_date (=X, the new off day) and the
     comp work day Y — so it reuses the whole submit/approve/card machinery."""

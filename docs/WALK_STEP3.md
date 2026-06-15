@@ -27,13 +27,21 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
    - **To give OT: do NOT tap Normal times.** Pick a **START** time → the **end ladder** appears.
 4. On the **end ladder**, pick an end past her normal end. → the tag reads in **minutes**, combined,
    e.g. **`+1h15 PB +45m OT`** (not decimals, not two separate lines).
-5. Type a reason → submit.
+5. **Reason is now mandatory.** Before typing, try sending a **blank/space-only** message →
+   - ✅ CHECK: it **refuses** ("a reason is required…") and keeps waiting — nothing is submitted.
+   Now type a real reason → submit.
    - ✅ CHECK (1a co-approval): because A1 *changes* a shift, it does **NOT** go straight to Staff. You
      should land on **"⏳ Awaiting another senior"**. The other seniors get a **co-approve card**.
    - ✅ EXCEPTION to confirm later (step 1c below): extending the shift **running right now** skips
      co-approval — that's intended.
-6. **🎭 Switch persona → Senior-B.** Open the co-approve card → **✅ Approve.**
-   - ✅ CHECK: now it advances to **Staff** as the awaiting-approval card.
+6. **🎭 Switch persona → Senior-B.** Open the co-approve card.
+   - ✅ CHECK (NEW): the co-approve card now has a **👁 Show who's working** toggle — tap it, confirm it
+     shows coverage for the changed day, tap **🙈 Hide** to collapse it.
+   - Tap **✅ Co-approve.**
+   - ✅ CHECK: it advances to **Staff** as the awaiting-approval card.
+   - ✅ CHECK (NEW — the dead-button fix): every **other** senior's co-approve card (if there were 3+
+     seniors) now reads "✅ Already co-approved by another senior…" with **no buttons** — tapping where
+     they used to be does nothing (no "dead button", no watchdog alert).
 7. **🎭 Switch persona → Staff.** Open the card → **✅ Approve.**
    - ✅ CHECK: the proposer's old "⏳ Awaiting" card **flips in place** to the approved verdict (no stale
      duplicate left behind).
@@ -48,11 +56,23 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
 2. **Pick the staffer.** → **pick the day to be OFF (X)** — 30-day working days.
 3. **Pick the comp work day (Y)** — offered from her real day-offs within ±7 of X (override-aware).
 4. Set Y's hours via the same start→end ladder (⏱ Normal times, or extend into OT).
-5. Type a reason → submit → co-approval (Senior-B) → Staff approves (same as Part 1).
+5. The reason prompt appears.
+   - ✅ CHECK (NEW): the A2 reason prompt now has a **👁 Show who's working** toggle that shows **BOTH
+     days** — who covers X (now off) **and** who works Y. Tap it to confirm, then 🙈 Hide.
+   - ✅ CHECK (NEW): a blank reason is **refused** here too (same as Part 1).
+   Type a reason → submit → co-approval (Senior-B) → Staff approves (same as Part 1).
+   - ✅ CHECK (NEW): the **co-approve card** also carries the both-days 👁 toggle, and the sibling-collapse
+     applies here too (other seniors' cards go button-less once one co-approves).
    - ✅ CHECK (1c — the big one): **every** notice/card states **BOTH dates** — "OFF on **X**, works **Y**".
      No message should mention only one date. The card frames it **"Day-off move — OFF X, work Y"**.
-6. After Staff approves, **verify the move actually landed**: as Staff, open **My Schedule** —
-   - ✅ X now shows as a **day off**; Y now shows as a **working day** with the chosen hours.
+6. The move is confirmed by the chain completing + the cards stating both dates (above). It will
+   surface in *real attendance* on X (she isn't expected / no no-show) and Y (the bot checks her in
+   for the chosen hours).
+   - ⚠ NOTE: **My Schedule does NOT show one-off moves** — it's a static summary of the *recurring*
+     pattern (weekly shift + weekly day-off weekday + balances), so "Day off · Tue" staying put there
+     is correct. A one-off A2 move lives in `dayoff_overrides` (read by `resolve_day()`), not on that
+     card. (If we ever want the staffer to see "this week: off X, working Y", that's a net-new
+     My-Schedule line reading the overrides — not built.)
 
 ---
 

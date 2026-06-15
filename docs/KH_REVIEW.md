@@ -343,6 +343,17 @@ Reason · មូលហេតុ៖ {reason}
 - A2 card 👁 both-date coverage (seniors+staff): `OFF {X} — who works (covers)` · `ឈប់ {X} — អ្នកធ្វើការ` ·
   `WORKS {Y} — who works` · `ធ្វើការ {Y} — អ្នកធ្វើការ`
 
+### Walk findings (Jun 15) — co-approve collapse · mandatory reason · A2/co-approve coverage toggle
+- **WHO/WHEN:** seniors during the A1/A2 co-approval + reason steps. **TONE:** plain. My KH is draft.
+- co-approve card sibling-collapse, when ANOTHER senior already co-approved (button-less terminal line):
+  `✅ Already co-approved by another senior — sent to {nm}` · `បានយល់ព្រមរួមដោយបងម្នាក់ទៀត — ផ្ញើទៅ {nm}`
+- co-approve card sibling-collapse, when ANOTHER senior declined:
+  `❌ Stopped — another senior declined this change` · `បានបញ្ឈប់ — បងម្នាក់ទៀតមិនបានយល់ព្រម`
+- mandatory-reason nag (any schedule change submitted with a blank reason):
+  `📝 A reason is required for a schedule change — please type the reason.` · `📝 ត្រូវការមូលហេតុសម្រាប់ការប្តូរវេន — សូមសរសេរមូលហេតុ។`
+- The co-approve card + A2 reason prompt reuse the EXISTING 👁/🙈 toggle + both-date coverage strings
+  (already vetted above) — no new toggle wording.
+
 ### WF2/WF3 — family-sick (Jun 14) — KH draft
 - **WHO:** the staffer (confirm + booked) + Supervisors (FYI). **WHEN:** family-sick TIMES path now asks a confirm; FYI on booking.
 - WF2 confirm `Family sick ({who}) — {window}.` · `គ្រួសារឈឺ ({who}) {window}។`  (window = `9:00am → 12:00pm`)

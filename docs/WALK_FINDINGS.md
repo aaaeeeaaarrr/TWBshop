@@ -101,7 +101,9 @@ This is date-derivation (use BOTH people's `day_off`) + the pairing/picker UI + 
   2 senior approvals → Approved → requester + partner + Supervisors notices all routed to owner (test).
   (Earlier confusion: in test mode every party's message routes to the owner — no persona-switch needed;
   the walk instruction was wrong, the build is current.)
-- **Step 8 F14 collision layer:** PARTIAL — 8a done+verified; 8b mis-fired; 8c/8d not done. Findings WF6–WF9 below.
+- **Step 8 F14 collision layer:** PARTIAL (owner hand-walk) — 8a done+verified; 8b mis-fired; 8c/8d
+  not done. Findings WF6–WF9 below. **Engine PROVEN on staging** (`tests/test_al_step3.py` 38/38) — see
+  the "Step 8 — engine proof" note at the end of this section.
 
 ---
 
@@ -177,3 +179,25 @@ THEN flip `attendance_live`.
   you already have approved leave on one of those days." (ii) give a party AL, approve a swap needing them
   to work that day → "Couldn't approve the swap — one of you has approved leave on a day it needs worked."
 - **Re-check** Late (no "Supervisors notified" line now) + family-sick TIMES (asks a confirm now).
+
+---
+
+## Step 8 — engine proof (staging, Jun 14)
+> Complementary to the PARTIAL owner hand-walk above: the F14 collision ENGINE is fully test-proven;
+> what remains is the owner eyeballing the four collision CARDS in `/test` to proof-read wording.
+- `tests/test_al_step3.py` **38/38** green against `twbshop_staging` (safety-gated on `current_database`).
+  All four Section-11 scenarios with real before/after rows + the three concurrency races:
+  - AL supersedes a senior redefine → `test_al_approval_supersedes_senior_redefine`,
+    `test_al_concurrent_vs_senior_redefine_al_always_wins`, `test_supersede_day_reverses_al_and_spares_payback`
+  - payback/OT-rest slot **and** swap-work day BLOCK an AL approval (F14) →
+    `test_f14_rejects_al_on_a_payback_slot_day`, `test_f14_rejects_al_on_a_swap_work_day`,
+    `test_al_blocks_when_payback_slot_shares_a_senior_redefine_day`,
+    `test_swap_approve_claim_blocks_when_party_has_al_on_worked_day`
+  - approve-your-own-redefine-over-your-own-AL → CONFIRM-revoke refunds + approves →
+    `test_shift_change_approve_revoking_al_refunds_and_approves`,
+    `test_shift_change_revoke_no_balance_move_if_not_proposed`
+  - request-side block on an already-committed day → `test_al_date_conflict_detects_approved_al_and_shift_change`,
+    `test_al_request_side_allows_senior_redefine_but_blocks_payback`
+  - races (exactly-one-wins) → `test_f14_concurrent_same_date_exactly_one_wins`,
+    `test_f14_concurrent_cross_flow_al_vs_shift_change_one_wins`, `test_f14_concurrent_swap_vs_al_one_wins`
+  - swap voided when one party goes away → `test_supersede_day_voids_a_swap_and_reverses_both_parties`
