@@ -2,7 +2,8 @@
 GM GREETING — FINAL (send-ready)   ·  NOT SENT YET — wire at go-live
 ================================================================================
 - One-time private DM from the GM bot to every active staff member.
-- Attach the persistent reply keyboard: [["📋 Menu"]] (is_persistent, resize).
+- No persistent keyboard — staff open the menu by simply messaging the bot (even "hi"). The old
+  [["📋 Menu"]] reply-keyboard was never wired and is obsolete (owner, Jun 16).
 - "check in" uses our standard term ចុះវត្តមាន (consistent with the rest of the bot).
 - The how-to line + the +10 points line are the already-approved system strings.
 ================================================================================
@@ -15,9 +16,7 @@ From now on the everyday things are easier: annual leave, telling us you'll be l
 swapping a day off, OT, and checking your own schedule — all in one place, just by
 chatting with me. No more paperwork or chasing people around.
 
-Message me anytime — even just "hi" — and I'll open your menu. You'll also see a
-📋 Menu button at the bottom of our chat; tap it whenever you need me. It's always
-there for you.
+Message me anytime — even just "hi" — and I'll open your menu. I'm always here for you. 🤍
 
 When you get to work, check in by sharing your live location with me:
 📍 Tap 📎 (Attach) → Location → Share Live Location
@@ -33,9 +32,7 @@ See you soon! 🤍
 និងឆែកកាលវិភាគរបស់ប្អូន — ទាំងអស់នៅកន្លែងតែមួយ គ្រាន់តែឆាតមកខ្ញុំ។ មិនបាច់សរសេរក្រដាស
 ឬរត់តាមសួរមនុស្សនេះមនុស្សនោះទៀតទេ។
 
-ឆាតមកខ្ញុំពេលណាក៏បាន — សូម្បីតែសរសេរ "hi" ក៏បាន — ខ្ញុំនឹងបើក Menu ឱ្យប្អូន។ ប្អូនក៏នឹងឃើញ
-ប៊ូតុង 📋 Menu នៅខាងក្រោមឆាតរបស់យើង; ចុចវាពេលណាក៏បាន ពេលប្អូនត្រូវការខ្ញុំ។
-វានៅទីនោះសម្រាប់ប្អូនជានិច្ច។
+ឆាតមកខ្ញុំពេលណាក៏បាន — សូម្បីតែសរសេរ "hi" ក៏បាន — ខ្ញុំនឹងបើក Menu ឱ្យប្អូន។ ខ្ញុំនៅទីនេះសម្រាប់ប្អូនជានិច្ច។ 🤍
 
 ពេលប្អូនមកធ្វើការ សូមចុះវត្តមានដោយចែករំលែកទីតាំងបន្តផ្ទាល់ជាមួយខ្ញុំ៖
 📍 ចុច 📎 (Attach) → ទីតាំង → ចែករំលែកទីតាំងបន្តផ្ទាល់

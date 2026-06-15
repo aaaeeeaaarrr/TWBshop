@@ -357,6 +357,15 @@ Reason · មូលហេតុ៖ {reason}
 - The co-approve card + A2 reason prompt reuse the EXISTING 👁/🙈 toggle + both-date coverage strings
   (already vetted above) — no new toggle wording.
 
+### Go-live content (Jun 16) — rules sick line + greeting reword — KH draft
+- **WHO:** all staff. **WHEN:** the Rules screen + the one-time go-live greeting. **TONE:** plain, warm.
+- Rules — Sick line (EN approved by owner; KH is my draft):
+  `Sick: never costs your salary. Send a doctor's note within 2 days and you owe no pay-back for that day — without one, you make the hours up later.`
+  · `ឈឺ៖ មិនដកប្រាក់ខែ។ ផ្ញើលិខិតពេទ្យក្នុង 2 ថ្ងៃ នោះមិនត្រូវសងម៉ោងវិញសម្រាប់ថ្ងៃនោះទេ — បើគ្មាន ត្រូវធ្វើសងម៉ោងវិញពេលក្រោយ។`
+- Greeting — reworded line (dropped the obsolete 📋 Menu button):
+  `Message me anytime — even just "hi" — and I'll open your menu. I'm always here for you. 🤍`
+  · `ឆាតមកខ្ញុំពេលណាក៏បាន — សូម្បីតែសរសេរ "hi" ក៏បាន — ខ្ញុំនឹងបើក Menu ឱ្យប្អូន។ ខ្ញុំនៅទីនេះសម្រាប់ប្អូនជានិច្ច។ 🤍`
+
 ### WF2/WF3 — family-sick (Jun 14) — KH draft
 - **WHO:** the staffer (confirm + booked) + Supervisors (FYI). **WHEN:** family-sick TIMES path now asks a confirm; FYI on booking.
 - WF2 confirm `Family sick ({who}) — {window}.` · `គ្រួសារឈឺ ({who}) {window}។`  (window = `9:00am → 12:00pm`)
