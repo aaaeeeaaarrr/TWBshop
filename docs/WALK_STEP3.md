@@ -77,45 +77,67 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
 ---
 
 ## PART 3 — 8b: taking leave on a day she's already committed to
-*This is the new "leave-on-a-committed-day" model — the part most worth abusing. Persona: Staff.*
+*The new "leave-on-a-committed-day" model — the part most worth abusing.*
+
+> 🎭 **TEST-MODE REALITY (read once — it changes how Parts 3–4 read).** In test mode **every** card
+> (staff request, senior approval, partner, Supervisors FYI) routes to **YOU**, and the senior/staff
+> role-checks are **bypassed**. So you switch persona (🎭) only to **INITIATE** an action *as* a
+> specific person — e.g. be on the **Staff** persona to *request* AL (it's her balance), or a **Senior**
+> to *propose*. To **approve/decide**, you do **NOT** switch — just tap the card that lands in your chat.
+> Every balance check below: after you act, **ask me to DB-verify the row** (I read it back independently).
 
 ### 3a — AL on an A2 comp-work day → it COEXISTS and is CHARGED 1
-1. Using the A2 move from Part 2 (Staff now works Y), as **Staff request AL on Y** (full day).
-2. **🎭 Senior-A → approve the AL.**
-   - ✅ CHECK: the AL is **charged 1 day** (not 0 — even though Y was originally her day-off, the move
-     made it a real work day). Look at her AL balance before/after.
-   - ✅ CHECK: the **Y redefine still stands** (the move is NOT cancelled — they coexist).
-   - ✅ CHECK: a reminder fires — **"took AL on Y, still OFF on X"** to her + Supervisors.
+1. On the **Staff** persona (the one you moved in Part 2, now working Y), **request AL on Y** (full day).
+   Note her **AL balance before**.
+2. **Tap the AL approval card** (no persona switch) → **✅ Approve**.
+   - ✅ CHECK: AL is **charged 1 day** — *not 0* — even though Y was her original day-off; the move made
+     it a real work day. (Ask me to verify `deducted_map[Y] == 1` and `al_left` dropped by 1.)
+   - ✅ CHECK: the **Y redefine still stands** — the move is **not** cancelled; they **coexist**.
+   - ✅ CHECK: this reminder fires to her **and** Supervisors (both dates):
+     **"🔁 {name} took AL on {Y} — the day-off move STAYS: they're still OFF on {X}. Please re-arrange cover if needed."**
 
 ### 3b — AL on a payback / OT-rest slot → the slot is REFUNDED (no dead-end)
-1. First make a slot: as **Staff**, book a **payback** slot on some day Z (My Schedule → Book payback).
-2. As **Staff request AL on Z** → **Senior-A approve**.
-   - ✅ CHECK: it does **NOT** block. The payback booking is **cancelled/refunded** and she gets a
-     **refund notice** (for an OT-rest slot instead: the OT bank is refunded, "OT rest" reminder).
-   - ✅ CHECK: her payback debt / OT bank returns to what it was before she booked the slot.
+1. On **Staff**, book a **payback** slot on a clean day Z (About Me → Book payback). Note her **debt before**.
+2. On **Staff**, **request AL on Z** → tap the approval card → **✅ Approve**.
+   - ✅ CHECK: it does **NOT** block. The notice is a **refund**, not a block:
+     **"↩ {name} took AL on {Z} — the payback slot ({mins}) is returned to their debt to re-book."**
+     (For an **OT-rest** slot instead: **"…the OT-rest is cancelled, +{mins} back to their OT bank."**)
+   - ✅ CHECK: her **payback debt / OT bank returns to exactly what it was before she booked the slot**
+     (ask me to verify the debt/bank row).
 
 ### 3c — AL on a swap-work day → the swap is VOIDED for BOTH, both reminded
-1. Set up a swap (Part-2-style or the swap flow) so Staff has a swapped **work** day W.
-2. As **Staff request AL on W** → **Senior-A approve**.
-   - ✅ CHECK: it does **NOT** block. The **whole swap is voided** — both staffers go back to their
-     original days — and **both** get a reminder.
+1. Set up a swap (the 🔁 Change-day-off / partner-swap flow) so **Staff** has a swapped **work** day W.
+2. On **Staff**, **request AL on W** → tap the approval card → **✅ Approve**.
+   - ✅ CHECK: it does **NOT** block. The whole swap is **voided** — both parties go back to their normal
+     days — and **both** + Supervisors get:
+     **"🔁 The day-off swap between {A} and {B} is off — {name} is now away. Both are back to their normal days; please arrange cover if needed."**
+   - ✅ CHECK: ask me to verify all 4 `reason='swap'` overrides are gone and the swap row is `superseded`.
 
 ### 3d — the AL picker hides days she isn't there
-1. As **Staff**, open the **AL** request day picker.
-   - ✅ CHECK: it only offers **resolved-working** days — her plain day-offs are **not** listed (no more
-     "0 AL on an off day"). A1/A2-moved working days DO appear (because she's working them).
+1. On **Staff**, open the **AL** request day picker.
+   - ✅ CHECK: it offers **only resolved-working** days — her plain day-offs are **not** listed (no more
+     "0 AL on an off day"). A1/A2-moved working days **do** appear (she's working them).
 
 ---
 
 ## PART 4 — Step 8 resume: the collision backstop (F14)
-*The point we paused at last walk. Persona: Staff + Senior-A.*
+*The point we paused at last walk. (`al_date_conflict` now blocks only an already-**approved** AL day or a
+settled `'done'` redefine — everything else flows to the refund/void paths in Part 3, by design.)*
 
-1. Request AL on a day, get it **approved**. Then try to request AL **again on the same day**.
-   - ✅ CHECK: the second request is **refused at submit** ("already booked / unavailable").
-2. With an approved AL on a day, as Senior-A try to **redefine that same day** via A1.
-   - ✅ CHECK: the senior is asked to **confirm it cancels her AL that day (AL refunded)** — an explicit
-     confirm, not a silent override and not a dead-end. Decline → AL stands, proposer told.
-3. (Optional, fast) `/testrun` the relevant job if you want to see a time-driven escalation.
+1. **Double-AL same day (request-side block).** Get an AL **approved** on day D. On **Staff**, try to
+   request AL **again on D**.
+   - ✅ CHECK: refused **at submit** —
+     **"⚠ You already have approved leave or a scheduled shift change on: {D}. Pick other day(s)."**
+2. **Redefine over your OWN approved AL (confirm-revoke — the silent-override killer).** With an approved
+   AL on D, propose an **A1 change** on D for that same staffer, then approve it *as that staffer*.
+   - ✅ CHECK: instead of a dead-end, the card asks an explicit confirm —
+     **"⚠ You have approved AL on {D}. Approving this shift change ({win}) will CANCEL that leave (your AL
+     is refunded) and schedule you to work. Confirm?"** with **✅ Yes — cancel my leave & work** /
+     **✋ Keep my leave**.
+   - Tap **✋ Keep** → the AL stands, the redefine is declined, and the proposing senior is told.
+   - Tap **✅ Yes** (re-run) → the redefine takes and the AL is **refunded** (ask me to verify `al_left`
+     went back up and the redefine is `approved`).
+3. (Optional, fast) `/testclock +Nd` then `/testrun <job>` to watch a time-driven escalation in seconds.
 
 ---
 

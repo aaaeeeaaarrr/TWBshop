@@ -158,6 +158,11 @@ day, or miss a now-working day). Separate from WF1–WF5; fold into the resolver
 ---
 
 ## ▶ RESUME — Step 8 tap-script (refreshed post-batch, deployed `49ba900`, attendance_live OFF)
+> ⚠ **SUPERSEDED for 8b/8e by `docs/WALK_STEP3.md` Parts 3–4 (Jun 15).** Since 8b #1/#2 deployed
+> (`d5be60a`), AL on a **payback/OT-rest slot** or a **swap-work day** no longer **blocks** — it
+> **refunds the slot / voids the swap**. The "Couldn't approve…" block lines in 8b/8e below are STALE;
+> use WALK_STEP3 Part 3 (3b refund, 3c void) instead. 8a/8c/8d below remain accurate.
+
 Batch is DEPLOYED + verified; test mode ON; slate reset+reseeded; `/audit` clean. Just `/test`. Act as a
 SENIOR (to approve) and as the STAFFER (to request). Strings below are the exact deployed text. After each,
 ask Claude to DB-verify the rows. When 8a–8e clean + Late/Sick re-checked → `/audit` → `/testreset` →

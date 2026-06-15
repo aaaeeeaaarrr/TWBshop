@@ -262,8 +262,11 @@ A2 move). Plus a **doc fix**: WALK_STEP3 no longer claims My Schedule shows one-
 pattern summary; moves live in `dayoff_overrides`/`resolve_day`). +4 regression tests, suite **597**. KH
 drafts (collapse notes + reason nag) → `docs/KH_REVIEW.md` Pending. **DEPLOYED to gm Jun 15 ~12:3x PP**
 (mid-day lull, gm-only restart, verified HEAD==origin/active/clean, code carries the change, other 4 bots
-untouched; `attendance_live`=OFF). WALK_STEP3 refined with the new checks. **NEXT: owner re-confirms Part 2
-+ continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
+untouched; `attendance_live`=OFF). WALK_STEP3 refined across **Parts 1–4** (new-behavior checks + a
+TEST-MODE REALITY note: in test every card routes to the owner + role-checks bypassed, so 🎭 is only to
+INITIATE, never to approve; exact deployed strings + DB-verify prompts for 8b/F14). Killed a doc
+contradiction: WALK_FINDINGS' Step-8 tap-script marked SUPERSEDED for 8b/8e (now refund/void, not block).
+**NEXT: owner re-confirms Part 2 + continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed
