@@ -305,6 +305,21 @@ entry + dispatch branch — dry-run 6 was deleted long ago), the orphaned `_buyb
 its now-unreachable `_DRS["take"]` sample. FLAGGED-NOT-REMOVED: `gm_bot/analyzer.py::_analyze_photo`
 (unused Haiku photo-analysis fn — likely an interface-first stub per Arch-Rule-2; owner to confirm). Suite
 **611**. FOURTH gm deploy Jun 16 (cleanups; dry-run/dead code only — zero live-path change).
+**▶ DEEPER DUE-DILIGENCE #1+#3 (Jun 16):** **#1** ran the double-commit MONEY paths on the isolated
+**staging** DB with real before/after balance reads — (A) two redefines same day → #1 cancelled / #2
+approved, settle banks ONCE then False (no double-bank); (B) AL on a swap-work day → swap STAYS, AL
+10.0→9.0 (charged 1), swap_coexist; (C) confirm-revoke → redefine approved, AL 9.0→10.0 (refunded),
+al_revoked. ALL PASS. **#3** wider dead-code scan found 24 unused fns in `shared/database.py` — ALL parked
+or shared-library API (owner-correction toolkit, dormant `ot_grant_*`, pending CSV-import, hiring/points/
+b2b getters) → REMOVED NONE (cross-bot lib + parked = "don't break before go-live"); catalogued for a
+post-go-live pass. **▶ TEST-DB SAFETY FIX (owner: "dev default to staging"):** root cause of the `ZZ_*`
+test-staff leaking into prod = `TWBSHOP_ENV` defaults to "prod", so `pytest` hit the LIVE DB. Added
+`tests/conftest.py` forcing `TWBSHOP_ENV=staging` for EVERY test run (pool is lazy, so it lands before
+first `_db()`). Verified: suite now routes to `twbshop_staging` (609 pass, 2 data-dependent integration
+tests skip gracefully — staging has zero prod data). Production runtime default LEFT as "prod" on purpose
+(conftest loads only under pytest; bots never import it → zero prod risk, no unit changes). RESIDUAL (owner,
+HIGH-RISK, guard-blocked → owner runs manually): the leftover `ZZ_*` test-staff already in prod should be
+cleaned (FK-safe statements on request). Suite **609 (+2 skip)**.
 **▶ NEXT: owner
 resumes the walk — re-check 3c with an hours-AL (Date+Time now on all messages) → 3d → Part 4 step 2 →
 `/audit` → `/testreset` → flip `attendance_live`.**
