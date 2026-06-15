@@ -2037,8 +2037,12 @@ def a2_compday_pick(p: dict, sid: int, xidx: int) -> tuple[str, InlineKeyboardMa
         # date ONCE, then bilingual label (owner, Jun 16: "work this day off" + KH, no repeated date)
         rows.append([InlineKeyboardButton("%s · work this day off · ធ្វើការថ្ងៃឈប់នេះ" % day_label(y),
                      callback_data="att:a2:ss:%d:%d:%d" % (sid, xidx, yidx))])
-    return _hdr(p, "%s off %s — which day-off will they WORK instead? (within 7 days)\n"
-                   "%s ឈប់ %s — ត្រូវឱ្យមកធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)"
+    # owner (Jun 16): keep this header line LONG so the message bubble widens to full screen width —
+    # otherwise the bilingual "work this day off" button gets clipped on a phone (Telegram sizes the
+    # bubble to its widest line, then truncates a narrower button rather than wrapping it).
+    return _hdr(p, "%s is OFF on %s — pick which of their day-offs they will come in and WORK "
+                   "instead, within 7 days:\n"
+                   "%s ឈប់នៅ %s — សូមជ្រើសថ្ងៃឈប់ណាមួយ ដែលគាត់នឹងមកធ្វើការជំនួសវិញ ក្នុងរយៈពេល 7 ថ្ងៃ៖"
                 % (nm, day_label(X), nm, day_label(X))), InlineKeyboardMarkup(rows)
 
 

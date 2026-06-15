@@ -335,7 +335,9 @@ Reason · មូលហេតុ៖ {reason}
   Changes; the card is the staffer's approval card. **TONE:** plain, clear. My KH is draft.
 - `Change day off — for whom?` · `ប្តូរថ្ងៃឈប់ — សម្រាប់អ្នកណា?`
 - `{nm} — which day should they be OFF? (next 30 days)` · `{nm} — គួរឈប់សម្រាកថ្ងៃណា? (30 ថ្ងៃខាងមុខ)`
-- `{nm} off {X} — which day-off will they WORK instead? (within 7 days)` · `{nm} ឈប់ {X} — នឹងធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)`
+- `{nm} is OFF on {X} — pick which of their day-offs they will come in and WORK instead, within 7 days:`
+  (lengthened Jun 16 so the bubble widens enough to show the full "work this day off" button on a phone)
+  · `{nm} ឈប់នៅ {X} — សូមជ្រើសថ្ងៃឈប់ណាមួយ ដែលគាត់នឹងមកធ្វើការជំនួសវិញ ក្នុងរយៈពេល 7 ថ្ងៃ៖`
 - `{Y} · work this day off` (button, relabelled Jun 16; bilingual on ONE button, date {Y} shown ONCE
   at the front — do NOT repeat the date in the KH half) · `{Y} · work this day off · ធ្វើការថ្ងៃឈប់នេះ`
 - `{Y} (their day off) — START time? (or ⏱ Normal times)` · `{Y} — ម៉ោងចាប់ផ្តើម?`
