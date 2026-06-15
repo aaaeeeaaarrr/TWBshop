@@ -2084,6 +2084,8 @@ async def submit_shift_change(context, senior: dict, staff: dict, when_date: str
         await _sc_send_staff_card(context, cid, g, staff)          # no extra approval for a live extension
     else:
         shift_change_set_status(cid, "awaiting_senior")
+        g["status"] = "awaiting_senior"   # keep the in-memory copy in sync (create defaults 'proposed')
+        # — else the co-approve card renders the 'proposed' branch (NO Co-approve buttons) → dead end
         await _sc_send_coapprove_card(context, cid, g, senior, staff)
     return cid
 
@@ -5884,12 +5886,20 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         _pc, _pm = pend.get("_prompt_chat"), pend.get("_prompt_msg")
         if _sc_cid and _pc and _pm:
             context.bot_data.setdefault("sc_senior_card", {})[_sc_cid] = (_pc, _pm)
-        await confirm(
-            "✅ Shift change sent — the staff is asked to approve.\n"
-            "✅ បានផ្ញើការស្នើប្តូរវេនហើយ — កំពុងរង់ចាំបុគ្គលិកយល់ព្រម។",
-            "🧪 Shift change submitted (test) — you got the staff's Approve/Can't card. On Approve, that "
-            "day uses the new times; OT (beyond normal length) banks at checkout, clearing payback first. "
-            "/testreset to wipe.")
+        if pend.get("is_extension"):
+            await confirm(
+                "✅ Shift change sent — the staff is asked to approve.\n"
+                "✅ បានផ្ញើការស្នើប្តូរវេនហើយ — កំពុងរង់ចាំបុគ្គលិកយល់ព្រម។",
+                "🧪 Shift change submitted (test) — you got the staff's Approve/Can't card. On Approve, "
+                "that day uses the new times; OT (beyond normal length) banks at checkout, clearing "
+                "payback first. /testreset to wipe.")
+        else:
+            await confirm(
+                "✅ Shift change proposed — one more senior must co-approve before the staff is asked.\n"
+                "✅ បានស្នើប្តូរវេន — ត្រូវការបងម្នាក់ទៀតយល់ព្រមរួម មុននឹងសួរបុគ្គលិក។",
+                "🧪 Shift change submitted (test) — the co-approve card went to the other seniors (1 more "
+                "senior must co-approve before the staffer is asked). Tap ✅ Co-approve as a senior to "
+                "advance it. /testreset to wipe.")
     elif flow == "swap":
         partner = next((s for s in staff_all("active") if s["id"] == pend.get("partner_id")), None)
         if not partner:

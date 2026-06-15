@@ -1027,7 +1027,7 @@ def test_1a_non_extension_needs_senior_coapproval(monkeypatch):
     sent = []
 
     async def _send(context, uid, role, nm, text, group=False, kb=None, **k):
-        sent.append((role, uid))
+        sent.append((role, uid, kb))
         return None
 
     monkeypatch.setattr(bot, "_att_send", _send)
@@ -1035,12 +1035,18 @@ def test_1a_non_extension_needs_senior_coapproval(monkeypatch):
     # normal change -> awaiting_senior + co-approve card to the OTHER senior (uid 7), NOT the staffer
     asyncio.run(bot.submit_shift_change(ctx, senior, staff, "2026-07-22", 480, 1020, 540, "x"))
     assert "awaiting_senior" in sets
-    assert ("Senior", 7) in sent and not any(r == "Staff" for r, _ in sent)
+    assert ("Senior", 7) in [(r, u) for r, u, _ in sent] and not any(r == "Staff" for r, _, _ in sent)
+    # REGRESSION (Jun 16 dead-end): the co-approve card MUST carry the ✅ Co-approve button. The bug was a
+    # stale in-memory g (still 'proposed' after set_status('awaiting_senior')) → the 'proposed' card branch
+    # rendered with NO buttons, the DB stuck at awaiting_senior, the staff card never sent.
+    sen_kb = next(kb for r, u, kb in sent if r == "Senior")
+    cbs = [b.callback_data for row in sen_kb.inline_keyboard for b in row]
+    assert any(c.startswith("att:scs:ok:") for c in cbs), "co-approve card lost its Co-approve button"
     # extension -> straight to the staffer, no senior co-approval
     sent.clear(); sets.clear(); g["status"] = "proposed"
     asyncio.run(bot.submit_shift_change(ctx, senior, staff, "2026-07-22", 480, 1020, 540, "x",
                                         is_extension=True))
-    assert "awaiting_senior" not in sets and any(r == "Staff" for r, _ in sent)
+    assert "awaiting_senior" not in sets and any(r == "Staff" for r, _, _ in sent)
 
 
 def test_sc_fyi_text_states_both_dates_for_a2():

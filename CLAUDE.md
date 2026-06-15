@@ -271,7 +271,16 @@ the ladder would UNDERPAY OT (`normal_len` = full standard shift even on a day-o
 day-off work correctly. PARKED (owner ideas, NOT built): a "grant pure-OT on a day off" A1 variant
 (normal_len=0); a seniors' "view + cancel staff changes" tool (recommend cancel quorum = 2 seniors, NOT
 unanimous, to avoid deadlock). **DEPLOYED to gm Jun 16 (gm-only restart, quiet window; verify HEAD==origin,
-gm active+clean, code carries the change, other 4 bots untouched; `attendance_live`=OFF).** **▶ NEXT: owner
+gm active+clean, code carries the change, other 4 bots untouched; `attendance_live`=OFF).** **▶ CO-APPROVAL DEAD-END FIXED (Jun 16, from the
+owner's Part-4 step-2 walk):** proposing any non-extension schedule change dead-ended — all seniors' cards
+showed "Co-approved — awaiting {staff}" with NO Co-approve buttons, the DB stuck at `awaiting_senior`, the
+staff card never sent. CAUSE: `submit_shift_change` fetched `g` (status defaults `'proposed'`), set the DB
+to `awaiting_senior`, but passed the STALE in-memory `g` to `_sc_send_coapprove_card` → the status-aware
+card (added s37) rendered the buttonless 'proposed' branch. FIX: sync `g["status"]="awaiting_senior"` in
+memory before sending. Also fixed the misleading test/live confirm ("you got the staff's card" → "1 more
+senior must co-approve"). Strengthened `test_1a_non_extension_needs_senior_coapproval` to assert the
+Co-approve button is PRESENT (revert-proven: fails without the fix). Suite 605. SECOND gm deploy Jun 16.
+**▶ NEXT: owner
 resumes the walk — re-check 3c with an hours-AL (Date+Time now on all messages) → 3d → Part 4 step 2 →
 `/audit` → `/testreset` → flip `attendance_live`.**
 
