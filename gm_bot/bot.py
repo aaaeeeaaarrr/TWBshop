@@ -2932,7 +2932,8 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def _announce_supersessions(context, victim_staff: dict, superseded: list,
-                                  away_reason: str = "took approved AL") -> None:
+                                  away_reason: str = "took approved AL",
+                                  al_window: str | None = None) -> None:
     """Schedule-model notify-all (docs/SCHEDULE_RESOLUTION_MODEL.md, Phase 4 seed): when a newer AWAY
     decision stood older ones down on a day, tell everyone affected so a human re-covers (the machine
     owns balances+truth+telling; humans own coverage). Best-effort + bilingual; never blocks the state
@@ -2940,7 +2941,10 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
       • a stood-down SENIOR redefine → the senior who set it + the Supervisors group (coverage broke);
       • a refunded approved AL (e.g. a sick day supersedes a planned AL) → the staffer (balance back) +
         the Supervisors group.
-    `away_reason` (EN) describes WHY the person is now away ('took approved AL', 'is out sick', …)."""
+    `away_reason` (EN) describes WHY the person is now away ('took approved AL', 'is out sick', …).
+    `al_window` (e.g. '10am–12pm') is appended to the AWAY day's label when an HOURS-AL drove this —
+    so every reminder states Date+Time, not a bare date (owner, Jun 16; a 2-hour AL read like a full
+    day off in the swap/move reminders). None for a full-day AL or a non-AL away event."""
     if not superseded:
         return
     from datetime import date as _date
@@ -2951,9 +2955,10 @@ async def _announce_supersessions(context, victim_staff: dict, superseded: list,
 
     def _dlabel(d):
         try:
-            return _date.fromisoformat(d.get("date") or "").strftime("%a %d/%m")
+            base = _date.fromisoformat(d.get("date") or "").strftime("%a %d/%m")
         except Exception:
-            return d.get("date") or ""
+            base = d.get("date") or ""
+        return "%s (%s)" % (base, al_window) if al_window else base
 
     for d in superseded:
         dlabel = _dlabel(d)
@@ -3064,6 +3069,12 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
     days_txt = alm.al_span_label(days, requester.get("day_off"), nw)   # from→to, bridging any absence
     runc = requester.get("telegram_ids") or []
     sl = (to_min(requester.get("work_end")) - to_min(requester.get("work_start"))) % 1440 or 1440
+    # HOURS-AL → '10am–12pm'; None for a full day. Owner (Jun 16): every AL message must state
+    # Date+Time when it's an hours-AL — the verdict line + the move/swap/refund reminders all read
+    # like a full day off otherwise. _al_when carries date+time to the staffer-facing notices.
+    al_window = ("%s–%s" % (_fmt_min(to_min(req["hours_start"])), _fmt_min(to_min(req["hours_end"]))) \
+                 if req["kind"] == "hours" and req.get("hours_start") and req.get("hours_end") else None)
+    al_when = "%s (%s)" % (days_txt, al_window) if al_window else days_txt
 
     # ── settle the decision ATOMICALLY before touching any card (S1/S2/S3) ─────
     new_bal = None
@@ -3140,7 +3151,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s is approved ✓. You have %g AL days left. 🤍\n"
             "AL របស់ប្អូនសម្រាប់ %s បានអនុម័តហើយ ✓។ ប្អូននៅសល់ AL %g ថ្ងៃទៀត 🤍"
-            % (days_txt, new_bal, days_txt, new_bal))
+            % (al_when, new_bal, al_when, new_bal))
         # Supervisors notice — ENGLISH-ONLY (owner, Jun 11: the bilingual twin doubled every
         # line; seniors read English). Locked format: leave + reason + day-off + BACK AT WORK
         # (the back-at-work line was promised by the locked format but missing live — added).
@@ -3167,12 +3178,12 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         # the AL COEXISTS (owner, Jun 15: AL never cancels a trade — the partner already gave/took their
         # day; she's just away on her committed work day, charged, a human covers). The 'swap_coexist'
         # descriptor (from al_approve_and_deduct) drives that reminder. Best-effort, after the verdict.
-        await _announce_supersessions(context, requester, superseded)
+        await _announce_supersessions(context, requester, superseded, al_window=al_window)
     else:
         # owner (Jun 11): say WHICH request — they may have several pending
         await _att_send(context, runc[0] if runc else None, "Requester", name,
             "Your AL for %s wasn't approved.\nAL របស់ប្អូនសម្រាប់ %s មិនបានអនុម័តទេ។"
-            % (days_txt, days_txt))
+            % (al_when, al_when))
 
 
 async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

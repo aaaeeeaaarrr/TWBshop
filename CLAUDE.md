@@ -249,7 +249,33 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-15 (session 37 — **A1/A2 WALK FINDINGS (3) BUILT + DEPLOYED to gm; `attendance_live`
+**Last updated:** 2026-06-16 (session 38 — **HOURS-AL Date+Time everywhere + A2 button relabel + Part-4
+verdict; DEPLOYED to gm; `attendance_live` still OFF**). From the owner's 3c re-walk (an hours-AL on a
+swap-work day). **(1) HOURS-AL now states Date+Time in EVERY staffer-facing message.** The gap: the
+approval verdict + the move/swap/refund **reminders** (`_announce_supersessions`) showed a bare date, so a
+2-hour AL read like a full day off. Fixed: `_al_finalize` builds `al_window` ('10am–12pm', None for a
+full day) → the verdict + rejection use `al_when` (date+time) and `_announce_supersessions` gets an
+`al_window` param that appends `(10am–12pm)` to the AWAY-day label in BOTH language halves. (The Cancel-AL
+list/confirm + the request card already showed time.) +1 regression test (`test_hours_al_shows_time_in_
+verdict_and_reminder`), suite **605**. **(2) A2 comp-day button relabelled** `· their day off` →
+`· work this day off · ធ្វើការថ្ងៃឈប់នេះ` (bilingual on one button, date shown ONCE; KH_REVIEW updated).
+**(3) PART-4 verdict (Option A confirmed by owner):** Step-1 (double-AL "refused at submit") is no longer
+a manual tap — the AL picker hides already-AL'd days (resolver→AWAY, =3d); `al_date_conflict` stays a
+race/non-UI BACKSTOP (unit-tested). WALK_STEP3 Part-4 step-1 reframed. Step-2 (redefine over own AL →
+confirm-revoke) KEPT: the change-time picker intentionally does NOT hide AL'd working days, so a senior
+CAN deliberately schedule work over leave — chain = proposing senior + **1** co-approving senior + the
+staffer's explicit ✅Yes/✋Keep consent (verified: `submit_shift_change` has no AL block; co-approve →
+proposed → staff). **(4) A1-on-a-day-off — owner asked "why hide day-offs in A1?": KEEP HIDDEN.** Reusing
+the ladder would UNDERPAY OT (`normal_len` = full standard shift even on a day-off → first ~9h counted as
+"normal", no OT for giving up the day off). A2 (move) + payback/OT-rest slots (normal_len=0) already cover
+day-off work correctly. PARKED (owner ideas, NOT built): a "grant pure-OT on a day off" A1 variant
+(normal_len=0); a seniors' "view + cancel staff changes" tool (recommend cancel quorum = 2 seniors, NOT
+unanimous, to avoid deadlock). **DEPLOYED to gm Jun 16 (gm-only restart, quiet window; verify HEAD==origin,
+gm active+clean, code carries the change, other 4 bots untouched; `attendance_live`=OFF).** **▶ NEXT: owner
+resumes the walk — re-check 3c with an hours-AL (Date+Time now on all messages) → 3d → Part 4 step 2 →
+`/audit` → `/testreset` → flip `attendance_live`.**
+
+**(prev) 2026-06-15 (session 37 — **A1/A2 WALK FINDINGS (3) BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). From the owner's Part-1/2 re-walk. **(F1) co-approve cards now collapse** — when ONE senior
 co-approves/declines, every OTHER senior's co-approve card is rewritten button-less ("Already co-approved
 by another senior" / "Stopped — another declined"), killing the dead-button taps + test-watchdog noise

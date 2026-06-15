@@ -540,6 +540,53 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
     assert any("who's working" in b for b in tog)
 
 
+def test_hours_al_shows_time_in_verdict_and_reminder(monkeypatch):
+    """Owner (Jun 16): an HOURS-AL must state Date+Time in EVERY staffer-facing message — the
+    approval verdict AND the coexist/swap/refund reminder (which read like a full day off before).
+    Here an hours-AL (10am–12pm) lands on a swap-WORK day → swap_coexist reminder; both messages
+    must carry the window."""
+    from gm_bot import bot
+    texts = []
+    g = {"id": 51, "staff_id": 2, "days": ["2026-06-23"], "reason": "2h appt", "kind": "hours",
+         "status": "pending", "hours_start": "10:00", "hours_end": "12:00"}
+    monkeypatch.setattr(bot, "al_get_request", lambda i: g)
+    monkeypatch.setattr(bot, "staff_absent_dates", lambda sid, exclude_req_id=None: set())
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [
+        {"id": 2, "canonical_name": "Anan", "call_name": "Anan", "telegram_ids": [222],
+         "work_start": "08:00", "work_end": "17:00", "day_off": "Sun"}])
+    monkeypatch.setattr(bot, "_seniors", lambda exclude_staff_id=None: [])
+    import shared.database as _sdb
+    monkeypatch.setattr(_sdb, "al_coexist_days", lambda sid, dates: set())
+
+    def _approve(i, total, dmap, pmap, superseded_out=None):
+        if superseded_out is not None:
+            superseded_out.append({"kind": "swap_coexist", "date": "2026-06-23"})
+        g["status"] = "approved"
+        return 6.8
+
+    monkeypatch.setattr(bot, "al_approve_and_deduct", _approve)
+
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+        texts.append((role, text))
+
+    monkeypatch.setattr(bot, "_att_send", _send)
+
+    class _Bot:
+        async def edit_message_text(self, *a, **k):
+            pass
+
+    ctx = _Ctx()
+    ctx.bot = _Bot()
+    ctx.bot_data = {"al_cards": {}, "al_staff_cards": {}}
+    asyncio.run(bot._al_finalize(ctx, g, approved=True))
+    # the approval verdict to the requester states the window
+    verdict = next(t for r, t in texts if r == "Requester")
+    assert "10am–12pm" in verdict and "approved" in verdict
+    # the swap_coexist reminder (staff + supervisors) states the window too — not a bare date
+    coexist = [t for r, t in texts if "swap STAYS" in t or "ប្តូរថ្ងៃឈប់នៅដដែល" in t]
+    assert coexist and all("10am–12pm" in t for t in coexist)
+
+
 def test_al_prompt_coverage_toggle(monkeypatch):
     """The AL reason PROMPT (before typing) carries a 👁 Show-who's-working toggle, computed live from
     the in-progress selection and stashed so the toggle can re-render."""

@@ -336,7 +336,8 @@ Reason · មូលហេតុ៖ {reason}
 - `Change day off — for whom?` · `ប្តូរថ្ងៃឈប់ — សម្រាប់អ្នកណា?`
 - `{nm} — which day should they be OFF? (next 30 days)` · `{nm} — គួរឈប់សម្រាកថ្ងៃណា? (30 ថ្ងៃខាងមុខ)`
 - `{nm} off {X} — which day-off will they WORK instead? (within 7 days)` · `{nm} ឈប់ {X} — នឹងធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)`
-- `{Y} · their day off` (button) · `{Y} · ថ្ងៃឈប់របស់គេ`
+- `{Y} · work this day off` (button, relabelled Jun 16; bilingual on ONE button, date {Y} shown ONCE
+  at the front — do NOT repeat the date in the KH half) · `{Y} · work this day off · ធ្វើការថ្ងៃឈប់នេះ`
 - `{Y} (their day off) — START time? (or ⏱ Normal times)` · `{Y} — ម៉ោងចាប់ផ្តើម?`
 - prompt `Day-off move — {nm}: OFF {X}, works {Y} {win}{ot}.` · `ប្តូរថ្ងៃឈប់ — {nm}៖ ឈប់ {X}, ធ្វើការ {Y} {win}{ot}។`
 - card `🗓 Day-off move — you're OFF {X}, and you WORK {Y}: {win}` · `🗓 ប្តូរថ្ងៃឈប់ — ប្អូនឈប់ {X}, ហើយធ្វើការ {Y}៖ {win}`

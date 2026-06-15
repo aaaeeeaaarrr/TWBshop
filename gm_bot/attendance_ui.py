@@ -2045,7 +2045,8 @@ def a2_compday_pick(p: dict, sid: int, xidx: int) -> tuple[str, InlineKeyboardMa
     rows = [_back_row("att:a2:x:%d" % sid)]
     for y in cands:
         yidx = (y - _today()).days
-        rows.append([InlineKeyboardButton("%s · their day off" % day_label(y),
+        # date ONCE, then bilingual label (owner, Jun 16: "work this day off" + KH, no repeated date)
+        rows.append([InlineKeyboardButton("%s · work this day off · ធ្វើការថ្ងៃឈប់នេះ" % day_label(y),
                      callback_data="att:a2:ss:%d:%d:%d" % (sid, xidx, yidx))])
     return _hdr(p, "%s off %s — which day-off will they WORK instead? (within 7 days)\n"
                    "%s ឈប់ %s — ត្រូវឱ្យមកធ្វើការជំនួសថ្ងៃឈប់ណា? (ក្នុង 7 ថ្ងៃ)"

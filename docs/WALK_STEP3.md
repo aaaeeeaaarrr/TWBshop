@@ -139,12 +139,18 @@ committed to work, so it's charged, and a human covers. Same as the A2 coexist.)
 *The point we paused at last walk. (`al_date_conflict` now blocks only an already-**approved** AL day or a
 settled `'done'` redefine — everything else flows to the refund / coexist paths in Part 3, by design.)*
 
-1. **Double-AL same day (request-side block).** Get an AL **approved** on day D. On **Staff**, try to
-   request AL **again on D**.
-   - ✅ CHECK: refused **at submit** —
-     **"⚠ You already have approved leave or a scheduled shift change on: {D}. Pick other day(s)."**
-2. **Redefine over your OWN approved AL (confirm-revoke — the silent-override killer).** With an approved
-   AL on D, propose an **A1 change** on D for that same staffer, then approve it *as that staffer*.
+1. **Double-AL same day — now enforced by the PICKER, not a submit error (refined Jun 16).** You can't
+   reach the old "refused at submit" message by tapping, because the AL day picker **hides any day you
+   already have approved AL** (the resolver marks it AWAY — same mechanism as 3d). So there's nothing to
+   re-pick. The submit-side block (`al_date_conflict`) **still exists as a backstop** for races (two
+   requests in flight before either is approved) and non-UI paths, and is covered by
+   `test_al_date_conflict_detects_approved_al_and_shift_change` — no manual tap needed. ✅ Just confirm
+   in **3d** that an already-AL'd day is absent from the picker.
+2. **Redefine over your OWN approved AL (confirm-revoke — the silent-override killer).** *(Option A,
+   confirmed Jun 16: a senior CAN deliberately schedule work over leave — the change-time picker does
+   NOT hide AL'd working days. Chain: proposing senior + 1 co-approving senior + the staffer's explicit
+   consent below.)* With an approved AL on D, propose an **A1 change** on D for that same staffer
+   (it co-approves with one more senior first), then approve it *as that staffer*.
    - ✅ CHECK: instead of a dead-end, the card asks an explicit confirm —
      **"⚠ You have approved AL on {D}. Approving this shift change ({win}) will CANCEL that leave (your AL
      is refunded) and schedule you to work. Confirm?"** with **✅ Yes — cancel my leave & work** /
