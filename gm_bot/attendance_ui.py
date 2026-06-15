@@ -821,8 +821,18 @@ def _persona(context) -> dict | None:
     if sid is None:
         return None
     rec = next((r for r in staff_all("active") if r["id"] == sid), None)
-    if rec is not None and context.user_data.get("att_live_self"):
-        rec = dict(rec)
+    if rec is None:
+        return None
+    rec = dict(rec)
+    if att_test_on():
+        # test mode never mutates the real al_left column → overlay the simulated test deductions so the
+        # schedule view + over-balance gates match the approval messages during a walk (display only).
+        try:
+            from shared.database import al_effective_left
+            rec["al_left"] = al_effective_left(rec["id"])
+        except Exception:
+            pass
+    if context.user_data.get("att_live_self"):
         rec["_live"] = True   # a real staffer driving their own menu (not the owner shell)
     return rec
 

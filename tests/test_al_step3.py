@@ -220,6 +220,28 @@ def test_8b_al_refunds_payback_slot_and_ot_rest():
         _teardown(sid)
 
 
+def test_test_mode_cumulative_overlay_balance():
+    """Owner (Jun 15): test mode never touches the real al_left column. The approval message AND the
+    schedule overlay (al_effective_left) must both show the CUMULATIVE simulated balance, while the real
+    column stays untouched — so they agree during a walk. (Was: message showed real−this-request, the
+    schedule showed the untouched real column → they disagreed.)"""
+    sid = _seed("ZZ_AL_TEST_OVERLAY", 16.5)
+    db.set_att_test(True)
+    try:
+        D1, D2 = "2026-07-22", "2026-07-23"
+        r1 = db.al_create_request(sid, "days", [D1], None, None, "x", None)
+        assert db.al_approve_and_deduct(r1, 1.0, {D1: 1.0}, {}) == 15.5     # 16.5 − 1 (incl. this)
+        r2 = db.al_create_request(sid, "days", [D2], None, None, "x", None)
+        assert db.al_approve_and_deduct(r2, 1.0, {D2: 1.0}, {}) == 14.5     # CUMULATIVE: 16.5 − 2
+        assert db.al_effective_left(sid) == 14.5          # schedule overlay agrees with the messages
+        assert _al_left(sid) == 16.5                      # the REAL column is NEVER touched in test
+        db.set_att_test(False)
+        assert db.al_effective_left(sid) == 16.5          # live → straight from the real column
+    finally:
+        db.set_att_test(False)
+        _teardown(sid)
+
+
 def test_8b3_supersede_a2_move_clears_paired_off():
     """8b #3: standing down an A2 move's redefine (a NEW redefine on the same day supersedes it) also
     clears the paired OFF on X — she's never left off X with no comp work day (the move fully reverses).

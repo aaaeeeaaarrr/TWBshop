@@ -3828,6 +3828,27 @@ def al_deduct(staff_id: int, amount: float) -> float:
             return float(r["al_left"]) if r else 0.0
 
 
+def al_effective_left(staff_id: int) -> float:
+    """The AL balance to DISPLAY. LIVE: the real `al_left` column (deduct-at-approval keeps it true).
+    TEST: the real column MINUS the sum of every approved TEST AL deduction — because test mode never
+    mutates the real column (al_deduct/al_approve_and_deduct), so the schedule view must overlay the
+    simulated deductions to agree with the approval messages during a walk. Read-only; mutates nothing."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s", (staff_id,))
+            r = cur.fetchone()
+            base = float(r["b"]) if r else 0.0
+            if not _ATT_TEST:
+                return base
+            cur.execute("SELECT deducted_map FROM al_requests WHERE staff_id=%s AND status='approved' "
+                        "AND is_test=TRUE", (staff_id,))
+            spent = 0.0
+            for rr in cur.fetchall():
+                for v in (rr["deducted_map"] or {}).values():
+                    spent += float(v)
+            return round(base - spent, 2)
+
+
 def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_map: dict,
                           superseded_out: list | None = None):
     """Atomic approve (state-integrity S1/S2/S3): in ONE transaction claim pending→approved, FREEZE
@@ -3954,10 +3975,18 @@ def al_approve_and_deduct(req_id: int, total: float, deducted_map: dict, points_
                             superseded_out.append({"kind": "pb_refund", "date": sd,
                                                    "minutes": int(bk["minutes"]) if bk else 0})
             if is_test:
-                cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s",
-                            (staff_id,))
+                # test never moves the real column → return the CUMULATIVE simulated balance (real minus
+                # ALL approved test deductions, incl. the row just approved in this txn) so the approval
+                # message agrees with the overlaid schedule view (al_effective_left).
+                cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s", (staff_id,))
                 b = cur.fetchone()
-                return (float(b["b"]) - float(total)) if b else 0.0
+                cur.execute("SELECT deducted_map FROM al_requests WHERE staff_id=%s AND status='approved' "
+                            "AND is_test=TRUE", (staff_id,))
+                spent = 0.0
+                for rr in cur.fetchall():
+                    for v in (rr["deducted_map"] or {}).values():
+                        spent += float(v)
+                return round(float(b["b"]) - spent, 2) if b else 0.0
             cur.execute("""UPDATE staff_registry SET al_left=COALESCE(al_left,0)-%s, updated_at=NOW()
                            WHERE id=%s RETURNING al_left""", (total, staff_id))
             r = cur.fetchone()

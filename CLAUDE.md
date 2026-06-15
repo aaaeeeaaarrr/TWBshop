@@ -292,8 +292,16 @@ for an A2 comp-work day → new `_al_charged_with_coexist` adds the coexist day 
 branches), so the count + the "Day off" line now match the real charge; (2) the **audit `v_exclusivity`**
 flagged the *intended* coexistence ("on leave AND scheduled to work") → now excludes A2 paired-move
 redefines (a plain redefine sharing an AL day is still flagged). +2 tests (picker helper + audit coexist).
-Suite 599. **NEXT: owner re-confirms 3a + continues 3b/3c/3d + Part 4 → `/audit` → `/testreset` → flip
-`attendance_live`.**
+Suite 599.
+**▶ TEST-MODE AL OVERLAY (Jun 15, from the Part-3 walk):** the approval message showed 15.5 but My
+Schedule showed 16.5 — because test mode deliberately NEVER mutates the real `al_left` column (data
+isolation), so the message overlaid the test maps while My Schedule read the untouched column. Made them
+agree: new `al_effective_left(staff_id)` = real `al_left` − Σ(approved TEST deductions) [live = the real
+column]; `_persona` overlays it in test (covers My Schedule + the over-balance early gate); and
+`al_approve_and_deduct`'s test return is now CUMULATIVE (real − all approved test deductions incl. this
+one) so the message matches the schedule. Real column still untouched in test (verified). +1 staging test
+(cumulative + real-untouched + live passthrough). Suite 600. **NEXT: owner re-confirms 3a + continues
+3b/3c/3d + Part 4 → `/audit` → `/testreset` → flip `attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`
 still OFF**). Built the full punch-list (commits `8a51a08` + `49ba900`, suite **578**): **WF6** /testseed
