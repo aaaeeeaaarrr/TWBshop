@@ -113,13 +113,20 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
    - ✅ CHECK: her **payback debt / OT bank returns to exactly what it was before she booked the slot**
      (ask me to verify the debt/bank row).
 
-### 3c — AL on a swap-work day → the swap is VOIDED for BOTH, both reminded
-1. Set up a swap (the 🔁 Change-day-off / partner-swap flow) so **Staff** has a swapped **work** day W.
+### 3c — AL on a swap-WORK day → the swap STAYS and the AL is CHARGED 1 *(rule changed Jun 15)*
+*(New rule: AL never cancels a swap — the partner already gave/took their day; she's just away on a day she
+committed to work, so it's charged, and a human covers. Same as the A2 coexist.)*
+1. Set up a swap (🔁 Change day off / partner-swap) so **Staff** has a swapped **WORK** day W. Note her **AL balance**.
 2. On **Staff**, **request AL on W** → tap the approval card → **✅ Approve**.
-   - ✅ CHECK: it does **NOT** block. The whole swap is **voided** — both parties go back to their normal
-     days — and **both** + Supervisors get:
-     **"🔁 The day-off swap between {A} and {B} is off — {name} is now away. Both are back to their normal days; please arrange cover if needed."**
-   - ✅ CHECK: ask me to verify all 4 `reason='swap'` overrides are gone and the swap row is `superseded`.
+   - ✅ CHECK: it does **NOT** block and does **NOT** cancel the swap. The swap **stays** (all 4 overrides intact).
+   - ✅ CHECK: the AL is **charged 1** (W is a real work day for her via the swap). *(verify `deducted_map[W]==1`, `al_left` −1)*
+   - ✅ CHECK: reminder to her + Supervisors: **"🔁 {name} took AL on {W} — the day-off swap STAYS (they were covering that day). Please re-arrange cover if needed."**
+   - → *ask me to verify the swap row is still `approved` and the 4 overrides remain*
+
+### 3c-2 — you can't swap ONTO a day you already have AL *(your screenshot — option A)*
+1. On **Staff**, get an AL **approved** on some day. Then open the swap flow (🔁 Change day off) → pick a partner.
+   - ✅ CHECK: **no pairing** is offered that lands on the AL'd day (neither as your off nor your work day).
+     The picker silently drops those — you can't create a swap onto a day you're already away.
 
 ### 3d — the AL picker hides days she isn't there
 1. On **Staff**, open the **AL** request day picker.
@@ -130,7 +137,7 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
 
 ## PART 4 — Step 8 resume: the collision backstop (F14)
 *The point we paused at last walk. (`al_date_conflict` now blocks only an already-**approved** AL day or a
-settled `'done'` redefine — everything else flows to the refund/void paths in Part 3, by design.)*
+settled `'done'` redefine — everything else flows to the refund / coexist paths in Part 3, by design.)*
 
 1. **Double-AL same day (request-side block).** Get an AL **approved** on day D. On **Staff**, try to
    request AL **again on D**.
