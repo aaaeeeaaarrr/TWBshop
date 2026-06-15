@@ -276,7 +276,15 @@ strengthened 2 tests + walk Part 1/2 checks. Suite 597.
 comment warned about); watchdog message made dynamic ("caps at 18h"). Closed the picker gap that let
 Rath's 16h through: the A1/A2 end-ladders (`sc_end`/`a2_end`) now bound `extra` by `day_ext_cap(normal_len)`
 so the picker can never offer an over-cap change (was: only the audit caught it after). OT-bank cap (14h)
-unchanged — different concept. Tests updated to 18h + new ladder-cap guard. Suite 598. **NEXT: owner
+unchanged — different concept. Tests updated to 18h + new ladder-cap guard. Suite 598.
+**▶ SENIOR-CARD LIFECYCLE fix (Jun 15, from the A2 walk):** the co-approving seniors' cards were stuck at
+"sent to {staff}" — they never learned the staffer's verdict (only the proposer did), and the 👁 toggle
+vanished after co-approval. Rebuilt `_sc_coapprove_card` to be **status-aware** (awaiting-senior → buttons;
+proposed → "⏳ awaiting {staff}"; decided → verdict) with the **👁 toggle persisting at every stage**;
+new `_refresh_senior_cards` re-renders ALL senior cards (registry `sc_senior_cards`) on co-approval AND on
+the staffer's decision (wired into all 4 staff-decision branches: approve/no/keep/rev). Replaced the
+sibling-collapse (now every card just re-renders to the live status — no dead buttons). Coverage stays
+computed live at tap-time. Tests: swapped the collapse test for a refresh test. Suite 598. **NEXT: owner
 re-confirms Part 2 + continues Parts 3–4 → `/audit` → `/testreset` → flip `attendance_live`.**
 
 **(prev) 2026-06-14 (session 36 — **WALK-FINDINGS BATCH BUILT + DEPLOYED to gm; `attendance_live`

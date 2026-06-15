@@ -41,12 +41,15 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
      shows coverage for the changed day, tap **🙈 Hide** to collapse it.
    - Tap **✅ Co-approve.**
    - ✅ CHECK: it advances to **Staff** as the awaiting-approval card.
-   - ✅ CHECK (NEW — the dead-button fix): every **other** senior's co-approve card (if there were 3+
-     seniors) now reads "✅ Already co-approved by another senior…" with **no buttons** — tapping where
-     they used to be does nothing (no "dead button", no watchdog alert).
+   - ✅ CHECK (NEW): **every** senior's card (the one you tapped AND the others) now reads
+     **"⏳ Co-approved — awaiting {staff}'s approval"**, the Co-approve buttons are **gone**, but the
+     **👁 toggle stays** so they can still re-check coverage (no dead buttons, no watchdog alert).
 7. **🎭 Switch persona → Staff.** Open the card → ✅ confirm it shows **"Why · មូលហេតុ"** too → **✅ Approve.**
    - ✅ CHECK: the proposer's old "⏳ Awaiting" card **flips in place** to the approved verdict (no stale
      duplicate left behind).
+   - ✅ CHECK (NEW): **every senior's card** updates to the staffer's verdict —
+     **"✅ {staff} approved"** (or **"❌ {staff} did not approve"** if you decline) — not just the
+     proposer's. The 👁 toggle is still there.
    - ✅ CHECK (NEW): the Supervisors group notice now states the change **and the reason**
      ("…is now {time}. Reason · មូលហេតុ៖ {reason}").
 
@@ -64,8 +67,9 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
      days** — who covers X (now off) **and** who works Y. Tap it to confirm, then 🙈 Hide.
    - ✅ CHECK (NEW): a blank reason is **refused** here too (same as Part 1).
    Type a reason → submit → co-approval (Senior-B) → Staff approves (same as Part 1).
-   - ✅ CHECK (NEW): the **co-approve card** carries the **reason** + the both-days 👁 toggle, and the
-     sibling-collapse applies here too (other seniors' cards go button-less once one co-approves).
+   - ✅ CHECK (NEW): the **co-approve card** carries the **reason** + the both-days 👁 toggle; once one
+     senior co-approves, **all** seniors' cards move to "⏳ awaiting {staff}" (buttons gone, toggle stays),
+     and after the staffer decides they **all** show the verdict ("✅/❌ {staff} …").
    - ✅ CHECK (NEW): the **Supervisors FYI** states the reason too (and both dates).
    - ✅ CHECK (1c — the big one): **every** notice/card states **BOTH dates** — "OFF on **X**, works **Y**".
      No message should mention only one date. The card frames it **"Day-off move — OFF X, work Y"**.

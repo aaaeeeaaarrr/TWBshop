@@ -1065,26 +1065,31 @@ def test_coapprove_card_has_coverage_toggle(monkeypatch):
     assert body_on.count("covers: someone") >= 2
 
 
-def test_coapprove_resolution_collapses_sibling_cards(monkeypatch):
-    """Finding 1 (owner, Jun 15): when ONE senior co-approves, the OTHER seniors' co-approve cards are
-    collapsed to a terminal one-liner (no live buttons left → no dead taps / watchdog noise)."""
+def test_refresh_senior_cards_updates_all_with_verdict_and_keeps_toggle(monkeypatch):
+    """Findings (owner, Jun 15): on a resolution, EVERY senior's card re-renders to the verdict (not just
+    the proposer's), the Co-approve buttons are gone, and the 👁 who's-working toggle SURVIVES so they can
+    re-check coverage. No dead co-approve buttons left anywhere."""
     import gm_bot.bot as bot
+    from shared import database as db
     g = {"id": 9, "staff_id": 11, "senior_id": 2, "when_date": "2026-07-22", "start_min": 480,
-         "end_min": 1020}
+         "end_min": 1020, "normal_len": 540, "reason": "mama", "status": "declined"}
+    monkeypatch.setattr(db, "shift_change_get", lambda cid: dict(g))
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [_DAYREC, {"id": 2, "call_name": "Sen"}])
     edits = []
 
     class _Bot:
-        async def edit_message_text(self, text, chat_id=None, message_id=None, **k):
-            edits.append((chat_id, message_id, text))
+        async def edit_message_text(self, text, chat_id=None, message_id=None, reply_markup=None, **k):
+            edits.append((chat_id, message_id, text, reply_markup))
 
     ctx = types.SimpleNamespace(bot=_Bot(),
-                                bot_data={"sc_coapprove_cards": {9: [(100, 1), (100, 2), (100, 3)]}})
-    # senior looking at card (100,2) resolves it; (100,1) and (100,3) must be collapsed, (100,2) kept
-    asyncio.run(bot._collapse_sibling_coapprove_cards(ctx, 9, g, "Anan", 100, 2, "✅ handled"))
-    collapsed = {(c, m) for c, m, _ in edits}
-    assert collapsed == {(100, 1), (100, 3)}                          # siblings only
-    assert all("✅ handled" in t for _, _, t in edits)
-    assert 9 not in ctx.bot_data["sc_coapprove_cards"]                # one-shot (popped)
+                                bot_data={"sc_senior_cards": {9: [(100, 1), (100, 2), (100, 3)]}})
+    asyncio.run(bot._refresh_senior_cards(ctx, 9, status_line="❌ Visal did not approve"))
+    assert {(c, m) for c, m, _, _ in edits} == {(100, 1), (100, 2), (100, 3)}   # ALL cards updated
+    for _, _, text, kb in edits:
+        assert "❌ Visal did not approve" in text                                # the verdict shows
+        flat = [b.callback_data for row in kb.inline_keyboard for b in row]
+        assert any(cd.startswith("att:scscov:9:") for cd in flat)               # 👁 toggle KEPT
+        assert not any(cd.startswith("att:scs:ok:") for cd in flat)             # no dead Co-approve button
 
 
 def test_a2_reason_prompt_has_both_days_toggle(monkeypatch):

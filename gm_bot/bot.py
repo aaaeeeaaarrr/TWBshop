@@ -1960,38 +1960,58 @@ def _sc_what(g: dict, sn: str) -> str:
             else ("Shift change — %s on %s %s" % (sn, g["when_date"], win)))
 
 
-def _sc_coapprove_card(g: dict, pn: str, sn: str, staff: dict,
-                       show_cov: bool = False) -> tuple[str, InlineKeyboardMarkup]:
-    """The co-approve card a SECOND senior sees. Carries a 👁 who's-working toggle (both dates for an
-    A2 move) so the co-approving senior can see coverage before deciding (owner, Jun 15)."""
+def _sc_coapprove_card(g: dict, pn: str, sn: str, staff: dict, show_cov: bool = False,
+                       status_line: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
+    """A senior's card for a schedule change, at ANY stage. While 'awaiting_senior' it carries the
+    Co-approve / No buttons; once resolved the buttons vanish but the 👁 who's-working toggle PERSISTS
+    (owner, Jun 15: seniors must be able to re-check coverage even after deciding) and the line states
+    the current stage / the staffer's final verdict (owner: don't leave them stuck at 'sent to …').
+    `status_line` lets the caller state the exact verdict at the moment it happens; otherwise it's
+    derived from g['status'] so a later toggle re-render stays correct. Coverage is computed LIVE here
+    (each render), never frozen at send time."""
     cid = g["id"]
     what = _sc_what(g, sn)
     why = (g.get("reason") or "—")
-    body = ("👀 %s proposes: %s.\nWhy · មូលហេតុ៖ %s\n"
-            "Co-approve? (1 more senior needed before the staffer is asked.)\n"
-            "👀 %s ស្នើ៖ %s។\nយល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)"
-            % (pn, what, why, pn, what))
+    st = g.get("status")
+    if status_line is None:
+        if st == "awaiting_senior":
+            status_line = ("Co-approve? (1 more senior needed before the staffer is asked.)\n"
+                           "យល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)")
+        elif st == "proposed":
+            status_line = "⏳ Co-approved — awaiting %s's approval · កំពុងរង់ចាំ %s យល់ព្រម" % (sn, sn)
+        elif st in ("approved", "done"):
+            status_line = "✅ %s approved · %s បានយល់ព្រម" % (sn, sn)
+        elif st == "declined":
+            status_line = "❌ Not approved — this change did not go ahead · មិនបានអនុម័ត"
+        else:
+            status_line = ""
+    body = ("👀 %s proposes: %s.\nWhy · មូលហេតុ៖ %s\n👀 %s ស្នើ៖ %s។\nមូលហេតុ៖ %s\n\n%s"
+            % (pn, what, why, pn, what, why, status_line))
     if show_cov:
         blk = _sc_cov_block(staff, g["when_date"], int(g["start_min"]), int(g["end_min"]),
                             g.get("paired_off_date"))
         if blk:
             body += "\n\n" + blk
+    rows = []
+    if st == "awaiting_senior":
+        rows.append([InlineKeyboardButton("✅ Co-approve · យល់ព្រម", callback_data="att:scs:ok:%d" % cid)])
+        rows.append([InlineKeyboardButton("❌ No — explain · មិនយល់ព្រម — ពន្យល់",
+                                          callback_data="att:scs:no:%d" % cid)])
     cov_btn = (("🙈 Hide who's working · លាក់អ្នកធ្វើការ", 0) if show_cov
                else ("👁 Show who's working · បង្ហាញអ្នកធ្វើការ", 1))
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Co-approve · យល់ព្រម", callback_data="att:scs:ok:%d" % cid)],
-        [InlineKeyboardButton("❌ No — explain · មិនយល់ព្រម — ពន្យល់", callback_data="att:scs:no:%d" % cid)],
-        [InlineKeyboardButton(cov_btn[0], callback_data="att:scscov:%d:%d" % (cid, cov_btn[1]))]])
-    return body, kb
+    rows.append([InlineKeyboardButton(cov_btn[0], callback_data="att:scscov:%d:%d" % (cid, cov_btn[1]))])
+    return body, InlineKeyboardMarkup(rows)
 
 
 async def _sc_send_coapprove_card(context, cid: int, g: dict, proposer: dict, staff: dict) -> None:
     """1a (owner): a SECOND senior must co-approve a schedule change before the staffer is asked. The
-    proposer is excluded; one co-approval moves it to the staff. (Extensions skip this — see caller.)"""
+    proposer is excluded; one co-approval moves it to the staff. (Extensions skip this — see caller.)
+    Cards are registered in sc_senior_cards so they re-render through the whole lifecycle (co-approval
+    resolution → the staffer's final verdict), keeping the 👁 toggle the whole way."""
     sn = staff.get("call_name") or staff["canonical_name"]
     pn = proposer.get("call_name") or proposer["canonical_name"]
     body, kb = _sc_coapprove_card(g, pn, sn, staff, show_cov=False)
-    cards = context.bot_data.setdefault("sc_coapprove_cards", {}).setdefault(cid, [])
+    cards = context.bot_data.setdefault("sc_senior_cards", {}).setdefault(cid, [])
     for sen in _seniors(exclude_staff_id=proposer["id"]):
         m = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                             sen.get("call_name") or sen["canonical_name"], body, kb=kb)
@@ -1999,9 +2019,33 @@ async def _sc_send_coapprove_card(context, cid: int, g: dict, proposer: dict, st
             cards.append((m.chat_id, m.message_id))
 
 
+async def _refresh_senior_cards(context, cid: int, status_line: str | None = None) -> None:
+    """Re-render EVERY co-approving senior's card for this change to the current status: the Co-approve
+    buttons vanish once resolved, the 👁 toggle persists, and the staffer's final verdict lands on ALL
+    of them (owner, Jun 15: previously only the proposer learned the staffer's decision)."""
+    from shared.database import shift_change_get
+    cards = context.bot_data.get("sc_senior_cards", {}).get(cid, [])
+    if not cards:
+        return
+    g = shift_change_get(cid)
+    if not g:
+        return
+    staff = next((s for s in staff_all("active") if s["id"] == g.get("staff_id")), None)
+    proposer = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
+    sn = (staff or {}).get("call_name") or (staff or {}).get("canonical_name", "Staff")
+    pn = (proposer or {}).get("call_name") or (proposer or {}).get("canonical_name", "A senior")
+    body, kb = _sc_coapprove_card(g, pn, sn, staff or {}, show_cov=False, status_line=status_line)
+    for ch, mid in cards:
+        try:
+            await context.bot.edit_message_text(body, chat_id=ch, message_id=mid, reply_markup=kb)
+        except Exception:
+            pass
+
+
 async def _sc_coapprove_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """att:scscov:{cid}:{flag} — the co-approve card's who's-working toggle (both dates for an A2 move).
-    Re-renders the card only; the awaiting_senior state is untouched."""
+    """att:scscov:{cid}:{flag} — the senior card's who's-working toggle (both dates for an A2 move).
+    Works at EVERY stage (awaiting / awaiting-staff / decided) — re-renders THIS card only, recomputing
+    coverage live; the DB state is untouched."""
     from shared.database import shift_change_get
     query = update.callback_query
     await query.answer()
@@ -2019,24 +2063,6 @@ async def _sc_coapprove_cov_callback(update: Update, context: ContextTypes.DEFAU
         await query.edit_message_text(body, reply_markup=kb)
     except Exception:
         pass
-
-
-async def _collapse_sibling_coapprove_cards(context, cid: int, g: dict, sn: str,
-                                            keep_chat, keep_msg, note: str) -> None:
-    """When ONE senior resolves a co-approval (co-approves or declines), the OTHER seniors' co-approve
-    cards must stop being live buttons — else they're dead taps (owner, Jun 15: stale ✅/❌ stayed and
-    threw 'dead button' + test-watchdog noise). Replace each sibling with a terminal one-liner (no
-    buttons); skip the card the resolving senior is looking at (it gets its own edit). One-shot (pop)."""
-    cards = context.bot_data.get("sc_coapprove_cards", {}).pop(cid, [])
-    what = _sc_what(g, sn)
-    for ch, mid in cards:
-        if ch == keep_chat and mid == keep_msg:
-            continue
-        try:
-            await context.bot.edit_message_text("👀 %s\n\n%s" % (what, note),
-                                                chat_id=ch, message_id=mid)
-        except Exception:
-            pass
 
 
 async def submit_shift_change(context, senior: dict, staff: dict, when_date: str,
@@ -2082,33 +2108,22 @@ async def _sc_coapprove_callback(update: Update, context: ContextTypes.DEFAULT_T
     staff = next((s for s in staff_all("active") if s["id"] == g["staff_id"]), None)
     sn = (staff or {}).get("call_name") or (staff or {}).get("canonical_name", "Staff")
     proposer = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
-    _kc = query.message.chat_id if query.message else None
-    _km = query.message.message_id if query.message else None
     if act == "no":
         shift_change_set_status(cid, "declined")
-        try:
-            await query.edit_message_text(query.message.text + "\n\n❌ Not co-approved · មិនបានយល់ព្រមរួម")
-        except Exception:
-            pass
-        await _collapse_sibling_coapprove_cards(context, cid, g, sn, _kc, _km,
-            "❌ Stopped — another senior declined this change · "
-            "បានបញ្ឈប់ — បងម្នាក់ទៀតមិនបានយល់ព្រម")
+        # re-render ALL seniors' cards (incl. the one tapped) → buttons gone, the 👁 toggle stays
+        await _refresh_senior_cards(context, cid,
+            status_line="❌ Stopped — a senior declined this change · "
+                        "បានបញ្ឈប់ — បងម្នាក់ទៀតមិនបានយល់ព្រម")
         if proposer:   # tell the proposing senior their change was stopped before the staffer
             await _att_send(context, (proposer.get("telegram_ids") or [None])[0], "Senior",
                 proposer.get("call_name") or proposer["canonical_name"],
                 "❌ Your change for %s was not co-approved by another senior.\n"
                 "❌ ការផ្លាស់ប្តូររបស់បងសម្រាប់ %s មិនបានយល់ព្រមរួមដោយបងម្នាក់ទៀតទេ។" % (sn, sn))
         return
-    # co-approved → move to staff
+    # co-approved → move to staff. ALL seniors' cards re-render to "⏳ awaiting {staff}" + the 👁 toggle
+    # (the buttons vanish; they're never dead taps, and they keep coverage re-checkable while waiting).
     shift_change_set_status(cid, "proposed")
-    try:
-        await query.edit_message_text(query.message.text + "\n\n✅ Co-approved — sent to %s · "
-                                      "បានយល់ព្រមរួម — ផ្ញើទៅ %s" % (sn, sn))
-    except Exception:
-        pass
-    await _collapse_sibling_coapprove_cards(context, cid, g, sn, _kc, _km,
-        "✅ Already co-approved by another senior — sent to %s · "
-        "បានយល់ព្រមរួមដោយបងម្នាក់ទៀត — ផ្ញើទៅ %s" % (sn, sn))
+    await _refresh_senior_cards(context, cid)
     if staff:
         await _sc_send_staff_card(context, cid, shift_change_get(cid), staff)
 
@@ -2139,9 +2154,12 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 await query.edit_message_text(body0, reply_markup=kb0)
             except Exception:
                 pass
-            await _flip_sc_senior_card(context, cid, g,
-                stf0.get("call_name") or stf0["canonical_name"],
+            _nm = stf0.get("call_name") or stf0["canonical_name"]
+            await _flip_sc_senior_card(context, cid, g, _nm,
                 "✋ Declined — leave kept · មិនបានយល់ព្រម — រក្សា AL")
+            await _refresh_senior_cards(context, cid,
+                status_line="✋ %s kept their leave — change not approved · "
+                            "%s រក្សា AL — ការប្តូរវេនមិនបានអនុម័ត" % (_nm, _nm))
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         if sen:
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
@@ -2172,6 +2190,8 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                             _sc_fyi_text(g, nm, win), group=True)
             await _flip_sc_senior_card(context, cid, g, nm,
                 "✅ Approved (AL refunded) · បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)")
+            await _refresh_senior_cards(context, cid,
+                status_line="✅ %s approved (AL refunded) · %s បានយល់ព្រម (AL ដាក់ត្រឡប់ចូលវិញ)" % (nm, nm))
         return
     if action == "no":
         shift_change_set_status(cid, "declined")
@@ -2181,8 +2201,10 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
                 await query.edit_message_text(body0, reply_markup=kb0)
             except Exception:
                 pass
-            await _flip_sc_senior_card(context, cid, g,
-                stf0.get("call_name") or stf0["canonical_name"], "❌ Declined · មិនបានយល់ព្រម")
+            _nm = stf0.get("call_name") or stf0["canonical_name"]
+            await _flip_sc_senior_card(context, cid, g, _nm, "❌ Declined · មិនបានយល់ព្រម")
+            await _refresh_senior_cards(context, cid,
+                status_line="❌ %s did not approve · %s មិនបានយល់ព្រម" % (_nm, _nm))
         # tell the PROPOSING senior (owner, Jun 11: they were left waiting forever otherwise)
         sen = next((s for s in staff_all("active") if s["id"] == g.get("senior_id")), None)
         stf = stf0
@@ -2244,6 +2266,8 @@ async def _shift_change_callback(update: Update, context: ContextTypes.DEFAULT_T
         await _att_send(context, None, "Supervisors group", "",
                         _sc_fyi_text(g, nm, win), group=True)
         await _flip_sc_senior_card(context, cid, g, nm, "✅ Approved · បានយល់ព្រម")
+        await _refresh_senior_cards(context, cid,
+            status_line="✅ %s approved · %s បានយល់ព្រម" % (nm, nm))
 
 
 def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, int]:
