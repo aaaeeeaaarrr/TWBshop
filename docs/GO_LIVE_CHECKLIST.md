@@ -1,60 +1,71 @@
-# Attendance Go-Live Checklist
+# Attendance Go-Live Checklist — SINGLE SOURCE
 
-> The single tracked list for flipping `attendance_live`. Updated as items close. Companion to
-> `ATTENDANCE_SYSTEM_DETAILED.md` (the full spec). Everything below is gated OFF until the flip.
-
-## A. Built & shipped this session (✅ done, live on server, gated OFF)
-- ✅ **OT / shift-redefine** end-to-end: propose → staff approve → attendance uses redefined times →
-  checkout banks OT (clamped to the approved window) → buyback offer. Overnight-safe (right date).
-- ✅ **Shield** — an approved upcoming OT pauses the payback ignore-ladder before its deadline.
-- ✅ **Auto-checkout** — live share still in-zone at shift end closes silently + thanks them; detects
-  a stopped share so it can't be gamed.
-- ✅ **My Schedule** — `Payback debt: 5h (4h booked)` + `OT bank: Xh (Yh upcoming)`, no double-count.
-- ✅ **Khmer batch** wired (ChatGPT pass) + `+10 points ⭐` convention; coverage label `ពេលនោះ`.
-- ✅ **Owner tools:** `/pb` (who owes pay-back + booked), `/commands` (full help list).
-- ✅ **Group-redirect** — Supervisors group only, rotating zero-API wording, tags the sender (uid-safe).
-- ✅ **`/test` harness:** simulate-checkout, test clock (`/testclock`), job triggers (`/testrun`).
-- ✅ **Guard tuning** (dev-machine only): allow our own app-bot restarts; don't scan commit-message text.
-
-## B. To wire/finish before the flip (⏳)
-1. ✅ **Summary/digest SOURCE switch — DONE (split digest).** When `attendance_live`, the weekly digest
-   is now Brain-computed from the button tables (`gm_weekly_attendance_facts`): exact time-ledger
-   ("staff owe Xh · shop owes Yh"), this week's late/no-show/AL/special counts, open-debt list, and
-   `frequency.detect` pattern flags — all deterministic, Brain never miscounts. Opus 4.8
-   (`narrate_attendance_week`) then writes ONLY the narrative over the verbatim reasons (told never to
-   recount). The pre-live AI digest stays as the fallback. The owner walks it via `/testrun` once seeded.
-2. ✅ **Khmer proof-read tooling — DONE (`/testkhmer on|off`).** Test mode stripped Khmer→English on
-   the `_att_send`-routed bodies (approval cards, thank-yous, group notices); the dry-runs and nav
-   screens were always bilingual. `/testkhmer on` keeps the routed bodies bilingual too, so EVERYTHING
-   shows Khmer for proof-reading. The proof-read walk itself is part of B3.
-3. ⏳ **Owner role-play sign-off** — walk every flow as each persona + every `/testrun` job; tweak any
-   wording. **Then run `/audit`** — it cross-checks every input → stored result over the TEST rows
-   (AL deducted right, payback math, OT banked ≤ cap, sessions sane, no-show vs check-in, bookings,
-   swaps, staff schedule sanity). ✅ clean = the role-play actually produced lawful data; ❌ = a
-   paste-to-Claude problem list. Then `/testreset`. (After live, `/audit` checks the real rows —
-   run it whenever you want assurance. First real-data run 2026-06-11: CLEAN.)
-4. ✅ **Points ACTIVATED (owner, 2026-06-11)** with the catalogued values: early +10 · late
-   informed −1/min · late uninformed −2/min · no-show −2/shift-min · return-after-doctor +15 ·
-   OT no-show −30 · short-notice AL −0.1/affected-min. Found+fixed at activation: the verdict
-   charged EVERYONE late_uninformed (placeholder) — now reads the declare flag; short-notice AL
-   was displayed but never recorded — now recorded at approval. Also built: the AL-today gate
-   (shift started + no check-in → no AL-today button; kills no-show laundering).
-
-## C. The flip
-1. Owner confirms role-play is clean → `/testreset` (wipe test rows) → `/teststatus` shows zero.
-2. Brief staff; everyone has pressed Start (done 33/33).
-3. Set `attendance_live='true'`. Live-location requirement waits until the owner has explained it.
-
-## D. Standing (not attendance, but on the books)
-- 🔒 **Bedrock delta 2** — owner OS-locks the global guard files (elevated shell).
-- ⏰ **Staging Postgres** by 2026-06-30 — get the prod DB credential out of dev.
-- 🔁 **Deploy discipline** — quiet-window · batched · single-service restarts, always verify after.
-  Full rule in `CLAUDE.md` → "Deploy Discipline". OT-banking is crash-safe (atomic claim); keep new
-  balance-moving paths idempotent (status flips FIRST). `TimeoutStopSec=15` set on all `twbshop-*` units.
+> The one tracked list for flipping `attendance_live`. Consolidated 2026-06-16 from the three places
+> this used to live (this file, the embedded list in `ATTENDANCE_SYSTEM_DETAILED.md`, and the greeting
+> notes). Everything is built behind the `attendance_live` master switch (default OFF = zero staff
+> contact). When in doubt about *behaviour*, the spec is `ATTENDANCE_SYSTEM_DETAILED.md`; this is the
+> go/no-go.
 
 ---
-### Open question for the digest-source item (B1)
-- When live, **replace** the AI digest with the structured one, or **show both** (structured facts +
-  AI's softer pattern notes)?
-- Any **other** GM summaries beyond the weekly digest that should switch source? (daily report
-  watchdogs and the receipt/finance reports read different systems and likely stay as-is.)
+
+## ✅ BUILT, SHIPPED, GATED OFF (the whole system)
+Check-in (scheduler + live-location + verdict + sessions) · late→payback (debt, slot picker, ignore-
+ladder, Supervisors notice) · **auto-checkout** (live-share in-zone at shift end) · **AL** request/approve
+with deduct-at-approval + refund-on-cancel · **Special Leave** (own-sick anti-fake ladder + papers AI,
+family-sick, marriage, family-death two-tier, wife-birth) · **OT / shift-redefine** (emergent OT, bank,
+buyback) + shield · **Staff Changes** A1 (change time +OT) / A2 (move a day off) with 2-senior co-approval
++ staff approval · **day-off swap** (partner-first → seniors, ≤7 days) · **8b** leave-on-a-committed-day
+(coexist/refund) · **F14** collision net (AL↔AL, AL↔redefine confirm-revoke, AL↔swap coexist) · points
+engine (activated, catalogued) · group-redirect · My-Schedule · weekly digest (Brain-computed) · `/test`
+harness (personas, `/testclock`, `/testrun`, simulate-checkout) · watchdogs + daily `/audit` ·
+test-mode isolation (`is_test`) · KH batch wired + vetted.
+
+## ✅ VERIFIED THIS GO-LIVE PASS (Jun 16)
+- Owner role-play walk **Parts 1–4 complete** (A1 · A2 · 8b 3a/3b/3c/3c-2/3d · F14 double-AL + confirm-revoke).
+- Staging end-to-end **balance proof** (double-redefine no-double-bank · AL-on-swap coexist charge · confirm-revoke refund).
+- `resolve_day` **collision matrix** (one coherent decision per day, no double-work).
+- `/audit` **clean** on test + real rows (only a historical dead-tap that clears on `/testreset`).
+- Tests now run on **staging** (conftest) — the suite can no longer pollute prod.
+
+---
+
+## ⏳ REMAINING BEFORE THE FLIP
+
+### A. Content (decide wording, then wire)
+1. **GM greeting** (`docs/gm_greeting_FINAL.txt`) — send-ready text, **NOT wired/sent yet.**
+   - ✏️ **Reword:** drop the obsolete "📋 Menu button" line (no persistent keyboard exists — staff open
+     the menu by messaging the bot). New line: *"Message me anytime — even 'hi' — and I'll open your menu."*
+   - 🔧 **Wire:** one-time DM to every active staffer at flip time.
+2. **Rules screen** — optional add (owner deciding): the **doctor's-papers → no pay-back** line.
+   Leave the +15 part-duty OUT (owner-discretionary, "no pressure").
+3. **Khmer** for any new/changed strings (greeting reword + rules line) → `KH_REVIEW.md` → ChatGPT pass
+   before they reach staff.
+
+### B. The launch gate
+4. `/audit` on the test rows reads ✅ clean (done — re-run anytime for assurance).
+5. `/testreset` → `/teststatus` shows zero test rows.
+6. Confirm **every active staffer has pressed Start** (last count 33/33 — re-confirm).
+7. Brief staff on what's changing.
+
+## 🚦 THE FLIP
+8. Set `attendance_live='true'`. **Verify** independently (running code live, a real staffer routes to
+   themselves not the owner, a test tap no longer hijacks).
+9. **Live-location requirement stays OFF** until the owner has explained it to staff (staged go-live).
+
+---
+
+## 🅿️ POST-LIVE (parked, not blockers)
+- **Owner test capability after live** — owner wants to rehearse new features post-live. The current
+  `attendance_test_mode` is a GLOBAL switch (routes *all* messages to owner + tags *all* writes `is_test`
+  + warps the clock) → **unsafe to flip while live.** Safest path: a **separate test bot** (own token,
+  own process) pointed at the **staging DB** — shares nothing with live, so it can't corrupt live data.
+  (An in-process owner-scoped redesign is possible but carries a real residual data-corruption risk;
+  the separate bot avoids it.)
+- **Digest source when live** — replace the AI digest with the structured one, or show both? (owner decision)
+- **Bedrock delta 2** — owner OS-locks the global guard files (elevated shell).
+- **Staging cutover** — route the raw-`psycopg2` run-scripts through `_db()` so they honor the env switch too.
+
+---
+> The old embedded checklist in `ATTENDANCE_SYSTEM_DETAILED.md` (§"⛔ BEFORE GO-LIVE") is **superseded by
+> this file** — it was a stale running log (listed long-built features as "not built"). Spec/behaviour
+> detail still lives there; the go/no-go is here.

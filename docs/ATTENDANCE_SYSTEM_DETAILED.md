@@ -5,6 +5,11 @@
 > Confirmed: 2 senior approvals · 100m geofence (TWB) · seniors set new-staff day-offs · Tyty exempt · Delis excluded.
 
 ## ⛔ BEFORE GO-LIVE CHECKLIST (flip attendance_live='true' ONLY after ALL of these)
+> ⚠️ **SUPERSEDED (2026-06-16) by `docs/GO_LIVE_CHECKLIST.md` — the single go/no-go list.** The items
+> below are a STALE running log: almost everything marked ⏳/partial here (check-out, AL accrual,
+> My-Schedule, day-off swap, OT, special leave, points, group-redirect, …) is now BUILT. Kept only for
+> the build-history detail; do NOT use it as the go-live gate.
+>
 > The whole system is built behind the `attendance_live` master switch (default OFF = zero staff
 > contact). This list is everything that must be wired/verified before the switch flips. Status:
 > ✅ done · �p partial(first-version) · ⏳ not built.
