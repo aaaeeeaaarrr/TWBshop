@@ -980,14 +980,16 @@ def test_1a_non_extension_needs_senior_coapproval(monkeypatch):
 
 
 def test_sc_fyi_text_states_both_dates_for_a2():
-    """1c: the Supervisors FYI for an A2 move states BOTH dates (off X + work Y), not just Y."""
+    """1c: the Supervisors FYI for an A2 move states BOTH dates (off X + work Y), not just Y; and (Jun 15)
+    it now carries the REASON so the group sees WHY the shift moved."""
     import gm_bot.bot as bot
-    a2 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080, "paired_off_date": "2026-07-20"}
+    a2 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080, "paired_off_date": "2026-07-20",
+          "reason": "cover the bakery"}
     t = bot._sc_fyi_text(a2, "Anan", "8am-6pm")
-    assert "2026-07-20" in t and "2026-07-22" in t and "OFF" in t
-    a1 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080}    # plain change-time
+    assert "2026-07-20" in t and "2026-07-22" in t and "OFF" in t and "cover the bakery" in t
+    a1 = {"when_date": "2026-07-22", "start_min": 480, "end_min": 1080, "reason": "busy day"}
     t1 = bot._sc_fyi_text(a1, "Anan", "8am-6pm")
-    assert "2026-07-22" in t1 and "OFF" not in t1
+    assert "2026-07-22" in t1 and "OFF" not in t1 and "busy day" in t1
 
 
 def test_shift_change_requires_reason(monkeypatch):
@@ -1034,12 +1036,13 @@ def test_coapprove_card_has_coverage_toggle(monkeypatch):
     monkeypatch.setattr(db, "payback_open_debt", lambda sid: None)
     monkeypatch.setattr(bot, "_al_availability_lines", lambda staff, days, *a: "covers: someone")
     g = {"id": 9, "staff_id": 11, "senior_id": 2, "when_date": "2026-07-22", "start_min": 480,
-         "end_min": 1020, "normal_len": 540, "reason": "x", "status": "awaiting_senior",
+         "end_min": 1020, "normal_len": 540, "reason": "short-staffed", "status": "awaiting_senior",
          "paired_off_date": "2026-07-20"}
     body, kb = bot._sc_coapprove_card(g, "Sen", "Anan", _DAYREC, show_cov=False)
     flat = [b.callback_data for row in kb.inline_keyboard for b in row]
     assert any(cd.startswith("att:scscov:9:") for cd in flat)        # the toggle is present
     assert "att:scs:ok:9" in flat and "att:scs:no:9" in flat          # decision buttons still there
+    assert "short-staffed" in body                                    # the 2nd senior sees the REASON
     body_on, _ = bot._sc_coapprove_card(g, "Sen", "Anan", _DAYREC, show_cov=True)
     assert "2026-07-20" in body_on and "2026-07-22" in body_on        # both dates' coverage shown
     assert body_on.count("covers: someone") >= 2

@@ -35,6 +35,8 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
    - ✅ EXCEPTION to confirm later (step 1c below): extending the shift **running right now** skips
      co-approval — that's intended.
 6. **🎭 Switch persona → Senior-B.** Open the co-approve card.
+   - ✅ CHECK (NEW): the co-approve card shows the **reason** — **"Why · មូលហេតុ៖ {your reason}"** — so the
+     2nd senior can see *why* before deciding.
    - ✅ CHECK (NEW): the co-approve card now has a **👁 Show who's working** toggle — tap it, confirm it
      shows coverage for the changed day, tap **🙈 Hide** to collapse it.
    - Tap **✅ Co-approve.**
@@ -42,10 +44,11 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
    - ✅ CHECK (NEW — the dead-button fix): every **other** senior's co-approve card (if there were 3+
      seniors) now reads "✅ Already co-approved by another senior…" with **no buttons** — tapping where
      they used to be does nothing (no "dead button", no watchdog alert).
-7. **🎭 Switch persona → Staff.** Open the card → **✅ Approve.**
+7. **🎭 Switch persona → Staff.** Open the card → ✅ confirm it shows **"Why · មូលហេតុ"** too → **✅ Approve.**
    - ✅ CHECK: the proposer's old "⏳ Awaiting" card **flips in place** to the approved verdict (no stale
      duplicate left behind).
-   - ✅ CHECK: a Supervisors group notice fires stating the change.
+   - ✅ CHECK (NEW): the Supervisors group notice now states the change **and the reason**
+     ("…is now {time}. Reason · មូលហេតុ៖ {reason}").
 
 ---
 
@@ -61,8 +64,9 @@ a **staffer** (*Staff*), and for the swap part a staffer who has a real **partne
      days** — who covers X (now off) **and** who works Y. Tap it to confirm, then 🙈 Hide.
    - ✅ CHECK (NEW): a blank reason is **refused** here too (same as Part 1).
    Type a reason → submit → co-approval (Senior-B) → Staff approves (same as Part 1).
-   - ✅ CHECK (NEW): the **co-approve card** also carries the both-days 👁 toggle, and the sibling-collapse
-     applies here too (other seniors' cards go button-less once one co-approves).
+   - ✅ CHECK (NEW): the **co-approve card** carries the **reason** + the both-days 👁 toggle, and the
+     sibling-collapse applies here too (other seniors' cards go button-less once one co-approves).
+   - ✅ CHECK (NEW): the **Supervisors FYI** states the reason too (and both dates).
    - ✅ CHECK (1c — the big one): **every** notice/card states **BOTH dates** — "OFF on **X**, works **Y**".
      No message should mention only one date. The card frames it **"Day-off move — OFF X, work Y"**.
 6. The move is confirmed by the chain completing + the cards stating both dates (above). It will

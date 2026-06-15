@@ -1909,14 +1909,16 @@ async def _sc_cov_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 def _sc_fyi_text(g: dict, nm: str, win: str) -> str:
     """The Supervisors FYI for an approved shift change. For an A2 day-off MOVE (paired_off_date set)
-    it states BOTH dates — OFF X and works Y — never just one (owner, Jun 15: full details to all)."""
+    it states BOTH dates — OFF X and works Y — never just one (owner, Jun 15: full details to all).
+    Carries the reason too (owner, Jun 15: the group sees WHY a shift moved)."""
     poff = g.get("paired_off_date")
+    why = (g.get("reason") or "—")
     if poff:
-        return ("FYI: %s is now OFF %s and works %s %s.\n"
+        return ("FYI: %s is now OFF %s and works %s %s.\nReason · មូលហេតុ៖ %s\n"
                 "FYI: %s ឥឡូវឈប់ %s ហើយមកធ្វើការ %s %s។"
-                % (nm, poff, g["when_date"], win, nm, poff, g["when_date"], win))
-    return ("FYI: %s's shift on %s is now %s.\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
-            % (nm, g["when_date"], win, nm, g["when_date"], win))
+                % (nm, poff, g["when_date"], win, why, nm, poff, g["when_date"], win))
+    return ("FYI: %s's shift on %s is now %s.\nReason · មូលហេតុ៖ %s\nFYI: វេនរបស់ %s នៅ %s ឥឡូវ %s។"
+            % (nm, g["when_date"], win, why, nm, g["when_date"], win))
 
 
 async def _flip_sc_senior_card(context, cid: int, g: dict, staff_nm: str, verdict: str) -> None:
@@ -1964,9 +1966,11 @@ def _sc_coapprove_card(g: dict, pn: str, sn: str, staff: dict,
     A2 move) so the co-approving senior can see coverage before deciding (owner, Jun 15)."""
     cid = g["id"]
     what = _sc_what(g, sn)
-    body = ("👀 %s proposes: %s.\nCo-approve? (1 more senior needed before the staffer is asked.)\n"
+    why = (g.get("reason") or "—")
+    body = ("👀 %s proposes: %s.\nWhy · មូលហេតុ៖ %s\n"
+            "Co-approve? (1 more senior needed before the staffer is asked.)\n"
             "👀 %s ស្នើ៖ %s។\nយល់ព្រមរួមដែរទេ? (ត្រូវការបង 1 នាក់ទៀតមុនសួរបុគ្គលិក។)"
-            % (pn, what, pn, what))
+            % (pn, what, why, pn, what))
     if show_cov:
         blk = _sc_cov_block(staff, g["when_date"], int(g["start_min"]), int(g["end_min"]),
                             g.get("paired_off_date"))
@@ -2680,9 +2684,11 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
         pn2 = partner.get("call_name") or partner["canonical_name"]
         rd2 = _date.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
         pd2 = _date.fromisoformat(str(sw["partner_off_date"])).strftime("%a %d/%m")
+        swhy = (sw.get("reason") or "—")
         await _att_send(context, None, "Supervisors group", "",
-            "Day-off swap: %s off %s, %s off %s.\nប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
-            % (rn2, rd2, pn2, pd2, rn2, rd2, pn2, pd2), group=True)
+            "Day-off swap: %s off %s, %s off %s.\nReason · មូលហេតុ៖ %s\n"
+            "ប្តូរថ្ងៃឈប់៖ %s ឈប់ %s, %s ឈប់ %s។"
+            % (rn2, rd2, pn2, pd2, swhy, rn2, rd2, pn2, pd2), group=True)
     else:
         from datetime import date as _dr
         rd3 = _dr.fromisoformat(str(sw["req_off_date"])).strftime("%a %d/%m")
