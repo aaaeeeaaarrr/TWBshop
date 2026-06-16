@@ -5011,19 +5011,20 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     gets the 'try it now' nudge. Requires attendance_live (so the check-in they're invited to do works)."""
     if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
         return
-    if not _attendance_live():
-        await update.message.reply_text(
-            "❌ Not live yet — run /golive confirm first, then /broadcast (so staff can actually check in).")
-        return
     targets = [s for s in staff_all("active")
                if s.get("org") == "TWB" and s.get("canonical_name") != "Tyty" and (s.get("telegram_ids") or [])]
-    if (context.args or [""])[0].lower() != "confirm":
+    if (context.args or [""])[0].lower() != "confirm":   # PREVIEW — allowed even before going live
         done = sum(1 for s in targets
                    if gm_get_state("gm_greeting_sent:%d" % s["telegram_ids"][0]) == "true")
         await update.message.reply_text(
-            "📣 Send the greeting to %d active staff (%d already greeted → will skip).\n"
-            "Anyone on shift now also gets the 'try it now' nudge.\nTo send: /broadcast confirm"
+            "📣 Will send the greeting to %d active staff (%d already greeted → will skip).\n"
+            "Anyone on shift now also gets the 'try it now' nudge.\n"
+            "To send: /broadcast confirm  (go live first — /golive confirm — so the check-in works)."
             % (len(targets), done))
+        return
+    if not _attendance_live():
+        await update.message.reply_text(
+            "❌ Not live yet — run /golive confirm first, then /broadcast confirm.")
         return
     onshift_ids = {s["id"] for s, *_ in _on_shift_now()}
     sent = skipped = failed = nudged = 0
