@@ -252,6 +252,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
 RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**▶ `/att` OWNER COMMAND ADDED (Jun 16, owner, DEPLOYED `1a844b3` to gm; verified HEAD==origin/active,
+other 4 bots untouched):** owner-only, READ-ONLY live attendance snapshot on demand (private DM, zero
+group/staff noise). Buckets: ⏰ past-end-not-checked-out (stuck, sorted worst-first) · ❓ on-shift-never-
+checked-in · 🟢 still on shift · ✅ checked out · 🚫 ended-never-in · ⏳ not started yet + a counts line.
+Uses the ONE resolver (`resolve_day`/`_day_context`), overnight-aware (`we+=1440`), and applies the
+go-live grace so pre-live night shifts aren't false-flagged. Pure formatter `_fmt_att_snapshot` +
+helpers unit-tested (`tests/test_att_snapshot.py`); real-path proven against live DB (caught + fixed an
+overnight-misclassification bug before deploy). Suite **629** (+3, 2 skip). Added to `/commands`.
+(Aside: the 16:04 PP "GM bot: a flow crashed — httpx.ReadError/Bad Gateway" alert was a transient
+Telegram-API network blip — traceback all in httpx/telegram libs, NRestarts=0, gm stayed up, error
+handler throttled it; benign, no action.)
 **▶ GROUP-REDIRECT KEYWORDS WIDENED (Jun 16, owner, DEPLOYED `9df620a` to gm; verified HEAD==origin /
 active, other 4 bots untouched):** the Supervisors-group "DM me, the group doesn't count" nudge now also
 fires on **payback / pay back / swap / shift / schedule / overtime / ប្តូរ / សង** (was late/day-off/leave/
