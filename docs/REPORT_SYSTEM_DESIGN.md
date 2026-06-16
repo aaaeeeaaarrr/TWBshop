@@ -154,12 +154,24 @@ vendor-rule + few-shot **learning shrinks clarifications over time.** Net: the n
 
 ---
 
-## ▶ OPEN DECISIONS (owner — decide before building)
-1. **Accountant bot now, or build-in-GM-then-split?** (Claude leans: separate now, because attendance
-   is live; but pure-modules make a later split cheap.)
-2. **Is SambaPOS reachable as DATA (file/export/API), or do we stay with the POS photo** for the
-   cross-check?
+## ▶ DECISIONS MADE (owner, 2026-06-16)
+1. **Accountant bot — SEPARATE, NOW.** New `twbshop-accountant` service so finance churn never blips
+   live attendance. Keep all finance logic in a self-contained package (`finance.py`/`reconcile.py`/
+   `clarify.py` already pure) so the bot is a thin Telegram shell over them. GM hands off its REPORT
+   receipt role at cutover.
+2. **SambaPOS = DIGITAL access (photo is the fallback).** Owner's screenshot confirms SambaPOS 5.7.14
+   runs on **Microsoft SQL Server**: instance `SERVER\SAMBASQL`, database **`WineBakery`**, `sa` login.
+   So sales data (tickets, payments, cash/card split, grand total) is queryable from real SQL tables —
+   the truth anchor, no photo read. CONSTRAINT: that MSSQL is on the shop's LAN PC; our bot is on the DO
+   droplet. **Do NOT expose `sa`/MSSQL to the internet.** Pattern: a small **shop-PC agent** queries the
+   local `WineBakery` DB and **pushes the day's numbers to our Postgres** (outbound only, no inbound
+   ports); the bot reads from Postgres. POS photo + `assess_receipt_photo` stays as the cross-check /
+   fallback when the agent is down. **Creds → `secrets.py` at build time, never in the repo.**
+   OPEN SUB-CHECK before relying on it: confirm the shop PC can run a Python agent + reach the internet
+   outbound (almost certainly yes), and map the exact `WineBakery` tables/columns for daily totals.
 
 ## ▶ NEXT STEP (when work resumes)
-Draft the **receipt-ledger schema** + the **Phase-1 Expense-Group intake** as a concrete build plan.
-Owner found this "very interesting" and wants to work on it next.
+Draft the **receipt-ledger schema** + the **Phase-1 Expense-Group intake** as a concrete build plan
+(reuses `assess_receipt_photo` + `clarify.py`; cash auto-paid; numbered rows = the spine). In parallel,
+the SambaPOS sub-check: identify the `WineBakery` tables/columns for a day's cash/ABA/grand-total and
+sketch the shop-PC push agent. Owner found this "very interesting" and wants to work on it next.
