@@ -252,6 +252,19 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
 RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
+day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
+to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT
+(`9df620a`), `/att` owner snapshot (`1a844b3`), test-sim leak→live-staff fix (`0df7bda`). **+ `8e6190e`
+(owner_adjustment points cause + `points_set_rule` helper) — deployed this wrap.** **Real-data corrections
+(ledger, before/after proof):** Chantrea +23m PB (#144); Por made whole after radius bug (debt+late
+points reversed); Seth wiped to 0 (debt+booking+redefine cancelled to avoid OT-mint); Chomreun hours
+→09:00–21:00; Thyda PB+late-points →0; Heng points −156→0 via +156 `owner_adjustment` (payback KEPT,
+late events untouched/audit-consistent). **Verified:** Nak's 10-min PB was REAL (measured at 21:10:54
+live check-in, not his declaration). **Report/Expense/Payment system = the NEXT BUILD** (still design):
+deep A→Z pass done → `docs/REPORT_SYSTEM_DESIGN.md`; DECISIONS LOCKED: separate `twbshop-accountant` bot
+· SambaPOS=digital (MSSQL `WineBakery`) · supplier-group=paid-signal · weekly-lump → payable-run loop +
+FIFO matcher. NEXT STEP: draft the receipt-ledger schema + vendor↔group map (P0) when owner resumes.
 **▶ TEST-SIM LEAK TO LIVE STAFF FIXED (Jun 16, owner caught it on Heng's phone; DEPLOYED `0df7bda` to gm;
 verified HEAD==origin/active, other 4 bots untouched):** the live check-in screen (`checkin_screen`) had a
 hardcoded "▶️ Simulate the check-in messages" button (`att:cis`) — the ONE menu spot that forgot the
