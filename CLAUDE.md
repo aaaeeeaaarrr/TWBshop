@@ -251,7 +251,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
-RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**). **▶▶ NEXT WORK (cross-machine — owner is
+RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**▶ CHECK-IN ZONE WIDENED 100m→150m (Jun 16, owner, DEPLOYED `fc3fedc` to gm; verified HEAD==origin /
+active / on-disk carries 150, other 4 bots untouched):** Por couldn't check in at 100m (GPS drift).
+`WORK_ZONE_RADIUS_M=150` in `gm_bot/attendance.py`; zone test updated (now `test_just_inside_and_outside_
+150m`), 9 passed. **Validated against the live go-live pings:** of 13 who pinged Jun 16, 11 were ≤76m
+(mostly <35m — clearly at the shop), 1 was at 121m (failed at 100m — the new 150m now rescues this
+Por-style case), 1 genuinely off-site at 1.2km (still correctly excluded at 150m). Big dead gap between
+the 76m cluster and the 1.2km outlier → 150m is safe, not borderline.
+**▶ CHANTREA (id15) 23-min payback registered (Jun 16, owner, real data, before/after proof):** she had
+NO open debt before; created debt #144 = 23m (`payback_add_debt`, reason "owner correction Jun 16", today,
+is_test=False); independent re-read confirms #144 balance=23 open. (New debt, not a reduction.) **▶▶ NEXT WORK (cross-machine — owner is
 continuing this thread on ANOTHER COMPUTER): the REPORT / EXPENSE / PAYMENT system → READ
 `docs/REPORT_SYSTEM_DESIGN.md` FIRST.** Brainstorm done (design only, nothing built): you're **~70% built
 already** (`ai_client.assess_receipt_photo` · `gm_bot/clarify.py` · `gm_bot/finance.py` recompute ·
