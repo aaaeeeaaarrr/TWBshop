@@ -2187,13 +2187,17 @@ def _a2_reason_prompt(p: dict, context, sid: int, xidx: int, yidx: int, start: i
 
 
 def checkin_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [_back_row()]
+    # The check-in SIMULATOR is an owner /test feature ONLY — never show it to a live staffer
+    # (Heng, Jun 16: a live staffer tapped it and saw the test simulator screen). Same _live gate
+    # the rest of the menu uses (e.g. the persona switcher).
+    if not p.get("_live"):
+        rows.append([InlineKeyboardButton("▶️ Simulate the check-in messages", callback_data="att:cis")])
     return _hdr(p, "Tap 📎 (Attach) → Location / ទីតាំង → Share Live Location / "
                    "ចែករំលែកទីតាំងបន្តផ្ទាល់\n\n"
                    "Shift: %s–%s"
                 % (fmt12s(p.get("work_start")), fmt12s(p.get("work_end")))), \
-        InlineKeyboardMarkup([_back_row(),
-                              [InlineKeyboardButton("▶️ Simulate the check-in messages",
-                                                    callback_data="att:cis")]])
+        InlineKeyboardMarkup(rows)
 
 
 def ci_sim_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
@@ -2618,8 +2622,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Khmer is stripped only from the message BODIES routed to the owner (in bot._att_send).
         await query.edit_message_text(text, reply_markup=kb)
 
-    if _is_live(context) and action in ("pick", "pickp", "persona"):
-        return await show(main_menu(_persona(context)))   # live: locked to self
+    # Live staff are LOCKED to their own self-menu and must NEVER reach an owner /test surface —
+    # the persona switcher, the check-in SIMULATOR (att:cis*), or the DRY-RUN catalogue (att:dr/drs).
+    # This also neutralises a stale test button left in a staffer's chat from a pre-go-live walk
+    # (Heng, Jun 16): tapping it now just re-opens their own menu instead of rendering test content.
+    if _is_live(context) and action in ("pick", "pickp", "persona", "cis", "dr", "drs"):
+        return await show(main_menu(_persona(context)))   # live: locked to self, no test surfaces
 
     if action == "drs":
         # dry-run sample buttons demonstrate their consequence (owner: ladders must continue).

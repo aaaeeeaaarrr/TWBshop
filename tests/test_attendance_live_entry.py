@@ -61,6 +61,18 @@ def test_main_menu_hides_persona_switch_for_live():
         assert cd in flat_live and cd in flat_test
 
 
+def test_checkin_screen_hides_simulator_from_live_staff():
+    # Heng (Jun 16): a live staffer reached the owner /test check-in SIMULATOR. The sim button
+    # must show ONLY in the owner shell, never to live staff.
+    live = dict(_PERSONA); live["_live"] = True
+    _, kb_live = ui.checkin_screen(live)
+    _, kb_test = ui.checkin_screen(_PERSONA)
+    flat_live = [b.callback_data for row in kb_live.inline_keyboard for b in row]
+    flat_test = [b.callback_data for row in kb_test.inline_keyboard for b in row]
+    assert "att:cis" not in flat_live           # live staff never see the simulator
+    assert "att:cis" in flat_test                # owner role-play shell still does
+
+
 # ---- armed gating ------------------------------------------------------------
 
 def test_armed_true_for_live_even_when_test_off(monkeypatch):
