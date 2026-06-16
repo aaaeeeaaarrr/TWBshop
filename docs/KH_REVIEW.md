@@ -376,6 +376,18 @@ Reason · មូលហេតុ៖ {reason}
   `⚠️ One important thing: if you'll be late, you're sick, or anything comes up — please tell us as EARLY as you can. Telling us early keeps your points safe; telling us late, or not at all, loses performance points 🔻`
   · `⚠️ រឿងសំខាន់មួយ៖ បើប្អូននឹងមកយឺត ឈឺ ឬមានរឿងអ្វីមួយ — សូមប្រាប់យើងឱ្យបានឆាប់បំផុត។ ប្រាប់ឆាប់ = រក្សា Points; ប្រាប់យឺត ឬមិនប្រាប់ = ដក Points ការងារ 🔻`
 
+### Late sick-informing (Jun 16) — KH draft (callout · family note · deferred −15 reminder)
+- **WHO:** the staffer. **WHEN:** the own-sick screen / family-sick screen / their NEXT check-in.
+  **TONE:** firm-but-kind nudge (no preaching). My KH is draft.
+- Own-sick callout, **< 30 min** before shift: `⏰ Only {X} minutes before your shift starts — that's very late to let us know. You usually know you're unwell before this; please tell us as soon as you can next time 🤍`
+  · `⏰ នៅសល់តែ {X} នាទីប៉ុណ្ណោះមុនវេនរបស់ប្អូន — យឺតពេលណាស់ក្នុងការប្រាប់។ ជាធម្មតាប្អូនដឹងថាមិនស្រួលខ្លួនមុនពេលនេះ; សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ 🤍`
+- Own-sick callout, **already started**: `⏰ Your shift has already started — that's very late to let us know. Please tell us as soon as you feel unwell next time 🤍`
+  · `⏰ វេនរបស់ប្អូនបានចាប់ផ្តើមហើយ — យឺតពេលណាស់ក្នុងការប្រាប់។ សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ នៅពេលប្អូនមិនស្រួលខ្លួន 🤍`
+- Family-sick soft note, **< 10 min** (NO points): `⏰ Thanks for telling us 🤍 Just a note — that's quite late. We know family things can be sudden, but the earlier you let us know, the easier for us to cover.`
+  · `⏰ អរគុណដែលប្រាប់ 🤍 កត់សម្គាល់តិច — យឺតបន្តិចហើយ។ យើងដឹងថារឿងគ្រួសារអាចកើតភ្លាមៗ ប៉ុន្តែបើប្រាប់បានឆាប់ យើងកាន់តែងាយរៀបចំជំនួស។`
+- Deferred −15 reminder (at next check-in): `Quick note 🤍 last time you let us know you were sick very late — that's −15 Late Informing 🔻. Earlier next time keeps your points safe.`
+  · `កត់សម្គាល់តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះ −15 Late Informing 🔻។ សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ ដើម្បីរក្សា points។`
+
 ### WF2/WF3 — family-sick (Jun 14) — KH draft
 - **WHO:** the staffer (confirm + booked) + Supervisors (FYI). **WHEN:** family-sick TIMES path now asks a confirm; FYI on booking.
 - WF2 confirm `Family sick ({who}) — {window}.` · `គ្រួសារឈឺ ({who}) {window}។`  (window = `9:00am → 12:00pm`)

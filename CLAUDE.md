@@ -249,7 +249,26 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 cont — **GO-LIVE PREP TOOLING BUILT + DEPLOYED to gm; all INERT;
+**Last updated:** 2026-06-16 (session 38 cont — **LATE SICK-INFORMING + GENDER BUILT + DEPLOYED to gm; all
+INERT; `attendance_live` still OFF**). Locked over a long design chat → `docs/SICK_LATE_INFORM.md`.
+**Own-sick told within 30 min of shift start (or after) = −15 "Late Informing" 🔻** (new points cause,
+seeded ACTIVE=−15, verified live; recorded SILENTLY at the "really can't come" filing, idempotent/day,
+**papers do NOT wipe it**); taught GENTLY at their NEXT check-in (deferred `late_inform_notice:<uid>`
+flag, 7-day expiry — not while they're sick); callout ①B on the sick screen. **Family-sick within 10 min
+= a soft note, NO points** (family is sudden). **Come-in grace (the incentive fix):** a sick person who
+comes in is NOT charged late-arrival points on top — at check-in, an open own-sick case today forces a
+clean on-time verdict, so coming in never costs more than staying home (they only owe pay-back for the
+missed hours). **Fixed** the sick-papers display "3 days"→"2 days" (enforcement is `PAPERS_GRACE_DAYS=2`;
+the owner caught the stray 3). **Gender stored:** additive `staff_registry.gender` column (via init) +
+`seed_staff_genders` from the owner roster — **26/26 matched, 0 unmatched** (verified in the deploy log);
+cosmetic (KH is gender-neutral), for records. **KNOWN GAP (pre-existing, flagged):** the "come try"
+(`att:sp:meo`) path is UI-only (doesn't book a case / send FYI in live), so the −15 fires on the "really
+can't come" filing for now; fully covering "come try" needs that path built out first. Suite **617** (+4).
+KH drafts (callout/note/reminder) → `docs/KH_REVIEW.md` Pending. **DEPLOYED to gm 6c45017** (gm active +
+clean, gender seed 26/26, `late_sick_inform` active=−15, `attendance_live`=None OFF — feature inert until
+the flip). **▶ NEXT: owner ChatGPT-vets the KH; then we can compact.**
+
+**(prev) session 38 cont — **GO-LIVE PREP TOOLING BUILT + DEPLOYED to gm; all INERT;
 `attendance_live` still OFF**). The owner's walk is DONE; built the launch machinery (nothing fires until
 the owner presses the button). **(1) Vetted KH wired** (ChatGPT pass): rules sick line, greeting
 (`ខ្ញុំនៅជួយប្អូនជានិច្ច`), disclaimer (`បាត់បង់ performance points`). **(2) 🔻 points-lost marker** made
