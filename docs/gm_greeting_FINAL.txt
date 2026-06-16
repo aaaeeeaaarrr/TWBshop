@@ -1,5 +1,6 @@
 ================================================================================
-GM GREETING — FINAL (send-ready)   ·  NOT SENT YET — wire at go-live
+GM GREETING — FINAL (send-ready)   ·  WIRED Jun 16 → sent by /broadcast at go-live
+The LIVE copy is `_GREETING` in gm_bot/bot.py (keep this doc in sync if edited).
 ================================================================================
 - One-time private DM from the GM bot to every active staff member.
 - No persistent keyboard — staff open the menu by simply messaging the bot (even "hi"). The old

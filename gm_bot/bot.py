@@ -4932,6 +4932,143 @@ async def cmd_golive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "Next: /broadcast (send the greeting), then /golivestatus." % now.strftime("%a %d/%m %H:%M"))
 
 
+# The one-time go-live greeting (canonical live copy; the design doc is docs/gm_greeting_FINAL.txt).
+# Khmer ChatGPT-vetted Jun 16. No persistent keyboard — staff open the menu by messaging the bot.
+_GREETING = (
+    "👋 Hi team! I'm the GM — your new helper here at The Wine Bakery.\n\n"
+    "From now on the everyday things are easier: annual leave, telling us you'll be late, swapping a "
+    "day off, OT, and checking your own schedule — all in one place, just by chatting with me. No more "
+    "paperwork or chasing people around.\n\n"
+    "Message me anytime — even just \"hi\" — and I'll open your menu. I'm always here for you. 🤍\n\n"
+    "When you get to work, check in by sharing your live location with me:\n"
+    "📍 Tap 📎 (Attach) → Location → Share Live Location\n"
+    "Arrive 5 minutes early and you earn +10 points ⭐\n\n"
+    "⚠️ One important thing: if you'll be late, you're sick, or anything comes up — please tell us as "
+    "EARLY as you can. Telling us early keeps your points safe; telling us late, or not at all, loses "
+    "performance points 🔻\n\n"
+    "See you soon! 🤍\n\n"
+    "——————————————————————————————\n\n"
+    "👋 សួស្តីក្រុមការងារ! ខ្ញុំជា GM — អ្នកជួយថ្មីរបស់ប្អូននៅ The Wine Bakery។\n\n"
+    "ចាប់ពីពេលនេះទៅ រឿងប្រចាំថ្ងៃនឹងងាយជាងមុន៖ សុំ AL, ប្រាប់ថាប្អូននឹងមកយឺត, ប្តូរថ្ងៃឈប់, OT, "
+    "និងឆែកកាលវិភាគរបស់ប្អូន — ទាំងអស់នៅកន្លែងតែមួយ គ្រាន់តែឆាតមកខ្ញុំ។ មិនបាច់សរសេរក្រដាស "
+    "ឬរត់តាមសួរមនុស្សនេះមនុស្សនោះទៀតទេ។\n\n"
+    "ឆាតមកខ្ញុំពេលណាក៏បាន — សូម្បីតែសរសេរ \"hi\" ក៏បាន — ខ្ញុំនឹងបើក menu ឱ្យប្អូន។ "
+    "ខ្ញុំនៅជួយប្អូនជានិច្ច 🤍\n\n"
+    "ពេលប្អូនមកធ្វើការ សូមចុះវត្តមានដោយចែករំលែកទីតាំងបន្តផ្ទាល់ជាមួយខ្ញុំ៖\n"
+    "📍 ចុច 📎 (Attach) → ទីតាំង → ចែករំលែកទីតាំងបន្តផ្ទាល់\n"
+    "មកដល់មុន 5 នាទី អ្នកនឹងទទួលបាន +10 points ⭐\n\n"
+    "⚠️ រឿងសំខាន់មួយ៖ បើប្អូននឹងមកយឺត ឈឺ ឬមានរឿងអ្វីមួយ — សូមប្រាប់យើងឱ្យបានឆាប់បំផុត។ "
+    "ប្រាប់ឆាប់ = រក្សា points របស់ប្អូន; ប្រាប់យឺត ឬមិនប្រាប់ = បាត់បង់ performance points 🔻\n\n"
+    "ជួបគ្នាឆាប់ៗនេះ! 🤍")
+
+_TRY_IT_NOW = (
+    "📍 You're on shift right now — give it a try! Check in by sharing your live location: tap 📎 → "
+    "Location → Share Live Location. (You're already here, so nothing's owed today — this is just to "
+    "try it out 🤍)\n\n"
+    "📍 ឥឡូវប្អូនកំពុងនៅវេន — សាកល្បងមើល! ចុះវត្តមានដោយចែករំលែកទីតាំងបន្តផ្ទាល់៖ ចុច 📎 → "
+    "Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់។ (ប្អូននៅទីនេះស្រាប់ហើយ "
+    "ដូច្នេះថ្ងៃនេះមិនមានម៉ោងត្រូវសងទេ — នេះគ្រាន់តែសាកល្បងមើលប៉ុណ្ណោះ 🤍)")
+
+
+def _on_shift_now() -> list:
+    """[(staff, shift_date_iso, start_min, end_min)] for everyone whose shift is RUNNING right now —
+    resolve_day says working AND 'now' falls inside the window (overnight-aware: a shift that started
+    yesterday evening and runs past midnight still counts). Uses the ONE resolver, so it matches
+    attendance exactly. TWB only, Tyty excluded."""
+    from gm_bot import attendance_ui as ui
+    now_pp = _now_pp()
+    today = now_pp.date()
+    yday = today - timedelta(days=1)
+    now_min = now_pp.hour * 60 + now_pp.minute
+    try:
+        ctx = ui._day_context([yday.isoformat(), today.isoformat()])
+    except Exception:
+        ctx = None
+    out = []
+    for s in staff_all("active"):
+        if s.get("org") != "TWB" or s.get("canonical_name") == "Tyty":
+            continue
+        for d in (today, yday):
+            try:
+                dec = ui.resolve_day(s, d.isoformat(), ctx=ctx)
+            except Exception:
+                continue
+            if not dec.get("working"):
+                continue
+            ws, we = dec.get("start_min"), dec.get("end_min")
+            if ws is None or we is None:
+                continue
+            now_abs = (today - d).days * 1440 + now_min   # minutes from d-midnight to now
+            if int(ws) <= now_abs < int(we):
+                out.append((s, d.isoformat(), int(ws), int(we)))
+                break
+    return out
+
+
+async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/broadcast [confirm] — owner-only. Sends the one-time go-live greeting to every active TWB
+    staffer (idempotent: skips anyone already greeted, so re-running is safe). Anyone ON SHIFT now also
+    gets the 'try it now' nudge. Requires attendance_live (so the check-in they're invited to do works)."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
+        return
+    if not _attendance_live():
+        await update.message.reply_text(
+            "❌ Not live yet — run /golive confirm first, then /broadcast (so staff can actually check in).")
+        return
+    targets = [s for s in staff_all("active")
+               if s.get("org") == "TWB" and s.get("canonical_name") != "Tyty" and (s.get("telegram_ids") or [])]
+    if (context.args or [""])[0].lower() != "confirm":
+        done = sum(1 for s in targets
+                   if gm_get_state("gm_greeting_sent:%d" % s["telegram_ids"][0]) == "true")
+        await update.message.reply_text(
+            "📣 Send the greeting to %d active staff (%d already greeted → will skip).\n"
+            "Anyone on shift now also gets the 'try it now' nudge.\nTo send: /broadcast confirm"
+            % (len(targets), done))
+        return
+    onshift_ids = {s["id"] for s, *_ in _on_shift_now()}
+    sent = skipped = failed = nudged = 0
+    for s in targets:
+        uid = s["telegram_ids"][0]
+        if gm_get_state("gm_greeting_sent:%d" % uid) == "true":
+            skipped += 1
+            continue
+        try:
+            await context.bot.send_message(uid, _GREETING)
+            gm_set_state("gm_greeting_sent:%d" % uid, "true")   # mark FIRST-class so a retry never doubles
+            sent += 1
+            if s["id"] in onshift_ids:
+                await context.bot.send_message(uid, _TRY_IT_NOW)
+                nudged += 1
+        except Exception as e:
+            failed += 1
+            logger.error("broadcast to %s failed: %s", uid, e)
+    await update.message.reply_text(
+        "✅ Broadcast done.\n• greeting sent: %d\n• already greeted (skipped): %d\n• failed: %d\n"
+        "• on-shift 'try it now' nudges: %d\n\n/golivestatus to watch who tries it."
+        % (sent, skipped, failed, nudged))
+
+
+async def cmd_golivestatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/golivestatus — owner-only. Of the staff ON SHIFT right now, who has checked in (tried it) vs
+    not — so you can see who read the greeting and acted on it at go-live."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
+        return
+    on = _on_shift_now()
+    if not on:
+        await update.message.reply_text("No one is on shift right now — nothing to check yet.")
+        return
+    lines, tried = [], 0
+    for s, sd, _ws, _we in on:
+        nm = s.get("call_name") or s["canonical_name"]
+        sess = att_get_session(s["id"], sd)
+        ok = bool(sess and sess.get("checked_in_at"))
+        lines.append("%s %s" % ("✅" if ok else "⬜", nm))
+        tried += 1 if ok else 0
+    await update.message.reply_text(
+        "🚦 Go-live adoption — on shift now (%d):\n%s\n\n✅ tried check-in: %d / %d"
+        % (len(on), "\n".join(lines), tried, len(on)))
+
+
 async def cmd_testreset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/testreset — delete EXACTLY the test-tagged attendance rows (real data can't be caught)."""
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
@@ -6773,6 +6910,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testrun",    cmd_testrun))
     app.add_handler(CommandHandler("testkhmer",  cmd_testkhmer))
     app.add_handler(CommandHandler("golive",     cmd_golive))
+    app.add_handler(CommandHandler("broadcast",  cmd_broadcast))
+    app.add_handler(CommandHandler("golivestatus", cmd_golivestatus))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
