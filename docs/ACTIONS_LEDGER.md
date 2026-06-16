@@ -204,6 +204,16 @@
 
 ## Done (with proof)
 
+- **2026-06-16 — payback reality update (owner: "everyone paid back except Seth, 1h remaining"; HIGH-RISK
+  real data, before/after independent proof).** BEFORE (fresh-process read): 2 real open debts — PISEY #60
+  (29m) + Por #61 (120m), no bookings; **Seth (id21) had NO open debt** (his old 300m was deleted in the
+  Jun 14 reset). Did: cleared both via `payback_credit` (PISEY→0/cleared, Por→0/cleared); created Seth a
+  fresh 60-min debt **#143** (`payback_add_debt`, reason "owner correction Jun 16: 1h remaining", created
+  today, is_test=False). AFTER (separate-process re-read): exactly ONE real open debt remains — **Seth #143
+  balance=60**. **MISMATCH FLAGGED:** Seth wasn't tracked, so "1h remaining" became a *newly created* debt,
+  not a reduction of an existing one — say so if that's wrong (reversible: delete #143). Behind
+  `attendance_live`=OFF (ladder dormant, no staff pushed).
+
 - **2026-06-14 — GO-LIVE REALITY RESET (owner-instructed, HIGH-RISK real data, before/after proof on real
   rows).** Synced the real DB to the true current state ahead of go-live. **Day-offs:** confirmed all 33
   active staff vs the owner's latest screenshot — 2 drifts corrected to image (An Davy `Wed→Thu`, Rom
