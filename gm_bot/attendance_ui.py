@@ -526,8 +526,8 @@ def build_catalogue3(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | Non
     return [
         (_DEMO_AL_LABEL, al_body, al_kb),
         ("② SHORT-NOTICE request (within 7 days) — costs points, computed total shown",
-         "⚠ Short notice (within 7 days) — about −54 points for a full day (−0.1/min).\n"
-         "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
+         "⚠ Short notice (within 7 days) — about −54 points 🔻 for a full day (−0.1/min).\n"
+         "⚠ ស្នើជិតពេល (ក្នុង 7 ថ្ងៃ) — ប្រហែល −54 points 🔻 សម្រាប់ពេញមួយថ្ងៃ (−0.1/min)។", None),
         ("③ HOURS-AL (part of a day)",
          "Hours AL: 9pm → 12am (3h of a 9h shift = 0.3 AL).\n"
          "AL តាមម៉ោង៖ 9pm → 12am (3h ក្នុងវេន 9h = 0.3 AL)។", None),
@@ -1671,9 +1671,9 @@ def al_fullday_or_time(p: dict, picked: set[str]) -> tuple[str, InlineKeyboardMa
         pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
         nd = ", ".join(day_label(date.fromisoformat(d)) for d in near)
         txt += ("\n\n⚠ Short notice: %s\n⚠ ស្នើជិតពេល៖ %s\n"
-                "Full-day cost: about −%d points (−0.1/min). Hours-AL costs less — I'll show the "
+                "Full-day cost: about −%d points 🔻 (−0.1/min). Hours-AL costs less — I'll show the "
                 "exact number.\n"
-                "ពេញមួយថ្ងៃ៖ ប្រហែល −%d points (−0.1/min)។ AL តាមម៉ោងដក points តិចជាង — "
+                "ពេញមួយថ្ងៃ៖ ប្រហែល −%d points 🔻 (−0.1/min)។ AL តាមម៉ោងដក points តិចជាង — "
                 "ខ្ញុំនឹងបង្ហាញចំនួនពិត។" % (nd, nd, pts, pts))
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
@@ -2883,8 +2883,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if near:
                     sl = shift_len_min(p.get("work_start"), p.get("work_end")) or 0
                     pts = round(SHORT_NOTICE_PT_PER_MIN * sl * len(near))
-                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min)."
-                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min)។"
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points 🔻 (−0.1/min)."
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points 🔻 (−0.1/min)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
                     _arm_pending(context, update,
@@ -2922,8 +2922,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if near:
                     window = t - f
                     pts = round(SHORT_NOTICE_PT_PER_MIN * window * len(near))
-                    detail += ("\n⚠ %d short-notice day(s) → −%d points (−0.1/min)."
-                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points (−0.1/min)។"
+                    detail += ("\n⚠ %d short-notice day(s) → −%d points 🔻 (−0.1/min)."
+                               "\n⚠ %d ថ្ងៃស្នើជិតពេល → −%d points 🔻 (−0.1/min)។"
                                % (len(near), pts, len(near), pts))
                 if _armed(context):
                     _arm_pending(context, update,
