@@ -9,10 +9,10 @@ def test_in_work_zone_at_bakery():
     assert att.in_work_zone(att.TWB_LAT, att.TWB_LNG) is True
 
 
-def test_just_inside_and_outside_100m():
-    # 100m zone (session 28): ~0.0005 deg lat ≈ 55m -> inside; ~0.001 deg ≈ 111m -> outside.
-    assert att.in_work_zone(att.TWB_LAT + 0.0005, att.TWB_LNG) is True
-    assert att.in_work_zone(att.TWB_LAT + 0.001, att.TWB_LNG) is False
+def test_just_inside_and_outside_150m():
+    # 150m zone (session 38, Jun 16): ~0.001 deg lat ≈ 111m -> inside; ~0.0015 deg ≈ 167m -> outside.
+    assert att.in_work_zone(att.TWB_LAT + 0.001, att.TWB_LNG) is True
+    assert att.in_work_zone(att.TWB_LAT + 0.0015, att.TWB_LNG) is False
 
 
 def test_haversine_known_distance():
