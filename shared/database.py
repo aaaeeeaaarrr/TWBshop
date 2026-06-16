@@ -2903,6 +2903,15 @@ def staff_set_day_off(staff_id: int, day_off: str) -> None:
                         (day_off, staff_id))
 
 
+def staff_set_work_time(staff_id: int, work_start: str, work_end: str) -> None:
+    """Owner correction: set a staffer's shift start/end (HH:MM 24h, e.g. '09:00','21:00').
+    The attendance scheduler + verdict read these live, so the change applies on the next tick."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET work_start=%s, work_end=%s, updated_at=NOW() "
+                        "WHERE id=%s", (work_start, work_end, staff_id))
+
+
 def al_adjust_balance(staff_id: int, delta: float) -> float:
     """Owner correction: move a staffer's AL balance by a RELATIVE delta (negative = deduct).
     Relative (never an absolute from a possibly-stale read) so it can't clobber a concurrent

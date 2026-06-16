@@ -204,6 +204,20 @@
 
 ## Done (with proof)
 
+- **2026-06-16 — Chomreun (id19) work time corrected + Thyda (id34) zeroed (owner; HIGH-RISK staff/points/
+  payback real data, before/after independent proof).** **Chomreun:** work time 06:00–18:00 → **09:00–21:00**
+  (`staff_set_work_time`, new additive helper in shared/database.py — not bot-called, so no deploy; the gm
+  scheduler/verdict read work_start/work_end live so it applies next tick). No payback/points/lateness on
+  him. Per-arc check: it was 20:17 PP (past the old 18:00 end) so he'd received wrong 18:00 checkout prompts,
+  but `checked_out_at=None` (he ignored them; auto-checkout couldn't fire — stopped sharing at 11:47) → no
+  early checkout, no damage; now prompts correctly at 21:00. **Thyda:** owner "back to zero — payback +
+  lateness points." Deleted open payback **#147** (478m "late arrival", open/0-paid/no bookings/no redefine →
+  1 row removed) + offset the **478 `late_uninformed`** points with same-cause −478 (ref
+  `owner_jun16_thyda_zero`, net 0, audit trail). FLAGGED: her 478 came from an ~8h-late check-in (≈19:58 PP
+  vs 12:00 start) — possibly her shift time is also wrong (like Chomreun's); owner only asked to zero, so
+  hours left as-is. **Proof (separate-process re-read):** Chomreun work 09:00/21:00; Thyda open debt=None,
+  #147 gone, late_uninformed net=0.
+
 - **2026-06-16 — Seth (id21) wiped to ZERO at owner request (PB + late points + late = 0; HIGH-RISK real
   data, before/after independent proof).** Owner: "his real debt also gone, back to zero PB." UNLIKE Por,
   Seth was NOT a radius victim — his only ping was 13.2m (inside even old 100m); the 45-min late was a
