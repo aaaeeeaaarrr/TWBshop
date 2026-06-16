@@ -357,8 +357,14 @@ Reason · មូលហេតុ៖ {reason}
 - The co-approve card + A2 reason prompt reuse the EXISTING 👁/🙈 toggle + both-date coverage strings
   (already vetted above) — no new toggle wording.
 
-### Go-live content (Jun 16) — rules sick line + greeting reword — KH draft
-- **WHO:** all staff. **WHEN:** the Rules screen + the one-time go-live greeting. **TONE:** plain, warm.
+### Go-live content (Jun 16) — rules sick line + greeting + broadcast — ✅ VETTED (ChatGPT)
+- **WHO:** all staff. **WHEN:** the Rules screen + the one-time go-live greeting + the broadcast.
+- ✅ VETTED + WIRED (the live wording is in `rules_screen` + `gm_greeting_FINAL.txt`). ChatGPT tweaks
+  applied: greeting `ខ្ញុំនៅជួយប្អូនជានិច្ច` (was …សម្រាប់ប្អូនជានិច្ច), disclaimer `បាត់បង់ performance
+  points` (was ដក Points ការងារ), rules `មិនដកប្រាក់ខែទេ`/`បើផ្ញើ…`/`បើមិនមានលិខិតពេទ្យ`.
+- Broadcast "try it now" (on-shift staff at flip) — ✅ VETTED:
+  `📍 You're on shift right now — give it a try! Check in by sharing your live location: tap 📎 → Location → Share Live Location. (You're already here, so nothing's owed today — this is just to try it out 🤍)`
+  · `📍 ឥឡូវប្អូនកំពុងនៅវេន — សាកល្បងមើល! ចុះវត្តមានដោយចែករំលែកទីតាំងបន្តផ្ទាល់៖ ចុច 📎 → Location / ទីតាំង → Share Live Location / ចែករំលែកទីតាំងបន្តផ្ទាល់។ (ប្អូននៅទីនេះស្រាប់ហើយ ដូច្នេះថ្ងៃនេះមិនមានម៉ោងត្រូវសងទេ — នេះគ្រាន់តែសាកល្បងមើលប៉ុណ្ណោះ 🤍)`
 - Rules — Sick line (EN approved by owner; KH is my draft):
   `Sick: never costs your salary. Send a doctor's note within 2 days and you owe no pay-back for that day — without one, you make the hours up later.`
   · `ឈឺ៖ មិនដកប្រាក់ខែ។ ផ្ញើលិខិតពេទ្យក្នុង 2 ថ្ងៃ នោះមិនត្រូវសងម៉ោងវិញសម្រាប់ថ្ងៃនោះទេ — បើគ្មាន ត្រូវធ្វើសងម៉ោងវិញពេលក្រោយ។`
