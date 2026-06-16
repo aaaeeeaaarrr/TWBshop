@@ -21,6 +21,9 @@ CATALOGUE = {
                                 "(quantity = window-min × short-notice days)"),
     "late_sick_inform":  (-15, "per event — told us sick within 30 min of shift start / after it "
                                "(Late Informing; own-sick only; papers do NOT wipe it)"),
+    "owner_adjustment":  (1,   "per unit — owner manual goodwill/correction; quantity = points added "
+                               "(+ or −). Lets the owner nudge a balance (e.g. lift a net-negative to 0) "
+                               "WITHOUT touching the real late_* events the /audit late-points law checks."),
 }
 
 

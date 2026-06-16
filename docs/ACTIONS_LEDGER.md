@@ -204,6 +204,18 @@
 
 ## Done (with proof)
 
+- **2026-06-16 — Heng (id37) points lifted to ZERO (owner: been coming early all week; HIGH-RISK points
+  real data, before/after independent proof).** Owner: keep his payback, but ADD to his points to make the
+  balance 0, not minus. BEFORE: points total **−156** (`late_uninformed` 67×−2 + `late_informed` 22×−1),
+  open payback **#148 = 89m**. Did NOT touch the late events or payback (owner: "he has to payback"; and
+  the `/audit` late-points law requires late_* events to sum to the session's 89 late-min — offsetting them
+  would desync + trip the daily audit). Instead added a NEW reusable cause **`owner_adjustment`** (value +1,
+  active; helper `points_set_rule`, catalogued) and recorded **+156** (ref `owner_jun16_heng_goodwill_to_
+  zero`). AFTER (separate-process re-read): **total points = 0.0**, late_* events still sum to **89**
+  (audit-consistent), payback #148 = 89 KEPT, owner_adjustment rule active/+1. Additive code (points.py
+  CATALOGUE + database.py helper) — not bot-called, data already live on prod, no deploy needed. The
+  `owner_adjustment` primitive is now reusable for future balance corrections (+ or −).
+
 - **2026-06-16 — Chomreun (id19) work time corrected + Thyda (id34) zeroed (owner; HIGH-RISK staff/points/
   payback real data, before/after independent proof).** **Chomreun:** work time 06:00–18:00 → **09:00–21:00**
   (`staff_set_work_time`, new additive helper in shared/database.py — not bot-called, so no deploy; the gm

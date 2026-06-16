@@ -3729,13 +3729,23 @@ def points_seed_catalogue() -> None:
     # late_sick_inform is a NEW owner penalty (Jun 16) → seed ACTIVE so it counts immediately; the
     # rest seed inactive (the owner activated the live set on Jun 11). DO NOTHING never clobbers an
     # owner-edited row, so this only sets the default the first time each cause appears.
-    _active_by_default = {"late_sick_inform"}
+    _active_by_default = {"late_sick_inform", "owner_adjustment"}
     with _db() as conn:
         with conn.cursor() as cur:
             for cause, (val, _desc) in CATALOGUE.items():
                 cur.execute("INSERT INTO points_rules (cause, value, active) VALUES (%s,%s,%s) "
                             "ON CONFLICT (cause) DO NOTHING",
                             (cause, val, cause in _active_by_default))
+
+
+def points_set_rule(cause: str, value: float, active: bool = True) -> None:
+    """Owner: add or (re)activate a points rule. Used to install the 'owner_adjustment' goodwill
+    cause (value +1) so a manual balance correction can be recorded as a normal points event."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO points_rules (cause, value, active) VALUES (%s,%s,%s) "
+                        "ON CONFLICT (cause) DO UPDATE SET value=EXCLUDED.value, active=EXCLUDED.active",
+                        (cause, value, active))
 
 
 def points_record(staff_id: int, cause: str, quantity: int = 1, ref: str | None = None) -> None:
