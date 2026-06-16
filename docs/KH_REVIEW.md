@@ -365,6 +365,10 @@ Reason · មូលហេតុ៖ {reason}
 - Greeting — reworded line (dropped the obsolete 📋 Menu button):
   `Message me anytime — even just "hi" — and I'll open your menu. I'm always here for you. 🤍`
   · `ឆាតមកខ្ញុំពេលណាក៏បាន — សូម្បីតែសរសេរ "hi" ក៏បាន — ខ្ញុំនឹងបើក Menu ឱ្យប្អូន។ ខ្ញុំនៅទីនេះសម្រាប់ប្អូនជានិច្ច។ 🤍`
+- Greeting — NEW disclaimer (owner, before "See you soon"; 🔻 = a reusable "points lost" marker, owner
+  to confirm the emoji):
+  `⚠️ One important thing: if you'll be late, you're sick, or anything comes up — please tell us as EARLY as you can. Telling us early keeps your points safe; telling us late, or not at all, loses performance points 🔻`
+  · `⚠️ រឿងសំខាន់មួយ៖ បើប្អូននឹងមកយឺត ឈឺ ឬមានរឿងអ្វីមួយ — សូមប្រាប់យើងឱ្យបានឆាប់បំផុត។ ប្រាប់ឆាប់ = រក្សា Points; ប្រាប់យឺត ឬមិនប្រាប់ = ដក Points ការងារ 🔻`
 
 ### WF2/WF3 — family-sick (Jun 14) — KH draft
 - **WHO:** the staffer (confirm + booked) + Supervisors (FYI). **WHEN:** family-sick TIMES path now asks a confirm; FYI on booking.
