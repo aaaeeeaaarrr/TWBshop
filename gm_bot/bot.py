@@ -6742,6 +6742,15 @@ _GROUP_REDIRECT_LINES = [
     "@twb_gm_bot.\n— រឿងនេះមិនរាប់ពី group នេះទេ 🙂 សម្រាប់ AL, ឈឺ ឬសុំឈប់ សូមផ្ញើសារមកខ្ញុំផ្ទាល់តាម "
     "@twb_gm_bot។",
 ]
+# Keywords that trip the Supervisors-group redirect nudge (substring match on text.lower()).
+# Covers late / day-off / leave / AL / sick AND (owner Jun 16) payback / schedule-change / swap / OT.
+# Trailing space on "off "/"al " avoids matching inside other words. NOTE: the 2-letter "ot"
+# abbreviation is deliberately NOT a keyword — substring-matching "ot " also hits not/got/lot — so OT
+# is caught via "overtime" only (accepted gap: "give him OT" alone won't nudge).
+_REDIRECT_KEYWORDS = (
+    "late", "មកយឺត", "off ", "day off", "ឈប់", "leave", "al ", "sick", "ឈឺ", "ច្បាប់",
+    "payback", "pay back", "swap", "shift", "schedule", "overtime", "ប្តូរ", "សង",
+)
 _REDIRECT_COOLDOWN = 1800   # one nudge per sender per 30 min (never spam a burst of messages)
 _redirect_last: dict = {}   # (chat_id, uid) → last-nudged ts
 
@@ -6825,8 +6834,7 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     # GM (no processing here — forces the private channel). Keyword, zero-API.
     if (_attendance_live() and text.strip() and chat_id == config.SUPERVISORS_CHAT_ID):
         try:
-            kws = ("late", "មកយឺត", "off ", "day off", "ឈប់", "leave", "al ", "sick", "ឈឺ", "ច្បាប់")
-            if any(k in text.lower() for k in kws) and msg.from_user:
+            if any(k in text.lower() for k in _REDIRECT_KEYWORDS) and msg.from_user:
                 sender_staff = staff_get_by_uid(msg.from_user.id)
                 key = (chat_id, msg.from_user.id)
                 if (sender_staff and sender_staff.get("status") == "active"
