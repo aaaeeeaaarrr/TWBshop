@@ -241,10 +241,38 @@ MVP (≈80% of the relief) = the SPINE: ledger + supplier-group paid-signal + da
 + counted cash + ledger expenses + float). Aging, price tracking, exports, KHQR-pay, voice-notes are
 valuable LATERS, not v1. Build the spine, prove on a week of real receipts, then layer.
 
+### C6. OWNER ANSWERS (2026-06-16) → LOCKED design choices
+**(a) Per-supplier Telegram groups ALREADY EXIST for most suppliers.** → group-signal works ~immediately;
+P0 = map group_id→vendor (`/vendor link <name>` run inside each group). Bot joins/sits silent, reads.
+**(b) Payments are ABA LUMP weekly/periodic** (one transfer clears several deliveries). → the matcher is
+**subset-sum per vendor**, NOT 1:1.
+
+**THE PAYABLE-RUN LOOP (the high-value win this style enables — bot runs the payment FOR the owner):**
+1. Week: receipts pile per supplier group, numbered, unpaid (ABA).
+2. Pay day: bot DMs a **payable run** — per supplier: "Atlas — #14 $138.60 + #17 $190 + #21 $83.70 =
+   **$412.30** (oldest 6d)."
+3. Owner pays that lump in ABA, drops slip in the Atlas group (existing habit).
+4. Bot reads slip → vendor=Atlas (group), $412.30 → subset-sum/FIFO → flips #14/#17/#21 paid → private
+   "✅ Atlas settled $412.30, 3 receipts."
+Owner never computes "what do I owe Atlas this week" — bot hands the number, watches the pay, reconciles.
+
+**MATCHER RULES (lump):** default **oldest-first (FIFO)**; **tolerance band** for Riel rounding
+(~few-hundred-riel/0.5% = exact, else flag); exact/clean FIFO → auto-propose + owner ✅; ambiguous (fits
+several combos) → propose oldest-first + show alternatives; < total owed → partial FIFO + remainder (flag
+if it splits one receipt); > total owed → overpay OR missing receipt → leak-detector fires.
+
+**AP AGING elevated** — because receipts sit ~a week unpaid, "what's outstanding per supplier" is core,
+not a nice-to-have (it powers the payable run).
+
+## ▶ REFINED PHASES (post-answers)
+- **P0** — ledger schema + vendor↔group map (`/vendor link` in each group) [+ SambaPOS sub-check in parallel].
+- **P1** — receipt capture in supplier groups (numbered, cash auto-paid, 1-tap correct; reuse
+  `assess_receipt_photo`+`clarify.py`).
+- **P2 (HEART)** — payable-run + lump subset-sum/FIFO matcher + private ✅ confirm + leak-detector.
+- **P3** — AP aging + daily report (SambaPOS sales + counted cash + ledger expenses + float carry).
+- **P4+** — supplier price tracking · Sheet/CSV export · voice-note expenses · KHQR-pay (pending Bakong).
+
 ## ▶ NEXT STEP (when work resumes)
-Draft the **receipt-ledger schema** + the **vendor master / supplier-group map** + the **Phase-1
-Expense-Group intake** as a concrete build plan (reuses `assess_receipt_photo` + `clarify.py`; cash
-auto-paid; numbered rows = the spine; supplier-group paid-signal = Phase 2). In parallel, the SambaPOS
-sub-check: map `WineBakery` tables/columns for a day's cash/ABA/grand-total + sketch the shop-PC push
-agent. **OWNER INPUTS NEEDED (see chat):** (a) do per-supplier Telegram groups already exist / which
-suppliers; (b) how payments are actually made today (ABA app per-supplier? lump weekly? cash?).
+Draft the **receipt-ledger schema** + **vendor master / group map** as the concrete P0 build (still
+design until owner says build). SambaPOS sub-check in parallel: map `WineBakery` tables/columns for a
+day's cash/ABA/grand-total + sketch the least-privilege shop-PC push agent.
