@@ -5120,6 +5120,138 @@ async def cmd_golivestatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         % (len(on), "\n".join(lines), tried, len(on)))
 
 
+def _att_hm(minute: int) -> str:
+    """A shift minute-of-day (may exceed 1440 for an overnight end) → HH:MM clock string."""
+    minute %= 1440
+    return "%02d:%02d" % (minute // 60, minute % 60)
+
+
+def _att_pp_hm(dt) -> str:
+    """A stored UTC timestamp → Phnom-Penh HH:MM."""
+    try:
+        return (dt + timedelta(hours=7)).strftime("%H:%M")
+    except Exception:
+        return "--"
+
+
+def _att_overdue(mins: int) -> str:
+    """Minutes overdue → '(Xh Ym ago)' / '(Ym ago)'."""
+    h, m = divmod(int(mins), 60)
+    return "(%dh %dm ago)" % (h, m) if h else "(%dm ago)" % m
+
+
+def _att_today_snapshot() -> dict:
+    """Classify every TWB staffer scheduled today (and overnight-from-yesterday) by check-in/out
+    state, using the ONE resolver so it matches attendance exactly. Read-only. Buckets:
+      stuck    [(name, end_min, overdue_min)]  — checked in, past shift end, NOT checked out
+      onshift  [(name, ci_hm, end_min)]        — checked in, still within shift
+      out      [(name, ci_hm, co_hm)]          — checked out
+      notin    [(name, end_min)]               — on shift NOW but never checked in
+      absent   [(name, end_min)]               — shift already ended, never checked in
+      upcoming [(name, start_min)]             — scheduled later today, not started yet
+    """
+    from gm_bot import attendance_ui as ui
+    now_pp = _now_pp()
+    today = now_pp.date()
+    yday = today - timedelta(days=1)
+    now_min = now_pp.hour * 60 + now_pp.minute
+    try:
+        ctx = ui._day_context([yday.isoformat(), today.isoformat()])
+    except Exception:
+        ctx = None
+    b = {"stuck": [], "onshift": [], "out": [], "notin": [], "absent": [], "upcoming": []}
+    for s in staff_all("active"):
+        if s.get("org") != "TWB" or s.get("canonical_name") == "Tyty":
+            continue
+        nm = s.get("call_name") or s["canonical_name"]
+        for d in (today, yday):
+            try:
+                dec = ui.resolve_day(s, d.isoformat(), ctx=ctx)
+            except Exception:
+                continue
+            if not dec.get("working"):
+                continue
+            ws, we = dec.get("start_min"), dec.get("end_min")
+            if ws is None or we is None:
+                continue
+            ws, we = int(ws), int(we)
+            if we <= ws:
+                we += 1440                       # overnight: end rolls past midnight (21:00→06:00)
+            # yesterday only matters if it ran overnight INTO today; today's own shift always matters
+            if d == yday and we <= 1440:
+                continue
+            now_abs = (today - d).days * 1440 + now_min   # minutes from d-midnight to now
+            sess = att_get_session(s["id"], d.isoformat())
+            ci = sess.get("checked_in_at") if sess else None
+            co = sess.get("checked_out_at") if sess else None
+            if co:
+                b["out"].append((nm, _att_pp_hm(ci), _att_pp_hm(co)))
+            elif ci and now_abs >= we:
+                b["stuck"].append((nm, we, now_abs - we))
+            elif ci:
+                b["onshift"].append((nm, _att_pp_hm(ci), we))
+            elif _golive_grace(_shift_start_dt(d.isoformat(), ws)):
+                break   # shift began before go-live — they couldn't check in; not a miss (grace)
+            elif now_abs >= we:
+                b["absent"].append((nm, we))
+            elif now_abs >= ws:
+                b["notin"].append((nm, we))
+            else:
+                b["upcoming"].append((nm, ws))
+            break   # one shift per person per snapshot
+    b["stuck"].sort(key=lambda x: -x[2])
+    return b
+
+
+def _fmt_att_snapshot(b: dict, now_str: str) -> str:
+    """Render the snapshot buckets into one private message (pure → unit-testable)."""
+    out = ["📋 Attendance · %s" % now_str]
+    n_in = len(b["stuck"]) + len(b["onshift"]) + len(b["out"])
+    expected = n_in + len(b["notin"]) + len(b["absent"]) + len(b["upcoming"])
+    if b["stuck"]:
+        out.append("\n⏰ Past shift-end, NOT checked out (%d)  ← action" % len(b["stuck"]))
+        out += [" • %s — ended %s %s" % (nm, _att_hm(we), _att_overdue(od)) for nm, we, od in b["stuck"]]
+    if b["notin"]:
+        out.append("\n❓ On shift now, never checked in (%d)" % len(b["notin"]))
+        out += [" • %s — ends %s" % (nm, _att_hm(we)) for nm, we in b["notin"]]
+    if b["onshift"]:
+        out.append("\n🟢 Still on shift (%d)" % len(b["onshift"]))
+        out += [" • %s — in %s · ends %s" % (nm, ci, _att_hm(we)) for nm, ci, we in b["onshift"]]
+    if b["out"]:
+        out.append("\n✅ Checked out (%d)" % len(b["out"]))
+        out += [" • %s — %s→%s" % (nm, ci, co) for nm, ci, co in b["out"]]
+    if b["absent"]:
+        out.append("\n🚫 Shift ended, never checked in (%d)" % len(b["absent"]))
+        out += [" • %s — ended %s" % (nm, _att_hm(we)) for nm, we in b["absent"]]
+    if b["upcoming"]:
+        out.append("\n⏳ Not started yet (%d)" % len(b["upcoming"]))
+        out += [" • %s — starts %s" % (nm, _att_hm(ws)) for nm, ws in b["upcoming"]]
+    out.append("\n%d expected · %d in · %d out · %d stuck · %d missing"
+               % (expected, n_in, len(b["out"]), len(b["stuck"]), len(b["notin"]) + len(b["absent"])))
+    return "\n".join(out)
+
+
+async def cmd_att(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/att — owner-only, read-only. Today's live attendance snapshot (check-ins / check-outs /
+    stuck-open sessions). Private DM, sends nothing to staff or groups."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
+        return
+    if not _attendance_live():
+        await update.message.reply_text("❌ Attendance isn't live yet — nothing to show.")
+        return
+    now_str = _now_pp().strftime("%a %d/%m · %H:%M PP")
+    try:
+        b = _att_today_snapshot()
+    except Exception as e:
+        logger.error("/att snapshot failed: %s", e)
+        await update.message.reply_text("⚠ Couldn't build the snapshot — check the logs.")
+        return
+    if not any(b.values()):
+        await update.message.reply_text("📋 Attendance · %s\nNo one is scheduled today." % now_str)
+        return
+    await update.message.reply_text(_fmt_att_snapshot(b, now_str))
+
+
 async def cmd_trynow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/trynow [confirm] — owner-only. Nudge everyone ON SHIFT right now who HASN'T checked in yet to
     try the live-location check-in (the _TRY_IT_NOW message). Unlike /broadcast (one-time, rides the
@@ -5596,6 +5728,7 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/testseed [name] — copy real ALs/paybacks into test so flows have realistic data\n"
         "/testreset — wipe all test data\n"
         "\n— Attendance · live overviews —\n"
+        "/att — today's live snapshot: who's in / out / still on shift / stuck-open (private, on demand)\n"
         "/menu — your private menu: Staff info → PB+OT · AL+Joined · Salaries 1st/2nd\n"
         "/joined <name> <date> — set a hire date (03/05/2023, or 05/2023 if you only know the month)\n"
         "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
@@ -7014,6 +7147,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("golive",     cmd_golive))
     app.add_handler(CommandHandler("broadcast",  cmd_broadcast))
     app.add_handler(CommandHandler("golivestatus", cmd_golivestatus))
+    app.add_handler(CommandHandler("att",        cmd_att))
     app.add_handler(CommandHandler("trynow",     cmd_trynow))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
