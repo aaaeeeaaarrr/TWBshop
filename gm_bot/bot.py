@@ -2396,29 +2396,36 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
 
 
 async def _offer_buyback(context, staff: dict, bank_min: int, uid: int, just_added: int) -> None:
-    """Offer buyback rest at the SAFEST (most-surplus) times — reward tone."""
+    """Offer buyback rest at the 4 SAFEST (most-surplus = LEAST-needed) shift-edge times — reward
+    tone (owner, Jun 16: cap at 4, was up to 6). The rest SHORTENS the shift (come in later / leave
+    earlier); the booking auto-approves a redefine, so the shortened shift still runs as a NORMAL
+    shift — the check-in/checkout nudges fire at the new edges (compute_day_events is redefine-aware)
+    and the early +10 applies to the (new) start. Surplus now counts who's actually away that day,
+    so 'least needed' is honest, not blind."""
     from gm_bot import coverage as cov, payback as pb
     from gm_bot.attendance import to_min
     ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
     label = ("%dmin" % just_added) if just_added < 60 else ("%gh" % (just_added / 60))
     rows = []
     if ws is not None and we is not None:
-        days = pb.working_days_ahead(staff.get("day_off"), set(),
-                                     _today_pp(), 7, 3)
+        days = pb.working_days_ahead(staff.get("day_off"), set(), _today_pp(), 7, 3)
         roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
+        name_of = {s["id"]: (s.get("call_name") or s.get("canonical_name") or "").lower() for s in roster}
+        away = away_staff_by_dates([d.isoformat() for d in days])
         scored = []
         for d in days:
             wd = d.strftime("%a")
+            leave_names = {name_of.get(sid, "") for sid in away.get(d.isoformat(), set())} - {""}
             for lbl, s_min, e_min in pb.takeback_windows(ws, we, bank_min):
                 surp = cov.slot_surplus(staff.get("expertise") or [], s_min, e_min, wd,
-                                        roster, set(), to_min)
+                                        roster, leave_names, to_min)
                 tag = "🌅 in late" if lbl == "start late" else "🌙 leave early"
                 txt = "%s %s-%s · %s" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min), tag)
                 scored.append((surp, [InlineKeyboardButton(
                     txt, callback_data="att:otb:%d:%s:%d:%d:%d"
                     % (staff["id"], d.isoformat(), s_min, e_min, bank_min))]))
-        scored.sort(key=lambda t: -t[0])   # safest (most surplus) first
-        rows = [b for _s, b in scored]
+        scored.sort(key=lambda t: -t[0])   # safest (most surplus = least needed) first
+        rows = [b for _s, b in scored[:4]]   # owner: show only the 4 least-neediest
     await _att_send(context, uid, "Staff", staff.get("call_name") or staff["canonical_name"],
         "+%s OT approved — your bank: %gh. Choose when to take it back:\n"
         "+%s OT ត្រូវបានអនុម័ត — OT bank៖ %gh។ សូមជ្រើសម៉ោងសម្រាកសងវិញ៖"

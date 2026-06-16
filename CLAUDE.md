@@ -257,7 +257,12 @@ per-date coverage shortfall (new batched `away_staff_by_dates` counts who's actu
 that day), **TOP 8 neediest** shown. **Day-off demoted from a fixed 3 appended rows → ONE candidate that
 appears ONLY on a genuine shortfall (score>0) AND only if it ranks** (working a rest day = last resort, not
 a push). +2 tests, suite **619**. Real render proof: Seth (60m) → 8 working slots, Friday day-off correctly
-hidden (not short). **▶ PAYBACK DATA (Jun 16, owner, real, proven, ledger'd):** "everyone paid back except
+hidden (not short).
+**▶ OT BUYBACK PUSH (Jun 16, owner):** same treatment for the OT rest/back-pay push (`_offer_buyback`) —
+capped to the **4 least-neediest** shift-edge rest times (was up to 6), surplus now counts real absences.
+The rest SHORTENS the shift but it stays a NORMAL shift: nudges fire at the new edges + early +10 on the new
+start (confirmed in `compute_day_events`/`checkin`/`ot`). +1 test, suite **620**; real render Seth 1h → 4 options.
+**▶ PAYBACK DATA (Jun 16, owner, real, proven, ledger'd):** "everyone paid back except
 Seth 1h" → cleared PISEY #60 (29m) + Por #61 (120m), created Seth #143 = 60m (he had NO open debt —
 flagged); only open real debt now = Seth #143 (independent fresh-process re-read). **▶ KH VET (Jun 16):** vetted the owner's ChatGPT paste
 against intent (not blind) → wired 6 strings: the 4 late-sick callouts/deferred-reminder, the mandatory-

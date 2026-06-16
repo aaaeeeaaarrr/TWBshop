@@ -165,3 +165,27 @@ def test_payback_dayoff_shows_only_when_it_ranks(monkeypatch):
     txts = [b.text for row in bot._payback_slot_keyboard(staff, 120).inline_keyboard for b in row
             if b.callback_data.startswith("att:pb:book:")]
     assert any("day off" in t for t in txts), "neediest day off not shown"
+
+
+def test_buyback_push_offers_only_4_least_neediest(monkeypatch):
+    """Owner (Jun 16): the OT buyback (rest) push shows only the 4 SAFEST (most-surplus =
+    least-needed) shift-edge times, not all 6 (3 days x in-late/leave-early)."""
+    import asyncio
+    from gm_bot import bot
+    import gm_bot.coverage as coverage
+    from datetime import date
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [{"id": 1, "org": "TWB",
+                                                            "call_name": "X", "expertise": []}])
+    monkeypatch.setattr(bot, "away_staff_by_dates", lambda *a, **k: {})
+    monkeypatch.setattr(bot, "_today_pp", lambda: date(2026, 6, 16))   # Tue; day off Sun
+    monkeypatch.setattr(coverage, "slot_surplus", lambda *a, **k: 1)   # all equally safe
+    cap = {}
+    async def _send(*a, **k):
+        cap["kb"] = k.get("kb")
+    monkeypatch.setattr(bot, "_att_send", _send)
+    staff = {"id": 1, "work_start": "07:00", "work_end": "17:00", "day_off": "Sun",
+             "expertise": ["kitchen"], "call_name": "X", "canonical_name": "X"}
+    asyncio.run(bot._offer_buyback(None, staff, 60, 999, 60))   # 1h bank
+    book = [b for row in cap["kb"].inline_keyboard for b in row
+            if b.callback_data.startswith("att:otb:")]
+    assert len(book) == 4, "buyback showed %d options, expected 4" % len(book)
