@@ -1671,10 +1671,15 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         return True
     now_min = now_pp.hour * 60 + now_pp.minute
     state, mins = ci.verdict(now_min, ws, True)
-    # GO-LIVE GRACE: if this shift started before we went live, a "late" verdict becomes a clean
-    # on-time check-in (no late points, no pay-back) — the staff couldn't check in pre-live.
-    if state == "late" and _golive_grace(_shift_start_dt(shift_date, ws)):
-        state, mins = "ontime", 0
+    # GRACE — a "late" verdict becomes a clean on-time check-in (no late points) when either:
+    #  (a) GO-LIVE: the shift started before we flipped live (staff couldn't check in pre-live); or
+    #  (b) COME-IN SICK: they have an open own-sick case for today and came in anyway — coming in must
+    #      never cost MORE than staying home (owner). Pay-back for the missed hours is the sick mechanic.
+    if state == "late":
+        _sc = _open_sick_case(staff["id"])
+        if _golive_grace(_shift_start_dt(shift_date, ws)) \
+                or (_sc and str(_sc.get("the_date")) == shift_date):
+            state, mins = "ontime", 0
     late = mins if state == "late" else 0
     early = mins if state == "early" else 0
     first = att_check_in(staff["id"], shift_date, now_pp.isoformat(), True, late, early)
@@ -1720,6 +1725,23 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
                 await msg.reply_text(ui._V_LATE % (late, late))
         else:
             await msg.reply_text(ui._V_ONTIME)
+    # DEFERRED Late-Informing reminder (owner, Jun 16): taught at the NEXT check-in, not while they're
+    # sick. Expires after 7 days (the −15 still stands in their points; only the courtesy note expires).
+    if first:
+        _lk = "late_inform_notice:%d" % user.id
+        _lv = gm_get_state(_lk)
+        if _lv:
+            gm_set_state(_lk, "")                     # deliver once, then clear
+            try:
+                _age = (_today_pp().date() - datetime.fromisoformat(_lv).date()).days
+            except Exception:
+                _age = 0
+            if _age <= 7:
+                await msg.reply_text(
+                    "Quick note 🤍 last time you let us know you were sick very late — that's "
+                    "−15 Late Informing 🔻. Earlier next time keeps your points safe.\n"
+                    "កត់សម្គាល់តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះ −15 Late Informing 🔻។ "
+                    "សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ ដើម្បីរក្សា points។")
     return True
 
 
@@ -3863,6 +3885,22 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     await _att_send(context, None, "Supervisors group", "",
         "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។\nReason · មូលហេតុ៖ %s"
         % (_snm, _snm, reason), group=True)
+    # LATE INFORMING (owner, Jun 16): own-sick reported within 30 min of shift start / after it = −15,
+    # ONCE per day. Recorded SILENTLY (don't pile on while they're sick); taught at the next check-in
+    # (deferred flag below). Papers do NOT wipe it. Only for TODAY's shift; None = not working today.
+    try:
+        from gm_bot.attendance_ui import _sick_late_mins, LATE_SICK_OWN_MIN
+        mins = _sick_late_mins(persona)
+        if date_iso == _today_pp().isoformat() and mins is not None and mins < LATE_SICK_OWN_MIN:
+            done_key = "late_inform_done:%d:%s" % (persona["id"], date_iso)
+            if gm_get_state(done_key) != "true":
+                points_record(persona["id"], "late_sick_inform", 1, date_iso)
+                gm_set_state(done_key, "true")
+                uid = (persona.get("telegram_ids") or [None])[0]
+                if uid:
+                    gm_set_state("late_inform_notice:%d" % uid, _today_pp().isoformat())
+    except Exception as e:
+        logger.error("late-informing penalty failed for %s: %s", persona.get("id"), e)
 
 
 async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:

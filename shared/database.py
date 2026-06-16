@@ -2306,6 +2306,9 @@ def init_attendance_db() -> None:
                 -- mm/yyyy so an unknown day is never shown as a fake "01/".
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_date DATE;
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS joined_month_only BOOLEAN DEFAULT FALSE;
+                -- Jun 16: gender ('M'|'F') for records (the bot's Khmer is gender-neutral); seeded from
+                -- the owner's roster by seed_staff_genders().
+                ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS gender TEXT;
                 -- session 28: flow-state persistence (H1) — one active ladder per uid, survives restart
                 CREATE TABLE IF NOT EXISTS gm_flow_state (
                     uid        BIGINT PRIMARY KEY,
@@ -2768,6 +2771,44 @@ def import_staff_schedule_csv(path: str, year: int = 2026) -> dict:
                     cur.execute("UPDATE staff_registry SET status='ex_staff', left_at=NOW(), left_reason='not in CSV' WHERE id=%s", (rr["id"],))
                     report["ex_staffed"].append(rr["canonical_name"])
     return report
+
+
+# Owner's roster gender (Jun 16). 'M'|'F'. Used by seed_staff_genders() to fill the gender column —
+# records only (the bot's Khmer is gender-neutral). Match is by EXACT canonical_name.
+_GENDER_ROSTER = {
+    "An Davy": "F", "Ban Chheangmeng": "F", "Chim Samphass": "M", "Chuch Pisey": "M",
+    "Chun Chomruen": "M", "Doeun Rothanak": "M", "Hong Vannary": "F", "Khon Visalpisey": "M",
+    "Kiry Sachak Anan": "M", "Korn Chantrea": "F", "Lim Kimlong": "M", "Mon Chenda": "M",
+    "Nao Norin": "M", "Neat Kheak": "M", "Phal Rath": "M", "Phan Piseth": "M",
+    "Rom Sopheaktra": "M", "Sao Visal": "M", "Sen Vathanakthyda": "F", "Som Renaud": "M",
+    "Sun Kimying": "F", "Tengmarim Chaktopor": "M", "Thorn Kimheng": "M", "Vann Failin": "M",
+    "Vinal Piseth": "M", "Yi Sony": "F",
+}
+
+
+def seed_staff_genders() -> None:
+    """Idempotent: set gender from the owner's roster (fills NULL only, by EXACT canonical_name). Logs
+    how many were set and any roster names NOT found in the registry — so the owner reconciles, never
+    guessed. Runs at startup after the column exists."""
+    import logging
+    log = logging.getLogger(__name__)
+    matched, missing = 0, []
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                for name, g in _GENDER_ROSTER.items():
+                    cur.execute("UPDATE staff_registry SET gender=%s WHERE canonical_name=%s "
+                                "AND gender IS NULL", (g, name))
+                    if cur.rowcount:
+                        matched += 1
+                        continue
+                    cur.execute("SELECT 1 FROM staff_registry WHERE canonical_name=%s", (name,))
+                    if not cur.fetchone():
+                        missing.append(name)
+        log.warning("gender seed: set %d new; %d roster name(s) NOT in registry: %s",
+                    matched, len(missing), missing)
+    except Exception as e:                 # never crash startup over a cosmetic seed
+        log.error("gender seed skipped: %s", e)
 
 
 def seed_staff_registry() -> int:
@@ -3676,11 +3717,16 @@ def points_seed_catalogue() -> None:
     """Idempotent: ensure every catalogue cause exists (inactive, default value). Never clobbers
     an owner-edited value/active flag (DO NOTHING)."""
     from gm_bot.points import CATALOGUE
+    # late_sick_inform is a NEW owner penalty (Jun 16) → seed ACTIVE so it counts immediately; the
+    # rest seed inactive (the owner activated the live set on Jun 11). DO NOTHING never clobbers an
+    # owner-edited row, so this only sets the default the first time each cause appears.
+    _active_by_default = {"late_sick_inform"}
     with _db() as conn:
         with conn.cursor() as cur:
             for cause, (val, _desc) in CATALOGUE.items():
-                cur.execute("INSERT INTO points_rules (cause, value, active) VALUES (%s,%s,FALSE) "
-                            "ON CONFLICT (cause) DO NOTHING", (cause, val))
+                cur.execute("INSERT INTO points_rules (cause, value, active) VALUES (%s,%s,%s) "
+                            "ON CONFLICT (cause) DO NOTHING",
+                            (cause, val, cause in _active_by_default))
 
 
 def points_record(staff_id: int, cause: str, quantity: int = 1, ref: str | None = None) -> None:

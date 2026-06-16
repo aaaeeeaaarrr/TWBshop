@@ -1112,6 +1112,47 @@ def sick_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     return _hdr(p, "🤒 Who is sick?\n🤒 អ្នកណាឈឺ?"), InlineKeyboardMarkup(rows)
 
 
+LATE_SICK_OWN_MIN = 30   # own-sick told < this many min before shift start (or after) = late → −15
+LATE_SICK_FAM_MIN = 10   # family-sick told this late = a soft note (NO points — family is sudden)
+
+
+def _sick_late_mins(p: dict) -> int | None:
+    """Minutes until p's shift starts TODAY (negative if already started); None if they don't work today
+    (day-off / on leave). Honors overrides via resolve_day. Flags a late sick report."""
+    try:
+        dec = resolve_day(p, _today().isoformat())
+    except Exception:
+        return None
+    if not dec.get("working") or dec.get("start_min") is None:
+        return None
+    return int(dec["start_min"]) - _now_min()
+
+
+def _late_sick_callout(mins: int | None) -> str:
+    """Own-sick 'why so late?' nudge (no points talk), or '' if not late (≥ 30 min before shift)."""
+    if mins is None or mins >= LATE_SICK_OWN_MIN:
+        return ""
+    if mins < 0:
+        return ("⏰ Your shift has already started — that's very late to let us know. Please tell us as "
+                "soon as you feel unwell next time 🤍\n"
+                "⏰ វេនរបស់ប្អូនបានចាប់ផ្តើមហើយ — យឺតពេលណាស់ក្នុងការប្រាប់។ សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ "
+                "នៅពេលប្អូនមិនស្រួលខ្លួន 🤍\n\n")
+    return ("⏰ Only %d minutes before your shift starts — that's very late to let us know. You usually "
+            "know you're unwell before this; please tell us as soon as you can next time 🤍\n"
+            "⏰ នៅសល់តែ %d នាទីប៉ុណ្ណោះមុនវេនរបស់ប្អូន — យឺតពេលណាស់ក្នុងការប្រាប់។ ជាធម្មតាប្អូនដឹងថាមិនស្រួលខ្លួន"
+            "មុនពេលនេះ; សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ 🤍\n\n" % (mins, mins))
+
+
+def _late_famsick_note(mins: int | None) -> str:
+    """Family-sick soft note (NO points), or '' if not late (≥ 10 min before shift)."""
+    if mins is None or mins >= LATE_SICK_FAM_MIN:
+        return ""
+    return ("⏰ Thanks for telling us 🤍 Just a note — that's quite late. We know family things can be "
+            "sudden, but the earlier you let us know, the easier for us to cover.\n"
+            "⏰ អរគុណដែលប្រាប់ 🤍 កត់សម្គាល់តិច — យឺតបន្តិចហើយ។ យើងដឹងថារឿងគ្រួសារអាចកើតភ្លាមៗ "
+            "ប៉ុន្តែបើប្រាប់បានឆាប់ យើងកាន់តែងាយរៀបចំជំនួស។\n\n")
+
+
 def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     ws = to_min(p.get("work_start"))
     if ws is None:
@@ -1121,7 +1162,8 @@ def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [_back_row("att:sp:sick")] + grid(btns, 3)
     rows.append([InlineKeyboardButton("📝 Really can't — explain · មិនអាចមក — ពន្យល់",
                                       callback_data="att:sp:mecant")])   # typed reason → Supervisors
-    return _hdr(p, "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
+    return _hdr(p, _late_sick_callout(_sick_late_mins(p)) +
+                   "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
                    "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល — មើលថាអ្នកមានអារម្មណ៍យ៉ាងម៉េច"
                    "នៅកន្លែងធ្វើការ។\n\n"
                    "What time can you come?\nអ្នកអាចមកម៉ោងប៉ុន្មាន?"), InlineKeyboardMarkup(rows)
@@ -1145,7 +1187,7 @@ def sick_me_cant(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     txt = _hdr(p,
                "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
                "បានហើយ — សម្រាកឱ្យបានល្អ 🤍 បើអ្នកបានទៅជួបពេទ្យ សូមផ្ញើរូបថតឯកសារពេទ្យមកខ្ញុំ។\n\n"
-               "(Provisional: the missed shift becomes pay-back time unless papers arrive within 3 days.\n"
+               "(Provisional: the missed shift becomes pay-back time unless papers arrive within 2 days.\n"
                "Papers → real sick day: no pay-back, no points, AL untouched.)")
     return txt, InlineKeyboardMarkup([_back_row("att:sp:me"), _walk_btn("sickme"),
                                       [InlineKeyboardButton("🏠 Main menu", callback_data="att:menunew")]])
@@ -1168,9 +1210,10 @@ def sick_family_fulltime(p: dict, who: str, iso: str) -> tuple[str, InlineKeyboa
                                           callback_data="att:sp:famf:%s:%s" % (who, iso))])
     rows.append([InlineKeyboardButton("Choose time · ជ្រើសម៉ោង",
                                       callback_data="att:sp:famt:%s:%s" % (who, iso))])
-    txt = ("Sick leave for your %s — %s\nច្បាប់ឈឺសម្រាប់%s — %s\n"
-           "Full day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?"
-           % (who, d, _WHO_KH.get(who, who), d))
+    note = _late_famsick_note(_sick_late_mins(p)) if iso == _today().isoformat() else ""
+    txt = note + ("Sick leave for your %s — %s\nច្បាប់ឈឺសម្រាប់%s — %s\n"
+                  "Full day or part of the day?\nសុំឈប់ពេញមួយថ្ងៃ ឬសុំឈប់តាមម៉ោង?"
+                  % (who, d, _WHO_KH.get(who, who), d))
     return _hdr(p, txt), InlineKeyboardMarkup(rows)
 
 

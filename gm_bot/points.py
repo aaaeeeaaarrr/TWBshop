@@ -19,6 +19,8 @@ CATALOGUE = {
     "ot_no_show":        (-30, "per event — accepted OT then didn't do it"),
     "short_notice_al":   (-0.1, "per affected minute — AL day requested within 7 days "
                                 "(quantity = window-min × short-notice days)"),
+    "late_sick_inform":  (-15, "per event — told us sick within 30 min of shift start / after it "
+                               "(Late Informing; own-sick only; papers do NOT wipe it)"),
 }
 
 
