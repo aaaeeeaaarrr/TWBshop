@@ -252,6 +252,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
 RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**▶ GROUP-REDIRECT KEYWORDS WIDENED (Jun 16, owner, DEPLOYED `9df620a` to gm; verified HEAD==origin /
+active, other 4 bots untouched):** the Supervisors-group "DM me, the group doesn't count" nudge now also
+fires on **payback / pay back / swap / shift / schedule / overtime / ប្តូរ / សង** (was late/day-off/leave/
+AL/sick only). Supervisors group ONLY (unchanged scope), gated on `attendance_live`, active-staff only,
+30-min cooldown. Lifted the list to module-level `_REDIRECT_KEYWORDS` + regression test
+(`tests/test_group_redirect_keywords.py`). OT 2-letter abbreviation deliberately excluded (substring
+collision with not/got/lot) → covered via "overtime". The old in-group lateness/leave PROCESSING ladder
+stays OFF (`GM_ATTENDANCE_GROUP_ACTIVE`=false) — group is nudge-only, all recording happens in private DM.
 **▶ CHECK-IN ZONE WIDENED 100m→150m (Jun 16, owner, DEPLOYED `fc3fedc` to gm; verified HEAD==origin /
 active / on-disk carries 150, other 4 bots untouched):** Por couldn't check in at 100m (GPS drift).
 `WORK_ZONE_RADIUS_M=150` in `gm_bot/attendance.py`; zone test updated (now `test_just_inside_and_outside_
