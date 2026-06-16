@@ -249,8 +249,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 cont — **PAYBACK PUSH RANKING UPGRADE + KH VETTED+WIRED + LATE
-SICK-INFORMING + GENDER; DEPLOYED to gm; all INERT; `attendance_live` still OFF**). **▶ PAYBACK PUSH
+**Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
+11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
+RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**). **▶ GO-LIVE HAPPENED (Jun 16 ~11:08 PP):** the
+owner ran `/golive confirm` + `/broadcast confirm` (26 greeted) — the system is now LIVE for real staff (NO
+longer inert; earlier notes saying "OFF/INERT" are superseded). `attendance_live_at`=11:08 stamps the
+go-live grace (anyone already on shift at the flip is not penalised). **▶ `/trynow` ADDED (Jun 16):**
+owner-only — nudge on-shift staff who haven't checked in to try the live-location check-in (the one-shot
+`/broadcast` try-it-now skips already-greeted staff, so it can't re-nudge); preview then `/trynow confirm`;
+requires live; +3 tests. **▶ PAYBACK PUSH
 RANKING (Jun 16, owner):** rebuilt `_payback_slot_keyboard` into ONE unified need-ranked list — working-day
 before/after slots across the next ~6 working days PLUS the staff's NEXT day off, each scored by the REAL
 per-date coverage shortfall (new batched `away_staff_by_dates` counts who's actually on AL/leave/swap-off

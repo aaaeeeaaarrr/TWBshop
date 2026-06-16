@@ -5120,6 +5120,49 @@ async def cmd_golivestatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         % (len(on), "\n".join(lines), tried, len(on)))
 
 
+async def cmd_trynow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/trynow [confirm] — owner-only. Nudge everyone ON SHIFT right now who HASN'T checked in yet to
+    try the live-location check-in (the _TRY_IT_NOW message). Unlike /broadcast (one-time, rides the
+    first greeting), this can be fired any time — for staff who came on after the go-live broadcast,
+    or to re-prompt those who started their shift before go-live and so missed the auto check-in
+    prompt. Requires attendance_live (so the check-in works); preview first, send on confirm."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
+        return
+    if not _attendance_live():
+        await update.message.reply_text("❌ Not live — /trynow only works once attendance is live.")
+        return
+    pending = []
+    for s, sd, _ws, _we in _on_shift_now():
+        if not (s.get("telegram_ids") or []):
+            continue
+        sess = att_get_session(s["id"], sd)
+        if sess and sess.get("checked_in_at"):
+            continue                       # already tried — don't nag
+        pending.append((s, sd))
+    if not pending:
+        await update.message.reply_text(
+            "Nobody to nudge — everyone on shift now has already checked in (or no one is on shift).")
+        return
+    names = ", ".join((s.get("call_name") or s["canonical_name"]) for s, _ in pending)
+    if (context.args or [""])[0].lower() != "confirm":
+        await update.message.reply_text(
+            "📍 Will nudge %d on-shift staff who haven't checked in yet:\n%s\n\nTo send: /trynow confirm"
+            % (len(pending), names))
+        return
+    sent = failed = 0
+    for s, _sd in pending:
+        uid = s["telegram_ids"][0]
+        try:
+            await context.bot.send_message(uid, _TRY_IT_NOW)
+            sent += 1
+        except Exception as e:
+            failed += 1
+            logger.error("trynow to %s failed: %s", uid, e)
+    await update.message.reply_text(
+        "✅ Nudged %d on-shift staff to try check-in.\n• failed: %d\n\n/golivestatus to watch who tries."
+        % (sent, failed))
+
+
 async def cmd_testreset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/testreset — delete EXACTLY the test-tagged attendance rows (real data can't be caught)."""
     if update.effective_user.id not in {config.OWNER_TELEGRAM_ID, _tyty_uid()}:
@@ -6963,6 +7006,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("golive",     cmd_golive))
     app.add_handler(CommandHandler("broadcast",  cmd_broadcast))
     app.add_handler(CommandHandler("golivestatus", cmd_golivestatus))
+    app.add_handler(CommandHandler("trynow",     cmd_trynow))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
