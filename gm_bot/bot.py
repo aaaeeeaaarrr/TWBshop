@@ -1191,6 +1191,31 @@ def _attendance_live() -> bool:
     return gm_get_state("attendance_live") == "true"
 
 
+def _shift_start_dt(shift_date: str, ws_min: int) -> datetime:
+    """The PP-tz datetime a shift starts = its date + work_start minutes (overnight shifts start in the
+    evening of that date)."""
+    return datetime.fromisoformat(str(shift_date)).replace(tzinfo=finance.PP_TZ) \
+        + timedelta(minutes=ws_min or 0)
+
+
+def _golive_grace(shift_start: datetime) -> bool:
+    """GO-LIVE GRACE (owner): a shift that STARTED before we flipped attendance_live can't be a no-show
+    or 'late' — the staff couldn't have checked in (the system wasn't live yet). True only when an
+    `attendance_live_at` stamp exists (set by /golive at the flip) AND this shift began before it.
+    Returns False with no stamp (pre-go-live AND the normal steady state) → fully inert until the flip,
+    and self-expiring after the first day (every later shift starts after the stamp)."""
+    iso = gm_get_state("attendance_live_at")
+    if not iso:
+        return False
+    try:
+        live_at = datetime.fromisoformat(iso)
+        if live_at.tzinfo is None:
+            live_at = live_at.replace(tzinfo=finance.PP_TZ)
+        return shift_start < live_at
+    except Exception:
+        return False
+
+
 def _att_test_mode() -> bool:
     """TEST MODE: owner role-plays the whole system alone. Every message routes to the owner;
     every write is is_test-tagged; real balances untouched. Never messages a real staffer."""
@@ -1646,6 +1671,10 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         return True
     now_min = now_pp.hour * 60 + now_pp.minute
     state, mins = ci.verdict(now_min, ws, True)
+    # GO-LIVE GRACE: if this shift started before we went live, a "late" verdict becomes a clean
+    # on-time check-in (no late points, no pay-back) — the staff couldn't check in pre-live.
+    if state == "late" and _golive_grace(_shift_start_dt(shift_date, ws)):
+        state, mins = "ontime", 0
     late = mins if state == "late" else 0
     early = mins if state == "early" else 0
     first = att_check_in(staff["id"], shift_date, now_pp.isoformat(), True, late, early)
@@ -3731,6 +3760,8 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         sess = att_get_session(p["id"], yday.isoformat())
         if sess and sess.get("checked_in_at"):
             continue   # they checked in
+        if _golive_grace(_shift_start_dt(yday.isoformat(), to_min(p.get("work_start")) or 0)):
+            continue   # GO-LIVE GRACE: shift started before we went live → not a no-show
         if no_show_record(p["id"], yday.isoformat()):
             ws, we = to_min(p.get("work_start")), to_min(p.get("work_end"))
             shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
@@ -4868,6 +4899,37 @@ async def cmd_testkhmer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "(Tip: turn it on now, walk every flow once to read the Khmer, then off to test faster.)")
     else:
         await update.message.reply_text("✓ Test Khmer view OFF — back to English-only in /test.")
+
+
+async def cmd_golive(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/golive [confirm] — owner-only THE LIVE BUTTON. Flips attendance_live ON and stamps the go-live
+    moment (attendance_live_at) so any shift already in progress is GRACED — no no-show/late penalty,
+    because staff couldn't have checked in before the system was live. Refuses while test mode is on;
+    two-step (bare /golive = pre-flight, /golive confirm = do it)."""
+    if update.effective_user.id != config.OWNER_TELEGRAM_ID or update.message is None:
+        return
+    if _att_test_mode():
+        await update.message.reply_text(
+            "❌ Test mode is ON — run /testmode off (and /testreset) first, then /golive.")
+        return
+    if _attendance_live():
+        await update.message.reply_text("Already LIVE (attendance_live=ON). Nothing to do.")
+        return
+    if (context.args or [""])[0].lower() != "confirm":
+        await update.message.reply_text(
+            "🚦 GO LIVE — turns attendance ON for ALL real staff.\n"
+            "• Anyone already on shift is GRACED this round (no no-show/late penalty).\n"
+            "• Make sure: /testreset done · staff briefed · Paul removed from the groups.\n\n"
+            "To proceed: /golive confirm\n"
+            "(After: /broadcast to send the greeting · /golivestatus to watch who tries it.)")
+        return
+    now = _now_pp()
+    gm_set_state("attendance_live_at", now.isoformat())   # stamp FIRST so the grace is armed before live
+    gm_set_state("attendance_live", "true")
+    await update.message.reply_text(
+        "✅ LIVE. Real staff are now in the system.\n"
+        "🛡 Grace stamped %s — anyone already on shift is exempt this round.\n"
+        "Next: /broadcast (send the greeting), then /golivestatus." % now.strftime("%a %d/%m %H:%M"))
 
 
 async def cmd_testreset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6710,6 +6772,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("testclock",  cmd_testclock))
     app.add_handler(CommandHandler("testrun",    cmd_testrun))
     app.add_handler(CommandHandler("testkhmer",  cmd_testkhmer))
+    app.add_handler(CommandHandler("golive",     cmd_golive))
     app.add_handler(CommandHandler("testreset",  cmd_testreset))
     app.add_handler(CommandHandler("teststatus", cmd_teststatus))
     app.add_handler(CommandHandler("testseed",   cmd_testseed))
