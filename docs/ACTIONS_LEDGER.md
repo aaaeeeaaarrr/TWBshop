@@ -204,6 +204,20 @@
 
 ## Done (with proof)
 
+- **2026-06-16 — Seth (id21) wiped to ZERO at owner request (PB + late points + late = 0; HIGH-RISK real
+  data, before/after independent proof).** Owner: "his real debt also gone, back to zero PB." UNLIKE Por,
+  Seth was NOT a radius victim — his only ping was 13.2m (inside even old 100m); the 45-min late was a
+  genuine late arrival. His debt #143 was 105m = 60m (owner's morning "1h remaining" correction) + 45m
+  (today's auto late). Flagged both points to owner, who confirmed full wipe (Option A). Reversal: debt #143
+  had a BOOKED payback slot (#52, 60m) which had auto-created an approved shift REDEFINE (#258, 12:00–22:00,
+  normal_len 540). Per-arc catch: deleting the debt while leaving #258 live would have MINTED OT at checkout
+  (the extension would credit a non-existent debt → bank as OT). So: cancelled booking #52 (+unlinked its
+  debt_id FK), cancelled redefine #258, deleted debt #143 (`payback_delete_debt`, 1 row), offset 45 late
+  points with same-cause −45 (ref `owner_jun16_seth_full_wipe`, net 0, audit trail), session #16
+  minutes_late→0. **Proof (separate-process re-read):** open debt id21=None, #143 gone, booking #52=cancelled,
+  redefine #258=cancelled, late_uninformed net qty=0, session #16 minutes_late=0. Reversible if needed
+  (recreate the 60m debt; the 45m + points were the genuine-late portion the owner chose to forgive).
+
 - **2026-06-16 — Por (id16) made whole after the 100m radius bug (owner: "do what's best"; HIGH-RISK real
   points+payback data, before/after independent proof).** Por was on-site (earliest ping 121m @ 12:20 PP)
   but the old 100m zone rejected him until 13:18 PP → system recorded 78 min late, creating payback debt
