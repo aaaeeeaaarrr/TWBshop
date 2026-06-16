@@ -252,6 +252,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
 RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**▶ TEST-SIM LEAK TO LIVE STAFF FIXED (Jun 16, owner caught it on Heng's phone; DEPLOYED `0df7bda` to gm;
+verified HEAD==origin/active, other 4 bots untouched):** the live check-in screen (`checkin_screen`) had a
+hardcoded "▶️ Simulate the check-in messages" button (`att:cis`) — the ONE menu spot that forgot the
+`not p.get("_live")` gate the rest of the menu uses — so a live staffer (Heng) tapped into the owner /test
+check-in SIMULATOR. Fix, two layers: (1) the sim button now renders only in the owner test shell, hidden
+from live staff; (2) the dispatch live-lock (was `pick/pickp/persona`) extended to also block `cis/dr/drs`
+for any live staffer → neutralises stale sim/dry-run buttons ALREADY sitting in a staffer's chat from the
+pre-go-live walk (tapping now just re-opens their own menu). SWEEP (owner: "every corner"): dry-run
+catalogue + persona-switch are only reachable via `cmd_test` (owner-gated) or already gated; `att:cisco`
+already owner+test guarded; check-in screen was the only test surface wired into a live path. +1 regression
+test (`test_checkin_screen_hides_simulator_from_live_staff`), suite **630**.
 **▶ `/att` OWNER COMMAND ADDED (Jun 16, owner, DEPLOYED `1a844b3` to gm; verified HEAD==origin/active,
 other 4 bots untouched):** owner-only, READ-ONLY live attendance snapshot on demand (private DM, zero
 group/staff noise). Buckets: ⏰ past-end-not-checked-out (stuck, sorted worst-first) · ❓ on-shift-never-
