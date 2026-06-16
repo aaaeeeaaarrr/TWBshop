@@ -249,7 +249,31 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 — **HOURS-AL Date+Time everywhere + A2 button relabel + Part-4
+**Last updated:** 2026-06-16 (session 38 cont — **GO-LIVE PREP TOOLING BUILT + DEPLOYED to gm; all INERT;
+`attendance_live` still OFF**). The owner's walk is DONE; built the launch machinery (nothing fires until
+the owner presses the button). **(1) Vetted KH wired** (ChatGPT pass): rules sick line, greeting
+(`ខ្ញុំនៅជួយប្អូនជានិច្ច`), disclaimer (`បាត់បង់ performance points`). **(2) 🔻 points-lost marker** made
+consistent (mirrors ⭐) on the AL short-notice messages + the greeting disclaimer. **(3) GO-LIVE GRACE +
+`/golive` (T8):** `/golive [confirm]` is THE LIVE BUTTON — refuses while test mode on, stamps
+`attendance_live_at` FIRST then flips `attendance_live`. `_golive_grace` (keyed on that stamp) wired into
+the **no-show sweep** (skip) + **late verdict** (force clean on-time, no points/pay-back) so anyone already
+on shift at the flip is NOT punished (they couldn't check in pre-live). Inert (no stamp + live OFF = the
+penalty paths don't run); self-expires after day 1. **(4) `/broadcast` (T9):** owner sends the one-time
+greeting (embedded `_GREETING`, canonical) to all active TWB staff — idempotent (`gm_greeting_sent:<uid>`),
+preview before live / send requires live, and nudges anyone on shift with the vetted `_TRY_IT_NOW`.
+**(5) `/golivestatus` + `_on_shift_now` (T10):** of staff on shift NOW (the ONE resolver, overnight-aware),
+who checked in (tried) vs not. Suite **613 (+2 skip)**, +4 grace/on-shift tests. **Greeting reword:** dropped
+the obsolete 📋 Menu button (never wired). **Consolidated** the 3 scattered go-live lists → ONE
+`docs/GO_LIVE_CHECKLIST.md` (old embedded one marked superseded); Paul admin-removal added as a flip gate.
+**Sweep:** B2B was the only group noise-maker (GM posts only to Supervisors/seniors; analyzer monitors,
+never posts). **TEST-DB safety:** `tests/conftest.py` forces `TWBSHOP_ENV=staging` so the suite can't
+pollute prod again. **GUARD:** owner to apply a 1-line scoped tune (allow `systemctl stop/disable
+twbshop-*`) — Claude can't (guard self-protects). **▶ THE FLIP (all owner cmds, when ready):** `/testmode
+off` → `/testreset` → remove Paul from groups → `/golive confirm` → `/broadcast confirm` → `/golivestatus`.
+**OWNER OPEN:** run the guard 1-liner · silence b2b (paste, or me after guard) · Paul. **PARKED post-live:**
+separate test bot · digest-source decision · Bedrock delta 2 · staging cutover.
+
+**(prev) session 38 — **HOURS-AL Date+Time everywhere + A2 button relabel + Part-4
 verdict; DEPLOYED to gm; `attendance_live` still OFF**). From the owner's 3c re-walk (an hours-AL on a
 swap-work day). **(1) HOURS-AL now states Date+Time in EVERY staffer-facing message.** The gap: the
 approval verdict + the move/swap/refund **reminders** (`_announce_supersessions`) showed a bare date, so a
