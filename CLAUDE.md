@@ -249,8 +249,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 cont — **KH VETTED+WIRED + LATE SICK-INFORMING + GENDER; DEPLOYED
-to gm; all INERT; `attendance_live` still OFF**). **▶ KH VET (Jun 16):** vetted the owner's ChatGPT paste
+**Last updated:** 2026-06-16 (session 38 cont — **PAYBACK PUSH RANKING UPGRADE + KH VETTED+WIRED + LATE
+SICK-INFORMING + GENDER; DEPLOYED to gm; all INERT; `attendance_live` still OFF**). **▶ PAYBACK PUSH
+RANKING (Jun 16, owner):** rebuilt `_payback_slot_keyboard` into ONE unified need-ranked list — working-day
+before/after slots across the next ~6 working days PLUS the staff's NEXT day off, each scored by the REAL
+per-date coverage shortfall (new batched `away_staff_by_dates` counts who's actually on AL/leave/swap-off
+that day), **TOP 8 neediest** shown. **Day-off demoted from a fixed 3 appended rows → ONE candidate that
+appears ONLY on a genuine shortfall (score>0) AND only if it ranks** (working a rest day = last resort, not
+a push). +2 tests, suite **619**. Real render proof: Seth (60m) → 8 working slots, Friday day-off correctly
+hidden (not short). **▶ PAYBACK DATA (Jun 16, owner, real, proven, ledger'd):** "everyone paid back except
+Seth 1h" → cleared PISEY #60 (29m) + Por #61 (120m), created Seth #143 = 60m (he had NO open debt —
+flagged); only open real debt now = Seth #143 (independent fresh-process re-read). **▶ KH VET (Jun 16):** vetted the owner's ChatGPT paste
 against intent (not blind) → wired 6 strings: the 4 late-sick callouts/deferred-reminder, the mandatory-
 reason term `ការប្តូរវេន`→`ការប្តូរកាលវិភាគ` (fires for A1+A2; canonical "Staff Changes" term), and the
 declined-collapse line. Flagged 1 NO-OP (the "Already co-approved…" string is no longer wired — card

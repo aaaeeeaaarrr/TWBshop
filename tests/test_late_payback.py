@@ -84,6 +84,7 @@ def test_slot_keyboard_caps_at_18h(monkeypatch):
     monkeypatch.setattr(bot, "al_leave_days_set", lambda sid: set())
     monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [])
     monkeypatch.setattr(bot, "_sc_taken_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "away_staff_by_dates", lambda *a, **k: {})
     monkeypatch.setattr(bot, "_today_pp", lambda: date(2026, 6, 16))
 
     staff = {"id": 1, "work_start": "07:00", "work_end": "17:00",  # 10h shift
@@ -117,3 +118,50 @@ def test_who_kh_maps_relation_to_bare_khmer():
     assert bot._who_kh("CHILD ") == "កូន"          # case/space-insensitive
     assert bot._who_kh("sibling") == "sibling"      # unknown → unchanged, never crashes
     assert bot._who_kh(None) == "" and bot._who_kh("") == ""
+
+
+def _pb_kb_setup(monkeypatch, day_off="Sun"):
+    """Shared stubs for the payback-push ranking tests: empty leave/taken, a one-person TWB roster,
+    no real absences, a fixed 'today' (Tue 2026-06-16). slot_score is patched per-test."""
+    from gm_bot import bot
+    from datetime import date
+    monkeypatch.setattr(bot, "al_leave_days_set", lambda sid: set())
+    monkeypatch.setattr(bot, "staff_all", lambda *a, **k: [{"id": 1, "org": "TWB",
+                                                            "call_name": "X", "expertise": []}])
+    monkeypatch.setattr(bot, "_sc_taken_dates", lambda sid: set())
+    monkeypatch.setattr(bot, "away_staff_by_dates", lambda *a, **k: {})
+    monkeypatch.setattr(bot, "_today_pp", lambda: date(2026, 6, 16))   # Tuesday
+    return {"id": 1, "work_start": "07:00", "work_end": "17:00", "day_off": day_off,
+            "expertise": ["kitchen"]}
+
+
+def test_payback_push_caps_at_8_slots(monkeypatch):
+    """Owner (Jun 16): the unified need-ranked push shows at most the TOP 8 booking slots
+    (was: up to 6 working + 3 day-off appended). Partials are separate, not counted."""
+    from gm_bot import bot
+    import gm_bot.coverage as coverage
+    staff = _pb_kb_setup(monkeypatch)
+    monkeypatch.setattr(coverage, "slot_score", lambda *a, **k: 1)   # everything equally needed
+    kb = bot._payback_slot_keyboard(staff, 120)
+    book = [b for row in kb.inline_keyboard for b in row if b.callback_data.startswith("att:pb:book:")]
+    assert 0 < len(book) <= 8, "showed %d booking slots, expected 1..8" % len(book)
+
+
+def test_payback_dayoff_shows_only_when_it_ranks(monkeypatch):
+    """Owner (Jun 16): 'work your day off' appears ONLY if its coverage need ranks it into the top 8
+    — never as a fixed appended row. Zero need → hidden; top need → shown."""
+    from gm_bot import bot
+    import gm_bot.coverage as coverage
+    staff = _pb_kb_setup(monkeypatch, day_off="Sun")   # next day off = Sun 2026-06-21
+
+    # day off NOT needed (score 0) while working days are (score 1) → no day-off row survives the top 8
+    monkeypatch.setattr(coverage, "slot_score", lambda e, s, en, wd, *a, **k: 0 if wd == "Sun" else 1)
+    txts = [b.text for row in bot._payback_slot_keyboard(staff, 120).inline_keyboard for b in row
+            if b.callback_data.startswith("att:pb:book:")]
+    assert not any("day off" in t for t in txts), "day off shown despite zero need"
+
+    # day off is the NEEDIEST (score 5) → it ranks and IS shown
+    monkeypatch.setattr(coverage, "slot_score", lambda e, s, en, wd, *a, **k: 5 if wd == "Sun" else 1)
+    txts = [b.text for row in bot._payback_slot_keyboard(staff, 120).inline_keyboard for b in row
+            if b.callback_data.startswith("att:pb:book:")]
+    assert any("day off" in t for t in txts), "neediest day off not shown"

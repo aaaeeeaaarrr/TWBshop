@@ -33,7 +33,7 @@ from shared.database import (
     al_create_request, al_get_request, al_add_approval, al_get_approvals, al_set_status,
     al_approve_and_deduct, al_reject,
     al_pending_requests, al_deduct, points_record, points_seed_catalogue,
-    al_leave_days_set, staff_absent_dates, payback_bookings_due_reminder, payback_mark_reminded,
+    al_leave_days_set, staff_absent_dates, away_staff_by_dates, payback_bookings_due_reminder, payback_mark_reminded,
     dayoff_set_override, dayoff_override_for, swap_create, swap_get, swap_set_partner,
     swap_add_senior_vote, swap_set_status, swap_approve_claim,
     ot_bank_balance, ot_bank_add, ot_buyback_book,
@@ -1484,59 +1484,64 @@ def _who_kh(who: str) -> str:
 
 
 def _payback_slot_keyboard(staff: dict, balance: int):
-    """Build payback slot buttons sized to `balance` = the REMAINING-to-book minutes (callers
-    clamp via _pb_remaining): before/after each of the next working days + day-off option +
-    partial buttons. Working-day slots cap so the day's TOTAL work time never exceeds 15h
-    (owner rule, Jun 11); dates already carrying an approved redefine are skipped (a second
-    redefine would supersede the first). callback att:pb:book:{date}:{start}:{end}:{mins}."""
+    """Build the payback push, sized to `balance` = REMAINING-to-book minutes. ONE unified
+    need-ranked list (owner, Jun 16): before/after slots glued to the staff's own shift across the
+    next few WORKING days, PLUS the staff's NEXT day off — every candidate scored by the real
+    coverage shortfall that day (who's actually on leave/off is counted), then the TOP 8 neediest
+    shown (soonest as the tie-break). The day-off slot appears ONLY if its own need ranks it into the
+    8 (working a rest day is a last resort, never a push — was: a fixed 3 day-off rows always
+    appended). Working-day slots cap so the day's TOTAL never exceeds 18h; dates already carrying an
+    approved redefine or leave are skipped. callback att:pb:book:{date}:{start}:{end}:{mins}."""
     from gm_bot import payback as pb
+    from gm_bot import coverage as cov
     from gm_bot.attendance import to_min
     ws, we = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
     if ws is None or we is None or balance <= 0:
         return None
-    from gm_bot import coverage as cov
-    from gm_bot.attendance import to_min
-    leave = al_leave_days_set(staff["id"])
-    leave_isos = set(leave)
+    leave_isos = set(al_leave_days_set(staff["id"]))
     taken = _sc_taken_dates(staff["id"])
-    days = [d for d in pb.working_days_ahead(staff.get("day_off"), leave_isos,
-                                             _today_pp(), 7, 3) if d.isoformat() not in taken]
     roster = [s for s in staff_all("active") if s.get("org") == "TWB"]
+    name_of = {s["id"]: (s.get("call_name") or s.get("canonical_name") or "").lower() for s in roster}
     expertise = staff.get("expertise") or []
     normal_len = ((we - ws) % 1440) or 1440
-    slot_size = min(balance, pb.day_ext_cap(normal_len))   # 15h-total-day cap (owner rule)
-    # build (score, button) then sort neediest-first (the shop's most-needed times rise to the top)
-    scored = []
-    for d in (days if slot_size > 0 else []):
-        wd = d.strftime("%a")
-        for label, s_min, e_min in pb.slot_windows(ws, we, slot_size):
-            score = cov.slot_score(expertise, s_min, e_min, wd, roster, set(), to_min)
+    slot_size = min(balance, pb.day_ext_cap(normal_len))   # 18h-total-day cap (owner rule)
+    work_days = [d for d in pb.working_days_ahead(staff.get("day_off"), leave_isos,
+                                                  _today_pp(), 10, 6) if d.isoformat() not in taken]
+    next_off = [d for d in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos, _today_pp(), 14)
+                if d.isoformat() not in taken][:1]   # the NEXT day off only (owner: not a 14-day scan)
+    # real per-date away set (AL / special-leave / swap-off) → an honest shortfall, not a blind one
+    away = away_staff_by_dates([d.isoformat() for d in work_days + next_off])
+    def _leave_names(d):
+        return {name_of.get(sid, "") for sid in away.get(d.isoformat(), set())} - {""}
+    # candidates: (score, date, start, end, mins, label) — label 'before'/'after'/'dayoff'
+    cand = []
+    if slot_size > 0:
+        for d in work_days:
+            wd = d.strftime("%a")
+            for label, s_min, e_min in pb.slot_windows(ws, we, slot_size):
+                sc = cov.slot_score(expertise, s_min, e_min, wd, roster, _leave_names(d), to_min)
+                cand.append((sc, d, s_min, e_min, slot_size, label))
+    for do in next_off:                      # neediest window of the single next day off
+        best = None
+        for s_min, e_min in pb.dayoff_windows(ws, we, balance):
+            sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, _leave_names(do), to_min)
+            if best is None or sc > best[0]:
+                best = (sc, s_min, e_min)
+        if best and best[0] > 0:   # the day off appears ONLY on a genuine shortfall — by need, never
+            mins = (best[2] - best[1]) % 1440 or balance   # by recency (owner: "unless it ranks for need")
+            cand.append((best[0], do, best[1], best[2], mins, "dayoff"))
+    # ONE ranking: neediest first, soonest as the tie-break; the day off survives only if it ranks
+    cand.sort(key=lambda c: (-c[0], c[1], c[2]))
+    rows = []
+    for sc, d, s_min, e_min, mins, label in cand[:8]:
+        if label == "dayoff":
+            txt = "🛌 %s %s-%s · day off" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
+        else:
             txt = "%s %s %s-%s%s" % (("🌅" if label == "before" else "🌙"),
                                      d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
-                                     " ⚠" if score >= 2 else "")
-            scored.append((score, [InlineKeyboardButton(
-                txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, slot_size))]))
-    scored.sort(key=lambda t: -t[0])
-    rows = [btn for _score, btn in scored]
-    # + ONE day-off option (owner spec, now wired): the neediest slot WITHIN their regular shift hours
-    # on an upcoming day off (a night-shift person gets a night window, never a 5am call). Natural cap
-    # = a shift-length (dayoff_windows sizes the window to min(balance, shift span)).
-    do_scored = []
-    for do in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos,
-                                    _today_pp(), 14):
-        if do.isoformat() in taken:
-            continue
-        for s_min, e_min in pb.dayoff_windows(ws, we, balance):
-            sc = cov.slot_score(expertise, s_min, e_min, do.strftime("%a"), roster, set(), to_min)
-            do_scored.append((sc, do, s_min, e_min))
-    # owner spec (Jun 11): the TOP-3 neediest day-off windows, all within their own shift hours
-    # ("we choose the best hours for us"); full-shift debt naturally yields the whole shift.
-    do_scored.sort(key=lambda t: -t[0])
-    for _sc, do, s_min, e_min in do_scored[:3]:
-        mins = (e_min - s_min) % 1440 or balance
-        txt = "🛌 %s %s-%s · day off" % (do.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
+                                     " ⚠" if sc >= 2 else "")
         rows.append([InlineKeyboardButton(
-            txt, callback_data="att:pb:book:%s:%d:%d:%d" % (do.isoformat(), s_min, e_min, mins))])
+            txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, mins))])
     # partial options — 1h/2h/3h (owner)
     for part in (60, 120, 180):
         if part < balance:

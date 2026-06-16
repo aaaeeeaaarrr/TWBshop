@@ -4448,6 +4448,49 @@ def staff_absent_dates(staff_id: int, exclude_req_id: int | None = None) -> set:
     return out
 
 
+def away_staff_by_dates(date_isos) -> dict:
+    """{date_iso: set(staff_id)} for staff AWAY (approved AL · special-leave span · swap-'off'
+    override) on each given date. Mode-scoped (_ATT_TEST). Feeds the payback need-ranking so a
+    future day where colleagues are off scores as genuinely shorter-handed. Batched (3 queries
+    total, not per-staff); dates outside the input list are ignored. (Weekly day-offs are NOT here —
+    the coverage engine drops day-off-weekday staff itself.)"""
+    import json as _json
+    from datetime import date as _d, timedelta as _td
+    want = set(date_isos or [])
+    out = {iso: set() for iso in want}
+    if not want:
+        return out
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT staff_id, days FROM al_requests WHERE status='approved' AND is_test=%s",
+                        (_ATT_TEST,))
+            for r in cur.fetchall():
+                try:
+                    for iso in _json.loads(r["days"] or "[]"):
+                        if iso in want:
+                            out[iso].add(r["staff_id"])
+                except Exception:
+                    pass
+            cur.execute("SELECT staff_id, start_date, days FROM special_leaves WHERE is_test=%s",
+                        (_ATT_TEST,))
+            for r in cur.fetchall():
+                try:
+                    sd = _d.fromisoformat(str(r["start_date"]))
+                    for i in range(max(int(r["days"] or 1), 1)):
+                        iso = (sd + _td(days=i)).isoformat()
+                        if iso in want:
+                            out[iso].add(r["staff_id"])
+                except Exception:
+                    pass
+            cur.execute("SELECT staff_id, the_date FROM dayoff_overrides WHERE kind='off' AND is_test=%s",
+                        (_ATT_TEST,))
+            for r in cur.fetchall():
+                iso = str(r["the_date"])
+                if iso in want:
+                    out[iso].add(r["staff_id"])
+    return out
+
+
 def payback_bookings_due_reminder(within_hours: int = 12) -> list[dict]:
     """Booked payback slots starting within `within_hours` not yet 12h-reminded."""
     with _db() as conn:
