@@ -251,7 +251,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 
 **Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
 11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
-RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**). **▶ GO-LIVE HAPPENED (Jun 16 ~11:08 PP):** the
+RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**). **▶▶ NEXT WORK (cross-machine — owner is
+continuing this thread on ANOTHER COMPUTER): the REPORT / EXPENSE / PAYMENT system → READ
+`docs/REPORT_SYSTEM_DESIGN.md` FIRST.** Brainstorm done (design only, nothing built): you're **~70% built
+already** (`ai_client.assess_receipt_photo` · `gm_bot/clarify.py` · `gm_bot/finance.py` recompute ·
+`gm_bot/reconcile.py`); the REAL gaps = a per-receipt **numbered paid/unpaid LEDGER** + **payment→receipt
+matching** (reply-to-receipt = 0 API, or amount+vendor auto-match + ✅) + **unpaid-ABA reminders** +
+**report-generation from minimal input** (staff count cash + POS photo → bot composes). **2 OPEN DECISIONS:**
+(1) separate **"Accountant TWB"** bot NOW vs build-in-GM-then-split (Claude leans separate, since attendance
+is live → finance deploys shouldn't blip live check-in; logic is already pure/modular so the split is cheap;
+GM must hand off its REPORT receipt role); (2) **SambaPOS-as-data** (file/export) vs the **POS photo**
+cross-check. NEXT STEP = draft the ledger schema + Phase-1 Expense-Group intake. **▶ GO-LIVE HAPPENED (Jun 16 ~11:08 PP):** the
 owner ran `/golive confirm` + `/broadcast confirm` (26 greeted) — the system is now LIVE for real staff (NO
 longer inert; earlier notes saying "OFF/INERT" are superseded). `attendance_live_at`=11:08 stamps the
 go-live grace (anyone already on shift at the flip is not penalised). **▶ `/trynow` ADDED (Jun 16):**
