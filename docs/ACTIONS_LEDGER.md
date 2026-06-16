@@ -204,6 +204,19 @@
 
 ## Done (with proof)
 
+- **2026-06-16 — Por (id16) made whole after the 100m radius bug (owner: "do what's best"; HIGH-RISK real
+  points+payback data, before/after independent proof).** Por was on-site (earliest ping 121m @ 12:20 PP)
+  but the old 100m zone rejected him until 13:18 PP → system recorded 78 min late, creating payback debt
+  **#146** (78m) + late points event #52 (`late_uninformed` qty 78) + session #18 `minutes_late=78`.
+  Full reversal: (1) deleted debt #146 (`payback_delete_debt`, was open/0-paid/no bookings → 1 row removed);
+  (2) offset the late points with a same-cause `late_uninformed` qty **−78** (ref
+  `radius_bug_jun16_por_onsite_121m`) so net late_uninformed = 0, audit trail kept; (3) session #18
+  `minutes_late`→0. **Proof (separate-process re-read):** open debt id16 = None, net late qty = 0, session
+  #18 minutes_late=0, debt #146 row gone. NOTE: first session-UPDATE didn't commit (used `_db().__enter__()`
+  w/o exit) — caught by the independent re-read, redone inside a proper `with _db()` and re-verified. Por
+  was the ONLY staffer caught in the 100–150m band (everyone else ≤76m or genuinely off-site @1.2km), so no
+  other reversals needed. Root cause fixed structurally by the 100m→150m widening (`fc3fedc`, deployed gm).
+
 - **2026-06-16 — payback reality update (owner: "everyone paid back except Seth, 1h remaining"; HIGH-RISK
   real data, before/after independent proof).** BEFORE (fresh-process read): 2 real open debts — PISEY #60
   (29m) + Por #61 (120m), no bookings; **Seth (id21) had NO open debt** (his old 300m was deleted in the
