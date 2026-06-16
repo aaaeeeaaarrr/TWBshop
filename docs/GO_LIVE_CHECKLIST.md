@@ -45,7 +45,9 @@ test-mode isolation (`is_test`) · KH batch wired + vetted.
 4. `/audit` on the test rows reads ✅ clean (done — re-run anytime for assurance).
 5. `/testreset` → `/teststatus` shows zero test rows.
 6. Confirm **every active staffer has pressed Start** (last count 33/33 — re-confirm).
-7. Brief staff on what's changing.
+7. **🔴 Remove ex-partner (Paul) admin from ALL Telegram groups** (owner, in-app) — before the GM bot is
+   prominent in groups. Claude can't touch group admins; **remind the owner at the flip.**
+8. Brief staff on what's changing.
 
 ## 🚦 THE FLIP
 8. Set `attendance_live='true'`. **Verify** independently (running code live, a real staffer routes to
