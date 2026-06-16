@@ -257,7 +257,13 @@ longer inert; earlier notes saying "OFF/INERT" are superseded). `attendance_live
 go-live grace (anyone already on shift at the flip is not penalised). **▶ `/trynow` ADDED (Jun 16):**
 owner-only — nudge on-shift staff who haven't checked in to try the live-location check-in (the one-shot
 `/broadcast` try-it-now skips already-greeted staff, so it can't re-nudge); preview then `/trynow confirm`;
-requires live; +3 tests. **▶ PAYBACK PUSH
+requires live; +3 tests. **▶ ADOPTION (Jun 16, first live shift):** diagnosed "staff say checked in but
+/golivestatus=0/9" — root cause was staff not completing the LIVE-location share (📎→Location→Share Live
+Location); the bot logs a `location_pings` row for ANY share, and the 9 had zero → nothing reached it (NOT a
+bug; check-in records correctly when an in-zone live share arrives, verified via `_handle_staff_location`).
+Shop zone = lat 11.5387774 / lng 104.9147998 / 100m (one far ping was Heng off-site, 1.2km — coords NOT
+disproven). Owner confirmed staff then figured out the steps. From tomorrow everyone gets the auto check-in
+prompt at shift start; the manual `/trynow` covers anyone already mid-shift. **▶ PAYBACK PUSH
 RANKING (Jun 16, owner):** rebuilt `_payback_slot_keyboard` into ONE unified need-ranked list — working-day
 before/after slots across the next ~6 working days PLUS the staff's NEXT day off, each scored by the REAL
 per-date coverage shortfall (new batched `away_staff_by_dates` counts who's actually on AL/leave/swap-off
