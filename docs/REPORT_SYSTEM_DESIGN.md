@@ -170,8 +170,81 @@ vendor-rule + few-shot **learning shrinks clarifications over time.** Net: the n
    OPEN SUB-CHECK before relying on it: confirm the shop PC can run a Python agent + reach the internet
    outbound (almost certainly yes), and map the exact `WineBakery` tables/columns for daily totals.
 
+---
+
+## C. DEEP DESIGN PASS (owner asked for "A→Z, deeper", 2026-06-16, max-effort brainstorm)
+
+### C1. PAID-SIGNAL = pay into the SUPPLIER GROUP (owner's idea — ADOPT as PRIMARY)
+Better than reply-to-receipt: it removes vendor-ID entirely. **The group IS the vendor** (group_id→vendor
+map) → a payment slip in the "Atlas" group means vendor=Atlas with zero reading; only the AMOUNT must be
+matched (subset-sum) to unpaid Atlas receipts. Receipt+payment co-locate if staff also snap receipts in
+the supplier group. Matches what the owner already does (sends suppliers the ABA slip as proof) → no new
+habit. **Guardrails:**
+- **Bot is SILENT in supplier groups** (external-facing; suppliers are in them). It READS there, never
+  posts. ALL confirms/flags go to a PRIVATE OWNER channel.
+- **Confirm, never infer** (project rule): match → private "Atlas $138.60 → marks #14 paid ✅/✏️", one tap.
+- Exact match easy; lump weekly payment = subset-sum over unpaid rows, flips the set; no subset matches →
+  stays **"pending match"**, never silently paid, asks which.
+- **Leak-detector:** payment into a group with NO unpaid receipt → "paid Atlas $X but nothing logged —
+  missed a receipt?" (free control catching missing paperwork).
+- Idempotent (slip seen twice = one flip, flip-status-first — attendance lesson).
+- Fallbacks: payroll/rent/one-offs have no supplier group → private owner channel / "misc expense" group.
+
+### C2. REFRAME — build the BOOKS, not just "the report"
+The daily report is the tip. Real goal = the bot quietly becomes the accounting so the report + month-end
+fall out free. Three always-current ledgers (all half-existing): **Accounts Payable** (what we owe each
+supplier, per numbered receipt, paid/unpaid, aging) · **Cash book** (drawer: float + cash sales − cash
+expenses − cash banked, reconciled to a physical count) · **Sales journal** (SambaPOS digital, truth
+anchor). Then "report" = a render, and month-end = an export, not a reconstruction.
+
+### C3. A→Z (stages + cross-cutting)
+- **A. Ledger spine:** numbered row `#14`, state machine `captured→confirmed→(cash:paid | ABA:unpaid→
+  matched:paid)` + `disputed/void`; each row tags **payment SOURCE** (cash drawer / which ABA acct) +
+  **category** (drives cash recon AND expense reports).
+- **B. Vendor master:** group_id→vendor, default category, their ABA acct, typical-amount range, terms,
+  KH/EN aliases. Drives the group-signal + anomaly checks.
+- **C. Capture effortless:** 1 Haiku/photo (`assess_receipt_photo`). In a supplier group vendor known →
+  needs only **amount+date** (handwritten-KH gets easy). Block only on missing AMOUNT, rest `?`. Add
+  **voice-note expenses** ("paid 20,000៛ for ice") for receiptless market/cash buys (1 transcription).
+- **D. Recurring/expected:** rent/utilities/salary/standing orders pre-seeded as scheduled entries +
+  reminded when due-and-unlogged (report covers the predictable, not just what got photographed).
+- **E. Payment:** C1 supplier-group primary; reply-to-receipt/explicit "#14" secondary; cash auto-paid
+  at capture (reduces drawer).
+- **F. Reconciliation/controls (pure Python):** close-of-day invariant (every receipt cash-paid or
+  ABA-matched; pending flagged) · cash recon (counted vs expected) · POS cross-check (SambaPOS total ==
+  report sales) · anomaly flags (over-norm expense, new vendor, unreconciling round cash, dup
+  receipt/payment).
+- **G. Daily report generated:** human inputs shrink to **count cash** (+ optional sales, else from POS);
+  bot pulls ledger expenses + float carry → `recompute()` → cross-check vs POS → compose standard report
+  → flag → one-tap confirm. Every number traces to a source.
+- **H. Period/insights:** AP aging (→reminders) · expense by category/vendor weekly/monthly · **supplier
+  PRICE tracking** from receipts (free, ties to run_fetch_pricelists; "Atlas +8% this month") · cash-flow
+  + gross-margin-lite (COGS vs sales) + payroll tie-in for P&L sketch · export to Google Sheet/CSV for the
+  human accountant (Postgres stays source of truth).
+- **I. Efficiency:** ~1 Haiku/photo; matching/aging/report/reminders/dedup/price/anomaly = pure Python;
+  group-signal removes vendor-read, SambaPOS-digital removes POS-photo read; vendor-rules+few-shot shrink
+  clarifications. Near-zero added API.
+- **J. Channels (critical):** supplier groups = read-only/silent · internal expense group = staff capture
+  + 1-tap corrections · private owner channel = all confirms/flags/report/month-end.
+- **K. Failure modes:** payment-before-receipt · multiple ABA accts (store destination/payment) ·
+  Riel/USD mismatch · lump/partial payments (track remainder) · blur/dup photos · new/unmapped supplier ·
+  06:00→06:00 cutoff reuse · restart-safety (long-poll queue) · least-privilege SambaPOS agent · CAS/
+  flip-first idempotency.
+
+### C4. HIGHEST-LEVERAGE "make it easier" wins (least obvious)
+1) pay-into-group (owner) · 2) voice-note cash expenses · 3) recurring-expense calendar · 4) payment-
+without-receipt leak-detector · 5) supplier price alerts · 6) month-end becomes a non-event ·
+7) FUTURE (pending Bakong): bot GENERATES the KHQR to PAY the supplier → knows AND executes payment.
+
+### C5. SCOPE HONESTY — MVP vs dream
+MVP (≈80% of the relief) = the SPINE: ledger + supplier-group paid-signal + daily report (SambaPOS sales
++ counted cash + ledger expenses + float). Aging, price tracking, exports, KHQR-pay, voice-notes are
+valuable LATERS, not v1. Build the spine, prove on a week of real receipts, then layer.
+
 ## ▶ NEXT STEP (when work resumes)
-Draft the **receipt-ledger schema** + the **Phase-1 Expense-Group intake** as a concrete build plan
-(reuses `assess_receipt_photo` + `clarify.py`; cash auto-paid; numbered rows = the spine). In parallel,
-the SambaPOS sub-check: identify the `WineBakery` tables/columns for a day's cash/ABA/grand-total and
-sketch the shop-PC push agent. Owner found this "very interesting" and wants to work on it next.
+Draft the **receipt-ledger schema** + the **vendor master / supplier-group map** + the **Phase-1
+Expense-Group intake** as a concrete build plan (reuses `assess_receipt_photo` + `clarify.py`; cash
+auto-paid; numbered rows = the spine; supplier-group paid-signal = Phase 2). In parallel, the SambaPOS
+sub-check: map `WineBakery` tables/columns for a day's cash/ABA/grand-total + sketch the shop-PC push
+agent. **OWNER INPUTS NEEDED (see chat):** (a) do per-supplier Telegram groups already exist / which
+suppliers; (b) how payments are actually made today (ABA app per-supplier? lump weekly? cash?).
