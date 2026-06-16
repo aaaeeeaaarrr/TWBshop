@@ -1135,12 +1135,12 @@ def _late_sick_callout(mins: int | None) -> str:
     if mins < 0:
         return ("⏰ Your shift has already started — that's very late to let us know. Please tell us as "
                 "soon as you feel unwell next time 🤍\n"
-                "⏰ វេនរបស់ប្អូនបានចាប់ផ្តើមហើយ — យឺតពេលណាស់ក្នុងការប្រាប់។ សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ "
-                "នៅពេលប្អូនមិនស្រួលខ្លួន 🤍\n\n")
+                "⏰ វេនរបស់ប្អូនបានចាប់ផ្តើមហើយ — ប្រាប់ពេលនេះយឺតណាស់។ លើកក្រោយ ពេលប្អូនចាប់ផ្តើមមិនស្រួលខ្លួន "
+                "សូមប្រាប់យើងឱ្យបានឆាប់បំផុត 🤍\n\n")
     return ("⏰ Only %d minutes before your shift starts — that's very late to let us know. You usually "
             "know you're unwell before this; please tell us as soon as you can next time 🤍\n"
-            "⏰ នៅសល់តែ %d នាទីប៉ុណ្ណោះមុនវេនរបស់ប្អូន — យឺតពេលណាស់ក្នុងការប្រាប់។ ជាធម្មតាប្អូនដឹងថាមិនស្រួលខ្លួន"
-            "មុនពេលនេះ; សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ 🤍\n\n" % (mins, mins))
+            "⏰ នៅសល់តែ %d នាទីប៉ុណ្ណោះមុនវេនរបស់ប្អូនចាប់ផ្តើម — ប្រាប់ពេលនេះយឺតណាស់។ ជាធម្មតា ប្អូនដឹងថាមិនស្រួលខ្លួន"
+            "មុនពេលនេះ; លើកក្រោយ សូមប្រាប់យើងឱ្យបានឆាប់បំផុត 🤍\n\n" % (mins, mins))
 
 
 def _late_famsick_note(mins: int | None) -> str:
@@ -1149,8 +1149,8 @@ def _late_famsick_note(mins: int | None) -> str:
         return ""
     return ("⏰ Thanks for telling us 🤍 Just a note — that's quite late. We know family things can be "
             "sudden, but the earlier you let us know, the easier for us to cover.\n"
-            "⏰ អរគុណដែលប្រាប់ 🤍 កត់សម្គាល់តិច — យឺតបន្តិចហើយ។ យើងដឹងថារឿងគ្រួសារអាចកើតភ្លាមៗ "
-            "ប៉ុន្តែបើប្រាប់បានឆាប់ យើងកាន់តែងាយរៀបចំជំនួស។\n\n")
+            "⏰ អរគុណដែលប្រាប់យើង 🤍 សូមកត់សម្គាល់បន្តិច — ពេលនេះយឺតបន្តិចហើយ។ យើងដឹងថារឿងគ្រួសារអាចកើតឡើងភ្លាមៗ "
+            "ប៉ុន្តែបើប្អូនប្រាប់បានកាន់តែឆាប់ យើងកាន់តែងាយរៀបចំអ្នកជំនួស។\n\n")
 
 
 def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:

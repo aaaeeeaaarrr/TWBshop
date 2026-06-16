@@ -1740,8 +1740,8 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
                 await msg.reply_text(
                     "Quick note 🤍 last time you let us know you were sick very late — that's "
                     "−15 Late Informing 🔻. Earlier next time keeps your points safe.\n"
-                    "កត់សម្គាល់តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះ −15 Late Informing 🔻។ "
-                    "សូមប្រាប់ឱ្យបានឆាប់ពេលក្រោយ ដើម្បីរក្សា points។")
+                    "កត់សម្គាល់បន្តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះគឺ −15 Late Informing 🔻។ "
+                    "លើកក្រោយ ប្រាប់ឱ្យបានឆាប់ជាងនេះ ដើម្បីរក្សា points របស់ប្អូន។")
     return True
 
 
@@ -2166,7 +2166,7 @@ async def _sc_coapprove_callback(update: Update, context: ContextTypes.DEFAULT_T
         # re-render ALL seniors' cards (incl. the one tapped) → buttons gone, the 👁 toggle stays
         await _refresh_senior_cards(context, cid,
             status_line="❌ Stopped — a senior declined this change · "
-                        "បានបញ្ឈប់ — បងម្នាក់ទៀតមិនបានយល់ព្រម")
+                        "បានបញ្ឈប់ហើយ — បងម្នាក់ទៀតមិនបានយល់ព្រមលើការប្តូរនេះទេ")
         if proposer:   # tell the proposing senior their change was stopped before the staffer
             await _att_send(context, (proposer.get("telegram_ids") or [None])[0], "Senior",
                 proposer.get("call_name") or proposer["canonical_name"],
@@ -5989,7 +5989,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             from shared.database import flow_save
             flow_save(uid, "att_pending", "reason", pend, ttl_min=30)   # live: re-arm (restart-safe)
         nag = ("📝 A reason is required for a schedule change — please type the reason.\n"
-               "📝 ត្រូវការមូលហេតុសម្រាប់ការប្តូរវេន — សូមសរសេរមូលហេតុ។")
+               "📝 ត្រូវមានមូលហេតុសម្រាប់ការប្តូរកាលវិភាគ — សូមវាយមូលហេតុ។")
         if update.message is not None:
             await update.message.reply_text(nag)
         else:

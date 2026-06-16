@@ -26,20 +26,22 @@ test-mode isolation (`is_test`) · KH batch wired + vetted.
 - `resolve_day` **collision matrix** (one coherent decision per day, no double-work).
 - `/audit` **clean** on test + real rows (only a historical dead-tap that clears on `/testreset`).
 - Tests now run on **staging** (conftest) — the suite can no longer pollute prod.
+- **Late sick-informing** (−15 own / soft-note family / come-in grace) + **gender** column (26/26 matched)
+  built, tested (suite 617), deployed inert; all KH vetted (ChatGPT) + wired.
+- **Go-live tooling** built: `/golive` (stamps + flips, with grace for staff already on shift), `/broadcast`
+  (one-time greeting + "try it now"), `/golivestatus` (who tried check-in).
 
 ---
 
 ## ⏳ REMAINING BEFORE THE FLIP
 
-### A. Content (decide wording, then wire)
-1. **GM greeting** (`docs/gm_greeting_FINAL.txt`) — send-ready text, **NOT wired/sent yet.**
-   - ✏️ **Reword:** drop the obsolete "📋 Menu button" line (no persistent keyboard exists — staff open
-     the menu by messaging the bot). New line: *"Message me anytime — even 'hi' — and I'll open your menu."*
-   - 🔧 **Wire:** one-time DM to every active staffer at flip time.
-2. **Rules screen** — optional add (owner deciding): the **doctor's-papers → no pay-back** line.
-   Leave the +15 part-duty OUT (owner-discretionary, "no pressure").
-3. **Khmer** for any new/changed strings (greeting reword + rules line) → `KH_REVIEW.md` → ChatGPT pass
-   before they reach staff.
+### A. Content — ✅ DONE (built + vetted, all behind the flip)
+1. **GM greeting** — reworded (dropped the obsolete 📋 Menu line) + the "tell us early or lose points 🔻"
+   disclaimer; canonical text embedded as `_GREETING`; sent by **`/broadcast`** at flip (idempotent) with a
+   "try it now" nudge to staff on shift. KH vetted (ChatGPT).
+2. **Rules screen** — the **doctor's-papers → no pay-back** line is **wired** (KH vetted). +15 part-duty left OUT.
+3. **Khmer** — greeting / rules / broadcast vetted+wired; **late sick-informing** callouts + deferred −15
+   reminder + mandatory-reason term vetted+wired (Jun 16). No content blockers remain.
 
 ### B. The launch gate
 4. `/audit` on the test rows reads ✅ clean (done — re-run anytime for assurance).
@@ -49,10 +51,15 @@ test-mode isolation (`is_test`) · KH batch wired + vetted.
    prominent in groups. Claude can't touch group admins; **remind the owner at the flip.**
 8. Brief staff on what's changing.
 
-## 🚦 THE FLIP
-8. Set `attendance_live='true'`. **Verify** independently (running code live, a real staffer routes to
-   themselves not the owner, a test tap no longer hijacks).
-9. **Live-location requirement stays OFF** until the owner has explained it to staff (staged go-live).
+## 🚦 THE FLIP — owner runbook (owner commands, in order)
+1. `/testmode off` → `/testreset` → `/teststatus` shows zero test rows.
+2. **Remove ex-partner (Paul) admin from every group** (in-app; Claude can't).
+3. `/golive confirm` — stamps `attendance_live_at`, then flips `attendance_live='true'`. The grace exempts
+   anyone already on shift at the flip (they couldn't check in pre-live).
+4. `/broadcast confirm` — one-time greeting DM to all active staff + "try it now" to those on shift.
+5. `/golivestatus` — of staff on shift now, who tried check-in vs not. **Verify** a real staffer routes to
+   themselves (not the owner) and a test tap no longer hijacks.
+6. **Live-location requirement stays OFF** until the owner has explained it to staff (staged go-live).
 
 ---
 

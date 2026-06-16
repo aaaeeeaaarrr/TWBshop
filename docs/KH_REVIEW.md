@@ -376,7 +376,7 @@ Reason · មូលហេតុ៖ {reason}
   `⚠️ One important thing: if you'll be late, you're sick, or anything comes up — please tell us as EARLY as you can. Telling us early keeps your points safe; telling us late, or not at all, loses performance points 🔻`
   · `⚠️ រឿងសំខាន់មួយ៖ បើប្អូននឹងមកយឺត ឈឺ ឬមានរឿងអ្វីមួយ — សូមប្រាប់យើងឱ្យបានឆាប់បំផុត។ ប្រាប់ឆាប់ = រក្សា Points; ប្រាប់យឺត ឬមិនប្រាប់ = ដក Points ការងារ 🔻`
 
-### Late sick-informing (Jun 16) — KH draft (callout · family note · deferred −15 reminder)
+### Late sick-informing (Jun 16) — ✅ VETTED + WIRED (final KH in the "## Late sick-informing — Jun 16" record below)
 - **WHO:** the staffer. **WHEN:** the own-sick screen / family-sick screen / their NEXT check-in.
   **TONE:** firm-but-kind nudge (no preaching). My KH is draft.
 - Own-sick callout, **< 30 min** before shift: `⏰ Only {X} minutes before your shift starts — that's very late to let us know. You usually know you're unwell before this; please tell us as soon as you can next time 🤍`
@@ -784,3 +784,58 @@ Vetted ChatGPT's batch against the live code + intent (not blind):
   (English) — a bilingual version would overflow phone width.
 - ChatGPT left "coverage" English in a WF5 header; my live code never had it (KH says "ខុសគ្នាមិនលើស 6 ថ្ងៃ")
   so nothing to change.
+
+I reviewed the latest file. The only truly fresh KH-draft section needing a pass is **Walk findings** + **Late sick-informing**. I’m not reopening the already-vetted go-live/A1/A2/MM/SM blocks. 
+
+## Walk findings — co-approve collapse · mandatory reason
+
+> ✅ VETTED + WIRED Jun 16, EXCEPT #1. #2 declined-line wired (bot.py:2169) + #3 mandatory-reason nag
+> wired (bot.py:5992) — the nag's terminology `ការប្តូរវេន` → **`ការប្តូរកាលវិភាគ`** (the guard fires for
+> BOTH A1 change-time AND A2 change-day-off; កាលវិភាគ is the canonical "Staff Changes" term).
+> **#1 "Already co-approved…" is a NO-OP** — that exact string is no longer wired (the sibling-collapse
+> was rebuilt in s37; the card now re-renders to "⏳ awaiting {staff}"). Left as a record only.
+
+### 1. Another senior already co-approved
+
+✅ Already co-approved by another senior — sent to {nm}
+✅ បងម្នាក់ទៀតបានយល់ព្រមរួចហើយ — បានផ្ញើទៅ {nm}
+
+### 2. Another senior declined
+
+❌ Stopped — another senior declined this change
+❌ បានបញ្ឈប់ហើយ — បងម្នាក់ទៀតមិនបានយល់ព្រមលើការប្តូរនេះទេ
+
+### 3. Mandatory reason nag
+
+📝 A reason is required for a schedule change — please type the reason.
+📝 ត្រូវមានមូលហេតុសម្រាប់ការប្តូរកាលវិភាគ — សូមវាយមូលហេតុ។
+
+## Late sick-informing — Jun 16
+
+> ✅ VETTED (Claude, against intent + the canonical glossary) + WIRED Jun 16 — all 4 ACCEPTED; these
+> are the LIVE strings now (gm_bot/attendance_ui.py `_late_sick_callout`/`_late_famsick_note` +
+> gm_bot/bot.py deferred reminder). Why accepted: `ប្រាប់ពេលនេះយឺតណាស់` (cleaner than the draft's
+> `យឺតពេលណាស់ក្នុងការប្រាប់`), `…ចាប់ផ្តើម` ("starts"), the `កាន់តែ…កាន់តែ` correlative in the family
+> note, and `ឆាប់ជាងនេះ` / `points របស់ប្អូន` in the reminder. "Late Informing" kept English + 🔻 (owner rule).
+
+### 1. Own-sick callout — less than 30 min before shift
+
+⏰ Only {X} minutes before your shift starts — that's very late to let us know. You usually know you're unwell before this; please tell us as soon as you can next time 🤍
+⏰ នៅសល់តែ {X} នាទីប៉ុណ្ណោះមុនវេនរបស់ប្អូនចាប់ផ្តើម — ប្រាប់ពេលនេះយឺតណាស់។ ជាធម្មតា ប្អូនដឹងថាមិនស្រួលខ្លួនមុនពេលនេះ; លើកក្រោយ សូមប្រាប់យើងឱ្យបានឆាប់បំផុត 🤍
+
+### 2. Own-sick callout — shift already started
+
+⏰ Your shift has already started — that's very late to let us know. Please tell us as soon as you feel unwell next time 🤍
+⏰ វេនរបស់ប្អូនបានចាប់ផ្តើមហើយ — ប្រាប់ពេលនេះយឺតណាស់។ លើកក្រោយ ពេលប្អូនចាប់ផ្តើមមិនស្រួលខ្លួន សូមប្រាប់យើងឱ្យបានឆាប់បំផុត 🤍
+
+### 3. Family-sick soft note — less than 10 min
+
+⏰ Thanks for telling us 🤍 Just a note — that's quite late. We know family things can be sudden, but the earlier you let us know, the easier for us to cover.
+⏰ អរគុណដែលប្រាប់យើង 🤍 សូមកត់សម្គាល់បន្តិច — ពេលនេះយឺតបន្តិចហើយ។ យើងដឹងថារឿងគ្រួសារអាចកើតឡើងភ្លាមៗ ប៉ុន្តែបើប្អូនប្រាប់បានកាន់តែឆាប់ យើងកាន់តែងាយរៀបចំអ្នកជំនួស។
+
+### 4. Deferred −15 reminder — next check-in
+
+Quick note 🤍 last time you let us know you were sick very late — that's −15 Late Informing 🔻. Earlier next time keeps your points safe.
+កត់សម្គាល់បន្តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះគឺ −15 Late Informing 🔻។ លើកក្រោយ ប្រាប់ឱ្យបានឆាប់ជាងនេះ ដើម្បីរក្សា points របស់ប្អូន។
+
+Key terminology fix: use **ការប្តូរកាលវិភាគ**, not **ការប្តូរវេន**, for the mandatory-reason line, because this applies to both **Change time +OT** and **Change day off**.

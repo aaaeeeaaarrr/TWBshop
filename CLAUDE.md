@@ -249,8 +249,14 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 cont — **LATE SICK-INFORMING + GENDER BUILT + DEPLOYED to gm; all
-INERT; `attendance_live` still OFF**). Locked over a long design chat → `docs/SICK_LATE_INFORM.md`.
+**Last updated:** 2026-06-16 (session 38 cont — **KH VETTED+WIRED + LATE SICK-INFORMING + GENDER; DEPLOYED
+to gm; all INERT; `attendance_live` still OFF**). **▶ KH VET (Jun 16):** vetted the owner's ChatGPT paste
+against intent (not blind) → wired 6 strings: the 4 late-sick callouts/deferred-reminder, the mandatory-
+reason term `ការប្តូរវេន`→`ការប្តូរកាលវិភាគ` (fires for A1+A2; canonical "Staff Changes" term), and the
+declined-collapse line. Flagged 1 NO-OP (the "Already co-approved…" string is no longer wired — card
+re-renders to "⏳ awaiting {staff}"). Suite **617**, gm-deployed. **GO_LIVE_CHECKLIST reconciled** — its
+"Content" remaining items (greeting reword · rules sick line · KH) are all DONE; only owner flip-actions
+remain. Earlier this session the late-sick build was locked → `docs/SICK_LATE_INFORM.md`.
 **Own-sick told within 30 min of shift start (or after) = −15 "Late Informing" 🔻** (new points cause,
 seeded ACTIVE=−15, verified live; recorded SILENTLY at the "really can't come" filing, idempotent/day,
 **papers do NOT wipe it**); taught GENTLY at their NEXT check-in (deferred `late_inform_notice:<uid>`
