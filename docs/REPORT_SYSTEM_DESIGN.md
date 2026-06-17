@@ -276,3 +276,125 @@ not a nice-to-have (it powers the payable run).
 Draft the **receipt-ledger schema** + **vendor master / group map** as the concrete P0 build (still
 design until owner says build). SambaPOS sub-check in parallel: map `WineBakery` tables/columns for a
 day's cash/ABA/grand-total + sketch the least-privilege shop-PC push agent.
+
+---
+
+## D. P0 SCHEMA DRAFT (2026-06-17 — DESIGN, not migrated; review before build)
+
+> Proposed DDL for a new `init_accounting_db()` in `shared/database.py`, following the project's existing
+> conventions (SERIAL PK · status TEXT with an inline enum comment · TIMESTAMPTZ DEFAULT NOW() · `is_test`
+> flag · `IF NOT EXISTS` + additive `ALTER … ADD COLUMN IF NOT EXISTS`). Money is stored as **integer
+> cents in USD** (`amount_cents`) — one canonical unit, no float drift; Riel is converted at the fixed
+> **4000៛=$1** the books already use, with the *original* currency/amount kept for the audit trail.
+> Three tables map to the three ledgers in §C2: **vendors** (master) → **receipts** (Accounts Payable
+> spine) → **payments** + **payment_allocations** (the lump→receipt matcher, §C6).
+
+### D1. `vendors` — the master / group map (§B-vendor, C3-B)
+```sql
+CREATE TABLE IF NOT EXISTS acc_vendors (
+    id            SERIAL PRIMARY KEY,
+    name          TEXT NOT NULL,            -- canonical display name ("Atlas")
+    tg_group_id   BIGINT UNIQUE,            -- the supplier Telegram group → THE paid-signal (C1); NULL = no group
+    aliases       TEXT DEFAULT '[]',        -- JSON list, KH/EN spellings for matching
+    category      TEXT,                     -- default expense category (drives cash-recon + reports)
+    aba_account   TEXT,                     -- their usual ABA destination (anomaly check)
+    typical_min_cents INTEGER,              -- typical-amount band low  (anomaly / new-vendor flags)
+    typical_max_cents INTEGER,              -- typical-amount band high
+    terms_days    INTEGER,                  -- payment terms (powers AP aging / payable run)
+    active        BOOLEAN DEFAULT TRUE,
+    created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_acc_vendors_group ON acc_vendors (tg_group_id);
+```
+P0 populate: `/vendor link <name>` run *inside* each supplier group (captures `tg_group_id` from the
+chat) — owner-only, mirrors the existing `/joined` / link-style admin commands.
+
+### D2. `acc_receipts` — the spine (numbered AP rows, §B1, C3-A)
+```sql
+CREATE TABLE IF NOT EXISTS acc_receipts (
+    id            SERIAL PRIMARY KEY,       -- THIS is the human-facing "#14" (one shared ID space)
+    vendor_id     INTEGER REFERENCES acc_vendors(id),
+    biz_date      DATE,                     -- business day (06:00→06:00 PP cutoff, reuse finance.py)
+    amount_cents  INTEGER,                  -- canonical USD cents; NULL until a total is read/typed
+    orig_currency TEXT DEFAULT 'USD',       -- 'USD' | 'KHR' (audit trail)
+    orig_amount   NUMERIC,                  -- as-written amount in orig_currency
+    pay_method    TEXT,                     -- 'cash' | 'aba'  (cash → auto-paid at capture)
+    category      TEXT,                     -- defaults from vendor, correctable
+    items_text    TEXT,                     -- best-effort line items (never blocks)
+    is_handwritten BOOLEAN DEFAULT FALSE,
+    status        TEXT DEFAULT 'captured',  -- captured|confirmed|paid|disputed|void
+                                            -- ABA path: confirmed→(matched)→paid ; cash: →paid at capture
+    photo_file_id TEXT,                     -- Telegram file_id of the receipt image
+    photo_sha     TEXT,                     -- dedup key (same photo twice = one row, C3 idempotency)
+    tg_chat_id    BIGINT,                   -- where it was captured (supplier group vs expense group)
+    tg_msg_id     BIGINT,                   -- for reply-to-receipt secondary paid-signal (B3-a)
+    captured_by   BIGINT,                   -- Telegram user id (audit trail, who logged it)
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    is_test       BOOLEAN DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_acc_receipts_vendor_status ON acc_receipts (vendor_id, status);
+CREATE INDEX IF NOT EXISTS idx_acc_receipts_bizdate ON acc_receipts (biz_date);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_receipts_sha ON acc_receipts (photo_sha) WHERE photo_sha IS NOT NULL;
+```
+Notes: `photo_sha` UNIQUE (partial, NULLs allowed) gives dedup at the DB layer (flip-status-first lesson).
+`amount_cents` NULL is the ONLY thing that blocks a row from being payable (B4); vendor/items are
+best-effort. State machine matches §C3-A.
+
+### D3. `acc_payments` + `acc_payment_allocations` — the lump matcher (§C6)
+A lump ABA transfer clears several receipts → a payment is **1 row**, its split across receipts is
+**N allocation rows** (subset-sum / FIFO writes these). This keeps a payment auditable as one real-world
+event while flipping many `#`s paid.
+```sql
+CREATE TABLE IF NOT EXISTS acc_payments (
+    id            SERIAL PRIMARY KEY,
+    vendor_id     INTEGER REFERENCES acc_vendors(id),  -- from the group it landed in (C1, zero-read)
+    amount_cents  INTEGER,                  -- total transfer amount (canonical USD cents)
+    orig_currency TEXT DEFAULT 'USD',
+    orig_amount   NUMERIC,
+    paid_at       TIMESTAMPTZ,              -- slip timestamp
+    aba_account   TEXT,                     -- destination read off the slip
+    slip_file_id  TEXT,                     -- Telegram file_id of the payment slip
+    slip_sha      TEXT,                     -- dedup (same slip twice = one flip, C3)
+    tg_chat_id    BIGINT,
+    tg_msg_id     BIGINT,
+    status        TEXT DEFAULT 'pending',   -- pending|confirmed|unmatched  (never silently 'paid' anything)
+    confirmed_by  BIGINT,                   -- owner who tapped ✅ (the confirm gate, B3)
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    is_test       BOOLEAN DEFAULT FALSE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_payments_sha ON acc_payments (slip_sha) WHERE slip_sha IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS acc_payment_allocations (
+    id            SERIAL PRIMARY KEY,
+    payment_id    INTEGER REFERENCES acc_payments(id),
+    receipt_id    INTEGER REFERENCES acc_receipts(id),
+    amount_cents  INTEGER,                  -- how much of the payment applied to this receipt
+                                            -- (= receipt total normally; partial allowed, C6 remainder)
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (payment_id, receipt_id)
+);
+CREATE INDEX IF NOT EXISTS idx_acc_alloc_receipt ON acc_payment_allocations (receipt_id);
+```
+
+### D4. State-integrity / invariants this schema must honour (ties to §C3-F, STATE_INTEGRITY_LAWS)
+- **S2 idempotent paid-flip:** flip `acc_receipts.status='paid'` FIRST (atomic `UPDATE … WHERE
+  status<>'paid' RETURNING`), then write allocations — a redelivered slip can't double-pay. `slip_sha` /
+  `photo_sha` UNIQUE are the structural backstops.
+- **S3 atomic claim on match:** the matcher CAS-claims each receipt before allocating (no check-then-write
+  race between two slips touching the same `#`).
+- **Close-of-day invariant (future `/audit` law):** every `acc_receipts` row for a closed biz_date is
+  `paid` or `void`; anything `captured/confirmed` past cutoff is FLAGGED. A receipt's `amount_cents` must
+  equal Σ its allocations once `paid` (no over/under-allocation). Leak-detector (§C1): a `confirmed`
+  payment whose allocations < its amount, OR a payment in a vendor group with no open receipts → flag.
+- **S4 shown=true:** the `#14` shown in chat IS `acc_receipts.id`; the "$ owed Atlas" in the payable run
+  = Σ unpaid `amount_cents` for that vendor — derived, never stored stale.
+
+### D5. OPEN QUESTIONS before this becomes a migration
+1. **Receipt numbering** — global `SERIAL` (`#14` unique forever, simplest, recommended) vs per-day/
+   per-vendor sequence (prettier "#3 today" but needs a counter + collision handling). Lean: global serial.
+2. **New-bot vs GM ownership of `init_accounting_db()`** — decision §157 says separate `twbshop-accountant`
+   NOW; so the new bot's `run_*.py` calls `init_accounting_db()` at startup. Confirm before wiring.
+3. **`amount_cents` integer-cents** assumes USD-cents granularity is enough; Riel buys (20,000៛=$5.00)
+   convert clean at 4000៛=$1. Confirm no sub-cent need (there isn't for cash books).
+4. Whether `acc_` prefix is wanted (keeps the finance package's tables visually grouped + greppable) —
+   used here for that reason; easy to drop.

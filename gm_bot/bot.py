@@ -1198,6 +1198,31 @@ def _shift_start_dt(shift_date: str, ws_min: int) -> datetime:
         + timedelta(minutes=ws_min or 0)
 
 
+def _resolve_checkin_shift(staff: dict, now_pp: datetime) -> tuple[str | None, int | None]:
+    """Pick the (shift_date_iso, start_min) a live-location ping at `now_pp` belongs to — OVERNIGHT-AWARE.
+    A baker's 06:00 end-ping lands on the next calendar day, so binding to now.date() filed it under the
+    wrong shift (phantom next-day session + false no-show). We ask the ONE resolver about today AND
+    yesterday and let checkin.shift_for_now choose, so the binding, the /att snapshot, and the no-show
+    sweep all agree. Returns (None, None) when no scheduled shift is near now (caller logs the ping only).
+    Redefine-aware (resolve_day supplies the redefined start/end)."""
+    from gm_bot import attendance_ui as ui
+    from gm_bot import checkin as ci
+    today = now_pp.date()
+    now_min = now_pp.hour * 60 + now_pp.minute
+    cands = []
+    for off in (0, -1):
+        d = today + timedelta(days=off)
+        try:
+            dec = ui.resolve_day(staff, d.isoformat())
+        except Exception:
+            continue
+        cands.append((off, bool(dec.get("working")), dec.get("start_min"), dec.get("end_min")))
+    off, ws = ci.shift_for_now(now_min, cands)
+    if off is None:
+        return None, None
+    return (today + timedelta(days=off)).isoformat(), ws
+
+
 def _golive_grace(shift_start: datetime) -> bool:
     """GO-LIVE GRACE (owner): a shift that STARTED before we flipped attendance_live can't be a no-show
     or 'late' — the staff couldn't have checked in (the system wasn't live yet). True only when an
@@ -1640,35 +1665,33 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     # queued updates arrive late — a punctual staffer must never be marked late (and a stale ping
     # must never look fresh to auto-checkout) because of OUR downtime.
     now_pp = _msg_time_pp(update, _now_pp())
-    # find today's (or last night's overnight) shift this check-in belongs to
-    shift_date = now_pp.date().isoformat()
-    ws = att.to_min(staff.get("work_start"))
-    # the ONE resolver decides the shift start: a redefine moves it (lateness judged vs the REDEFINED
-    # start); leave (AL/sick) yields no redefined start so the normal work_start stands.
-    dec = ui.resolve_day(staff, shift_date)
-    if dec["working"] and dec.get("start_min") is not None:
-        ws = int(dec["start_min"]) % 1440
-    if ws is None:
-        return True
     # A STOPPED live-share (edited update, live_period gone) is NOT presence proof — record it
-    # in-zone=False so the auto-checkout never trusts a share the staffer just turned off.
+    # in-zone=False so the auto-checkout never trusts a share the staffer just turned off. Record the
+    # ping ALWAYS (the silent always-on feed), independent of whether a shift matches below.
     is_stop = ci.is_share_stop(bool(update.edited_message), getattr(loc, "live_period", None))
     try:
         att_record_ping(staff["id"], loc.latitude, loc.longitude, in_zone and not is_stop,
                         now_pp.isoformat())
     except Exception:
         pass
-    # check-OUT capture: if a check-out request armed this, an in-zone share closes the shift
+    # check-OUT capture: if a check-out request armed this, an in-zone share closes the shift. The armed
+    # flow carries its OWN shift_date (overnight-correct already), so handle it before check-in binding.
     from shared.database import flow_load, flow_clear, att_check_out
     fs = flow_load(user.id)
     if fs and fs.get("flow") == "checkout" and in_zone and not update.edited_message:
-        sd = fs["data"].get("shift_date", shift_date)
+        sd = fs["data"].get("shift_date", now_pp.date().isoformat())
         att_check_out(staff["id"], sd, now_pp.isoformat())
         flow_clear(user.id)
         banked, new_bal = _settle_redefined_shift(staff, sd, now_pp)   # OT net of payback, if redefined
         await msg.reply_text(ui._CO_DONE)
         if banked > 0:                               # earned OT → offer to take it back as rest
             await _offer_buyback(context, staff, new_bal, user.id, banked)
+        return True
+    # CHECK-IN: bind the ping to the shift it belongs to — OVERNIGHT-AWARE (a baker's 06:00 end-ping
+    # belongs to YESTERDAY's shift, not today). resolve_day supplies the redefined start, so lateness is
+    # judged vs the REDEFINED start. ws None = no scheduled shift near now → ping logged above, done.
+    shift_date, ws = _resolve_checkin_shift(staff, now_pp)
+    if ws is None:
         return True
     if not in_zone:
         if not update.edited_message:
@@ -3777,28 +3800,32 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _job_gate(live_only=True):
         return
     from gm_bot import attendance_ui as ui
-    from gm_bot.attendance import to_min
     yday = (_today_pp() - timedelta(days=1))
     for p in staff_all("active"):
         if p.get("org") != "TWB" or p["canonical_name"] == "Tyty":
             continue
-        # did they work yesterday's shift? (schedule, honoring overrides + leave)
-        try:
-            ev = ui.compute_day_events(yday)
-        except Exception:
-            ev = []
-        names = {n for _m, n, _l, _t, _sd in ev}
         nm = p.get("call_name") or p["canonical_name"]
-        if nm not in names:
-            continue   # not scheduled (day-off/AL/PH) — not a no-show
+        # Scheduled to START a shift on yday? Ask the ONE resolver DIRECTLY — NOT compute_day_events,
+        # whose event list also carries an overnight CHECKOUT tail from the PRIOR day's shift; counting
+        # that as "scheduled yday" falsely flagged day-off night staff (a Mon 18:00→06:00 shift puts a
+        # 06:00 event on Tue, their day off). resolve_day honors day-off / AL / sick / special / swap.
+        try:
+            dec = ui.resolve_day(p, yday.isoformat())
+        except Exception:
+            continue
+        if not dec.get("working"):
+            continue   # day-off / AL / sick / special / swap-off — not scheduled, not a no-show
+        ws_min = dec.get("start_min")
+        if ws_min is None:
+            continue
         sess = att_get_session(p["id"], yday.isoformat())
         if sess and sess.get("checked_in_at"):
             continue   # they checked in
-        if _golive_grace(_shift_start_dt(yday.isoformat(), to_min(p.get("work_start")) or 0)):
+        if _golive_grace(_shift_start_dt(yday.isoformat(), int(ws_min) % 1440)):
             continue   # GO-LIVE GRACE: shift started before we went live → not a no-show
         if no_show_record(p["id"], yday.isoformat()):
-            ws, we = to_min(p.get("work_start")), to_min(p.get("work_end"))
-            shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
+            we_min = dec.get("end_min")
+            shift_min = (((we_min - ws_min) % 1440) or 1440) if we_min is not None else 540
             try:
                 points_record(p["id"], "no_show", shift_min, yday.isoformat())
             except Exception:

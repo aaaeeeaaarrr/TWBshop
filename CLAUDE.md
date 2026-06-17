@@ -249,9 +249,31 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-16 (session 38 cont — **🔴 ATTENDANCE IS LIVE — owner flipped it 2026-06-16
-11:08 PP: `attendance_live`='true', test mode OFF, 26 staff greeted. + `/trynow` added; PAYBACK PUSH
-RANKING + KH + LATE SICK-INFORMING + GENDER all DEPLOYED**).
+**Last updated:** 2026-06-17 (session 39 — **🐞 OVERNIGHT CHECK-IN BINDING BUG found + FIXED + DEPLOYED;
+5 false no-shows + bug-created data being reversed**).
+**▶ THE BUG (Jun 17, owner caught it via `/att` + 5 NO-SHOW alerts):** `_handle_staff_location`
+(`gm_bot/bot.py`) bound every check-in to **`now_pp.date()`** — the calendar day of the ping — instead of
+the shift it belongs to. A night baker (21:00→06:00) shares live-location near their **06:00 end**, which
+is the NEXT calendar day, so the system filed it under the wrong shift. Cascade (all PROVEN on live DB,
+read-only): **(1)** the **no-show sweep** trusted `compute_day_events`'s `names`, which includes an
+overnight CHECKOUT *tail* on the next day → it flagged **Chenda/Piseth/Samphass on their Tuesday DAY OFF**
+(their Monday 18:00→06:00 shift's 06:00 tail) + the grace check used the wrong shift-start; **(2)**
+**Davy/Meng** (real Tue workers) had their end-of-shift ping mis-bound to Jun17 → their Jun16 session
+"missing" → false no-show (both were PRESENT — Davy 20 in-zone pings 06:09-06:20, Meng in-zone 06:01);
+**(3)** the same 06:00 ping spawned a **phantom open Jun17 session** judged ~9 h "late" → the "ends 06:00 /
+still on shift / 0 stuck" `/att` anomaly + **wrongful `late_uninformed` points** (PISEY 540·Nak 550·Heng
+660·Long 541·Davy 549) + **PISEY phantom payback debt #150 = 540 min** + Thyda phantom 00:01 session.
+**▶ THE FIX (suite 640, +10 binding tests; real-path PROVEN on live data, 7/7 cases):** new pure
+`checkin.shift_for_now` (overnight-aware: a ping near a 21:00→06:00 end binds to YESTERDAY, with 60-min
+pre / 120-min post windows) + thin DB wrapper `_resolve_checkin_shift` (today vs yesterday via the ONE
+resolver `resolve_day`, redefine-aware) replacing `shift_date = now_pp.date()`; ping recording moved up so
+it always logs; checkout branch unchanged (carries its own shift_date). **No-show sweep rewritten** to ask
+`resolve_day(p, yday)` DIRECTLY (scheduled-to-START test, honors day-off/AL/sick/swap) instead of
+`compute_day_events` `names` membership; grace + shift_min now use the resolved start/end (redefine-aware).
+Snapshot needs NO code change (binding fix + deleting phantom sessions makes it read correct). **DEPLOY +
+DATA REVERSAL in progress this session.** Confirmed staff ARE adopting it: Jun17 morning day-crew
+(Rath/Kheak/PISEY-CHUCH/Sony/Vannary/Renaud/Anan) all checked in clean (on-time/early); Jun16 night crew
+checked in+out correctly — the "06:00 weird" entries were OUR bug, not staff error.
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
 day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
 to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT

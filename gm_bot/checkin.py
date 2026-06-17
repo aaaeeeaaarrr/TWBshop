@@ -67,3 +67,31 @@ def is_due(event_min: int, now_min: int) -> bool:
     """A per-minute scheduler tick: fire an event when the clock reaches its minute.
     (The job runs ~every 60s; exact-minute match avoids double-fires.)"""
     return event_min == now_min
+
+
+CHECKIN_PRE_MIN = 60      # accept a check-in up to 60 min before the shift start (early birds + T-10)
+CHECKIN_POST_MIN = 120    # accept an end-of-shift checkout / late check-in up to 2 h past the end
+
+
+def shift_for_now(now_min: int, candidates: list[tuple[int, bool, int | None, int | None]],
+                  pre: int = CHECKIN_PRE_MIN, post: int = CHECKIN_POST_MIN) -> tuple[int | None, int | None]:
+    """Which scheduled shift a live-location ping at `now_min` (minute-of-day) belongs to — the fix for
+    the overnight-binding bug. A baker's 06:00 end-ping is on the NEXT calendar day, so binding to
+    `now.date()` filed it under the wrong shift (phantom next-day session + false no-show). Instead we
+    test each candidate shift and bind to the one whose window covers `now`.
+
+    `candidates`: (day_offset, working, ws, we) per candidate day, TODAY-FIRST (0=today, -1=yesterday).
+      ws/we = start/end minute-of-day as resolve_day returns them (we may be < ws for an overnight shift).
+    Returns (day_offset, ws_norm) of the matching shift (ws_norm in 0..1439), or (None, None) if none is
+    plausible. Today is preferred (listed first); yesterday only claims a ping if its shift ran PAST
+    midnight (overnight) and `now` still falls inside [start-pre, end+post). Pure — no DB/Telegram."""
+    for off, working, ws, we in candidates:
+        if not working or ws is None or we is None:
+            continue
+        we2 = we + 1440 if we <= ws else we          # overnight end rolls past midnight (21:00→06:00)
+        if off < 0 and we2 <= 1440:
+            continue                                  # a past day that didn't run past its own midnight
+        now_abs = (-off) * 1440 + now_min             # minutes from that day's midnight to now
+        if ws - pre <= now_abs < we2 + post:
+            return off, ws % 1440
+    return None, None
