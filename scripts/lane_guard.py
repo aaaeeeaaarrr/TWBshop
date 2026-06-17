@@ -11,6 +11,7 @@ DESIGN (v1, deliberately conservative):
   - On `main` / any non-`lane/...` branch: silent (you're the integrator, allowed to cross).
   - On its OWN error: exits 0 silently — a guard bug must never break the workflow.
   - Fail toward warning: anything not provably inside your own lane warns.
+  - ASCII-only output (a Windows console can't encode emoji; ASCII renders everywhere).
 
 NOT ACTIVE until wired into .claude/settings.json as a PreToolUse hook. Until then this file
 just sits here and does nothing. (Wiring it is an owner step — the highrisk guard blocks Claude
@@ -83,10 +84,13 @@ def main(raw: str) -> None:
         concerns = ", ".join(owners) if owners else "the SHARED / unowned area"
 
     sys.stderr.write(
-        "\n\U0001f6a8\U0001f6a8 CROSS-LANE EDIT  (you are in lane: %s) \U0001f6a8\U0001f6a8\n"
-        "  File: %s\n"
-        "  Concerns: %s.\n"
-        "  If you're actively working any of those lanes, PAUSE them until this edit is done.\n\n"
+        "\n============================================================\n"
+        "  CROSS-LANE EDIT  ->  you are in lane: %s\n"
+        "============================================================\n"
+        "  File:     %s\n"
+        "  Concerns: %s\n"
+        "  If you're actively working any of those lanes, PAUSE them until this edit is done.\n"
+        "============================================================\n\n"
         % (lane, path, concerns)
     )
 
