@@ -76,9 +76,8 @@ _CANT_ENGLISH = [
 # ── DB ────────────────────────────────────────────────────────────────────────
 
 def _conn():
-    from secrets import DATABASE_URL
-    import psycopg2
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 def get_intake_session(chat_id: int) -> dict | None:

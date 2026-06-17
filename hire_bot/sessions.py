@@ -31,8 +31,8 @@ INACTIVITY_TIMEOUT_SECONDS = 600  # 10 minutes
 
 
 def _conn():
-    from secrets import DATABASE_URL
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 def _hash(token: str) -> str:

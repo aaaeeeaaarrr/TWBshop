@@ -67,8 +67,8 @@ MULTI_PART_EXPECTED: dict[str, list[str]] = {
 
 
 def _db():
-    from secrets import DATABASE_URL
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 def _get_attempt(attempt_id: int) -> dict | None:

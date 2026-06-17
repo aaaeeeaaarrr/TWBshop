@@ -348,9 +348,9 @@ def store_assessment(
 ) -> int:
     """Store the Opus assessment. Returns assessment_id."""
     import psycopg2
-    from secrets import DATABASE_URL
+    from shared.database import raw_connect
 
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = raw_connect()
     cur = conn.cursor()
     try:
         cur.execute("""

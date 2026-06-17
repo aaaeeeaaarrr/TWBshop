@@ -45,10 +45,8 @@ logger = logging.getLogger(__name__)
 # ── Connection helper ────────────────────────────────────────────────────────
 
 def _conn():
-    import sys
-    sys.path.insert(0, '/root/TWBshop')
-    from secrets import DATABASE_URL
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 # ── Answer cache ─────────────────────────────────────────────────────────────

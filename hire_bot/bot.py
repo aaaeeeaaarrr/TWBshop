@@ -395,10 +395,10 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
     import html
     import json as _json
     import psycopg2
-    from secrets import DATABASE_URL
+    from shared.database import raw_connect
 
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = raw_connect()
         cur  = conn.cursor()
 
         # Idempotency check
@@ -529,8 +529,8 @@ async def _notify_owner_quiz(bot, chat_id: int, attempt_id: int,
         )
         # Send succeeded — now mark as notified
         try:
-            import psycopg2 as _pg2
-            conn2 = _pg2.connect(DATABASE_URL)
+            from shared.database import raw_connect
+            conn2 = raw_connect()
             cur2  = conn2.cursor()
             cur2.execute("""
                 UPDATE hiring_quiz_attempts

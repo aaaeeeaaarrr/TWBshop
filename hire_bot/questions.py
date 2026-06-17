@@ -131,9 +131,8 @@ _cache: dict[str, dict] = {}
 
 
 def _conn():
-    from secrets import DATABASE_URL
-    import psycopg2
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 # ── Part E helpers ────────────────────────────────────────────────────────────
