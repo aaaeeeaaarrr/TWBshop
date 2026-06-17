@@ -302,6 +302,29 @@ to_approved_window` still green). +3 tests (Norin stay-late→6, Chantrea come-e
 commit. **WHERE-ELSE flagged for owner:** senior OT redefines use the same `worked−normal_len` model, so a
 late arrival reduces earned OT there too — currently by-design, fixable the same way if owner wants.
 **PB-view display gap (owner: "just the balance is fine") → NOT changing** (view stays balance-only).
+**▶ 🌙 SYSTEM-WIDE OVERNIGHT / DATE-BOUNDARY AUDIT (Jun 17, owner: "where else does this persist? check
+it ALL 100%") — done + the residuals FIXED + DEPLOYED.** Traced every shift-keyed write/lookup. **VERIFIED
+SAFE (key by shift-start date `sd`/resolved):** check-in (fixed earlier), checkout (manual+auto), no-show
+sweep (fixed earlier), the per-minute scheduler (`compute_day_events` spans y'day/today/tomorrow),
+`/att` snapshot · `_on_shift_now` · `/golivestatus` (overnight loop `we+=1440`), `_settle_redefined_shift`
+(overnight math + the payback fix), late points/debt (resolved shift_date). **TIMEZONE clean in attendance:**
+`_today()`/`_today_pp()`/`_now_min()` are all Phnom-Penh. **FIXED — the last `_today()` shift-keyed
+bindings (would mis-date for an overnight worker acting AFTER MIDNIGHT for the shift that started the prior
+evening):** new `attendance_ui._shift_date_now(p)` (overnight-aware, reuses `checkin.shift_for_now`) now
+drives **own-sick** (sick case · away-supersede · paperless debt · late-sick points), **late-declare**, and
+the **test sim** (which also had a naive `datetime.now()` → now PP-aware); `_sick_late_mins` rewritten
+overnight-aware (was measuring tonight's shift for a 2am report → missed the −15); the late-inform gate
+dropped the now-wrong `date_iso==today` guard. +5 tests, suite **648**; **real-path proven** vs real
+overnight staff w/ a simulated 2am clock (PISEY/Heng→yesterday, Rath/Anan→today unchanged, late-mins −300).
+**b2b PP-clock fix (owner: don't wait till b2b revives):** new `shared/clock.py` (`pp_today`/`pp_now`);
+replaced the naive `date.today()` delivery-date computations across **6 b2b files** (summaries · recurring ·
+menu_keyboards · order_parsing · menu_handlers · order_handlers) — they were the WRONG PNH day during
+00:00–07:00 PNH (= 17:00–24:00 UTC). LEFT INTENTIONALLY: `billing.py` 6am-reminder `date.today()` (documented
+UTC, timed to the 23:00-UTC job) + `utcnow()` filename timestamps. **Picker-filter sub-class (`iso==_today()
+and _shift_running` in AL/sick/swap grids) = display-only, no data corruption** (over-restricts which
+future dates show during the 6h overnight window, self-corrects at 06:00) → assessed + LEFT (touching the
+Menu-Law pickers isn't worth a benign quirk; flagged for owner). DEPLOYED to gm `<this commit>` (gm restart;
+b2b code lands but b2b stays intentionally stopped — no restart).
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
 day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
 to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT

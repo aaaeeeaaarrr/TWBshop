@@ -6,6 +6,8 @@ from datetime import date, timedelta, datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
+
 logger = logging.getLogger(__name__)
 
 _DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -38,7 +40,7 @@ async def send_recurring_reminders(bot, reminder_num: int) -> None:
         get_recurring_order,
     )
 
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    tomorrow = (pp_today() + timedelta(days=1)).isoformat()
     orders = get_active_recurring_orders_for_date(tomorrow)
 
     for rec in orders:
@@ -101,7 +103,7 @@ async def auto_skip_unconfirmed(bot) -> None:
     """Called at 10:10pm — skip any still-pending recurring instances for tomorrow."""
     from shared.database import get_pending_recurring_for_date, skip_recurring_instance
 
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    tomorrow = (pp_today() + timedelta(days=1)).isoformat()
     for row in get_pending_recurring_for_date(tomorrow):
         skip_recurring_instance(row["recurring_order_id"], tomorrow)
         logger.info("Auto-skipped recurring order %s for %s", row["recurring_order_id"], tomorrow)

@@ -2,9 +2,11 @@
 
 import uuid
 import logging
-from datetime import date, timedelta
+from datetime import timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
 
 import config
 from b2b_bot.order_parsing import (
@@ -111,7 +113,7 @@ async def _notify_mini_order(bot, business_name: str, bread_items: list[dict], m
 
 async def _do_confirm_order(chat_id: int, pending: dict, context, reply_fn, from_user=None) -> None:
     business_name = get_business_name(chat_id)
-    delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
+    delivery_date = pending.get("delivery_date", (pp_today() + timedelta(days=1)).isoformat())
     new_bread, _ = _split_mini_items(pending.get("bread_items", []), delivery_date)
     new_cake     = pending.get("cake_items", [])
     method_   = pending.get("delivery_method")
@@ -319,7 +321,7 @@ async def handle_callback(update: Update, context) -> None:
     elif query.data == "b2b_cancel":
         logger.info("b2b_cancel by %s in chat %s", _actor(query), chat_id)
         pending       = _pending.get(chat_id) or get_pending_order(chat_id) or {}
-        delivery_date = pending.get("delivery_date", (date.today() + timedelta(days=1)).isoformat())
+        delivery_date = pending.get("delivery_date", (pp_today() + timedelta(days=1)).isoformat())
 
         # Check DB for existing confirmed orders on the same date
         existing_sessions = get_b2b_order_sessions(chat_id, delivery_date)
@@ -536,7 +538,7 @@ async def handle_order_photo(bot, chat_id: int, image_bytes: bytes, message_id: 
     method   = customer["delivery_method"] if customer else None
     time_str = customer["delivery_time"]   if customer else None
     location = customer["location"]        if customer else None
-    delivery_date = (date.today() + timedelta(days=1)).isoformat()
+    delivery_date = (pp_today() + timedelta(days=1)).isoformat()
 
     bread_items, photo_rejected = _split_mini_items(bread_items, delivery_date)
 

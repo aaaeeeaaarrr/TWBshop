@@ -5,8 +5,10 @@ Sent at 10:10pm Phnom Penh time (15:10 UTC) to the B2B staff group.
 
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from telegram import Bot
+
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
 
 import config
 from b2b_bot.menu import MINI_ITEMS
@@ -56,7 +58,7 @@ def _cake_order_label(row) -> str:
 
 async def send_b2b_pre_summary(bot: Bot, target_date: str | None = None) -> None:
     global _pre_summary_msg_id
-    day = target_date or (date.today() + timedelta(days=1)).isoformat()
+    day = target_date or (pp_today() + timedelta(days=1)).isoformat()
     bread_totals = get_b2b_daily_totals(day)
     cake_totals  = get_b2b_cake_daily_totals(day)
 
@@ -93,7 +95,7 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
 
     # Default: tomorrow's orders only. Same-day cake orders (delivery_date = today)
     # are excluded here — they were already handled by the instant notification on confirm.
-    day = target_date or (date.today() + timedelta(days=1)).isoformat()
+    day = target_date or (pp_today() + timedelta(days=1)).isoformat()
 
     bread_totals = get_b2b_daily_totals(day)
     cake_totals = get_b2b_cake_daily_totals(day)
@@ -185,7 +187,7 @@ async def send_b2b_summary(bot: Bot, target_date: str | None = None) -> None:
 
 async def send_b2b_mini_reminder(bot: Bot, target_date: str | None = None) -> None:
     """Remind bakery group about mini orders due in 48h (delivery_date = day+2)."""
-    day = target_date or (date.today() + timedelta(days=2)).isoformat()
+    day = target_date or (pp_today() + timedelta(days=2)).isoformat()
     rows = get_b2b_mini_orders_for_reminder(day, tuple(MINI_ITEMS))
     if not rows:
         return  # silent when no mini orders due

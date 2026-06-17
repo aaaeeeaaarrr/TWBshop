@@ -1,8 +1,10 @@
 """B2B menu — command/callback handlers and cart-to-confirmation bridge."""
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
 
 import config
 from b2b_bot.menu_keyboards import (
@@ -361,7 +363,7 @@ async def handle_menu_callback(update: Update, context) -> None:
                 await query.answer("Orders are locked after 10pm. Contact us directly.", show_alert=True)
                 return
             idx = int(data[16:])
-            delivery_date = (date.today() + timedelta(days=1)).isoformat()
+            delivery_date = (pp_today() + timedelta(days=1)).isoformat()
             sessions = get_b2b_order_sessions(chat_id, delivery_date)
             if idx >= len(sessions):
                 await query.answer("Order not found.", show_alert=True)
@@ -420,8 +422,8 @@ async def handle_menu_callback(update: Update, context) -> None:
             if _orders_locked():
                 await query.answer("Orders are locked after 10pm — bakery is producing.", show_alert=True)
                 return
-            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
-            tomorrow_d   = date.today() + timedelta(days=1)
+            tomorrow_str = (pp_today() + timedelta(days=1)).strftime("%Y%m%d")
+            tomorrow_d   = pp_today() + timedelta(days=1)
             await query.edit_message_text(
                 f"🕐 Select time — tomorrow ({tomorrow_d.strftime('%a %d %b')}):",
                 reply_markup=_time_picker_keyboard(f"bm_dt_{tomorrow_str}_", "bm_time_select"),
@@ -454,7 +456,7 @@ async def handle_menu_callback(update: Update, context) -> None:
             bread_tmp, cake_tmp = _parse_cart_items(chat_id)
             total        = order_total(bread_tmp, cake_tmp)
             d            = datetime.strptime(date_str, "%Y%m%d").date()
-            tomorrow_str = (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+            tomorrow_str = (pp_today() + timedelta(days=1)).strftime("%Y%m%d")
             back_cb      = "bm_time_select" if date_str == tomorrow_str else f"bm_date_m_{date_str[:6]}"
             await query.edit_message_text(
                 f"🚚 How will you receive your order?\n{d.strftime('%a %d %b')} at {_format_time(time_code)}",

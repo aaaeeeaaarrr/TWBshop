@@ -6,6 +6,8 @@ from datetime import date, datetime, timedelta, timezone
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters as _filters
 
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
+
 from b2b_bot.menu import B2B_MENU, _BUN_PRICE_BY_GRAMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU
 from b2b_bot.pricing import item_price, order_total, FREE_DELIVERY_THRESHOLD
@@ -100,7 +102,7 @@ def _get_cart_date(chat_id: int) -> str:
     d = _cart_date.get(chat_id)
     if d:
         return d
-    return (date.today() + timedelta(days=1)).isoformat()
+    return (pp_today() + timedelta(days=1)).isoformat()
 
 
 def _get_cart_method(chat_id: int) -> str | None:
@@ -116,7 +118,7 @@ def _get_cart_method(chat_id: int) -> str | None:
 
 def _delivery_date_label(iso_date: str) -> str:
     d = date.fromisoformat(iso_date)
-    if d == date.today() + timedelta(days=1):
+    if d == pp_today() + timedelta(days=1):
         return "Tomorrow"
     return d.strftime("%a %d %b")
 
@@ -489,7 +491,7 @@ def _bun_qty_keyboard(bun_key: str, grams: int, sesame_code: str | None, current
 
 
 def _date_picker_keyboard(back_cb: str = "bm_back") -> InlineKeyboardMarkup:
-    today      = date.today()
+    today      = pp_today()
     tomorrow   = today + timedelta(days=1)
     curr_month = today.replace(day=1)
     next_month = (curr_month.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -513,7 +515,7 @@ def _date_picker_keyboard(back_cb: str = "bm_back") -> InlineKeyboardMarkup:
 
 def _day_picker_keyboard(yyyymm: str) -> InlineKeyboardMarkup:
     year, month = int(yyyymm[:4]), int(yyyymm[4:])
-    tomorrow = date.today() + timedelta(days=1)
+    tomorrow = pp_today() + timedelta(days=1)
     _, days_in_month = calendar.monthrange(year, month)
     rows = []
     row  = []

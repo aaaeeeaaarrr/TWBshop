@@ -6,6 +6,8 @@ import logging
 from datetime import date, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from shared.clock import pp_today   # PP-based today (server is UTC; naive date.today() is off by a day at night)
+
 import config
 from b2b_bot.menu import B2B_MENU, ALIAS_MAP, INSTANT_BREAD_ITEMS, MINI_ITEMS
 from b2b_bot.cake_menu import B2B_CAKE_MENU, CAKE_ALIAS_MAP
@@ -231,7 +233,7 @@ def _merge_edit_cake(existing: list[dict], new_items: list[dict]) -> list[dict]:
 def _split_mini_items(bread_items: list[dict], delivery_date: str) -> tuple[list[dict], list[dict]]:
     valid, rejected = [], []
     try:
-        days_ahead = (date.fromisoformat(delivery_date) - date.today()).days
+        days_ahead = (date.fromisoformat(delivery_date) - pp_today()).days
     except (ValueError, TypeError):
         days_ahead = 1
     for it in bread_items:
@@ -436,9 +438,9 @@ def _cake_line(it: dict, show_edit_hint: bool = False) -> str:
 
 def _date_label(delivery_date: str) -> str:
     d = date.fromisoformat(delivery_date)
-    if d == date.today() + timedelta(days=1):
+    if d == pp_today() + timedelta(days=1):
         return f"tomorrow ({d.strftime('%a %d %b')})"
-    if d == date.today():
+    if d == pp_today():
         return f"today ({d.strftime('%a %d %b')})"
     return d.strftime("%a %d %b")
 

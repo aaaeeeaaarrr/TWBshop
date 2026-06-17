@@ -3950,7 +3950,10 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     try:
         from gm_bot.attendance_ui import _sick_late_mins, LATE_SICK_OWN_MIN
         mins = _sick_late_mins(persona)
-        if date_iso == _today_pp().isoformat() and mins is not None and mins < LATE_SICK_OWN_MIN:
+        # mins is None unless they have a CURRENT/imminent shift (overnight-aware), so that alone gates
+        # this to a real shift — the old `date_iso == today` guard is dropped (date_iso is now the
+        # overnight-aware shift date, which is YESTERDAY for a 2am report, so == today would wrongly skip).
+        if mins is not None and mins < LATE_SICK_OWN_MIN:
             done_key = "late_inform_done:%d:%s" % (persona["id"], date_iso)
             if gm_get_state(done_key) != "true":
                 points_record(persona["id"], "late_sick_inform", 1, date_iso)

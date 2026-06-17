@@ -50,6 +50,26 @@ def _hm(minutes) -> str:
     return ("%dh %dm" % (h, m)) if (h and m) else (("%dh" % h) if h else ("%dm" % m))
 
 
+def _shift_date_now(p: dict) -> date:
+    """The shift-START date the current moment belongs to — OVERNIGHT-AWARE (reuses the SAME resolver
+    as the check-in binding fix, checkin.shift_for_now): a baker acting at 2am is inside YESTERDAY's
+    21:00→06:00 shift, so 'today' for sick/late binding is yesterday, not the calendar day. Falls back
+    to today (the upcoming or just-finished shift) when no shift is running right now. This is the fix
+    for the last places that bound a shift action to the raw calendar day (_today())."""
+    from gm_bot import checkin as ci
+    today = _today()
+    cands = []
+    for off in (0, -1):
+        d = today + timedelta(days=off)
+        try:
+            dec = resolve_day(p, d.isoformat())
+        except Exception:
+            continue
+        cands.append((off, bool(dec.get("working")), dec.get("start_min"), dec.get("end_min")))
+    offset, _ws = ci.shift_for_now(_now_min(), cands)
+    return today if offset is None else today + timedelta(days=offset)
+
+
 def _shift_running(p: dict) -> bool:
     ws = to_min(p.get("work_start"))
     ln = shift_len_min(p.get("work_start"), p.get("work_end")) if ws is not None else None
@@ -1117,15 +1137,21 @@ LATE_SICK_FAM_MIN = 10   # family-sick told this late = a soft note (NO points �
 
 
 def _sick_late_mins(p: dict) -> int | None:
-    """Minutes until p's shift starts TODAY (negative if already started); None if they don't work today
-    (day-off / on leave). Honors overrides via resolve_day. Flags a late sick report."""
+    """Minutes until p's CURRENT/imminent shift starts (negative if already started); None if they
+    don't work that shift. OVERNIGHT-AWARE: resolves the shift 'now' belongs to (a 2am baker is
+    measured against the 21:00 shift they're in, not tonight's), so the late-sick flag is right after
+    midnight too. Honors overrides via resolve_day. For a day worker / pre-midnight this equals the
+    old `start_min − now` exactly (day_off = 0)."""
+    sd = _shift_date_now(p)
     try:
-        dec = resolve_day(p, _today().isoformat())
+        dec = resolve_day(p, sd.isoformat())
     except Exception:
         return None
     if not dec.get("working") or dec.get("start_min") is None:
         return None
-    return int(dec["start_min"]) - _now_min()
+    day_off = (sd - _today()).days                 # 0 today, −1 an overnight shift from yesterday
+    now_abs = -day_off * 1440 + _now_min()         # minutes from sd-midnight to now
+    return int(dec["start_min"]) - now_abs
 
 
 def _late_sick_callout(mins: int | None) -> str:
@@ -2500,8 +2526,8 @@ async def handle_location_test(update: Update, context: ContextTypes.DEFAULT_TYP
                 # production. Never writes real data unless /testmode on (is_test stamped from the flag).
                 from shared.database import att_test_on, att_record_ping, att_check_in
                 if att_test_on() and state != "not_here":
-                    today = _today().isoformat()
-                    nowiso = datetime.now().isoformat()
+                    today = _shift_date_now(p).isoformat()   # overnight-aware shift date (not raw calendar day)
+                    nowiso = datetime.now(_PP).isoformat()   # PP-aware (was naive UTC — inconsistent w/ verdict)
                     att_record_ping(p["id"], loc.latitude, loc.longitude, in_zone, nowiso)
                     att_check_in(p["id"], today, nowiso, in_zone,
                                  mins if state == "late" else 0, mins if state == "early" else 0)
@@ -2750,7 +2776,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "mecant":
             if _armed(context):
                 _arm_pending(context, update,
-                    {"flow": "sick_me", "persona_id": p["id"], "date": _today().isoformat()})
+                    {"flow": "sick_me", "persona_id": p["id"], "date": _shift_date_now(p).isoformat()})
                 return await show(_confirm_prompt(p, context,
                     "Sick — can't come to work today. · ឈឺ មកធ្វើការថ្ងៃនេះមិនបាន។",
                     "att:sp:me"))
@@ -2868,7 +2894,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 from gm_bot.attendance import to_min
                 from shared.database import late_declare as _late_declare
                 _ws = to_min(p.get("work_start"))
-                _late_declare(p["id"], _today().isoformat(),
+                _late_declare(p["id"], _shift_date_now(p).isoformat(),   # overnight-aware (not calendar day)
                               (_ws + mins) if _ws is not None else mins, "")
                 try:
                     from gm_bot.bot import _att_send
