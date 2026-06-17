@@ -287,6 +287,21 @@ split via live `points_rules`), nets PER CAUSE first so a same-cause reversal co
 owner_adjustment still shows). Current real state after cleanup: LONG/PISEY/RATH/RENAUD +10 (early); HENG 0
 (lates offset by +156 owner_adjustment); NAK −10, NORIN −12, SAMPHASS −144 (short-notice AL Jun20-21);
 POR/SETH/THYDA off-board (lates fully reversed). Suite 640.
+**▶ SAMPHASS short-notice-AL offset (Jun 17, owner: he informed earlier):** +144 `owner_adjustment` →
+net −144→0 (proof; the −144 short_notice_al stays, offset visibly).
+**▶ 🐞 PAYBACK-CREDIT BUG FIXED (Jun 17, owner caught it on Norin — a real settle bug I first wrongly
+rationalised as "by design"):** `_settle_redefined_shift` credited payback as `worked_in_window −
+normal_len`, so a LATE arrival on the normal portion silently CANCELLED a payback the staffer actually
+worked at the other edge. Norin booked +6m stay-late (13:00-23:06), came 6m late (13:06), stayed to 23:10
+→ old code read 0 paid, debt stood at 6. **Fix:** for `reason='payback slot'` redefines, credit = the
+EXTENSION ACTUALLY WORKED (presence ∩ the extension window — TAIL for stay-late, HEAD for come-early,
+whole window for day-off normal_len=0), measured DIRECTLY so lateness (penalised on its own track) can't
+eat it. OT (non-payback) behaviour UNCHANGED (its "late reduces OT" is deliberate — `test_settle_clamps_
+to_approved_window` still green). +3 tests (Norin stay-late→6, Chantrea come-early→20, no-stay→0), suite
+**643**. **Norin debt #145 credited 6 → cleared** (real data, proof, /audit clean). DEPLOY pending this
+commit. **WHERE-ELSE flagged for owner:** senior OT redefines use the same `worked−normal_len` model, so a
+late arrival reduces earned OT there too — currently by-design, fixable the same way if owner wants.
+**PB-view display gap (owner: "just the balance is fine") → NOT changing** (view stays balance-only).
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
 day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
 to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT

@@ -2377,9 +2377,10 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         ci_dt = sess.get("checked_in_at")
         if not ci_dt:
             return 0, 0
-        # Worked = presence INSIDE the approved [start,end] only. Early arrival earns points, never
-        # OT; lingering past the approved end banks nothing; late arrival still reduces (by design).
+        # Worked = presence INSIDE the approved [start,end]. Early arrival earns points, never OT;
+        # lingering past the approved end banks nothing.
         from datetime import date as _date, timedelta as _td
+        from gm_bot import attendance as att
         base = datetime.combine(_date.fromisoformat(str(shift_date)), datetime.min.time(),
                                 tzinfo=finance.PP_TZ)
         appr_start = base + _td(minutes=int(sc["start_min"]))
@@ -2394,11 +2395,30 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
             return 0, ot_bank_balance(staff["id"])
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
-        ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
         if (sc.get("reason") or "") == "payback slot":
+            # PAYBACK CREDIT = the EXTENSION actually worked, measured DIRECTLY against the extension
+            # window — NOT worked−normal_len, which a LATE arrival on the normal portion silently
+            # cancels (owner, Jun 17: Norin came 6m late, stayed to 23:10 past his 23:00 end → DID
+            # repay, but worked−normal_len read 0). Lateness is penalised on its own track (the debt
+            # itself); the payback must not be eaten by it too. The slot glues to ONE edge
+            # (payback.redefine_window): start unchanged → extension is the TAIL (stay-late);
+            # start moved earlier → the HEAD (come-early); day-off (normal_len 0) → the whole window.
+            nlen = int(sc.get("normal_len") or 0)
+            if nlen <= 0:
+                ext_start, ext_end = appr_start, appr_end
+            else:
+                ws_norm = att.to_min(staff.get("work_start"))
+                if ws_norm is not None and int(sc["start_min"]) % 1440 == ws_norm % 1440:
+                    ext_start, ext_end = appr_start + _td(minutes=nlen), appr_end      # stay-late tail
+                else:
+                    ext_start, ext_end = appr_start, appr_end - _td(minutes=nlen)      # come-early head
+            ext_worked = max(0, round((min(now_pp, ext_end) - max(ci_dt, ext_start)).total_seconds() / 60))
+            pb_cleared, _ot = ot_mod.split_ot_pb(ext_worked, pb)
             ot_banked = 0   # a payback slot repays debt ONLY — it can never mint OT (owner, Jun 11)
+        else:
+            ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
         if pb_cleared and debt:
-            payback_credit(debt["id"], pb_cleared)   # OT clears the debt first (uncapped)
+            payback_credit(debt["id"], pb_cleared)   # extension worked clears the debt first
         new_bal = ot_bank_balance(staff["id"])
         banked = 0
         if ot_banked:

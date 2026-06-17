@@ -1315,6 +1315,66 @@ def test_settle_payback_slot_never_banks_ot(monkeypatch):
     assert credited == [120], "debt should be credited for worked time"
 
 
+def _pb_settle_harness(monkeypatch, sc, owed, ci_dt, co_dt, work_start, shift_date):
+    """Shared harness: run _settle_redefined_shift for a payback redefine, return (banked, credited)."""
+    from shared import database as db
+    from gm_bot import bot
+    banked, credited = [], []
+    monkeypatch.setattr(db, "shift_change_active", lambda sid, iso: sc)
+    monkeypatch.setattr(db, "payback_open_debt",
+                        lambda sid: {"id": 5, "minutes_owed": owed, "minutes_paid": 0})
+    monkeypatch.setattr(db, "payback_credit", lambda did, m: credited.append(m))
+    monkeypatch.setattr(db, "ot_bank_balance", lambda sid: 0)
+    monkeypatch.setattr(db, "ot_bank_add", lambda sid, m: banked.append(m))
+    monkeypatch.setattr(db, "shift_change_set_banked", lambda cid, m: None)
+    monkeypatch.setattr(db, "shift_change_claim_settle", lambda cid: True)
+    monkeypatch.setattr(db, "payback_booking_mark_done", lambda sid, d: None)
+    monkeypatch.setattr(db, "ot_buyback_mark_taken", lambda sid, d: None)
+    monkeypatch.setattr(db, "att_get_session", lambda sid, iso: {"checked_in_at": ci_dt})
+    bot._settle_redefined_shift({"id": 11, "work_start": work_start}, shift_date, co_dt)
+    return banked, credited
+
+
+def test_settle_payback_stay_late_credited_despite_late_arrival(monkeypatch):
+    """THE Jun-17 bug (owner caught it on Norin): a STAY-LATE payback must credit the extension WORKED
+    even when the staffer came late on the normal portion. Norin: shift 13:00-23:00, booked +6m
+    (->23:06), came 6m late (13:06), stayed to 23:10. Old worked-normal_len read 0; the fix credits 6."""
+    import datetime as _dt
+    from gm_bot import finance
+    def _at(hh, mm, day=16): return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
+    sc = {"id": 9, "status": "approved", "normal_len": 600,                 # normal 10h (start unchanged)
+          "start_min": 780, "end_min": 1386, "reason": "payback slot"}      # 13:00-23:06 (+6m tail)
+    banked, credited = _pb_settle_harness(monkeypatch, sc, 6, _at(13, 6), _at(23, 10), "13:00", "2026-06-16")
+    assert credited == [6], "stay-late payback credits the extension worked, not 0"
+    assert banked == [], "payback slot never banks OT"
+
+
+def test_settle_payback_come_early_partial_when_late_to_slot(monkeypatch):
+    """A COME-EARLY payback credits only the early minutes ACTUALLY worked. Chantrea: shift 21:00-06:00,
+    booked 20:37-21:00 (+23m head), arrived 20:40 -> 20 of the 23 early minutes -> credit 20."""
+    import datetime as _dt
+    from gm_bot import finance
+    def _at(hh, mm, day=16): return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
+    sc = {"id": 10, "status": "approved", "normal_len": 540,                # 9h, start MOVED earlier
+          "start_min": 1237, "end_min": 1800, "reason": "payback slot"}     # 20:37-06:00 (+23m head)
+    banked, credited = _pb_settle_harness(monkeypatch, sc, 23, _at(20, 40), _at(6, 1, day=17),
+                                          "21:00", "2026-06-16")
+    assert credited == [20], "come-early payback credits only the early minutes worked"
+    assert banked == []
+
+
+def test_settle_payback_zero_if_extension_not_worked(monkeypatch):
+    """A stay-late payback credits 0 if they DON'T stay (came on time, left at the normal end)."""
+    import datetime as _dt
+    from gm_bot import finance
+    def _at(hh, mm, day=16): return _dt.datetime(2026, 6, day, hh, mm, tzinfo=finance.PP_TZ)
+    sc = {"id": 11, "status": "approved", "normal_len": 600,
+          "start_min": 780, "end_min": 1386, "reason": "payback slot"}      # 13:00-23:06 (+6m tail)
+    banked, credited = _pb_settle_harness(monkeypatch, sc, 6, _at(13, 0), _at(23, 0), "13:00", "2026-06-16")
+    assert credited == [], "no stay -> no payback credit"
+    assert banked == []
+
+
 def test_payback_ladder_shielded_by_agreed_ot(monkeypatch):
     """OT_DESIGN §4 shield: an agreed upcoming OT landing before the debt's 14-day deadline pauses
     the ignore-ladder (no warn, no auto-book); without it the ladder runs as before. Stateless —
