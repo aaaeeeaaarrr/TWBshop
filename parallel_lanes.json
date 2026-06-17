@@ -1,0 +1,18 @@
+{
+  "_doc": "Single resolver for file -> lane ownership (State-Integrity Law S5). scripts/lane_guard.py reads this to WARN when a worktree edits a file outside its own lane. RULE: every tracked file is owned by exactly one lane OR listed in 'shared'. Edits to THIS file are integrator-only (it concerns all lanes). A lane = the git branch 'lane/<name>'; on 'main' or a non-lane branch the guard stays silent (you're the integrator).",
+  "lanes": {
+    "attendance": ["gm_bot/", "run_gm_bot.py"],
+    "retail":     ["telegram_bot/", "run_bot.py"],
+    "b2b":        ["b2b_bot/", "run_b2b_bot.py"],
+    "hire":       ["hire_bot/", "run_hire_bot.py"],
+    "listener":   ["ops_intelligence/", "run_listener.py"],
+    "accountant": ["accountant/", "run_accountant.py"],
+    "pos":        ["pos/", "run_pos.py"],
+    "docs":       ["docs/"]
+  },
+  "shared": [
+    "shared/", "migrations/", "tests/", "scripts/", "config.py",
+    "requirements.txt", "bootstrap.py", "setup_staging.py",
+    ".claude/", ".githooks/", "CLAUDE.md", "parallel_lanes.json", ".gitignore"
+  ]
+}
