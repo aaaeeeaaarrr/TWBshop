@@ -280,6 +280,13 @@ debts #145/148/149 KEPT (owner chose reverse-bug-artifacts-only). Full detail �
 Done. Confirmed staff ARE adopting it: Jun17 morning day-crew
 (Rath/Kheak/PISEY-CHUCH/Sony/Vannary/Renaud/Anan) all checked in clean (on-time/early); Jun16 night crew
 checked in+out correctly — the "06:00 weird" entries were OUR bug, not staff error.
+**▶ DAVY made whole (Jun 17, owner confirmed she was present):** created a clean on-time Jun-16 session
+(in 21:00 → out 06:00, 0 late/0 early, closed); `/audit` clean. **▶ `/menu` → Staff info → `➕➖ Points`
+button added (TOP position):** owner-only running points tally (best-first leaderboard, ⭐+pos / 🔻neg
+split via live `points_rules`), nets PER CAUSE first so a same-cause reversal collapses to 0 (a real
+owner_adjustment still shows). Current real state after cleanup: LONG/PISEY/RATH/RENAUD +10 (early); HENG 0
+(lates offset by +156 owner_adjustment); NAK −10, NORIN −12, SAMPHASS −144 (short-notice AL Jun20-21);
+POR/SETH/THYDA off-board (lates fully reversed). Suite 640.
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
 day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
 to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT

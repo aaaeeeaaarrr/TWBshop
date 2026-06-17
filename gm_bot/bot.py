@@ -5398,6 +5398,42 @@ def _own_staff_sorted(org: str | None = "TWB", include_tyty: bool = False) -> li
     return sorted(rows, key=lambda r: (r.get("call_name") or r["canonical_name"]).lower())
 
 
+def _own_pts_text() -> str:
+    """➕➖ Points — every staffer's running points tally (live points_rules values), best-first,
+    with a positive/negative split so you see both at a glance. Resets when the owner confirms each
+    month's 2nd pay. Only ACTIVE rules score (inactive causes show nothing)."""
+    from shared.database import points_rules_map, points_events_for
+    from gm_bot.points import event_points
+    rules = points_rules_map()
+    rows = []
+    for s in _own_staff_sorted():
+        # net PER CAUSE first, so a same-cause reversal (a negative-quantity correction, e.g. a late
+        # made whole) collapses to 0 instead of showing as a fake ⭐; a real cross-cause adjustment
+        # (owner_adjustment) still surfaces in the +/− split.
+        by_cause: dict = {}
+        for e in points_events_for(s["id"]):
+            v = event_points(e["cause"], e.get("quantity", 1), rules)
+            if v:
+                by_cause[e["cause"]] = by_cause.get(e["cause"], 0.0) + v
+        pos = sum(v for v in by_cause.values() if v > 0)
+        neg = sum(v for v in by_cause.values() if v < 0)
+        if pos == 0 and neg == 0:
+            continue                              # no live points (none scored, or fully reversed)
+        rows.append((round(pos + neg, 2), round(pos, 2), round(neg, 2), s))
+    rows.sort(key=lambda r: -r[0])                # best-first (leaderboard)
+    lines = []
+    for net, pos, neg, s in rows:
+        seg = []
+        if pos:
+            seg.append("⭐+%g" % pos)
+        if neg:
+            seg.append("🔻%g" % neg)
+        lines.append("• %s — %g  (%s)" % (_caps_call(s), net, " / ".join(seg)))
+    head = "➕➖ Points%s\n(running tally — resets at 2nd-pay confirm)\n" % (
+        " · 🧪 test" if _att_test_mode() else "")
+    return head + ("\n".join(lines) if lines else "(no points scored yet)")
+
+
 def _own_pbot_text(today_iso: str) -> str:
     """PB + OT — only staff with something on the time ledger. Same no-double-count partition as
     My Schedule: booked = min(extension, debt) next to PB; only the leftover is upcoming OT."""
@@ -5476,6 +5512,7 @@ def _own_sal_text(which: int) -> str:
 
 
 _OWN_STAFF_KB_ROWS = [
+    [("➕➖ Points", "own:pts")],
     [("⏱ PB + OT", "own:pbot")],
     [("🏖 AL + Joined", "own:al")],
     [("💵 Salaries 1st", "own:sal1")],
@@ -5511,6 +5548,8 @@ async def _owner_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                                       reply_markup=_own_kb([[("👥 Staff info", "own:staff")]]))
     elif a == "staff":
         await query.edit_message_text("👥 Staff info", reply_markup=_own_kb(_OWN_STAFF_KB_ROWS))
+    elif a == "pts":
+        await query.edit_message_text(_own_pts_text(), reply_markup=back)
     elif a == "pbot":
         await query.edit_message_text(_own_pbot_text(_today_pp().isoformat()), reply_markup=back)
     elif a == "al":
@@ -5756,7 +5795,7 @@ async def cmd_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/testreset — wipe all test data\n"
         "\n— Attendance · live overviews —\n"
         "/att — today's live snapshot: who's in / out / still on shift / stuck-open (private, on demand)\n"
-        "/menu — your private menu: Staff info → PB+OT · AL+Joined · Salaries 1st/2nd\n"
+        "/menu — your private menu: Staff info → Points · PB+OT · AL+Joined · Salaries 1st/2nd\n"
         "/joined <name> <date> — set a hire date (03/05/2023, or 05/2023 if you only know the month)\n"
         "/pb — staff who owe pay-back, with how much is already booked by upcoming OT\n"
         "/audit — cross-check ALL data: did every button input produce the right result? "
