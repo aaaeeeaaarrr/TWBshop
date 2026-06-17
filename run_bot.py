@@ -20,5 +20,7 @@ sys.path.insert(0, str(_root / "telegram_bot"))
 from bot import main  # noqa: E402 — import after path setup
 
 if __name__ == "__main__":
+    from shared.runtime_guard import assert_polling_allowed
+    assert_polling_allowed("retail")
     asyncio.set_event_loop(asyncio.new_event_loop())
     main()

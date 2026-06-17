@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 from hire_bot.bot import build_application
 
 if __name__ == "__main__":
+    from shared.runtime_guard import assert_polling_allowed
+    assert_polling_allowed("hire")
     logger.info("Starting hire bot…")
     app = build_application(HIRE_BOT_TOKEN)
     app.run_polling(drop_pending_updates=True)

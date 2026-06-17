@@ -14,6 +14,11 @@ import time
 
 from telegram import Update
 
+try:
+    from telegram.error import Conflict
+except Exception:  # keep this shared handler import-safe across PTB versions
+    Conflict = ()  # isinstance(err, ()) is always False → the 409 branch stays inert
+
 import config
 
 logger = logging.getLogger(__name__)
@@ -35,6 +40,21 @@ def make_error_handler(bot_name: str):
                     await update.callback_query.answer()
             except Exception:
                 pass
+            return
+        if isinstance(err, Conflict):
+            # 409: a SECOND process is polling THIS bot token (a stray/dev poller) and is
+            # stealing live updates. Distinct, loud, separately-throttled owner alert.
+            logger.error("[%s] 409 CONFLICT — another process is polling this token: %s", bot_name, err)
+            ckey = bot_name + ":conflict"
+            if time.time() - _last_dm.get(ckey, 0.0) >= _THROTTLE_S:
+                _last_dm[ckey] = time.time()
+                try:
+                    await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+                        "🚨 %s bot: 409 CONFLICT — a SECOND process is polling this token.\n"
+                        "A stray/dev poller is stealing live updates (lost check-ins/orders). "
+                        "Stop it now, or check for a duplicate service." % bot_name)
+                except Exception as e:
+                    logger.error("[%s] conflict-alert DM failed: %s", bot_name, e)
             return
         logger.error("[%s] UNHANDLED in handler: %s", bot_name, err, exc_info=err)
         try:

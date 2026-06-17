@@ -17,5 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from b2b_bot.bot import main
 
 if __name__ == "__main__":
+    from shared.runtime_guard import assert_polling_allowed
+    assert_polling_allowed("b2b")
     asyncio.set_event_loop(asyncio.new_event_loop())
     main()

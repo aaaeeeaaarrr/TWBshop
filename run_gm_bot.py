@@ -12,6 +12,9 @@ if not config.GM_BOT_TOKEN:
     print("GM_BOT_TOKEN is not set. Add it to secrets.py and re-run bootstrap.")
     sys.exit(1)
 
+from shared.runtime_guard import assert_polling_allowed
+assert_polling_allowed("GM")  # refuse to poll the live token off the production server
+
 os.makedirs("logs", exist_ok=True)
 
 handler = RotatingFileHandler("logs/gm_bot.log", maxBytes=5_000_000, backupCount=3)

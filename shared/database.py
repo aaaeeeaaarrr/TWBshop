@@ -24,33 +24,42 @@ _pool: psycopg2.pool.SimpleConnectionPool | None = None
 def active_database_url() -> str:
     """Which database every connection in this module uses.
 
-    Default = prod (behavior UNCHANGED everywhere; the live server's systemd units
-    set nothing → prod). A dev machine sets ``TWBSHOP_ENV=staging`` to route ALL db
-    access through the isolated staging database (requires ``STAGING_DATABASE_URL``
-    in secrets.py), so migrations / payroll / AL work never touches live data.
+    FAIL-CLOSED (2026-06, Phase 0): ``TWBSHOP_ENV`` must be set EXPLICITLY to
+    ``prod`` (live data — the server's systemd units set this) or ``staging`` (the
+    isolated dev DB, requires ``STAGING_DATABASE_URL``). An UNSET or unknown value
+    RAISES — it must never silently fall back to production. Rationale: an unset env
+    that defaulted to prod let a dev run mutate live payroll; fail-closed converts
+    that silent catastrophe into a loud, instantly-recoverable boot error.
 
-    This is the single chokepoint for gm_bot / retail / b2b — they all go through
-    ``_db()``. KNOWN GAP: hire_bot/* and run_*.py scripts open their own
-    ``psycopg2.connect(DATABASE_URL)`` directly and do NOT yet honor this switch;
-    fold them in before relying on staging for hiring/import work.
+    Single chokepoint for gm_bot / retail / b2b (all via ``_db()``) and, once folded
+    in, the hire_bot / script paths via ``raw_connect()``.
     """
-    env = os.environ.get("TWBSHOP_ENV", "prod").strip().lower()
+    env = os.environ.get("TWBSHOP_ENV", "").strip().lower()
     if env == "staging":
         if not _STAGING_DATABASE_URL:
             raise RuntimeError(
                 "TWBSHOP_ENV=staging but STAGING_DATABASE_URL is empty in secrets.py. "
-                "Add the staging connection string, or unset TWBSHOP_ENV to use prod."
+                "Add the staging connection string, or set TWBSHOP_ENV=prod for prod."
             )
         return _STAGING_DATABASE_URL
-    return config.DATABASE_URL
+    if env == "prod":
+        return config.DATABASE_URL
+    raise RuntimeError(
+        "TWBSHOP_ENV is %r — refusing to guess the database. Set it EXPLICITLY to "
+        "'prod' (live; the server's systemd units set this) or 'staging' (isolated "
+        "dev DB). Fail-closed by design: an unset env must never touch production."
+        % (env or "<unset>")
+    )
 
 
 def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
     global _pool
     if _pool is None:
-        url = active_database_url()
-        if os.environ.get("TWBSHOP_ENV", "prod").strip().lower() == "staging":
-            logger.warning("DB pool → STAGING database (TWBSHOP_ENV=staging)")
+        url = active_database_url()  # raises if TWBSHOP_ENV is unset/unknown
+        env = os.environ.get("TWBSHOP_ENV", "").strip().lower()
+        # Announce the DB target on first connection — prod AND staging, never silent —
+        # so a mis-set env is obvious from the very first log line.
+        logger.warning("DB pool → %s database (TWBSHOP_ENV=%s)", env.upper(), env)
         _pool = psycopg2.pool.SimpleConnectionPool(1, 10, url)
     return _pool
 
@@ -68,6 +77,15 @@ def _db():
         raise
     finally:
         pool.putconn(conn)
+
+
+def raw_connect():
+    """A standalone psycopg2 connection that honors the SAME fail-closed
+    ``TWBSHOP_ENV`` switch as the pool. For the hire_bot / script paths that open
+    their own connection instead of using ``_db()``. Replaces direct
+    ``psycopg2.connect(DATABASE_URL)`` (which always hit prod and bypassed the switch).
+    """
+    return psycopg2.connect(active_database_url())
 
 
 def init_db() -> None:

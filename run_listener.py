@@ -23,4 +23,6 @@ logging.basicConfig(
 from ops_intelligence.listener import run
 
 if __name__ == "__main__":
+    from shared.runtime_guard import assert_polling_allowed
+    assert_polling_allowed("listener")
     asyncio.run(run())
