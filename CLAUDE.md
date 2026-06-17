@@ -270,8 +270,14 @@ resolver `resolve_day`, redefine-aware) replacing `shift_date = now_pp.date()`; 
 it always logs; checkout branch unchanged (carries its own shift_date). **No-show sweep rewritten** to ask
 `resolve_day(p, yday)` DIRECTLY (scheduled-to-START test, honors day-off/AL/sick/swap) instead of
 `compute_day_events` `names` membership; grace + shift_min now use the resolved start/end (redefine-aware).
-Snapshot needs NO code change (binding fix + deleting phantom sessions makes it read correct). **DEPLOY +
-DATA REVERSAL in progress this session.** Confirmed staff ARE adopting it: Jun17 morning day-crew
+Snapshot needs NO code change (binding fix + deleting phantom sessions makes it read correct).
+**DEPLOYED to gm `10fdf39`** (HEAD==origin, gm active, running code carries `shift_for_now` +
+`_resolve_checkin_shift`; other 4 bots untouched — b2b was already intentionally stopped Jun16 to silence
+it). **DATA REVERSED on prod** (owner-authorized, explicit-ID rowcount asserts + fresh-process re-read,
+`/audit` CLEAN after) — 5 false no-shows→reversed · 5 no-show points deleted · 6 phantom Jun17 sessions
+deleted · 6 wrongful Jun17 points deleted · PISEY phantom debt #150 deleted; real first-night lates +
+debts #145/148/149 KEPT (owner chose reverse-bug-artifacts-only). Full detail → `docs/ACTIONS_LEDGER.md`
+Done. Confirmed staff ARE adopting it: Jun17 morning day-crew
 (Rath/Kheak/PISEY-CHUCH/Sony/Vannary/Renaud/Anan) all checked in clean (on-time/early); Jun16 night crew
 checked in+out correctly — the "06:00 weird" entries were OUR bug, not staff error.
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live

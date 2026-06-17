@@ -7,6 +7,28 @@
 > ("Open items: none" or the list). **Default: do real-data writes immediately, with independent
 > before/after proof — never defer them.**
 
+## Done (with proof)
+
+- **2026-06-17 — REVERSED bug-created attendance data (overnight check-in binding bug).** Owner
+  authorized "reverse all of it" after the deep read confirmed all 5 Jun-16 no-show flags were FALSE.
+  Applied to PROD with explicit-ID rowcount asserts (mismatch → rollback) + independent fresh-process
+  re-read + `/audit` CLEAN after:
+  - **A. 5 false no-shows (Jun16) → status='reversed'** (`no_show_reverse`): Chenda·Piseth·Samphass (all
+    flagged on their **Tuesday day off**), Davy (present — 20 in-zone pings 06:09-06:20), Meng (present —
+    in-zone 06:01). no_show records #1-5.
+  - **B. 5 no-show points_events DELETED** (pe #71-75: −540/−720 each).
+  - **C. 6 phantom Jun-17 sessions DELETED** (#564/597/599/600/612/654 — PISEY/Nak/Heng/Long/Davy/Thyda,
+    all open/no-checkout; the "ends 06:00 / still on shift" `/att` artifact).
+  - **D. 6 wrongful Jun-17 points DELETED** (pe #63/65/66/67/68/69: late_uninformed PISEY 540·Nak 550·
+    Heng 660·Long 541·Davy 549 + Thyda early 1).
+  - **E. PISEY phantom payback debt #150 (540 min) DELETED** (0 bookings referenced it).
+  - **KEPT (real, untouched):** debts #145 (Norin 6), #148 (Heng 89), #149 (Nak 10); all 7 real Jun-16
+    late points (ref=2026-06-16); Samphass AL #432 (Jun20-21). Owner chose option-1 (reverse bug
+    artifacts only; do NOT grace the real first-night lates). Root-cause CODE fix shipped+deployed to gm
+    (`10fdf39`) — see CLAUDE.md Current Status. Residual cosmetic: Davy has no Jun-16 session (she only
+    shared location at shift end under the old code) → may show "absent" for Jun16 in `/att` though
+    present; no penalty (no-show reversed); self-resolves on her next check-in under the fixed code.
+
 ## Open (not yet done)
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
