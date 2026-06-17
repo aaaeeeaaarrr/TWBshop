@@ -325,6 +325,17 @@ and _shift_running` in AL/sick/swap grids) = display-only, no data corruption** 
 future dates show during the 6h overnight window, self-corrects at 06:00) → assessed + LEFT (touching the
 Menu-Law pickers isn't worth a benign quirk; flagged for owner). DEPLOYED to gm `<this commit>` (gm restart;
 b2b code lands but b2b stays intentionally stopped — no restart).
+**▶ EARLY-BONUS vs ADJUSTED SHIFT — CONFIRMED CORRECT + threshold tweak (Jun 18).** Owner flagged
+"Nak came 7m early, no +10." Investigated: Nak/Chantrea booked **come-early paybacks** that moved their
+start (Nak→20:50), so checking in at 20:53 is **on-time vs the adjusted shift**, not early → no +10. Owner
+CONFIRMED this is the intended design: **the whole machine (verdict · +10 · late · nudges · checkout) runs
+vs the ADJUSTED (redefined) shift — payback / OT-backpay / any reason — same logic, adjusted timing.** That
+is what the system already does (proven: Nak's session early=0/late=0 = judged vs 20:50, not 21:00; verdict
+& `compute_day_events` both use the redefine start). **I over-called it a bug — it was correct.** No
+retroactive credits. Seth's earlier 45-late was correct for HIS adjusted 12:00 start (wiped only because the
+whole payback was cancelled). **ONE tweak shipped:** early threshold `>5` → **`>=5`** (`checkin.verdict`,
+`EARLY_BONUS_MIN`) so arriving EXACTLY 5 min early earns the +10 (owner: "5min 1sec early deserves it"). +2
+boundary tests, suite **650**. DEPLOYED to gm `<this commit>` (gm restart, ~03:xx PP lull; b2b untouched).
 **▶ SESSION-WRAP (Jun 16 eve — FIRST-LIVE-DAY OPS; owner continuing on ANOTHER MACHINE next):** a live
 day of fixes + real-data corrections, all proven & in `docs/ACTIONS_LEDGER.md`. **Code shipped+deployed
 to gm:** radius 100→150m (`fc3fedc`, Por GPS), group-redirect keywords +payback/swap/shift/schedule/OT

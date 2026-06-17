@@ -16,6 +16,16 @@ def test_early_within_grace_is_ontime():
     assert ci.verdict(537, 540, True) == ("ontime", 0)
 
 
+def test_early_exactly_5_earns_bonus():
+    # owner Jun 18: arriving EXACTLY 5 min early earns the +10 (threshold is >= 5, not > 5)
+    assert ci.verdict(535, 540, True) == ("early", 5)
+
+
+def test_early_4_min_is_ontime():
+    # 4 min early is still inside the grace -> no bonus
+    assert ci.verdict(536, 540, True) == ("ontime", 0)
+
+
 def test_late_within_grace_free():
     # 5 min late exactly -> free (ontime)
     assert ci.verdict(545, 540, True) == ("ontime", 0)

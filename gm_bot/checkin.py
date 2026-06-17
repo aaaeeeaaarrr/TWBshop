@@ -12,7 +12,7 @@ Rules (locked spec, session 28):
 from __future__ import annotations
 
 GRACE_MIN = 5          # ≤5 min late is free
-EARLY_BONUS_MIN = 5    # >5 min early earns the +10
+EARLY_BONUS_MIN = 5    # ≥5 min early earns the +10 (owner Jun 18: arriving exactly 5 min early counts)
 AUTO_CHECKOUT_GRACE_MIN = 3    # a live share seen in-zone within this many min of shift end = present
 
 
@@ -56,7 +56,7 @@ def verdict(now_min: int, shift_start_min: int, in_zone: bool) -> tuple[str, int
     if not in_zone:
         return "not_here", 0
     early, late = relative_minutes(now_min, shift_start_min)
-    if early > EARLY_BONUS_MIN:
+    if early >= EARLY_BONUS_MIN:
         return "early", early
     if late > GRACE_MIN:
         return "late", late
