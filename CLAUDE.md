@@ -286,6 +286,16 @@ warning** (owner step — the highrisk guard blocks Claude from editing `.claude
 command to the PreToolUse hooks array in `.claude/settings.json` (snippet in `docs/PARALLEL_LANES.md`).
 **START a lane:** `scripts/make_lane.ps1 <name>`. **DEFERRED hardening (build when 2+ concurrent lanes
 actually run):** sparse-checkout (absence-isolation), block-with-ack, server-side commit-scope CI, monitor daemon.
+**▶ ACCOUNTANT LANE STARTED — P0 DONE (branch `lane/accountant`, commit `010d005`, pushed; NOT merged):**
+finance/expense/payment build — design: `docs/REPORT_SYSTEM_DESIGN.md` (read it). **P0 (staging-proven, 5 tests):**
+`accountant/db.py` `init_accounting_db()` = 4 tables (acc_vendors · acc_receipts = the numbered `#` AP spine ·
+acc_payments · acc_payment_allocations, design §D) + vendor↔group map (`vendor_link`/`vendor_by_group`/`list_vendors`)
++ `tests/test_accounting_schema.py`. Money = integer USD cents, Riel @4000=1. **STAGING ONLY — no prod, no bot, no
+live money touched.** **RESUME = P1** (design §P1): `run_accountant.py` bot shell + `/vendor link` (owner runs inside
+each supplier group) + receipt capture (photo → 1 Haiku `assess_receipt_photo` → numbered row, cash auto-paid, 1-tap
+correct via `clarify.py`) + parallel SambaPOS sub-check (map `WineBakery` tables + push-agent sketch). **P2 (HEART,
+HIGH-RISK):** lump subset-sum/FIFO matcher + paid-flips — full rigor, per-step approval. Lane is a branch in this repo
+(not a separate worktree); when ready: merge → tag → deploy a new `twbshop-accountant` service (GM hands off REPORT receipts).
 
 **(prev)** 2026-06-17 (session 39 — **🐞 OVERNIGHT CHECK-IN BINDING BUG found + FIXED + DEPLOYED;
 5 false no-shows + bug-created data being reversed**).
