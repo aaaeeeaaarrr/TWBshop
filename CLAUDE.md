@@ -249,7 +249,35 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-17 (session 39 — **🐞 OVERNIGHT CHECK-IN BINDING BUG found + FIXED + DEPLOYED;
+**Last updated:** 2026-06-18 (session 40 — **PHASE 0 SAFETY RELEASE DEPLOYED to prod (inaugural tag-deploy)**).
+**▶ PHASE 0 — parallel-terminals safety foundation; BUILT · STAGING-PROVEN · DEPLOYED + VERIFIED (auto-bedrock).**
+Branch `phase0-db-safety` (commits 6deb337 + b9a4584) → merged to main → tagged **`phase0-safety-20260618`** →
+that tag deployed. **(1) Fail-closed DB switch** (`shared/database.py`): `active_database_url()` now REQUIRES
+`TWBSHOP_ENV` set explicitly to `prod`/`staging` — unset/unknown RAISES (no silent prod fallback) + new
+`raw_connect()` + a DB-target log on first connect. **(2) Live-poll guard** (new `shared/runtime_guard.py`):
+`assert_polling_allowed()` refuses to start a poller unless `TWBSHOP_POLL_OK=1` (server) or
+`ALLOW_LOCAL_POLLING=1` (dev opt-in) — kills the double-poller that silently steals live updates; wired into
+all 5 `run_*.py`. **(3)** 409-Conflict → distinct owner alert (`shared/error_handler.py`). **(4)** hire_bot's
+10 direct `connect(DATABASE_URL)` bypass sites folded into `raw_connect()`. **PROOF:** suite **657 passed / 2
+skipped** on staging; **tag-deployed** — server HEAD==origin==tag `b9a4584`; 5 units pinned via systemd
+drop-ins (`TWBSHOP_ENV=prod` + `TWBSHOP_POLL_OK=1`); gm/retail/hire/listener restarted + active (b2b stays
+intentionally inactive); logs show `DB pool → PROD database`, gm check-in scheduler + polling healthy, no
+409/Traceback/REFUSING; restart 05:31 PP completed clean, scheduler resumed 05:31:39 — **no check-in
+disruption observed**. **▶ NEW DEPLOY MODEL: deploy-from-TAG** (server now in detached HEAD at the tag, not
+main tip). **POST-DEPLOY (per-arc sweep caught one): collection-watchdog CRON pinned.**
+`run_collection_watchdog.py` (every-minute cron, OUTSIDE the 5 systemd units → no inherited env) hit the
+fail-closed switch at 05:31 → throttled owner alert (1 per 6h, no spam) → FIXED by prepending
+`TWBSHOP_ENV=prod` to root's crontab (test-run now returns `ok`). The guard working as designed: it refused
+to guess rather than silently touch prod. **REMAINING (deferred, non-blocking):** standalone `run_*.py` scripts still use the direct-connect
+bypass (manual/historical; not in any live service or the suite — fold before a dev lane runs them); the 409
+detector is best-effort (no Conflict has occurred to confirm it reaches the handler). **CONTEXT — Phase 0 is
+the foundation of the PARALLEL-TERMINALS/LANES plan** (worktrees + sparse-checkout + `lane_guard` hook +
+observational monitor); full design briefing (advisor critique folded in) lives OUTSIDE the repo at
+`C:\Users\Papa\twbshop-parallel-lanes-briefing.md`. Phase 0 is behavior-preserving on prod; its guards protect
+dev/fan-out + the live token. **NEXT (when owner resumes lanes work):** worktrees + sparse-checkout +
+server-side commit-scope CI + observational monitor → run 2–3 greenfield-first lanes.
+
+**(prev)** 2026-06-17 (session 39 — **🐞 OVERNIGHT CHECK-IN BINDING BUG found + FIXED + DEPLOYED;
 5 false no-shows + bug-created data being reversed**).
 **▶ THE BUG (Jun 17, owner caught it via `/att` + 5 NO-SHOW alerts):** `_handle_staff_location`
 (`gm_bot/bot.py`) bound every check-in to **`now_pp.date()`** — the calendar day of the ping — instead of
