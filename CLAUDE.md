@@ -276,6 +276,16 @@ observational monitor); full design briefing (advisor critique folded in) lives 
 `C:\Users\Papa\twbshop-parallel-lanes-briefing.md`. Phase 0 is behavior-preserving on prod; its guards protect
 dev/fan-out + the live token. **NEXT (when owner resumes lanes work):** worktrees + sparse-checkout +
 server-side commit-scope CI + observational monitor → run 2–3 greenfield-first lanes.
+**▶ LANES MACHINERY BUILT (DORMANT) + merged to main (`5a9110f`+`2690b36`):** the parallel-worktree
+tooling is on main but INERT until activated — `parallel_lanes.json` (file→lane S5 ownership map),
+`scripts/lane_guard.py` (WARN-only cross-lane PreToolUse hook; PROVEN: silent on own-lane/non-edit,
+warns naming the lane(s) for other-lane/shared, never blocks; NOT wired yet), `scripts/make_lane.ps1`
+(one-command worktree setup), `docs/PARALLEL_LANES.md` (guide + the exact activation snippet),
+`.gitignore`+=`CLAUDE.local.md`. Suite 657/2 unchanged; server/DB untouched (no deploy). **ACTIVATE the
+warning** (owner step — the highrisk guard blocks Claude from editing `.claude/`): add the lane_guard
+command to the PreToolUse hooks array in `.claude/settings.json` (snippet in `docs/PARALLEL_LANES.md`).
+**START a lane:** `scripts/make_lane.ps1 <name>`. **DEFERRED hardening (build when 2+ concurrent lanes
+actually run):** sparse-checkout (absence-isolation), block-with-ack, server-side commit-scope CI, monitor daemon.
 
 **(prev)** 2026-06-17 (session 39 — **🐞 OVERNIGHT CHECK-IN BINDING BUG found + FIXED + DEPLOYED;
 5 false no-shows + bug-created data being reversed**).
