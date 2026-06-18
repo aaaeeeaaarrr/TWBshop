@@ -336,6 +336,14 @@ deduped row (the new code never re-ran). Fixed properly: `get_receipt_by_sha` + 
 still-DRAFT duplicate** (delete + fresh extract — also lets staff re-send a clearer shot) while a
 **confirmed/paid** one stays protected ("already logged as #N"). Cleared stale draft #26; bot restarted.
 **TESTING NOTE: re-sending the same receipt now re-reads it** — no manual clearing needed.
+**▶ KHMER DATE READING (owner sent a 2nd receipt, date came back null):** the model reads Khmer text +
+numbers fine (a blank Khmer invoice pad: all amounts exact, $76.80+$58.50=$135.30; lines summed). The gap
+was the **Khmer DATE layout** (ថ្ងៃ=day ខែ=month ឆ្នាំ=year) — taught it in the `extract_receipt` prompt.
+Calibrated to **read only when day+month+year are EACH legible, else null (never fabricate)** — proven:
+the 2nd receipt now reads `2026-06-08`, while Song Heng's faint/blank date stays null (it was guessing
+'2025-05-03' at a looser setting). Vendor null on a blank pad is correct (no printed name → group/vendor-tap
+IDs it in production). Handwritten Khmer **product names** remain weak (→ item-alias learning, stock lane).
+Bot restarted (staging).
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received
