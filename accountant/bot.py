@@ -24,16 +24,24 @@ try:
 except Exception:
     OWNER_TELEGRAM_ID = 0
 
+EXPENSE_GROUP_ID = -5417163768   # "Expenses TWB" — the one internal capture group
+LISTENER_ACTOR = 1271537077      # the shop/listener account (Café Wine O'clock / TheWineBakery24PP)
+CARD_ACTORS = {OWNER_TELEGRAM_ID, LISTENER_ACTOR}  # who may capture + tap cards (Tyty only observes)
+
 logger = logging.getLogger(__name__)
 
 
-def _blocked(update):
-    """Owner's rule: in PRIVATE chat only the owner may use the bot; everyone else is ignored.
-    In GROUPS membership is the access control (only invited people are in the Expense group)."""
+def _allowed(update):
+    """Who may capture / act: the OWNER in a private DM; OWNER + the listener/shop account in the
+    Expenses group. Everyone else (incl. Tyty, who observes) is ignored; other groups are ignored."""
     chat = update.effective_chat
     user = update.effective_user
-    if chat is not None and chat.type == "private":
-        return user is None or user.id != OWNER_TELEGRAM_ID
+    if chat is None or user is None:
+        return False
+    if chat.type == "private":
+        return user.id == OWNER_TELEGRAM_ID
+    if chat.id == EXPENSE_GROUP_ID:
+        return user.id in CARD_ACTORS
     return False
 
 
@@ -49,7 +57,7 @@ async def _send_card(update, rid):
 
 
 async def cmd_start(update, context):
-    if _blocked(update):
+    if not _allowed(update):
         return
     await update.message.reply_text(
         "🧾 Accountant — send a receipt photo here (or in the Expense group) and I'll log it as a "
@@ -71,7 +79,7 @@ async def cmd_vendor(update, context):
 
 async def on_photo(update, context):
     """Receipt photo → 1 Haiku assess → numbered living card. Cash/ABA + ✏️ Fix from the card."""
-    if _blocked(update):
+    if not _allowed(update):
         return
     msg = update.effective_message
     photo = msg.photo[-1]
@@ -86,9 +94,12 @@ async def on_photo(update, context):
         return  # expense sheets / POS screens / other are the report engine's job (P3)
 
     v = vendor_by_group(update.effective_chat.id)  # zero-read vendor if posted in a supplier group
+    cents, currency, orig = capture.parse_amount_cents(assess.get("readable_partial"))
     rid = add_receipt(
         vendor_id=(v["id"] if v else None),
-        amount_cents=capture.parse_amount_cents(assess.get("readable_partial")),
+        amount_cents=cents,
+        orig_currency=(currency or "USD"),
+        orig_amount=orig,
         items_text=((assess.get("readable_partial") or "")[:300] or None),
         is_handwritten=assess.get("is_handwritten", False),
         photo_file_id=photo.file_id,
@@ -103,7 +114,7 @@ async def on_photo(update, context):
 async def on_callback(update, context):
     q = update.callback_query
     await q.answer()
-    if _blocked(update):
+    if not _allowed(update):
         return
     parts = (q.data or "").split(":")
     if len(parts) != 3:
@@ -129,16 +140,19 @@ async def on_callback(update, context):
 
 async def on_text(update, context):
     """A ✏️ Fix reply: a number updates the total, anything else updates the item note."""
-    if _blocked(update):
+    if not _allowed(update):
         return
     rid = context.user_data.pop("acc_fix", None)
     if not rid:
         return
     text = (update.message.text or "").strip()
-    cents = capture.parse_amount_cents(text)
+    cents, currency, orig = capture.parse_amount_cents(text)
     if cents is None and text.replace(".", "", 1).isdigit():
-        cents = int(round(float(text) * 100))
-    edit_receipt(rid, amount_cents=cents) if cents is not None else edit_receipt(rid, items_text=text)
+        cents, currency, orig = int(round(float(text) * 100)), "USD", float(text)
+    if cents is not None:
+        edit_receipt(rid, amount_cents=cents, orig_currency=(currency or "USD"), orig_amount=orig)
+    else:
+        edit_receipt(rid, items_text=text)
     await _send_card(update, rid)
 
 

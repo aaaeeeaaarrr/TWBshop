@@ -296,10 +296,16 @@ flagged don't-bulk-store, promo-listening, dormant kept for price-broadcast); CS
 dedup · `list_open_receipts`) · `accountant/bot.py` handlers (photo→assess_receipt_photo→numbered living
 card · ✏️Fix · cash/ABA · `/vendor link`) · `run_accountant.py` shell · `tests/test_accountant_capture.py`
 **19 pass** (pure + staging lifecycle). Cash→paid at capture, ABA→open list; P2 (slip relay/match) untouched.
-**▶ GATED on owner action:** create the accountant bot via @BotFather → add `ACCOUNTANT_BOT_TOKEN` to the
-secrets repo → `python bootstrap.py --push-secrets`. THEN: real-path test in a fake Expense group → wire
-vendor-tap learning + "Received Yet?" candidate flow → P2. (Note: `config.py` token edit was blocked by the
-high-risk guard — unneeded; the shell reads the token straight from secrets like the other bots.)
+**▶ BOT LIVE + WIRED (session 42 cont):** owner created **@AccountantTWB_bot** (id 8653120770), token in
+secrets; **privacy OFF verified** (`can_read_all_group_messages=True`), bot is a member of **"Expenses TWB"**
+(`-5417163768`, the one capture group). bot.py now: **scoped to that group** + **private DMs owner-only** +
+**capture/card-taps locked to owner (1313155971) + listener/shop acct (1271537077)**; Tyty observes (added
+later). **Riel auto-read added** — USD preferred (dual-currency receipts use the supplier's USD, since their
+Riel rate ≠ our 4000/1), Riel-only converts at 4000៛=$1, biases to the figure after "total" so received/
+change can't win. Forwarded photos = same path. Suite **18** capture tests (Riel/dual/received cases).
+**▶ NEXT: real-path test** — run locally vs STAGING, owner sends a receipt in Expenses TWB → verify the
+living card; then vendor-tap learning + "Received Yet?" → P2. (Note: `config.py` token edit was blocked by
+the high-risk guard — unneeded; the shell reads the token straight from secrets like the other bots.)
 **▶ (prev, session 41) CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
 **continue on `main`** (the `lane/accountant` branch is now redundant, kept in sync on origin). **Server
 UNCHANGED** — still pinned to tag `phase0-safety-20260618`; the accountant code is **inert** (no running

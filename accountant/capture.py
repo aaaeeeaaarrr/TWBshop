@@ -8,8 +8,6 @@ Card lifecycle (design §E1):  DRAFT(captured) → CONFIRMED(confirmed) → [�
 """
 import re
 
-_AMT_RE = re.compile(r"(\d[\d,]*\.\d{2})")
-
 STATUS_LABEL = {
     "captured": "DRAFT",
     "confirmed": "CONFIRMED",
@@ -41,16 +39,32 @@ def math_check(items_total_cents, printed_total_cents, tol_pct=8.0, tol_floor_ce
 
 
 def parse_amount_cents(text):
-    """Best-effort total from assess_receipt_photo's readable_partial — the total is usually the
-    largest money figure on the slip. None if nothing parseable (→ card asks for ✏️ Fix). USD only
-    for now; Riel handwritten receipts fall through to a manual type-in. A heuristic, never trusted
-    blindly — the confirm + ✏️ Fix gate is the safety net."""
+    """Best-effort (amount_cents, orig_currency, orig_amount) from assess_receipt_photo's
+    readable_partial. USD is PREFERRED — many suppliers print BOTH Riel and USD and their Riel
+    rate is NOT our 4000/1, so when a $ figure exists we trust it; a Riel-only receipt converts at
+    the fixed 4000៛=$1 book rate (orig kept for the card). We bias toward the figure after 'total'
+    so a cash receipt's 'received/change' doesn't win. A heuristic — confirm + ✏️ Fix is the net."""
     if not text:
+        return (None, None, None)
+    t = text.replace(",", "")
+    usd = [float(x) for x in re.findall(r"\$?\s*(\d+\.\d{2})\b", t)]
+    riel = [float(x) for x in re.findall(r"(\d{3,})\s*\(?\s*(?:khmer\s*)?(?:៛|riel|khr)", t, re.I)]
+    riel += [float(x) for x in re.findall(r"៛\s*(\d{3,})", t)]
+
+    def _after_total(cands, is_decimal):
+        for c in cands:
+            needle = f"{c:.2f}" if is_decimal else str(int(c))
+            if re.search(r"total[^0-9]{0,15}\$?\s*" + re.escape(needle), t, re.I):
+                return c
         return None
-    nums = [float(m.replace(",", "")) for m in _AMT_RE.findall(text)]
-    if not nums:
-        return None
-    return int(round(max(nums) * 100))
+
+    if usd:
+        amt = _after_total(usd, True) or max(usd)
+        return (int(round(amt * 100)), "USD", amt)
+    if riel:
+        amt = _after_total(riel, False) or max(riel)
+        return (int(round(amt / 4000 * 100)), "KHR", amt)
+    return (None, None, None)
 
 
 def route(assess: dict) -> str:

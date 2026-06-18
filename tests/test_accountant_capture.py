@@ -27,10 +27,31 @@ def test_math_check_unknown_never_cries_wolf():
     assert capture.math_check(13860, None)[0] is True
 
 
-def test_parse_amount_cents_picks_total():
-    assert capture.parse_amount_cents("Total: $138.60, items 2x $12.00") == 13860
-    assert capture.parse_amount_cents("no numbers here") is None
-    assert capture.parse_amount_cents("") is None
+def test_parse_amount_usd_total():
+    assert capture.parse_amount_cents("Total: $138.60, items 2x $12.00") == (13860, "USD", 138.60)
+
+
+def test_parse_amount_prefers_total_over_received_change():
+    # cash receipt: Grand Total $2.40, Received $20.00, Change $17.60 — must pick the TOTAL
+    cents, cur, _ = capture.parse_amount_cents(
+        "Grand Total(USD): $2.40 Received(USD): $20.00 Change(USD): $17.60")
+    assert (cents, cur) == (240, "USD")
+
+
+def test_parse_amount_dual_currency_prefers_usd():
+    # supplier prints both; their Riel rate may differ from 4000/1 → trust the USD figure
+    cents, cur, _ = capture.parse_amount_cents("Grand Total(Riel): ៛9,800 Grand Total(USD): $2.40")
+    assert (cents, cur) == (240, "USD")
+
+
+def test_parse_amount_riel_only_converts_at_4000():
+    cents, cur, orig = capture.parse_amount_cents("Total: 92000 (Khmer Riel)")
+    assert (cents, cur, orig) == (2300, "KHR", 92000.0)   # 92000 / 4000 = $23.00
+
+
+def test_parse_amount_none():
+    assert capture.parse_amount_cents("no numbers here") == (None, None, None)
+    assert capture.parse_amount_cents("") == (None, None, None)
 
 
 def test_route():
