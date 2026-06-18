@@ -27,6 +27,16 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
+def _blocked(update):
+    """Owner's rule: in PRIVATE chat only the owner may use the bot; everyone else is ignored.
+    In GROUPS membership is the access control (only invited people are in the Expense group)."""
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat is not None and chat.type == "private":
+        return user is None or user.id != OWNER_TELEGRAM_ID
+    return False
+
+
 def _kb(r):
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(label, callback_data=data) for (label, data) in row]
@@ -39,6 +49,8 @@ async def _send_card(update, rid):
 
 
 async def cmd_start(update, context):
+    if _blocked(update):
+        return
     await update.message.reply_text(
         "🧾 Accountant — send a receipt photo here (or in the Expense group) and I'll log it as a "
         "numbered receipt.\nOwner: run /vendor link <name> inside a supplier group to map it.")
@@ -59,6 +71,8 @@ async def cmd_vendor(update, context):
 
 async def on_photo(update, context):
     """Receipt photo → 1 Haiku assess → numbered living card. Cash/ABA + ✏️ Fix from the card."""
+    if _blocked(update):
+        return
     msg = update.effective_message
     photo = msg.photo[-1]
     raw = bytes(await (await photo.get_file()).download_as_bytearray())
@@ -89,6 +103,8 @@ async def on_photo(update, context):
 async def on_callback(update, context):
     q = update.callback_query
     await q.answer()
+    if _blocked(update):
+        return
     parts = (q.data or "").split(":")
     if len(parts) != 3:
         return
@@ -113,6 +129,8 @@ async def on_callback(update, context):
 
 async def on_text(update, context):
     """A ✏️ Fix reply: a number updates the total, anything else updates the item note."""
+    if _blocked(update):
+        return
     rid = context.user_data.pop("acc_fix", None)
     if not rid:
         return
