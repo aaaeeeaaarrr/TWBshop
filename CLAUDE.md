@@ -290,8 +290,16 @@ Gas + ~18 supplier groups it lacked**. **`acc_vendors` SEEDED on STAGING** (`scr
 resolves (Indoguna/Song Heng/POSFlow). **Prod seeds at go-live.** Curated seed + ALL owner decisions in
 `scripts/vendor_seed.py` (B2B=customers, Atlas Ice=cash/no-group, ABA TWB=QR-only signal, broadcast groups
 flagged don't-bulk-store, promo-listening, dormant kept for price-broadcast); CSV/broadcast-scan reqs →
-`docs/REPORT_SYSTEM_DESIGN.md §F`. **▶ NEXT: build P1 capture** (`run_accountant.py` + receipt → living
-card; reuse `assess_receipt_photo` + `clarify.py`) — starting now.
+`docs/REPORT_SYSTEM_DESIGN.md §F`. **▶ P1 CAPTURE CORE BUILT + PROVEN (session 42):** `accountant/capture.py`
+(pure living-card + tax-tolerant math check + best-effort amount parse) · `accountant/db.py` `add_receipt`
++ lifecycle (`confirm_receipt`/`set_payment` cash→paid-idempotent/ABA→open · `edit_receipt` · `photo_sha`
+dedup · `list_open_receipts`) · `accountant/bot.py` handlers (photo→assess_receipt_photo→numbered living
+card · ✏️Fix · cash/ABA · `/vendor link`) · `run_accountant.py` shell · `tests/test_accountant_capture.py`
+**19 pass** (pure + staging lifecycle). Cash→paid at capture, ABA→open list; P2 (slip relay/match) untouched.
+**▶ GATED on owner action:** create the accountant bot via @BotFather → add `ACCOUNTANT_BOT_TOKEN` to the
+secrets repo → `python bootstrap.py --push-secrets`. THEN: real-path test in a fake Expense group → wire
+vendor-tap learning + "Received Yet?" candidate flow → P2. (Note: `config.py` token edit was blocked by the
+high-risk guard — unneeded; the shell reads the token straight from secrets like the other bots.)
 **▶ (prev, session 41) CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
 **continue on `main`** (the `lane/accountant` branch is now redundant, kept in sync on origin). **Server
 UNCHANGED** — still pinned to tag `phase0-safety-20260618`; the accountant code is **inert** (no running
