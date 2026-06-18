@@ -1064,11 +1064,19 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         "- total_amount: the FINAL total as a plain number (usually handwritten at the bottom)\n"
         "- total_currency: 'USD' or 'KHR' — if BOTH are shown use the USD figure (a supplier's Riel "
         "rate may differ from the 4000 our books use)\n"
+        "- date: the receipt/invoice date ONLY if you can read it fully (YYYY-MM-DD); if any part is "
+        "illegible or blank return null — do NOT pad with the word 'null' or guess\n"
+        "- invoice_no: the supplier's own receipt/invoice number if printed (else null)\n"
+        "- tax_amount: VAT/tax as a plain number if shown as a SEPARATE line (else null)\n"
+        "- supplier_account: the supplier's bank/ABA account NUMBER if printed on the receipt (else null)\n"
+        "- bank_name: the bank for that account if named, e.g. 'ABA' (else null)\n"
         "- is_handwritten: true if the amounts are mostly handwritten\n"
         "- is_clear: true if the vendor AND total are readable enough to record\n"
         "- issues: short notes ONLY if genuinely unreadable (blurry/cut off); else []\n\n"
         'Respond ONLY with JSON: {"is_receipt": true, "is_clear": true, "vendor": "", "items": "", '
-        '"total_amount": null, "total_currency": "USD", "is_handwritten": false, "issues": []}'
+        '"total_amount": null, "total_currency": "USD", "date": null, "invoice_no": null, '
+        '"tax_amount": null, "supplier_account": null, "bank_name": null, '
+        '"is_handwritten": false, "issues": []}'
     )
     try:
         resp = await _get_client().messages.create(
@@ -1090,14 +1098,20 @@ async def extract_receipt(image_bytes: bytes) -> dict:
             "items_text":     (r.get("items") or "").strip(),
             "total_amount":   r.get("total_amount"),
             "total_currency": (r.get("total_currency") or "USD").strip().upper(),
+            "date":           (lambda d: d if d and "null" not in d.lower() else None)((r.get("date") or "").strip()),
+            "invoice_no":     (str(r["invoice_no"]).strip() if r.get("invoice_no") else None),
+            "tax_amount":     r.get("tax_amount"),
+            "supplier_account": (str(r["supplier_account"]).strip() if r.get("supplier_account") else None),
+            "bank_name":      (r.get("bank_name") or None),
             "is_handwritten": bool(r.get("is_handwritten", False)),
             "issues":         r.get("issues", []),
         }
     except Exception:
         logger.exception("extract_receipt failed")
         return {"is_receipt": True, "is_clear": False, "vendor": "", "items_text": "",
-                "total_amount": None, "total_currency": "USD", "is_handwritten": False,
-                "issues": ["could not read — try again"]}
+                "total_amount": None, "total_currency": "USD", "date": None, "invoice_no": None,
+                "tax_amount": None, "supplier_account": None, "bank_name": None,
+                "is_handwritten": False, "issues": ["could not read — try again"]}
 
 
 async def assess_receipt_photo(image_bytes: bytes,

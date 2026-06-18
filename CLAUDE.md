@@ -319,7 +319,12 @@ design for prod, but it hid the test; added `delete_receipt` + cleared #17 so re
 focused **Sonnet** call that classifies + reads vendor/items/total/currency; bot now calls it instead of
 assess. **PROVEN on the real receipt:** `vendor Song Heng · Gas 48kg x1 · $68 · USD` (handwritten-only,
 template ignored), 4.3s. **Cost ~$0.006/receipt** (owner OK — robust across endless receipt variety beats
-per-format tuning). assess_receipt_photo untouched for GM. Local bot restarted (staging) with the Sonnet read.
+per-format tuning). assess_receipt_photo untouched for GM. **▶ RICHER READ (owner: it ignored date/inv#):**
+reading more fields is ~FREE (the image is the cost, read once; extra fields = a few output tokens) →
+`extract_receipt` now also reads **date · invoice_no · tax · supplier bank account + bank name** (the last
+two quietly feed the supplier-CSV / vendor-master learning). Additive `acc_receipts` cols (invoice_no,
+receipt_date, tax_cents, supplier_account, bank_name); card shows 📅date · inv#. Proven: invoice_no 001987
+read; partial/illegible dates now store null (not 'YYYY-null-null'). Local bot restarted (staging).
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

@@ -81,6 +81,11 @@ def init_accounting_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_receipts_vendor_status ON acc_receipts (vendor_id, status)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_receipts_bizdate ON acc_receipts (biz_date)")
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_receipts_sha ON acc_receipts (photo_sha) WHERE photo_sha IS NOT NULL")
+            # additive detail columns (read off the receipt; cheap to capture, valuable for the books)
+            for _col, _typ in (("invoice_no", "TEXT"), ("receipt_date", "TEXT"),
+                               ("tax_cents", "INTEGER"), ("supplier_account", "TEXT"),
+                               ("bank_name", "TEXT")):
+                cur.execute(f"ALTER TABLE acc_receipts ADD COLUMN IF NOT EXISTS {_col} {_typ}")
 
             # ── acc_payments + acc_payment_allocations — the lump matcher (design §D3) ──
             cur.execute("""
@@ -182,7 +187,8 @@ def list_vendors(active_only: bool = True) -> list[dict]:
 def add_receipt(vendor_id=None, amount_cents=None, pay_method=None, orig_currency="USD",
                 orig_amount=None, category=None, items_text=None, is_handwritten=False,
                 photo_file_id=None, photo_sha=None, tg_chat_id=None, tg_msg_id=None,
-                captured_by=None, is_test=False) -> int:
+                captured_by=None, is_test=False, invoice_no=None, receipt_date=None,
+                tax_cents=None, supplier_account=None, bank_name=None) -> int:
     """P1 — capture a numbered receipt row. status='captured' (DRAFT); pay_method/paid are set
     later from the living card. Dedup on photo_sha: the same photo returns the EXISTING row's id
     (S2 — one photo, one row; the uq_acc_receipts_sha index is the structural backstop)."""
@@ -197,12 +203,14 @@ def add_receipt(vendor_id=None, amount_cents=None, pay_method=None, orig_currenc
                 INSERT INTO acc_receipts
                     (vendor_id, amount_cents, pay_method, orig_currency, orig_amount, category,
                      items_text, is_handwritten, status, photo_file_id, photo_sha, tg_chat_id,
-                     tg_msg_id, captured_by, is_test)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'captured',%s,%s,%s,%s,%s,%s)
+                     tg_msg_id, captured_by, is_test, invoice_no, receipt_date, tax_cents,
+                     supplier_account, bank_name)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'captured',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (vendor_id, amount_cents, pay_method, orig_currency, orig_amount, category,
                   items_text, is_handwritten, photo_file_id, photo_sha, tg_chat_id, tg_msg_id,
-                  captured_by, is_test))
+                  captured_by, is_test, invoice_no, receipt_date, tax_cents, supplier_account,
+                  bank_name))
             return cur.fetchone()["id"]
 
 

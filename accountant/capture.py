@@ -91,6 +91,13 @@ def render_card(r: dict) -> str:
     lines = [f"🧾 #{r.get('id', '?')} · {vendor} · {amt} · {pay} · {state}"]
     if r.get("items_text"):
         lines.append(f"Items: {r['items_text']}")
+    meta = []
+    if r.get("receipt_date"):
+        meta.append(f"📅 {r['receipt_date']}")
+    if r.get("invoice_no"):
+        meta.append(f"inv #{r['invoice_no']}")
+    if meta:
+        lines.append(" · ".join(meta))
     if r.get("math_msg"):
         lines.append(r["math_msg"])
     if r.get("is_handwritten"):
