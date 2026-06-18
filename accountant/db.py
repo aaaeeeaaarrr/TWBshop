@@ -135,6 +135,7 @@ def init_accounting_db() -> None:
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_lines_receipt ON acc_receipt_lines (receipt_id)")
+            cur.execute("ALTER TABLE acc_receipt_lines ADD COLUMN IF NOT EXISTS orig_name TEXT")
 
 
 # ── Vendor master / group map — P0 (`/vendor link <name>` run inside each supplier group) ──
@@ -254,10 +255,11 @@ def save_receipt_lines(receipt_id, line_items, currency="USD") -> None:
         if not isinstance(li, dict):
             continue
         name = (li.get("name") or "").strip() or None
+        orig = (li.get("name_orig") or "").strip() or None
         up, lt = _num(li.get("unit_price")), _num(li.get("line_total"))
-        if name is None and up is None and lt is None:
+        if name is None and orig is None and up is None and lt is None:
             continue
-        rows.append((receipt_id, name, _num(li.get("qty")),
+        rows.append((receipt_id, name, orig, _num(li.get("qty")),
                      to_usd_cents(up, currency) if up is not None else None,
                      to_usd_cents(lt, currency) if lt is not None else None))
     if not rows:
@@ -265,8 +267,8 @@ def save_receipt_lines(receipt_id, line_items, currency="USD") -> None:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.executemany("""INSERT INTO acc_receipt_lines
-                (receipt_id, raw_name, qty, unit_price_cents, line_total_cents)
-                VALUES (%s,%s,%s,%s,%s)""", rows)
+                (receipt_id, raw_name, orig_name, qty, unit_price_cents, line_total_cents)
+                VALUES (%s,%s,%s,%s,%s,%s)""", rows)
 
 
 def get_receipt_lines(receipt_id) -> list[dict]:

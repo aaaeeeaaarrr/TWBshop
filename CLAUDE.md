@@ -342,8 +342,13 @@ was the **Khmer DATE layout** (ថ្ងៃ=day ខែ=month ឆ្នាំ=yea
 Calibrated to **read only when day+month+year are EACH legible, else null (never fabricate)** — proven:
 the 2nd receipt now reads `2026-06-08`, while Song Heng's faint/blank date stays null (it was guessing
 '2025-05-03' at a looser setting). Vendor null on a blank pad is correct (no printed name → group/vendor-tap
-IDs it in production). Handwritten Khmer **product names** remain weak (→ item-alias learning, stock lane).
-Bot restarted (staging).
+IDs it in production). Bot restarted (staging).
+**▶ KHMER→ENGLISH ITEM TRANSLATION (owner: stock must be in English):** `extract_receipt` line_items now
+return **name = ENGLISH (translated)** + **name_orig = as-written** (Khmer kept for the item-alias record);
+`acc_receipt_lines.orig_name` added. Asking for translation also made it READ the Khmer better — the 2nd
+receipt's "unspecified Khmer product" became **Shirt/Outfit Set (ឈុតអាវ) ×4 + Pants (ខោ) ×3** (a clothing
+buy). **MEASURED AVERAGE COST after ALL changes ≈ $0.011/receipt (~1.1¢)** (`_LAST_USAGE` hook: #41 in1914/
+out360=$0.0111, Song Heng in2292/out245=$0.0106) — ~$110/yr at 10k receipts. Suite 23. Bot restarted (staging).
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

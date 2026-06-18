@@ -1044,6 +1044,9 @@ async def detect_leave_request(text: str) -> dict:
         return {"is_leave_request": False, "_error": True}
 
 
+_LAST_USAGE = {"in": 0, "out": 0}  # tokens of the most recent extract_receipt call (cost observability)
+
+
 async def extract_receipt(image_bytes: bytes) -> dict:
     """Focused, robust receipt read for the accountant (P1). ONE Sonnet call that classifies +
     extracts — kept deliberately narrow (not the kitchen-sink assess_receipt_photo) so the model
@@ -1061,9 +1064,11 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         "printed 'Expense list' clipboard sheet, a product photo, or anything else)\n"
         "- vendor: the business name printed at the top\n"
         "- items: the actually-purchased line(s) as short text, e.g. 'Gas 48kg x1'\n"
-        "- line_items: the SAME purchases as a structured list, each {name, qty, unit_price, "
-        "line_total} — numbers as plain numbers in the receipt's currency, null where not shown; "
-        "EXCLUDE blank pre-printed options\n"
+        "- line_items: the SAME purchases as a structured list, each {name, name_orig, qty, "
+        "unit_price, line_total}. name = the product in ENGLISH (TRANSLATE from Khmer/other if needed "
+        "— we register stock in English; transliterate a brand/proper name that has no translation); "
+        "name_orig = exactly as written on the receipt. Numbers as plain numbers in the receipt's "
+        "currency, null where not shown; EXCLUDE blank pre-printed options\n"
         "- total_amount: the FINAL total as a plain number (usually handwritten at the bottom)\n"
         "- total_currency: 'USD' or 'KHR' — if BOTH are shown use the USD figure (a supplier's Riel "
         "rate may differ from the 4000 our books use)\n"
@@ -1079,7 +1084,7 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         "- is_clear: true if the vendor AND total are readable enough to record\n"
         "- issues: short notes ONLY if genuinely unreadable (blurry/cut off); else []\n\n"
         'Respond ONLY with JSON: {"is_receipt": true, "is_clear": true, "vendor": "", "items": "", '
-        '"line_items": [{"name": "", "qty": null, "unit_price": null, "line_total": null}], '
+        '"line_items": [{"name": "", "name_orig": "", "qty": null, "unit_price": null, "line_total": null}], '
         '"total_amount": null, "total_currency": "USD", "date": null, "invoice_no": null, '
         '"tax_amount": null, "supplier_account": null, "bank_name": null, '
         '"is_handwritten": false, "issues": []}'
@@ -1096,6 +1101,7 @@ async def extract_receipt(image_bytes: bytes) -> dict:
                 ],
             }],
         )
+        _LAST_USAGE["in"], _LAST_USAGE["out"] = resp.usage.input_tokens, resp.usage.output_tokens
         r = _parse_json(resp.content[0].text)
         return {
             "is_receipt":     bool(r.get("is_receipt", True)),
