@@ -349,6 +349,12 @@ return **name = ENGLISH (translated)** + **name_orig = as-written** (Khmer kept 
 receipt's "unspecified Khmer product" became **Shirt/Outfit Set (ឈុតអាវ) ×4 + Pants (ខោ) ×3** (a clothing
 buy). **MEASURED AVERAGE COST after ALL changes ≈ $0.011/receipt (~1.1¢)** (`_LAST_USAGE` hook: #41 in1914/
 out360=$0.0111, Song Heng in2292/out245=$0.0106) — ~$110/yr at 10k receipts. Suite 23. Bot restarted (staging).
+**▶ TimedOut CRASH FIXED (owner got a crash DM after a group send):** the crash-alerter worked, but a send
+crashed — `telegram.error.TimedOut` in **`get_file`** (photo fetch over a slow PC↔Telegram link hit the 5s
+default; receipt was NOT captured). Fixed: `build_application` now sets generous timeouts (read/write 30s,
+connect 15s, pool 10s, media 60s) + `on_photo` catches a fetch failure → asks to resend instead of crash-
+alerting. The 17:00 receipt was lost to the timeout → owner resends. **This matters on the OWNER's PC (local
+test poller); the DO server's link to Telegram is fast.** Bot restarted (staging).
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

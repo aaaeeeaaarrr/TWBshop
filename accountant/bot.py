@@ -90,7 +90,15 @@ async def on_photo(update, context):
         return
     msg = update.effective_message
     photo = msg.photo[-1]
-    raw = bytes(await (await photo.get_file()).download_as_bytearray())
+    try:
+        raw = bytes(await (await photo.get_file()).download_as_bytearray())
+    except Exception:
+        logger.exception("photo fetch failed (network)")
+        try:
+            await msg.reply_text("⚠️ Couldn't fetch that photo (network hiccup) — please resend it.")
+        except Exception:
+            pass
+        return
     sha = hashlib.sha256(raw).hexdigest()
     existing = get_receipt_by_sha(sha)
     if existing and existing.get("status") not in (None, "captured"):
@@ -179,7 +187,10 @@ async def on_text(update, context):
 
 
 def build_application(token: str) -> Application:
-    app = Application.builder().token(token).build()
+    # generous timeouts — photo fetch over a slow link was timing out at the 5s default
+    app = (Application.builder().token(token)
+           .read_timeout(30).write_timeout(30).connect_timeout(15).pool_timeout(10)
+           .media_write_timeout(60).build())
     from shared.error_handler import make_error_handler
     app.add_error_handler(make_error_handler("Accountant"))   # crashes are never silent
     app.add_handler(CommandHandler("start", cmd_start))
