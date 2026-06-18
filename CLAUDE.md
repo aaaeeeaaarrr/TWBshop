@@ -355,6 +355,17 @@ default; receipt was NOT captured). Fixed: `build_application` now sets generous
 connect 15s, pool 10s, media 60s) + `on_photo` catches a fetch failure → asks to resend instead of crash-
 alerting. The 17:00 receipt was lost to the timeout → owner resends. **This matters on the OWNER's PC (local
 test poller); the DO server's link to Telegram is fast.** Bot restarted (staging).
+**▶ DATE-READING + ITEM CORRECT-AND-LEARN LOOP (owner: still no date; how would a name correction know which
+item?):** (1) date prompt relaxed to **read what's written (best-effort), null only if the line is BLANK**
+→ proven: receipt reads `2026-06-08` (Khmer ថ្ងៃ/ខែ/ឆ្នាំ). Messy handwriting = best guess, correctable.
+(2) **The learning loop is BUILT** (answers "how would it know"): card now **numbers items** (`1.`, `2.`);
+`✏️ Fix` accepts **`1 Apple`** = rename item 1; that writes the line AND **`learn_item_alias`** (new
+`acc_item_aliases` table, keyed vendor + as-written original name). On the NEXT capture `save_receipt_lines`
+**applies the learned alias** (overrides the model's fresh guess) → the correction sticks; the model's own
+translation also auto-seeds it. **Proven end-to-end on staging** (capture#1 = model guess → correct →
+capture#2 = learned name). **Honest limit:** keyed on the model's transcription of the original, so it's
+reliable for printed/legible names; for very messy handwriting the transcription itself varies so the key
+may not always match (improves as reads stabilise / with the supplier-group signal). Suite 23. Bot restarted.
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

@@ -90,8 +90,8 @@ def render_card(r: dict) -> str:
 
     lines = [f"🧾 #{r.get('id', '?')} · {vendor} · {amt} · {pay} · {state}"]
     if r.get("lines"):
-        for li in r["lines"]:
-            seg = f"  • {li.get('raw_name') or '?'}"
+        for i, li in enumerate(r["lines"], 1):
+            seg = f"  {i}. {li.get('raw_name') or '?'}"
             if li.get("qty"):
                 seg += f" ×{float(li['qty']):g}"
             if li.get("line_total_cents") is not None:

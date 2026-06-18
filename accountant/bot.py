@@ -9,6 +9,7 @@ The pure logic + DB lifecycle it calls ARE proven (tests/test_accountant_capture
 """
 import hashlib
 import logging
+import re
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
@@ -16,8 +17,9 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 
 from accountant import capture
 from accountant.db import (add_receipt, confirm_receipt, delete_receipt, edit_receipt,
-                           get_receipt, get_receipt_by_sha, get_receipt_lines, save_receipt_lines,
-                           set_payment, to_usd_cents, vendor_by_group, vendor_by_name, vendor_link)
+                           get_receipt, get_receipt_by_sha, get_receipt_lines, learn_item_alias,
+                           rename_receipt_line, save_receipt_lines, set_payment, to_usd_cents,
+                           vendor_by_group, vendor_by_name, vendor_link)
 from shared.ai_client import extract_receipt
 
 try:
@@ -137,7 +139,7 @@ async def on_photo(update, context):
         tg_msg_id=msg.message_id,
         captured_by=update.effective_user.id,
     )
-    save_receipt_lines(rid, rec.get("line_items"), cur)
+    save_receipt_lines(rid, rec.get("line_items"), cur, vendor_id=(v["id"] if v else None))
     await _send_card(update, rid)
 
 
@@ -162,7 +164,11 @@ async def on_callback(update, context):
         set_payment(rid, "aba")
     elif action == "fix":
         context.user_data["acc_fix"] = rid
-        await q.message.reply_text("✏️ Send the correction — a number = the total, otherwise a note.")
+        await q.message.reply_text(
+            "✏️ Send a correction:\n"
+            "• a number = the total (e.g. 135.30)\n"
+            "• `1 Apple` = rename item 1 (I'll remember it for next time)\n"
+            "• anything else = a note")
         return
     r = get_receipt(rid)
     await q.edit_message_text(capture.render_card(r), reply_markup=_kb(r))
@@ -176,6 +182,17 @@ async def on_text(update, context):
     if not rid:
         return
     text = (update.message.text or "").strip()
+    # per-item correction: "1 Apple" → rename item 1 AND remember it (vendor + original name → English)
+    m = re.match(r"^(\d+)\s+(.+)$", text)
+    if m:
+        idx, newname = int(m.group(1)), m.group(2).strip()
+        lines = get_receipt_lines(rid)
+        if 1 <= idx <= len(lines):
+            line = lines[idx - 1]
+            rename_receipt_line(line["id"], newname)
+            learn_item_alias((get_receipt(rid) or {}).get("vendor_id"), line.get("orig_name"), newname)
+            await _send_card(update, rid)
+            return
     cents, currency, orig = capture.parse_amount_cents(text)
     if cents is None and text.replace(".", "", 1).isdigit():
         cents, currency, orig = int(round(float(text) * 100)), "USD", float(text)

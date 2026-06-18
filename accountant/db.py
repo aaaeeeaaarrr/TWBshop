@@ -137,6 +137,18 @@ def init_accounting_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_lines_receipt ON acc_receipt_lines (receipt_id)")
             cur.execute("ALTER TABLE acc_receipt_lines ADD COLUMN IF NOT EXISTS orig_name TEXT")
 
+            # ── acc_item_aliases — the bot's learned item names (model translation + staff corrections) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS acc_item_aliases (
+                    id           SERIAL PRIMARY KEY,
+                    vendor_key   INTEGER NOT NULL DEFAULT 0,  -- vendor_id, or 0 for unknown/global
+                    orig_name    TEXT NOT NULL,               -- as written on the receipt (e.g. Khmer)
+                    english_name TEXT NOT NULL,               -- learned / staff-corrected English
+                    updated_at   TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (vendor_key, orig_name)
+                )
+            """)
+
 
 # ── Vendor master / group map — P0 (`/vendor link <name>` run inside each supplier group) ──
 
@@ -248,14 +260,18 @@ def _num(v):
         return None
 
 
-def save_receipt_lines(receipt_id, line_items, currency="USD") -> None:
-    """Store the structured per-line detail (design §E11). Prices → USD cents; all best-effort."""
+def save_receipt_lines(receipt_id, line_items, currency="USD", vendor_id=None) -> None:
+    """Store the structured per-line detail (design §E11). A LEARNED alias (the bot's own memory or a
+    past staff correction) for this vendor + original name OVERRIDES the model's fresh translation."""
     rows = []
     for li in (line_items or []):
         if not isinstance(li, dict):
             continue
         name = (li.get("name") or "").strip() or None
         orig = (li.get("name_orig") or "").strip() or None
+        learned = get_item_alias(vendor_id, orig) if orig else None
+        if learned:
+            name = learned
         up, lt = _num(li.get("unit_price")), _num(li.get("line_total"))
         if name is None and orig is None and up is None and lt is None:
             continue
@@ -277,6 +293,41 @@ def get_receipt_lines(receipt_id) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM acc_receipt_lines WHERE receipt_id=%s ORDER BY id", (receipt_id,))
             return list(cur.fetchall())
+
+
+def get_item_alias(vendor_id, orig_name):
+    """The learned English name for this vendor's original (as-written) item name, or None."""
+    if not orig_name:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT english_name FROM acc_item_aliases "
+                        "WHERE vendor_key=%s AND lower(orig_name)=lower(%s)",
+                        (vendor_id or 0, orig_name.strip()))
+            row = cur.fetchone()
+            return row["english_name"] if row else None
+
+
+def learn_item_alias(vendor_id, orig_name, english_name) -> None:
+    """Remember (or update) an item's English name for next time — the model's translation OR a staff
+    ✏️ correction. Keyed on vendor + the original as-written name (so the bot teaches itself)."""
+    if not orig_name or not english_name:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO acc_item_aliases (vendor_key, orig_name, english_name)
+                           VALUES (%s,%s,%s)
+                           ON CONFLICT (vendor_key, orig_name)
+                           DO UPDATE SET english_name=EXCLUDED.english_name, updated_at=NOW()""",
+                        (vendor_id or 0, orig_name.strip(), english_name.strip()))
+
+
+def rename_receipt_line(line_id, new_name) -> None:
+    """Apply a staff correction to one line's English name."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_receipt_lines SET raw_name=%s WHERE id=%s",
+                        ((new_name or "").strip(), line_id))
 
 
 def get_receipt_by_sha(photo_sha: str) -> dict | None:
