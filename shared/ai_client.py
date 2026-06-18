@@ -1044,6 +1044,62 @@ async def detect_leave_request(text: str) -> dict:
         return {"is_leave_request": False, "_error": True}
 
 
+async def extract_receipt(image_bytes: bytes) -> dict:
+    """Focused, robust receipt read for the accountant (P1). ONE Sonnet call that classifies +
+    extracts — kept deliberately narrow (not the kitchen-sink assess_receipt_photo) so the model
+    isn't juggling five jobs on a hard handwritten read. Sonnet (not Haiku) for robustness across
+    the endless variety of supplier formats. Returns:
+        {is_receipt, is_clear, vendor, items_text, total_amount, total_currency, is_handwritten, issues}
+    """
+    prompt = (
+        "Read this purchase receipt/invoice for bookkeeping.\n"
+        "It may be a PRE-PRINTED FORM that lists many product OPTIONS (e.g. a gas shop pre-prints "
+        "Gas 12kg / 15kg / 48kg). ONLY the line(s) with a HANDWRITTEN quantity or price were ACTUALLY "
+        "bought — IGNORE the blank printed options.\n\n"
+        "Extract:\n"
+        "- is_receipt: true ONLY if this is a receipt / invoice / bill (NOT a POS/computer screen, a "
+        "printed 'Expense list' clipboard sheet, a product photo, or anything else)\n"
+        "- vendor: the business name printed at the top\n"
+        "- items: the actually-purchased line(s) as short text, e.g. 'Gas 48kg x1'\n"
+        "- total_amount: the FINAL total as a plain number (usually handwritten at the bottom)\n"
+        "- total_currency: 'USD' or 'KHR' — if BOTH are shown use the USD figure (a supplier's Riel "
+        "rate may differ from the 4000 our books use)\n"
+        "- is_handwritten: true if the amounts are mostly handwritten\n"
+        "- is_clear: true if the vendor AND total are readable enough to record\n"
+        "- issues: short notes ONLY if genuinely unreadable (blurry/cut off); else []\n\n"
+        'Respond ONLY with JSON: {"is_receipt": true, "is_clear": true, "vendor": "", "items": "", '
+        '"total_amount": null, "total_currency": "USD", "is_handwritten": false, "issues": []}'
+    )
+    try:
+        resp = await _get_client().messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=500,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _encode(image_bytes)}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        r = _parse_json(resp.content[0].text)
+        return {
+            "is_receipt":     bool(r.get("is_receipt", True)),
+            "is_clear":       bool(r.get("is_clear", True)),
+            "vendor":         (r.get("vendor") or "").strip(),
+            "items_text":     (r.get("items") or "").strip(),
+            "total_amount":   r.get("total_amount"),
+            "total_currency": (r.get("total_currency") or "USD").strip().upper(),
+            "is_handwritten": bool(r.get("is_handwritten", False)),
+            "issues":         r.get("issues", []),
+        }
+    except Exception:
+        logger.exception("extract_receipt failed")
+        return {"is_receipt": True, "is_clear": False, "vendor": "", "items_text": "",
+                "total_amount": None, "total_currency": "USD", "is_handwritten": False,
+                "issues": ["could not read — try again"]}
+
+
 async def assess_receipt_photo(image_bytes: bytes,
                                past_examples: list[dict] | None = None,
                                vendor_rules: list[dict] | None = None) -> dict:

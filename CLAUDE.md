@@ -309,10 +309,17 @@ Expenses TWB; the bot captured but (a) dropped the printed vendor and (b) read t
 `assess_receipt_photo` (`shared/ai_client.py`, additive `fields.receipt_vendor/receipt_total/
 receipt_currency`; GM's REPORT path ignores them) to read the printed vendor, take ONLY handwritten-filled
 lines (ignore blank pre-printed options), and extract the total (USD preferred on dual-currency). Bot now
-uses the structured total + `vendor_by_name` learning-lite ('SONG HENG'→seeded 'Song Heng Gas'). **PROVEN
-on the real receipt:** Haiku returns vendor SONG HENG · Gas 48kg ×1 · $68 — correct. **Cost (measured):**
-~$0.002/receipt on Haiku (≈ same as before; Sonnet would be ~$0.006 — NOT needed). gm gets the ai_client
-improvement at its next deploy (server tag-pinned, unaffected now). Local bot restarted (staging) for re-test.
+uses the structured total + `vendor_by_name` learning-lite ('SONG HENG'→seeded 'Song Heng Gas').
+**▶ RE-TEST FAILED → ROOT-CAUSED + FIXED PROPERLY:** owner's re-send still showed the old wrong card —
+TWO causes: (1) **photo_sha dedup** returned the SAME row #17 (the new code never ran on a re-send — by
+design for prod, but it hid the test; added `delete_receipt` + cleared #17 so re-sends re-capture); (2) the
+**kitchen-sink `assess_receipt_photo` prompt overloads Haiku** — it got the vendor but `receipt_total=null`
+(my *focused* prompt read $68 fine; doing classify+clarity+expense+pos+receipt in one call is too much).
+**FIX (owner agreed "sonnet this"):** new dedicated **`extract_receipt`** (`shared/ai_client.py`) — ONE
+focused **Sonnet** call that classifies + reads vendor/items/total/currency; bot now calls it instead of
+assess. **PROVEN on the real receipt:** `vendor Song Heng · Gas 48kg x1 · $68 · USD` (handwritten-only,
+template ignored), 4.3s. **Cost ~$0.006/receipt** (owner OK — robust across endless receipt variety beats
+per-format tuning). assess_receipt_photo untouched for GM. Local bot restarted (staging) with the Sonnet read.
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

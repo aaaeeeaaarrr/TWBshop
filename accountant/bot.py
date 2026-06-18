@@ -18,7 +18,7 @@ from accountant import capture
 from accountant.db import (add_receipt, confirm_receipt, edit_receipt, get_receipt,
                            set_payment, to_usd_cents, vendor_by_group, vendor_by_name,
                            vendor_link)
-from shared.ai_client import assess_receipt_photo
+from shared.ai_client import extract_receipt
 
 try:
     from config import OWNER_TELEGRAM_ID
@@ -79,7 +79,7 @@ async def cmd_vendor(update, context):
 
 
 async def on_photo(update, context):
-    """Receipt photo → 1 Haiku assess → numbered living card. Cash/ABA + ✏️ Fix from the card."""
+    """Receipt photo → one focused Sonnet read → numbered living card. Cash/ABA + ✏️ Fix from the card."""
     if not _allowed(update):
         return
     msg = update.effective_message
@@ -87,30 +87,25 @@ async def on_photo(update, context):
     raw = bytes(await (await photo.get_file()).download_as_bytearray())
     sha = hashlib.sha256(raw).hexdigest()
     try:
-        assess = await assess_receipt_photo(raw)
+        rec = await extract_receipt(raw)
     except Exception:
-        logger.exception("assess_receipt_photo failed")
+        logger.exception("extract_receipt failed")
         return
-    if capture.route(assess) != "receipt":
-        return  # expense sheets / POS screens / other are the report engine's job (P3)
+    if not rec.get("is_receipt"):
+        return  # POS screens / expense sheets / other are the report engine's job (P3)
 
-    fields = assess.get("fields") or {}
     v = vendor_by_group(update.effective_chat.id)  # zero-read vendor if posted in a supplier group
     if not v:  # else learn from the printed name (vendor-learning lite): "SONG HENG" → "Song Heng Gas"
-        v = vendor_by_name(fields.get("receipt_vendor") or assess.get("vendor"))
-    # prefer the structured total the model read (handwritten-aware); fall back to parsing free text
-    rtotal, rcur = fields.get("receipt_total"), (fields.get("receipt_currency") or "USD")
-    if rtotal is not None:
-        cents, currency, orig = to_usd_cents(rtotal, rcur), rcur, rtotal
-    else:
-        cents, currency, orig = capture.parse_amount_cents(assess.get("readable_partial"))
+        v = vendor_by_name(rec.get("vendor"))
+    total, cur = rec.get("total_amount"), (rec.get("total_currency") or "USD")
+    cents = to_usd_cents(total, cur) if total is not None else None
     rid = add_receipt(
         vendor_id=(v["id"] if v else None),
         amount_cents=cents,
-        orig_currency=(currency or "USD"),
-        orig_amount=orig,
-        items_text=((assess.get("readable_partial") or "")[:300] or None),
-        is_handwritten=assess.get("is_handwritten", False),
+        orig_currency=cur,
+        orig_amount=total,
+        items_text=(rec.get("items_text") or None),
+        is_handwritten=rec.get("is_handwritten", False),
         photo_file_id=photo.file_id,
         photo_sha=sha,
         tg_chat_id=update.effective_chat.id,

@@ -250,6 +250,15 @@ def edit_receipt(rid: int, **fields) -> None:
             cur.execute(f"UPDATE acc_receipts SET {cols} WHERE id=%s", (*sets.values(), rid))
 
 
+def delete_receipt(rid: int) -> None:
+    """Remove a receipt row (+ any allocations) — correcting a mis-capture or clearing a test row so
+    the same photo can be re-captured (the photo_sha dedup otherwise returns the existing row)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM acc_payment_allocations WHERE receipt_id=%s", (rid,))
+            cur.execute("DELETE FROM acc_receipts WHERE id=%s", (rid,))
+
+
 def list_open_receipts(is_test=False) -> list[dict]:
     """Unpaid ABA receipts — the open list / carry-forward (design §B4)."""
     with _db() as conn:
