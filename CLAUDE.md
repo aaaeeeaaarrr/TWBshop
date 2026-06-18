@@ -275,7 +275,34 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-18 (session 42 — **ACCOUNTANT receipt-archive + OCR + vendor seed (staging); P1 capture starting**).
+**Last updated:** 2026-06-18 (session 42 — **ACCOUNTANT P1 CAPTURE live-testing on staging + correct-and-learn loop**).
+
+**▶▶ RESUME HERE (cross-machine, session 42 — READ THIS FIRST):** Building the **Accountant bot (P1
+capture)**, live-tested on **STAGING** via a LOCAL poller (the bot is NOT on the server — inert there,
+tag-pinned; nothing deployed). **WORKING NOW:** a receipt photo in the Expense group → **one Sonnet call**
+(`shared/ai_client.py::extract_receipt`) → a **numbered living card** — `vendor · $total · method · draft`
+/ numbered line items in **ENGLISH** (Khmer kept in `orig_name`) / **📅 date** (best-effort, null if blank) /
+**✓ math check** (Σ lines+tax vs total) / inv# · tax · supplier bank acct — with buttons **✅ Looks right ·
+🏦 For ABA · 💵 Cash-paid · ✏️ Fix**. Cash→paid, ABA→open list. **CORRECT-AND-LEARN LOOP (built + proven):**
+items are numbered; **✏️ Fix → `1 Apple`** renames item 1 AND learns it (`acc_item_aliases`, keyed
+vendor+original-name → English); the NEXT capture auto-applies the learned name over the model's guess (the
+model's own translation seeds it too). Re-sending a **draft** photo re-reads it (a finalized one is
+protected). **Cost ≈ $0.011/receipt** (Sonnet). Honest limits: messy handwriting reads inconsistently
+(vendor/date/item names wobble) → learning firms up for printed/legible names + the supplier-group signal
+scopes it in prod.
+**▶ HOW TO RUN THE TEST BOT (either machine):** `python scripts/run_accountant_local.py` (staging + dev
+poller + Py-3.14 loop fix). **ONE poller per token** — don't run on two machines at once (I stopped the one
+on the prior machine). Token `ACCOUNTANT_BOT_TOKEN` is in the secrets repo (pushed this session).
+**KEY IDs:** Expense group `-5417163768` · TEST Supplier `-5406470751` (fake supplier group for the forward
+flow) · @AccountantTWB_bot `8653120770` · card actors owner `1313155971` + listener/shop `1271537077` (Tyty
+added later, observes). `vendor_seed.py` seeded `acc_vendors` (48) on staging. **▶ NEXT:** keep testing
+capture (a PRINTED Khmer receipt is the best showcase of translation+memory) → build the **TEST-Supplier
+forward flow** ("Received Yet?" candidate forwarded to the Expense group, top-text = supplier **name + group**
+so routing is verifiable, vendor learning) → then **P2** = owner→bot→supplier **slip relay** + subset-sum/FIFO
+**matcher** + anti-double-pay (HIGH-RISK money, per-step owner approval). Tooling: `scripts/fetch_report_
+receipts.py` (daily archive cron live) · `ocr_catalogue.py` · `match_suppliers.py` · `seed_vendors.py`.
+Blow-by-blow of this session is in the blocks below.
+
 **▶ RECEIPT INTELLIGENCE + VENDOR SEED (session 42, 2026-06-18):** From TWB REPORT (`-5136886404`, born
 2026-05-27): archived **421 photos** (123 MB) via the read-only `ops_listener` session
 (`scripts/fetch_report_receipts.py`; listener verified `active` throughout). **204 early receipts were
