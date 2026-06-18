@@ -303,9 +303,21 @@ secrets; **privacy OFF verified** (`can_read_all_group_messages=True`), bot is a
 later). **Riel auto-read added** — USD preferred (dual-currency receipts use the supplier's USD, since their
 Riel rate ≠ our 4000/1), Riel-only converts at 4000៛=$1, biases to the figure after "total" so received/
 change can't win. Forwarded photos = same path. Suite **18** capture tests (Riel/dual/received cases).
-**▶ NEXT: real-path test** — run locally vs STAGING, owner sends a receipt in Expenses TWB → verify the
-living card; then vendor-tap learning + "Received Yet?" → P2. (Note: `config.py` token edit was blocked by
-the high-risk guard — unneeded; the shell reads the token straight from secrets like the other bots.)
+**▶ FIRST REAL RECEIPT + SMARTER CAPTURE (session 42 cont):** owner sent a Song Heng gas receipt to
+Expenses TWB; the bot captured but (a) dropped the printed vendor and (b) read the whole printed TEMPLATE
+(all gas sizes) + no total. **Universal fix — a better PROMPT, not a pricier model:** extended
+`assess_receipt_photo` (`shared/ai_client.py`, additive `fields.receipt_vendor/receipt_total/
+receipt_currency`; GM's REPORT path ignores them) to read the printed vendor, take ONLY handwritten-filled
+lines (ignore blank pre-printed options), and extract the total (USD preferred on dual-currency). Bot now
+uses the structured total + `vendor_by_name` learning-lite ('SONG HENG'→seeded 'Song Heng Gas'). **PROVEN
+on the real receipt:** Haiku returns vendor SONG HENG · Gas 48kg ×1 · $68 — correct. **Cost (measured):**
+~$0.002/receipt on Haiku (≈ same as before; Sonnet would be ~$0.006 — NOT needed). gm gets the ai_client
+improvement at its next deploy (server tag-pinned, unaffected now). Local bot restarted (staging) for re-test.
+**TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
+name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
+the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received
+Yet?" candidate, top-text=name+group) → vendor-tap learning → P2. (Note: `config.py` token edit was blocked
+by the high-risk guard — unneeded; the shell reads the token straight from secrets like the other bots.)
 **▶ (prev, session 41) CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
 **continue on `main`** (the `lane/accountant` branch is now redundant, kept in sync on origin). **Server
 UNCHANGED** — still pinned to tag `phase0-safety-20260618`; the accountant code is **inert** (no running

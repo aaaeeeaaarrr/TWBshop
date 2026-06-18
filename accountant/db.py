@@ -152,6 +152,22 @@ def vendor_by_group(tg_group_id: int) -> dict | None:
             return cur.fetchone()
 
 
+def vendor_by_name(name: str) -> dict | None:
+    """Vendor-learning (lite): match a printed receipt name to a seeded vendor by case-insensitive
+    substring (either direction), e.g. read 'SONG HENG' → seeded 'Song Heng Gas'. None if no match.
+    (Full printed-name learning — storing each receipt's exact spelling — comes later.)"""
+    if not name:
+        return None
+    n = " ".join(name.strip().lower().split())
+    if len(n) < 3:
+        return None
+    for v in list_vendors(active_only=False):
+        vn = " ".join((v["name"] or "").lower().split())
+        if vn and (vn in n or n in vn):
+            return v
+    return None
+
+
 def list_vendors(active_only: bool = True) -> list[dict]:
     """All vendors (for an owner overview / the payable run)."""
     with _db() as conn:

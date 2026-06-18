@@ -16,7 +16,8 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 
 from accountant import capture
 from accountant.db import (add_receipt, confirm_receipt, edit_receipt, get_receipt,
-                           set_payment, vendor_by_group, vendor_link)
+                           set_payment, to_usd_cents, vendor_by_group, vendor_by_name,
+                           vendor_link)
 from shared.ai_client import assess_receipt_photo
 
 try:
@@ -93,8 +94,16 @@ async def on_photo(update, context):
     if capture.route(assess) != "receipt":
         return  # expense sheets / POS screens / other are the report engine's job (P3)
 
+    fields = assess.get("fields") or {}
     v = vendor_by_group(update.effective_chat.id)  # zero-read vendor if posted in a supplier group
-    cents, currency, orig = capture.parse_amount_cents(assess.get("readable_partial"))
+    if not v:  # else learn from the printed name (vendor-learning lite): "SONG HENG" → "Song Heng Gas"
+        v = vendor_by_name(fields.get("receipt_vendor") or assess.get("vendor"))
+    # prefer the structured total the model read (handwritten-aware); fall back to parsing free text
+    rtotal, rcur = fields.get("receipt_total"), (fields.get("receipt_currency") or "USD")
+    if rtotal is not None:
+        cents, currency, orig = to_usd_cents(rtotal, rcur), rcur, rtotal
+    else:
+        cents, currency, orig = capture.parse_amount_cents(assess.get("readable_partial"))
     rid = add_receipt(
         vendor_id=(v["id"] if v else None),
         amount_cents=cents,
