@@ -552,3 +552,38 @@ SHARED zone** (read/written by both the accountant and stock lanes, per E7); the
   queue** · **owner menu**.
 - **P4+** — price tracking + supplier-message-with-approval · **stock 3-way reconciliation** (with the
   stock lane, via `stock_movements`) · Sheet/CSV export · voice-note expenses · KHQR-pay (pending Bakong).
+
+---
+
+## F. (2026-06-18) Data-collection mandate + CSV exports + broadcast price-scan
+
+### F1. Daily receipt-archive cron (DONE 2026-06-18)
+The report group lost ~204 early receipts to manual deletion (the listener kept metadata only, not
+bytes). Fix: a daily cron archives every new photo from TWB REPORT to
+`/root/TWBshop/receipts_archive/TWB_REPORT/` (gitignored, server-only) via the read-only
+`ops_listener` session — `scripts/fetch_report_receipts.py` (idempotent, skips existing), cron
+**15:15 PP daily**. ~135 MB for 3 wks, ~2 GB/yr against 39 GB free → **no compression** (receipts
+must stay legible). Supplier *broadcast* groups are deliberately NOT archived (volume — see F4).
+
+### F2. "Collect a lot of good details" — schema mandate (owner)
+Owner wants rich CSVs, so capture generously as we go:
+- **acc_vendors enrich:** `payment_account_no`, `bank_name` (NOT all ABA — owner pays from ABA
+  regardless), secondary accounts (JSON), contact name/phone, `terms_days`, typical-spend band,
+  `last_order_at`, `total_spent`, aliases, notes.
+- **acc_items enrich (stock lane):** canonical name, category, unit, pack/qty, on-hand, `min_qty`,
+  `reorder_qty`, candidate suppliers, per-supplier price+pack, cheapest supplier, last price,
+  price trend, aliases. (More columns than the 3 reorder-sheet images.)
+
+### F3. CSV exports (owner-requested)
+1. **Products CSV** — per item: F2 detail + **price per supplier per pack/qty + "who wins" (cheapest)**
+   + min/reorder + how-much-to-order. The stock lane's headline export.
+2. **Suppliers CSV** — per vendor: payment account + bank + contact + terms + spend + group + aliases.
+3. **Bonus ideas:** AP aging (owed per supplier, days outstanding) · monthly expense by category/vendor
+   · price-change log · cash-vs-ABA spend · receipt-ledger dump · payment history · recurring-expense
+   calendar · 3-way reconciliation (bought/sold/counted).
+
+### F4. Broadcast price-scan (PARKED — after the accountant + stock lanes are solid)
+On-demand only (owner at the terminal): scan recent photos+messages of the BROADCAST groups
+(`scripts/vendor_seed.py::BROADCAST`) and compare to our current product prices → flag cheaper
+options. "No API for these spammers": text promos are free (regex); photo promos need vision, so do
+it SELECTIVELY + on demand, never as routine spend. Do NOT bulk-store their photos.

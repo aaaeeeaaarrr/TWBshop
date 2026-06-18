@@ -34,6 +34,9 @@ photos/
 # Downloaded supplier price lists (server-only, can be large)
 pricelists/
 
+# Archived receipt/report photos pulled from Telegram (server-only, business data — never commit)
+receipts_archive/
+
 # IDE
 .vscode/
 .idea/

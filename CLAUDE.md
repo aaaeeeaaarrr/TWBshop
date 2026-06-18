@@ -275,8 +275,24 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-18 (session 41 — **ACCOUNTANT P0 + DESIGN §E; cross-machine checkpoint, ALL MERGED TO `main`**).
-**▶ CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
+**Last updated:** 2026-06-18 (session 42 — **ACCOUNTANT receipt-archive + OCR + vendor seed (staging); P1 capture starting**).
+**▶ RECEIPT INTELLIGENCE + VENDOR SEED (session 42, 2026-06-18):** From TWB REPORT (`-5136886404`, born
+2026-05-27): archived **421 photos** (123 MB) via the read-only `ops_listener` session
+(`scripts/fetch_report_receipts.py`; listener verified `active` throughout). **204 early receipts were
+manually deleted before any byte-archiving → UNRECOVERABLE** (the listener stored metadata only). **Daily
+archive cron added** (15:15 PP) — made lock-safe by working off a COPY of the session file (a direct
+concurrent open hit `database is locked`; copy approach proven 3× clean, listener unharmed). **OCR:** all
+421 classified by the production `assess_receipt_photo` (`scripts/ocr_catalogue.py`, 0 errors) → **244
+receipts · 109 expense sheets · 66 POS screens**. **Vendor↔group map:** the static
+`price_list_fetcher.SUPPLIER_CHATS` was STALE; pulled the LIVE list from `ops_messages` → found **Song Heng
+Gas + ~18 supplier groups it lacked**. **`acc_vendors` SEEDED on STAGING** (`scripts/seed_vendors.py` via
+`vendor_link` upsert): **0→48 (39 active, 9 dormant)**, independent re-read proven, zero-read paid-signal
+resolves (Indoguna/Song Heng/POSFlow). **Prod seeds at go-live.** Curated seed + ALL owner decisions in
+`scripts/vendor_seed.py` (B2B=customers, Atlas Ice=cash/no-group, ABA TWB=QR-only signal, broadcast groups
+flagged don't-bulk-store, promo-listening, dormant kept for price-broadcast); CSV/broadcast-scan reqs →
+`docs/REPORT_SYSTEM_DESIGN.md §F`. **▶ NEXT: build P1 capture** (`run_accountant.py` + receipt → living
+card; reuse `assess_receipt_photo` + `clarify.py`) — starting now.
+**▶ (prev, session 41) CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
 **continue on `main`** (the `lane/accountant` branch is now redundant, kept in sync on origin). **Server
 UNCHANGED** — still pinned to tag `phase0-safety-20260618`; the accountant code is **inert** (no running
 service imports `accountant/`, `init_accounting_db()` is uncalled) → **nothing was deployed** this push.
