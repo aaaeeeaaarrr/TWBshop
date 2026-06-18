@@ -324,7 +324,13 @@ reading more fields is ~FREE (the image is the cost, read once; extra fields = a
 `extract_receipt` now also reads **date · invoice_no · tax · supplier bank account + bank name** (the last
 two quietly feed the supplier-CSV / vendor-master learning). Additive `acc_receipts` cols (invoice_no,
 receipt_date, tax_cents, supplier_account, bank_name); card shows 📅date · inv#. Proven: invoice_no 001987
-read; partial/illegible dates now store null (not 'YYYY-null-null'). Local bot restarted (staging).
+read; partial/illegible dates now store null (not 'YYYY-null-null').
+**▶ LINE ITEMS + MATH CHECK (owner: wants detail before stocks):** `extract_receipt` now returns structured
+**line_items** [{name,qty,unit_price,line_total}]; new **`acc_receipt_lines`** table (design §E11 — feeds the
+math check now + the stock lane later) via `save_receipt_lines`/`get_receipt_lines`; the card lists each line
+and shows a **tax-tolerant math check** (Σ lines + tax vs total → '✓ items add up' or a flagged gap). Proven
+end-to-end on the Song Heng slip: `• Gas 48kg ×1 = $68.00 / inv #001987 / ✓ items add up`. Local bot
+restarted (staging). NEXT new-receipt capture also stores the supplier's printed bank account (→ supplier CSV).
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

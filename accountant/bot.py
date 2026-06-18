@@ -16,8 +16,8 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 
 from accountant import capture
 from accountant.db import (add_receipt, confirm_receipt, edit_receipt, get_receipt,
-                           set_payment, to_usd_cents, vendor_by_group, vendor_by_name,
-                           vendor_link)
+                           get_receipt_lines, save_receipt_lines, set_payment, to_usd_cents,
+                           vendor_by_group, vendor_by_name, vendor_link)
 from shared.ai_client import extract_receipt
 
 try:
@@ -54,6 +54,12 @@ def _kb(r):
 
 async def _send_card(update, rid):
     r = get_receipt(rid)
+    r["lines"] = get_receipt_lines(rid)
+    items_sum = sum(li["line_total_cents"] for li in r["lines"]
+                    if li.get("line_total_cents") is not None)
+    if r["lines"] and items_sum and r.get("amount_cents"):
+        ok, msg = capture.math_check(items_sum + (r.get("tax_cents") or 0), r["amount_cents"])
+        r["math_msg"] = msg if not ok else "✓ items add up"
     await update.effective_message.reply_text(capture.render_card(r), reply_markup=_kb(r))
 
 
@@ -117,6 +123,7 @@ async def on_photo(update, context):
         tg_msg_id=msg.message_id,
         captured_by=update.effective_user.id,
     )
+    save_receipt_lines(rid, rec.get("line_items"), cur)
     await _send_card(update, rid)
 
 

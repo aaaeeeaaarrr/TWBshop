@@ -120,6 +120,22 @@ def init_accounting_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_alloc_receipt ON acc_payment_allocations (receipt_id)")
 
+            # ── acc_receipt_lines — per-line detail (design §E11): math check now, stock lane later ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS acc_receipt_lines (
+                    id               SERIAL PRIMARY KEY,
+                    receipt_id       INTEGER REFERENCES acc_receipts(id),
+                    raw_name         TEXT,
+                    item_id          INTEGER,            -- → acc_items (stock lane); NULL for now
+                    qty              NUMERIC,
+                    unit             TEXT,
+                    unit_price_cents INTEGER,
+                    line_total_cents INTEGER,
+                    created_at       TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_lines_receipt ON acc_receipt_lines (receipt_id)")
+
 
 # ── Vendor master / group map — P0 (`/vendor link <name>` run inside each supplier group) ──
 
@@ -223,6 +239,44 @@ def get_receipt(rid: int) -> dict | None:
             return cur.fetchone()
 
 
+def _num(v):
+    """Coerce a model value ('1', 1, '1.5', '1,200', 'x2') to float, else None."""
+    try:
+        return float(str(v).replace(",", "").replace("x", "").strip())
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def save_receipt_lines(receipt_id, line_items, currency="USD") -> None:
+    """Store the structured per-line detail (design §E11). Prices → USD cents; all best-effort."""
+    rows = []
+    for li in (line_items or []):
+        if not isinstance(li, dict):
+            continue
+        name = (li.get("name") or "").strip() or None
+        up, lt = _num(li.get("unit_price")), _num(li.get("line_total"))
+        if name is None and up is None and lt is None:
+            continue
+        rows.append((receipt_id, name, _num(li.get("qty")),
+                     to_usd_cents(up, currency) if up is not None else None,
+                     to_usd_cents(lt, currency) if lt is not None else None))
+    if not rows:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.executemany("""INSERT INTO acc_receipt_lines
+                (receipt_id, raw_name, qty, unit_price_cents, line_total_cents)
+                VALUES (%s,%s,%s,%s,%s)""", rows)
+
+
+def get_receipt_lines(receipt_id) -> list[dict]:
+    """The structured lines for a receipt (for the card + the math check)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_receipt_lines WHERE receipt_id=%s ORDER BY id", (receipt_id,))
+            return list(cur.fetchall())
+
+
 def confirm_receipt(rid: int) -> None:
     """Staff confirmed paper == bot → DRAFT(captured) to CONFIRMED."""
     with _db() as conn:
@@ -264,6 +318,7 @@ def delete_receipt(rid: int) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM acc_payment_allocations WHERE receipt_id=%s", (rid,))
+            cur.execute("DELETE FROM acc_receipt_lines WHERE receipt_id=%s", (rid,))
             cur.execute("DELETE FROM acc_receipts WHERE id=%s", (rid,))
 
 

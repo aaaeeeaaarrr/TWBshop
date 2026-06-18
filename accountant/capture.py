@@ -89,7 +89,15 @@ def render_card(r: dict) -> str:
              "captured": "draft", "disputed": "🚩 disputed", "void": "void"}.get(status, status)
 
     lines = [f"🧾 #{r.get('id', '?')} · {vendor} · {amt} · {pay} · {state}"]
-    if r.get("items_text"):
+    if r.get("lines"):
+        for li in r["lines"]:
+            seg = f"  • {li.get('raw_name') or '?'}"
+            if li.get("qty"):
+                seg += f" ×{float(li['qty']):g}"
+            if li.get("line_total_cents") is not None:
+                seg += f" = {fmt_money(li['line_total_cents'])}"
+            lines.append(seg)
+    elif r.get("items_text"):
         lines.append(f"Items: {r['items_text']}")
     meta = []
     if r.get("receipt_date"):

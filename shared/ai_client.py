@@ -1061,6 +1061,9 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         "printed 'Expense list' clipboard sheet, a product photo, or anything else)\n"
         "- vendor: the business name printed at the top\n"
         "- items: the actually-purchased line(s) as short text, e.g. 'Gas 48kg x1'\n"
+        "- line_items: the SAME purchases as a structured list, each {name, qty, unit_price, "
+        "line_total} — numbers as plain numbers in the receipt's currency, null where not shown; "
+        "EXCLUDE blank pre-printed options\n"
         "- total_amount: the FINAL total as a plain number (usually handwritten at the bottom)\n"
         "- total_currency: 'USD' or 'KHR' — if BOTH are shown use the USD figure (a supplier's Riel "
         "rate may differ from the 4000 our books use)\n"
@@ -1074,6 +1077,7 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         "- is_clear: true if the vendor AND total are readable enough to record\n"
         "- issues: short notes ONLY if genuinely unreadable (blurry/cut off); else []\n\n"
         'Respond ONLY with JSON: {"is_receipt": true, "is_clear": true, "vendor": "", "items": "", '
+        '"line_items": [{"name": "", "qty": null, "unit_price": null, "line_total": null}], '
         '"total_amount": null, "total_currency": "USD", "date": null, "invoice_no": null, '
         '"tax_amount": null, "supplier_account": null, "bank_name": null, '
         '"is_handwritten": false, "issues": []}'
@@ -1096,6 +1100,7 @@ async def extract_receipt(image_bytes: bytes) -> dict:
             "is_clear":       bool(r.get("is_clear", True)),
             "vendor":         (r.get("vendor") or "").strip(),
             "items_text":     (r.get("items") or "").strip(),
+            "line_items":     (r.get("line_items") if isinstance(r.get("line_items"), list) else []),
             "total_amount":   r.get("total_amount"),
             "total_currency": (r.get("total_currency") or "USD").strip().upper(),
             "date":           (lambda d: d if d and "null" not in d.lower() else None)((r.get("date") or "").strip()),
