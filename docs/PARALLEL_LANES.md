@@ -58,3 +58,58 @@ Then per the printed steps: `bootstrap.py --sync`, a per-lane venv, `TWBSHOP_ENV
 - **Server-side commit-scope CI** (GitHub branch protection) so a cross-lane commit can't merge.
 - **Observational monitor daemon** (watch worktrees/services/DB read-only → Telegram), then a
   localhost browser board. Partly overlaps the existing collection watchdog for the live side.
+
+---
+
+## Build sequence (locked with owner, 2026-06-19) — the master to-do, in order
+
+Stacks the lane infra + product work + the parked items + the owner-time bonuses. Greenfield-first;
+shared / HIGH-RISK work earns full rigor. Mark items done as they ship.
+
+### Phase A — Lock the lane infra  [DONE this session unless noted]
+- [x] Lane map gains `gm` + `stock`; `lane_guard.py` **v2** (read any lane, write only your own +
+      shared; `docs` is a SOFT lane = warn not block; `.lane_ack` overrides a deliberate cross-lane write).
+- [x] `scripts/monitor.py` — read-only watcher (lane board + service health → owner DM; send-only).
+- [x] `scripts/pull-all.ps1` — refresh every CLEAN worktree; skips dirty; abort+report on conflict.
+- [x] `pull.ps1` upgraded — `pull` in a lane also merges `main` ("get me everything").
+- [x] `.claude/settings.json` valid + lane_guard wired (owner); monitor bot live + DM verified.
+- [ ] **A2 — commit + push the infra** so new worktrees inherit it. (owner: say `push`)
+- [ ] **A3 — (owner choice)** switch this terminal to a guarded `lane/accountant` (+ park a `main`
+      worktree) so every active terminal is guarded, OR keep `main` as integrator+accountant.
+
+### Phase B — Fan out (shared groundwork single-threaded FIRST)
+- [ ] B1 — define the SHARED stock tables once on `main` (`acc_items`, `acc_item_aliases`,
+      `stock_movements`; design §E11) — the accountant↔stock seam, done before fan-out = no clash.
+- [ ] B2 — open the `gm` and `stock` lane worktrees (`scripts/make_lane.ps1`).
+
+### Phase C — Product work (parallel)
+- [ ] C1 — Accountant: finish P1 capture → **P2** (slip relay + subset-sum/FIFO matcher +
+      anti-double-pay). HIGH-RISK money, per-step owner approval.
+- [ ] C2 — Stock lane: AppSheet structure + Postgres↔AppSheet sync + 143-item catalog seed;
+      migrate GM's stock code out (`stock.py`/`stock_entry.py`/photo reader/7am job). First unknown
+      to prove: **AppSheet↔DO-Postgres connectivity**.
+- [ ] C3 — GM: staff stock-gateway **button** (link to AppSheet) + optional read-only "count done?"
+      glance. GM owns no stock data.
+
+### Phase D — Data-integrity cross-checks (needs C's data flowing)
+- [ ] D1 — AppSheet prefills last count + **today's received** + shows the unit (kg/piece) → staff
+      self-catch errors at source.
+- [ ] D2 — Accountant **READ-ONLY** discrepancy / unit-mismatch cross-check → alert (group TBD);
+      tune thresholds so small real-usage gaps don't false-alarm.
+
+### Phase E — Owner-time bonuses (demand-pulled, once lanes run)
+- [ ] E1 — Unified **"Needs You" inbox**: every lane writes owner-decisions to ONE shared
+      `pending_decisions` table; one digest/menu, batch-clear. (Generalize `acc_pending_decisions`.)
+- [ ] E2 — **Morning digest** from the watcher (lane board + services + pending count, one DM).
+- [ ] E3 — **`status` word**: glance all terminals from one place.
+- [ ] E4 — **Auto-refresh Stop-hook** (seamless): when a lane goes idle, **only if it's behind main**
+      → merge (≈zero overhead otherwise). **Clean → silent/auto.** **Conflict → the lane's own Claude
+      resolves it in place** (full context), commits on the lane, and the watcher DMs you the files +
+      a one-line fix. **A conflict in a money-path file (defined sensitive list) instead PAUSES with
+      "🛑 needs you"** — never auto-resolved. Safe because it all happens on a lane branch (pre-deploy);
+      deploys stay manual/tagged/verified. Opt-out per lane via a `.no_autorefresh` marker.
+      `.needs_pull` / `.no_autorefresh` are gitignored.
+
+### Phase F — Deferred hardening (only if scaling past ~3 lanes)
+- sparse-checkout · merge queue + auto-merge · server-side commit-scope CI · test-suite rollback
+  refactor · monitor autonomy.

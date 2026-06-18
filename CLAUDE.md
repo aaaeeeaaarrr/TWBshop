@@ -275,7 +275,17 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-18 (session 42 — **ACCOUNTANT P1 CAPTURE live-testing on staging + correct-and-learn loop**).
+**Last updated:** 2026-06-19 (session 43 — **PARALLEL-LANES OPERATOR INFRA: lane_guard v2 + monitor bot + pull-all + locked build sequence. NOTHING DEPLOYED — scripts/docs/map only; server untouched, tag-pinned**).
+**▶▶ RESUME (session 43):** built the tooling to run **3 parallel lanes** (this terminal = accountant · +gm · +stock) safely cross-machine. All inert on the live side.
+• **Lane map** (`parallel_lanes.json`): `attendance`→**`gm`**, added **`stock`** (`stock/`,`run_stock.py`).
+• **`scripts/lane_guard.py` v2** (wired in `.claude/settings.json`, JSON valid): **read any lane, write only your own + shared**; another CODE lane → **BLOCK**; **`docs` = SOFT lane** (warn, never block); shared → warn; own/main → silent; deliberate cross-lane write overrides with a gitignored **`.lane_ack`**. Decision matrix unit-proven.
+• **`scripts/monitor.py`** — read-only watcher (lane board + 5-service health via SSH → owner DM, **send-only**; b2b shown 'intentionally off'). **@TWB_Monitor_bot live + DM VERIFIED** (owner kept starting a Russian look-alike; fixed via BotFather `/mybots`; token in secrets, pushed).
+• **`scripts/pull-all.ps1`** (refresh every CLEAN worktree, skip dirty, abort+report on conflict) + **`pull.ps1` upgraded** (`pull` in a lane also merges `main`). One `push` (checkpoint) still consolidates all COMMITTED lanes from any terminal.
+• **STOCK ARCHITECTURE LOCKED (design only):** Postgres = source of truth; **staff use ONE bot (GM) → AppSheet** (gateway button; GM owns no stock data); **stock lane = worker (AppSheet⇄Postgres sync + cron), no chat bot**; **accountant = goods-in + READ-ONLY discrepancy/unit-mismatch cross-check** (alerts staff before errors stick); seam = shared tables (`acc_items`/`acc_item_aliases`/`stock_movements`), **no cross-lane code**.
+• **▶ MASTER BUILD SEQUENCE → `docs/PARALLEL_LANES.md` "Build sequence" (Phases A–F):** A infra (≈done) · B fan-out (define shared stock tables on main FIRST, then open gm+stock worktrees) · C product (accountant **P2 matcher** · stock AppSheet+sync+143-item catalog + migrate GM stock out · GM gateway button) · D cross-checks · E owner bonuses (**unified Needs-You inbox** · morning digest · `status` word · auto-refresh Stop-hook) · F hardening.
+**▶ NEXT:** **A3** (owner: switch THIS terminal to guarded `lane/accountant` + park a `main` worktree, or keep main as integrator) → **B1** shared stock tables → **B2** open gm+stock lanes → resume accountant **P1→P2**. accountant P1 capture already on main (session 42), staging-proven, inert.
+
+**(prev)** 2026-06-18 (session 42 — **ACCOUNTANT P1 CAPTURE live-testing on staging + correct-and-learn loop**).
 
 **▶▶ RESUME HERE (cross-machine, session 42 — READ THIS FIRST):** Building the **Accountant bot (P1
 capture)**, live-tested on **STAGING** via a LOCAL poller (the bot is NOT on the server — inert there,

@@ -55,6 +55,9 @@ Thumbs.db
 # Per-worktree lane notes (each lane keeps its own; never merge-conflicts)
 CLAUDE.local.md
 
+# Lane-guard cross-lane override marker (per-worktree, deliberate, never commit)
+.lane_ack
+
 # Telethon session files (contain auth tokens — never commit)
 *.session
 *.session-journal
