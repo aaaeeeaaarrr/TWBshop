@@ -83,6 +83,32 @@ A Telegram-based bakery operations system that handles:
 
 ---
 
+## The `push` and `pull` words — multi-lane (one word in, everything synced)
+
+The owner types ONE word and expects the WHOLE project synced across machines. Lanes are git
+worktrees on `lane/<name>` branches; **`main` is the single thing that travels** (deploys come from
+TAGS, never from `main`, so `main` may safely carry work-in-progress from every lane).
+
+**When the owner says `push`:**
+1. Commit the current worktree's CODE (clear message). Do NOT edit the tracked `CLAUDE.md` from
+   inside a lane — lane-local notes go in `CLAUDE.local.md` (gitignored) so merges never conflict.
+2. Run **`scripts/checkpoint.ps1`** — it merges EVERY `lane/*` branch that's ahead into `main`,
+   pushes `main` + all lane branches, and verifies `main == origin/main`. On a real conflict it
+   ABORTS that one lane and reports it (main untouched) — fix only that lane, then re-run. It never
+   resets and never force-pushes.
+3. Update **Current Status** in this file (on `main`, one place), commit, push.
+4. Deploy ONLY if a LIVE service's code changed, and only that service (see Deploy Discipline).
+   Inert/design/docs changes deploy nothing — say so.
+5. Report: merged lanes · any conflicted/dirty lanes · pushed SHA · deploy (or "nothing live changed").
+
+**When the owner says `pull`:** run **`pull.ps1`** (fetch --all, rebase, secrets sync, pip). `main`
+holds the full checkpoint; if you're on a lane it tells you. Then read Current Status (next rule).
+
+Preview anytime without changing anything: `scripts/checkpoint.ps1 -DryRun`. Start a new lane:
+`scripts/make_lane.ps1 <name>` (see `docs/PARALLEL_LANES.md`).
+
+---
+
 ## After Every Pull
 
 **Read the "Current Status" section of this file immediately.** It is the only source of truth for what to work on next. Never use memory notes — they are local to one machine and go stale across machines.
@@ -277,6 +303,11 @@ wired); **is_test test-mode** (owner plays staff + a fake supplier group). New t
 1 Haiku `assess_receipt_photo` → numbered living card → cash auto-paid → 1-tap correct (reuse `clarify.py`).
 Owner-side, non-blocking: confirm the listener account is *in* the supplier groups; create the fake supplier
 group for testing. **HIGH-RISK** (money) — the P2 matcher/paid-flips get full rigor + per-step owner approval.
+**▶ PUSH/PULL = ONE WORD, MULTI-LANE (built + proven this session) → see "The `push` and `pull` words".**
+`scripts/checkpoint.ps1` (the `push` engine — merges every ahead `lane/*` into `main`, pushes, verifies;
+conflict-safe, never resets/force-pushes; `-DryRun` previews) + `pull.ps1` (now `git fetch --all`). Proven:
+**sandbox 2-lane consolidation PASS** + real-repo dry-run clean. Across machines now: **`push`** before you
+leave, **`pull`** when you arrive — `main` carries everything (deploys still from TAGS, so WIP on `main` is safe).
 
 **(prev)** 2026-06-18 (session 40 — **PHASE 0 SAFETY RELEASE DEPLOYED to prod (inaugural tag-deploy)**).
 **▶ PHASE 0 — parallel-terminals safety foundation; BUILT · STAGING-PROVEN · DEPLOYED + VERIFIED (auto-bedrock).**

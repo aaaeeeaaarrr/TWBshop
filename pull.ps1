@@ -1,4 +1,7 @@
-# Pull: stash → git pull --rebase → bootstrap sync → pip install → report
+# Pull: fetch-all → stash → git pull --rebase → bootstrap sync → pip install → report
+# Multi-lane: `main` carries the full cross-lane checkpoint (see scripts/checkpoint.ps1).
+
+git fetch --all --prune --quiet
 
 $stashed = $false
 if (git status --porcelain) {
@@ -25,4 +28,9 @@ if ($before -ne $after) {
     Write-Host "Pulled: $($files -join ', ')"
 } else {
     Write-Host "Already up to date."
+}
+
+$branch = (git rev-parse --abbrev-ref HEAD).Trim()
+if ($branch -ne 'main') {
+    Write-Host "NOTE: you are on '$branch'. main holds the full cross-lane checkpoint - 'git checkout main' for everything." -ForegroundColor Yellow
 }
