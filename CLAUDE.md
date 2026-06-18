@@ -249,7 +249,36 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–31) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-18 (session 40 — **PHASE 0 SAFETY RELEASE DEPLOYED to prod (inaugural tag-deploy)**).
+**Last updated:** 2026-06-18 (session 41 — **ACCOUNTANT P0 + DESIGN §E; cross-machine checkpoint, ALL MERGED TO `main`**).
+**▶ CHECKPOINT FOR THE OTHER MACHINE:** everything is merged to **`main`** — a plain `pull` gets it all;
+**continue on `main`** (the `lane/accountant` branch is now redundant, kept in sync on origin). **Server
+UNCHANGED** — still pinned to tag `phase0-safety-20260618`; the accountant code is **inert** (no running
+service imports `accountant/`, `init_accounting_db()` is uncalled) → **nothing was deployed** this push.
+Full suite green before the merge.
+**▶ ACCOUNTANT — DESIGN refined + P0 code built (staging-proven), NOT wired into any bot yet.**
+• **P0 code** (`accountant/db.py`): `init_accounting_db()` → 4 tables (`acc_vendors` · `acc_receipts` =
+the numbered `#` AP spine · `acc_payments` · `acc_payment_allocations`); money = **integer USD cents**
+(Riel @ fixed 4000៛); `vendor_link`/`vendor_by_group`/`list_vendors`; capture/match stubs (P1/P2).
+`tests/test_accounting_schema.py` (5 tests, staging).
+• **DESIGN §E** (`docs/REPORT_SYSTEM_DESIGN.md` — this session's owner brainstorm; **read it first**): ONE
+**Expense-group** capture + a **living receipt card** (DRAFT→CONFIRMED→PAID · persistent ✏️ Edit/Fix ·
+**tax-tolerant math check** · vendor name-learning); **owner→bot→supplier slip relay** (so the match is
+explicit → the subset-sum/FIFO matcher drops to a *fallback*) + the **txn-ref wrong-amount ladder** (same
+ref = dup; different ref on a paid receipt = 🚨 double-pay); **anti-double-pay in depth** + the **"Received
+Yet?" candidate flow** for supplier-posted photos; **listener = FREE eyes** in supplier groups (verified in
+code: zero Claude API; regex spots account-number changes); **price tracking** + bot-never-messages-supplier-
+without-owner-approval; **stock = 3 layers** (item **catalog seeded from the owner's ~143-item reorder
+sheet** · per-supplier **price history** · learned **aliases** canonical↔supplier name) sharing a
+**`stock_movements` table** with the accountant — **no cross-lane code editing** (the seam is data); owner
+**`/menu`** + a **pending-decisions queue**; report cutoff = **release window** (`paid_at ≤ released_at`);
+**cash-from-drawer** recon + the **"count-the-cash"-only** target (honest dependency: needs SambaPOS sales
+wired); **is_test test-mode** (owner plays staff + a fake supplier group). New tables in §E11.
+• **▶ NEXT = build P1 (capture):** `run_accountant.py` bot shell + `/vendor link <name>` + receipt photo →
+1 Haiku `assess_receipt_photo` → numbered living card → cash auto-paid → 1-tap correct (reuse `clarify.py`).
+Owner-side, non-blocking: confirm the listener account is *in* the supplier groups; create the fake supplier
+group for testing. **HIGH-RISK** (money) — the P2 matcher/paid-flips get full rigor + per-step owner approval.
+
+**(prev)** 2026-06-18 (session 40 — **PHASE 0 SAFETY RELEASE DEPLOYED to prod (inaugural tag-deploy)**).
 **▶ PHASE 0 — parallel-terminals safety foundation; BUILT · STAGING-PROVEN · DEPLOYED + VERIFIED (auto-bedrock).**
 Branch `phase0-db-safety` (commits 6deb337 + b9a4584) → merged to main → tagged **`phase0-safety-20260618`** →
 that tag deployed. **(1) Fail-closed DB switch** (`shared/database.py`): `active_database_url()` now REQUIRES

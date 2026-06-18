@@ -398,3 +398,157 @@ CREATE INDEX IF NOT EXISTS idx_acc_alloc_receipt ON acc_payment_allocations (rec
    convert clean at 4000៛=$1. Confirm no sub-cent need (there isn't for cash books).
 4. Whether `acc_` prefix is wanted (keeps the finance package's tables visually grouped + greppable) —
    used here for that reason; easy to drop.
+
+---
+
+## E. THIRD DEEP PASS (2026-06-18) — capture UX, anti-double-pay, stock catalog, owner menu, test mode
+
+> Owner brainstorm continued. This pass **refines** earlier sections; where it differs, the note here
+> wins (flagged inline): capture is now in ONE internal Expense group (refines §C1), and the payment slip
+> is **relayed owner→bot→supplier** (refines §C1/§C6 — the subset-sum matcher drops to a *fallback*).
+
+### E1. Capture model — ONE Expense Group + the living receipt card  (REFINES C1)
+- Staff snap **all** receipts into ONE internal **Expense Group** (not per-supplier). Supplier groups are
+  now used by the bot only to (i) **post the payment slip** and (ii) be **watched** (by the listener) for
+  price/account changes — the bot still never chats there.
+- **Vendor ID:** read from the receipt if the name is printed; else the staffer **taps the vendor** from a
+  short list (one tap). **The bot learns** — a confirmed tap stores the receipt's printed name → that
+  vendor, so it auto-IDs next time. A *remembered mapping*, not an AI guess (deterministic, auditable, $0).
+- **ONE bot reply per photo = the living status card**, edited in place through its life:
+  `DRAFT (read + math-checked) → CONFIRMED (staff ✓ paper-vs-bot) → [💵 Cash-paid | 🏦 For ABA] → PAID`.
+  Persistent **✏️ Edit/Fix** button — the staffer's correction edits the card; no extra messages.
+- **Math check before listing:** compare Σ(line items **incl. tax/VAT/delivery/rounding**) to the printed
+  total; on a gap **SHOW it** ("items add to $X, receipt says $Y — check the paper"), never block. Tax
+  tolerance so it doesn't cry wolf on every normal receipt.
+
+### E2. Payment — owner→bot→supplier slip relay  (REFINES C1/C6; makes matching EXPLICIT)
+- After staff CONFIRM + tap **For ABA**, the bot DMs the **owner**. Owner pays in ABA and sends the slip
+  **to the bot (DM)**. Bot validates → **posts the slip into the supplier's group** → edits the
+  Expense-group card to **"ABA Paid ✅"**.
+- Because the owner pays from a *specific receipt's DM prompt*, the bot **knows which receipt(s)** the slip
+  covers → the subset-sum/FIFO matcher (§C6) becomes a **fallback** for lump payments made out-of-band.
+  The payable-run (§C6) still drives *what* to pay; the relay makes the *match* explicit.
+- **The wrong-amount ladder** (each surfaces as an attention card to the owner; the **txn ref** is the
+  strong key — owner's refinement):
+  - txn ref already seen → same slip → ignore (dedup).
+  - **DIFFERENT txn ref, same vendor + amount, on an ALREADY-PAID receipt → 🚨 accidental double-pay.**
+  - slip < receipt → partial, "still owe $Z." · slip > receipt → "covers #14+#17+#21?" (the set).
+  - wrong vendor → "looks like Beer Co, retry?" · Riel vs USD → convert at 4000៛ · unreadable → retype.
+  - Only an **exact, unambiguous** match auto-posts to the supplier + flips paid.
+
+### E3. Anti-double-pay — defense in depth (the owner's worry, answered)
+Risk: a supplier posts their own receipt copy a day later → re-logged → paid twice. Layers:
+1. Numbered ledger = sole truth; a **paid receipt can't be paid again** (S2 flip-first).
+2. `photo_sha` → identical image = "already #14."
+3. **Look-alike:** same vendor + total + within N days → "same as #14 (paid 2d ago)? [Same][New]."
+4. **Supplier's own invoice #** (when printed) = strongest dedup key.
+5. Payment side: slip **txn-ref** dedup + the double-pay alert (E2).
+- PLUS the **"Received Yet?" candidate flow** for supplier-group photos: a photo a supplier posts in THEIR
+  group is forwarded to the Expense group as a **CANDIDATE (never auto-numbered)**. First question forks:
+  `Not yet received → park as "expected" (order/quote)` · `Already logged → link to #14, ignore` ·
+  `New & received → run the look-alike guard → THEN promote to a numbered receipt`.
+
+### E4. Listener — free eyes in supplier groups (verified in code 2026-06-18)
+- `ops_intelligence/listener.py` is a Telethon **user account**: streams every message to `ops_messages`,
+  **zero Claude API calls**. Listening is free; AI cost only on a separate, gated analysis step.
+- Watching a supplier group for an **account-number change** = regex over already-stored text = **free** →
+  a pending-queue item to confirm.
+- **Division of labour:** listener = **eyes** in supplier groups (a photo / account-change posted there);
+  accountant bot = **hands** in the Expense group (gets photo *bytes* via Bot API → OCR → cards). The
+  listener stores that a photo *exists*, not its bytes — so OCR needs the accountant bot's direct access.
+- **Open:** confirm the listener account is a *member* of each supplier group (then the feed already exists).
+
+### E5. Price tracking + supplier-message guardrail (needs line items)
+- Store receipt **line items** (name/qty/unit/line-total). Compare each item's unit price to last-seen for
+  that vendor → up / down / new-product / substitution.
+- **Guardrail:** the bot **never messages a supplier on its own.** It DMs the **owner**
+  ("Atlas onion $1.20→$1.50 +25% [Ask Atlas][It's fine][Ignore]"); the owner triggers any supplier
+  message. Confirm-never-infer applies double to outward-facing (third-party) actions.
+
+### E6. Stock — three layers + catalog seed (answers "what's it good for")
+- **Three layers:** (1) **Item catalog** — canonical name, category, unit, min, reorder-qty, candidate
+  suppliers — **seeded from the owner's ~143-item reorder sheet** (~13 categories, multi-supplier);
+  (2) **Price history** — per item, per supplier, learned from receipts; (3) **Item aliases** — canonical
+  name ↔ each supplier's slightly-different name, **learned from confirmations**.
+- The sheet is a **re-order sheet, not a price list** (Item·Category·Unit·Min·Order-qty·Supplier(s)·
+  "unit correct?"). It seeds the **catalog**; **prices come from receipts over time.**
+- Sheet notes: some "suppliers" are **internal** (Homemade, Delis) → **NOT AP vendors we pay** (the
+  accounting vendor list ⊂ the stock supplier list). `[X]` items (Strawberry purée, Oregano, Marjoram,
+  Basil) look **discontinued** → skip on seed. Units are uncertain ("is unit correct?") → refine from
+  receipts.
+- **What stock gives:** paperless goods-in · inventory value · smart reorder · **🎯 3-way reconciliation**
+  (bought [accountant] + sold [POS] vs counted [stock] → shrinkage/theft/waste — the headline) · true
+  margin / COGS.
+- New item on a receipt → **pending-queue**: "recurring catalog item, or once-off purchase?"
+
+### E7. Stock ↔ accountant boundary — shared TABLE, not shared code (S5 seam; answers Q3)
+- The two lanes **never edit each other's code.** The seam is shared DB tables in the **`shared` zone**:
+  the item catalog + aliases, and a **`stock_movements`** ledger. Accountant inserts a `+received` movement
+  when a receipt confirms (a one-line write to a shared table); stock inserts `−used / −counted` and reads
+  on-hand `= SUM(qty_delta)`. Each lane edits only its own files; the shared schema changes via an
+  integrator merge (which the lane-guard already flags as "shared — concerns ALL lanes").
+- **Stock-from-receipt is gated on the item alias being resolved:** an unmapped supplier line → pending
+  queue ("map Atlas 'T55 Flour' to which catalog item?") and the movement waits until mapped. Graceful.
+
+### E8. Owner menu + pending-decisions queue (the time-saver)
+```
+/menu  (accountant, owner-only)
+  💵 To Pay   — everything awaiting your ABA, tap to pay      ← the worklist
+  🧾 Receipts — recent · by vendor · paid/unpaid · find by #
+  🏦 Vendors  — list · saved account # · group link · spend
+  📦 Stocks   — catalog · low-stock · price history · cheapest-supplier
+  ❗ Pending  — the decisions queue
+  📊 Reports  — midday / final · re-show · export
+```
+**Pending queue** = ONE list of everything needing your call (new vendor recurring/once-off · new item
+recurring/once-off · price change · account-number change · wrong-amount ladder · unmapped item).
+Batch-clear when convenient = saves your time.
+
+### E9. Report cutoff + cash recon + "count the cash" target (answers Q2)
+- **Cutoff = the moment the bot RELEASES the sheet** — a receipt counts if `paid_at ≤ released_at`. Each
+  report covers window `(last_release → this_release]` → no double-count, no gap.
+- **Cash-paid is always from the drawer** → reduces expected drawer.
+- **Target:** the only staff action at report time is **"count the cash, tell me $X."** Bot has float
+  (yesterday's close) + sales (POS) + expenses (ledger) → `expected = float + cash_sales − cash_expenses`;
+  `over/short = counted − expected` → composes the standard report instantly.
+- **SCOPE HONESTY (the one dependency):** "count the cash only" holds **once SambaPOS sales are wired**
+  (the shop-PC push agent, decision §157). Until then, staff/owner also gives the POS sales figure
+  (number or photo). v1 keeps recon simple (float + cash_sales − cash_expenses); cash-outs / float top-ups
+  refine later.
+
+### E10. Test mode — real-path, isolated data (owner's plan, mirrors attendance)
+Owner plays staff in the **real** Expense group + makes a **fake supplier group**. Reuse the proven
+`is_test` pattern (`docs/ATTENDANCE_TEST_MODE.md`): **real** buttons, OCR, matching, card edits — only the
+**data** is `is_test`-tagged so it never touches real reports/ledger/stock; `/testreset` wipes it.
+Satisfies Rule 1 (one real system, isolate data only). The fake supplier group makes the slip-relay +
+price/account-watch paths real too.
+
+### E11. SCHEMA ADDITIONS (extends §D; design, not migrated)
+New tables/columns implied by this pass. **`acc_items`, `acc_item_aliases`, `stock_movements` live in the
+SHARED zone** (read/written by both the accountant and stock lanes, per E7); the rest are accountant-owned.
+- **`acc_receipt_lines`** (`receipt_id` → acc_receipts, `raw_name`, `item_id` NULL → acc_items, `qty`,
+  `unit`, `unit_price_cents`, `line_total_cents`) — feeds the math check + price history + stock movements.
+- **`acc_items`** (catalog: `name` canonical, `category`, `unit`, `min_qty`, `reorder_qty`, `active`) —
+  seeded from the 143-item sheet.
+- **`acc_item_aliases`** (`item_id`, `vendor_id`, `supplier_name`) UNIQUE(`vendor_id`,`supplier_name`) —
+  learned canonical↔supplier name mappings.
+- **`stock_movements`** (`item_id`, `qty_delta`, `unit`, `reason` 'received|used|counted|waste|adjust',
+  `source` 'receipt|count|pos', `ref_id`, `at` TIMESTAMPTZ, `is_test`) — the shared accountant↔stock seam;
+  on-hand = SUM(qty_delta) per item.
+- **`acc_pending_decisions`** (`kind`, `payload` JSON, `status` open|done, `created_at`, `resolved_by`,
+  `resolved_at`, `is_test`) — the queue behind ❗ Pending.
+- **`acc_payments`** += **`txn_ref` TEXT** (bank-slip transaction id — dedup + double-pay key) + a UNIQUE
+  partial index on (`vendor_id`, `txn_ref`).
+- **`acc_vendors`** += **`printed_names` JSON** (learned receipt-name hints → auto vendor-ID, E1).
+
+### ▶ PHASES — 2026-06-18 UPDATE (supersedes the §"REFINED PHASES" list where they differ)
+- **P0** — ledger + vendor↔group map **+ seed `acc_items` from the sheet + `is_test` test-mode plumbing**.
+- **P1 (capture)** — ONE Expense group · living status card · ✏️ Edit/Fix · math check · **vendor-learning**
+  · cash auto-paid · "Received Yet?" candidate flow. (Reuse `assess_receipt_photo` + `clarify.py`.)
+- **P2 (HEART, HIGH-RISK)** — **owner→bot→supplier slip relay** + wrong-amount **txn-ref ladder** +
+  double-pay defense; subset-sum/FIFO as the lump **fallback**; per-step owner approval, no live money
+  until each step is approved.
+- **P3** — daily report (release-cutoff windows · cash recon · count-the-cash) · AP aging · **pending
+  queue** · **owner menu**.
+- **P4+** — price tracking + supplier-message-with-approval · **stock 3-way reconciliation** (with the
+  stock lane, via `stock_movements`) · Sheet/CSV export · voice-note expenses · KHQR-pay (pending Bakong).
