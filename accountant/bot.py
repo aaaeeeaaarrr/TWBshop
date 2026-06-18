@@ -15,9 +15,9 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           MessageHandler, filters)
 
 from accountant import capture
-from accountant.db import (add_receipt, confirm_receipt, edit_receipt, get_receipt,
-                           get_receipt_lines, save_receipt_lines, set_payment, to_usd_cents,
-                           vendor_by_group, vendor_by_name, vendor_link)
+from accountant.db import (add_receipt, confirm_receipt, delete_receipt, edit_receipt,
+                           get_receipt, get_receipt_by_sha, get_receipt_lines, save_receipt_lines,
+                           set_payment, to_usd_cents, vendor_by_group, vendor_by_name, vendor_link)
 from shared.ai_client import extract_receipt
 
 try:
@@ -92,6 +92,12 @@ async def on_photo(update, context):
     photo = msg.photo[-1]
     raw = bytes(await (await photo.get_file()).download_as_bytearray())
     sha = hashlib.sha256(raw).hexdigest()
+    existing = get_receipt_by_sha(sha)
+    if existing and existing.get("status") not in (None, "captured"):
+        await msg.reply_text(f"🧾 Already logged as #{existing['id']} ({existing['status']}).")
+        return
+    if existing:  # still a draft → re-read it fresh (a clearer re-send, or a re-test)
+        delete_receipt(existing["id"])
     try:
         rec = await extract_receipt(raw)
     except Exception:

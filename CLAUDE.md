@@ -331,6 +331,11 @@ math check now + the stock lane later) via `save_receipt_lines`/`get_receipt_lin
 and shows a **tax-tolerant math check** (Σ lines + tax vs total → '✓ items add up' or a flagged gap). Proven
 end-to-end on the Song Heng slip: `• Gas 48kg ×1 = $68.00 / inv #001987 / ✓ items add up`. Local bot
 restarted (staging). NEXT new-receipt capture also stores the supplier's printed bank account (→ supplier CSV).
+**▶ DEDUP-ON-RESEND FIX (owner kept seeing the old card):** re-sending the SAME photo returned the stale
+deduped row (the new code never re-ran). Fixed properly: `get_receipt_by_sha` + on_photo now **re-reads a
+still-DRAFT duplicate** (delete + fresh extract — also lets staff re-send a clearer shot) while a
+**confirmed/paid** one stays protected ("already logged as #N"). Cleared stale draft #26; bot restarted.
+**TESTING NOTE: re-sending the same receipt now re-reads it** — no manual clearing needed.
 **TEST Supplier group** created (`-5406470751`) for the supplier-side flows — owner won't type the supplier
 name (wants the bot to learn it); top-text on forwards should show name + group. **▶ NEXT: owner re-tests
 the Song Heng receipt** (should now read vendor+$68); then build the TEST-Supplier forward flow ("Received

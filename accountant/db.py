@@ -277,6 +277,16 @@ def get_receipt_lines(receipt_id) -> list[dict]:
             return list(cur.fetchall())
 
 
+def get_receipt_by_sha(photo_sha: str) -> dict | None:
+    """The receipt already logged for this exact photo (the dedup key), or None."""
+    if not photo_sha:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_receipts WHERE photo_sha = %s", (photo_sha,))
+            return cur.fetchone()
+
+
 def confirm_receipt(rid: int) -> None:
     """Staff confirmed paper == bot → DRAFT(captured) to CONFIRMED."""
     with _db() as conn:
