@@ -169,6 +169,13 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
 
 ## 8. The "up our game" backlog (build as demand pulls)
 
+- **⭐ Contention-only warnings (sibling-worktree dirty check) — NEXT.** Today the guard warns on EVERY
+  shared-file edit, so every `tests/test_x.py` a lane adds pings you (noise). Upgrade: at edit-time the
+  guard checks whether that exact file is **uncommitted (dirty) in another worktree right now** — warn/
+  block only on real overlap, silent otherwise (a brand-new file is dirty nowhere → silent). This is the
+  precise "make the lanes aware of each other": instant, no time-window to tune (an edit is a snapshot,
+  not a 10/30-min span; the committed-divergent overlap is caught at merge by checkpoint). The broad
+  shared-warn becomes a contention-warn.
 - **E4 auto-refresh Stop-hook** — a stale/skipped lane self-heals when it goes idle: if behind main →
   merge; clean → silent; conflict → flag (the lane's Claude resolves with context; money-path → pause).
   Never blind-resolves. Opt-out marker per lane.
@@ -208,3 +215,13 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
   the shared file the monitor watches — testing it pollutes the alert channel (it once DM'd test
   inputs to the owner as if a lane had done them). Test the **pure `_decide()`** instead; only
   `main()` does I/O.
+- **An edit is instantaneous; contention is a snapshot, not a time window.** A terminal that "churns
+  30 min" is doing many things (reads, thinks, test runs, many small edits) — not editing one file for
+  30 min. So "did another lane touch this in N minutes" is the wrong model; the precise signal is "is
+  this file dirty in a sibling worktree at the instant of the edit" (see §8 contention-only warnings).
+- **Keep the operating manual (`CLAUDE.md`) lean.** A long-running project bloats the status file with
+  per-session logs — every line costs context every session. Archive old sessions to `docs/HISTORY.md`,
+  keep only the latest state + open loops + the standing rules (most as TRIPWIRE pointers to topic docs).
+- **`git status` before `git add -A`** — especially as the integrator sweeping the hub. A blind `add -A`
+  once swept a delete-after scratch file + an unrelated working-tree change into a commit. Check first,
+  stage deliberately.
