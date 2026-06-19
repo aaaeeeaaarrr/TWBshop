@@ -320,8 +320,11 @@ now). Verified: moved phrases now in HISTORY only, boundary clean, dangling `(ab
 **▶ STALENESS GUARD BUILT (session 47):** `tests/test_doc_refs.py` — current-truth docs can't cite a
 deleted/moved file or a gone `file::symbol` (proven to bite on the deleted `al_cancel_day`; history-logs
 excluded). The structural half of the duplication detector; the semantic "same prose-fact in 2 places" half
-stays human-adjudicated (a prose detector would false-positive — noise worse than the disease). STILL OPEN:
-the deeper design-doc semantic sweep (→ `docs/SIMPLIFICATION_STRATEGY.md`).
+stays human-adjudicated (a prose detector would false-positive — noise worse than the disease). **STILL OPEN
+(owner resuming on the other PC):** (1) the duplication **"can we make it 100% safe?"** discussion — full
+pros/cons + the promising **`facts.json` generated-single-source** path (turn statuses/dates/IDs structural so
+they can't diverge by construction); (2) the deeper design-doc SEMANTIC sweep. Both detailed under
+`docs/SIMPLIFICATION_STRATEGY.md` → "DUPLICATION DETECTOR — OPEN DISCUSSION".
 
 **▶ STANDING OPEN LOOPS — the live threads (detail for completed work → `docs/HISTORY.md`):**
 1. **Multi-lane operation (current focus)** — hub (`twbshop`/`main`) + 3 lane worktrees (`twbshop-accountant`/`-gm`/`-stock`). Portable method · toolkit · build sequence (Phases A–F) · lane layout/recreate → **`docs/MULTI_LANE_PLAYBOOK.md`** + `docs/PARALLEL_LANES.md`. Monitor (`scripts/monitor_bot.py`, owner-only): `/board /health /issues /crossings /audit`.

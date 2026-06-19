@@ -87,4 +87,40 @@ directive + the design we agreed (this is what "perfect" actually is — and its
   without false positives, and noise would be worse than the disease. Prevention is the one-home-pointer
   discipline + this guard + pinning each human correction as a fact/test.
 - **END-OF-PASS STEP (owner-requested):** list every spot with 2+ differing infos → owner says which is true
-  → remove the untrue → trim map/CLAUDE.md to pointers-only. Do this AFTER re-verifying the 6 orphans.
+  → remove the untrue → trim map/CLAUDE.md to pointers-only. (First pass DONE session 47.)
+
+### DUPLICATION DETECTOR — OPEN DISCUSSION (owner wants to perfect it; RESUME HERE on the other PC, sober)
+**The open question (owner):** can we make duplication-prevention **100% safe — no human ever needed?**
+**Current honest answer:** yes for STRUCTURAL facts, no for pure SEMANTIC ones — BUT there's a promising trick
+(below) that turns many "semantic" facts into structural ones, which likely gets us most of the way there.
+
+**Two ways to beat duplication:**
+- **PREVENT** — one fact, one home + pointers. If a fact lives in exactly ONE place, nothing can diverge. Strongest.
+- **DETECT** — flag when the same fact sits in 2+ places / they disagree. Catches slips after they form.
+
+**Pros / cons (the heart of it):**
+- **Structural facts** (files, `::symbols`, dates, IDs, counts, subsystem statuses): mechanizable, **ZERO false
+  positives**, continuous proof. PRO: a green test = the docs provably agree. CON: must enumerate which facts to track.
+- **Semantic / prose facts** ("X means Y", "live via Z"): **NOT reliably mechanizable.** A prose detector throws
+  FALSE POSITIVES (flags non-conflicts) → noise → the detector gets ignored → worse than nothing, and it
+  re-creates distrust. It also can't safely AUTO-PICK which of two copies is true → could delete a TRUE thing.
+  This is why the semantic half is human-adjudicated and we DON'T fake it.
+
+**Built so far:** the structural file/`::symbol` staleness guard (`tests/test_doc_refs.py`, proven to bite).
+
+**▶ THE PROMISING PATH to ~100% (the thing to explore next):** *make the high-value facts STRUCTURAL and
+GENERATED from ONE source* — the same trick that makes `MAP_INDEX.md` impossible to be wrong (it's generated,
+not hand-kept, so it can't drift). Put the facts that actually bite into a single machine-readable source, e.g.
+`facts.json`: subsystem **statuses** (LIVE/BUILT/SHELVED), key **dates** (attendance go-live 2026-06-16),
+**group/chat IDs**, **owner IDs**. Then either (a) a test asserts no doc contradicts it, or — BETTER — (b) the
+doc status lines are GENERATED from it (can't drift by construction). **Generation beats assertion.** This drives
+the points/attendance-status class of conflict to **0 by construction**. The residual un-mechanizable prose is
+then small and low-stakes — that's the realistic "100% on what actually matters."
+
+**Honest ceiling:** pure-meaning claims not reducible to a value can't be machine-judged → stay human-adjudicated
+(rare). "No human EVER" isn't literally reachable for meaning — but "no human for any fact we put in `facts.json`"
+IS. That's the line to settle together.
+
+**RESUME HERE (owner, other PC):** decide — (1) build the `facts.json` generated-single-source? (2) which facts
+go in first (statuses · go-live date · group/owner IDs)? (3) generate-vs-assert? Plus the other open thread: the
+deeper design-doc SEMANTIC sweep (human-adjudicated, I bring cited conflicts).
