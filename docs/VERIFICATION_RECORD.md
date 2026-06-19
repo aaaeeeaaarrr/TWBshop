@@ -1,5 +1,10 @@
 # Verification record — attendance balance/schedule work (session 33, 2026-06-13)
 
+> ⚠ **HISTORICAL SNAPSHOT — SUPERSEDED.** Point-in-time proof from session 33 (2026-06-13), NOT current
+> truth. Attendance went **LIVE 2026-06-16**; the suite is now **775 passed / 2 skipped**. The figures below
+> ("564 passed", "`attendance_live=OFF`") were true AT session 33 — do not read them as current. Current
+> state lives in `CLAUDE.md`. Kept as the record of how precision was assured at go-live.
+
 > "How do we make sure the WHOLE is precise?" — this is the answer: the proof baseline + a re-review of
 > every invariant against the ACTUAL code, the residual risks, and the ongoing mechanisms that keep it
 > accurate. Re-run the baseline anytime; update the verdicts when code changes. All behind `attendance_live=OFF`.

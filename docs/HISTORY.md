@@ -8,6 +8,93 @@
 
 ---
 
+## Current-Status archive — sessions 44–46 (moved from CLAUDE.md 2026-06-19)
+
+> Moved verbatim from CLAUDE.md Current Status during the truth-consolidation pass (session 47), to keep
+> Current Status lean (current-truth only). Historical reference — not authority on current state.
+
+**▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (session 46, INERT — docs/test only, nothing live):**
+Built **`MAP.md`** — the task→files/laws/HISTORY/gotcha index every cold session opens FIRST (closes the
+2026-06-19 "claimed gaps without checking" failure). **TWO LAYERS:** **Layer 1 `MAP.md`** = curated wisdom (entry files + `file::symbol` anchors + laws +
+gotchas), kept SLIM. **Layer 2 `MAP_INDEX.md`** = AUTO-generated complete inventory (every file → docstring
++ symbols) via `scripts/gen_map_index.py`. Layer 2 being generated makes completeness FREE + current by
+construction — it dissolves the old MAP-IGNORE hand-classification (which I got wrong, the owner caught it).
+**All 3 human-faults now mechanical:** dead pointer + relocated logic (`tests/test_map_integrity.py`,
+proven to bite) · **new unlisted file is now IMPOSSIBLE** (a new file makes Layer 2 stale →
+`tests/test_map_index_fresh.py` FAILS — proven). Gotchas POINT to the law/test that owns the truth. Only
+residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — unmechanizable, tiny,
+caught at the destination. **RULE: on any file add/move, run `python scripts/gen_map_index.py` + commit.**
+**▶ NEXT (owner-requested 2026-06-19, NOT started): the SIMPLIFICATION PASS** — read everything via the
+two-layer map, make it short-reached + simpler (combine/split/simplify files), **behavior-preserving, ZERO
+accuracy loss, not one new problem**; characterization-test before each refactor, one module at a time,
+HIGH-RISK rigor on live/money modules. Safest wins first (dead code, tiny facades). → `docs/SIMPLIFICATION_STRATEGY.md` "NEXT ACTION". **DECISION (owner): a full rewrite-and-
+replace is too dangerous (it re-lives every solved bug); do "map, don't remodel" — understand via the map,
+delete only provably-dead code, refactor only what actively hurts, otherwise keep shipping.** Full reasoning
++ bonus ideas → `docs/SIMPLIFICATION_STRATEGY.md`. With the map in place, `CLAUDE.md` can be trimmed further
+(carefully). **▶ Owner continuing this thread on ANOTHER MACHINE — pull there to get MAP.md + the strategy.**
+**▶ FALLBACK END-OF-SHIFT SESSION-CLOSER — BUILT · DEPLOYED · VERIFIED (gm, tag `session-closer-20260619b`=
+`15f2575`):** kills the recurring stale-open-session class the watchdog surfaced. Auto-checkout only fires if
+the live-share is on+in-zone AT shift end; staff stop sharing early, so a checked-in session otherwise dangles
+OPEN forever. New daily **07:00 PP** `_session_closer_job` (`gm_bot/bot.py`) closes any still-open session whose
+shift has FULLY ended, at the **resolved shift end** (redefine window if any, else normal hours — overnight-aware;
+a check-in means they worked, so it closes even a resolver-day-off shift), settling EXACTLY like auto-checkout
+(no-op for a normal shift; banks pre-authorized OT idempotently; **no behavior fork**, Rule 1). Live rows only,
+SILENT to staff (the watchdog's ✅ tells the owner). Belt: only closes `shift_date<today` AND `end_dt<now`
+(never a running shift). `att_open_past_sessions` (`shared/database.py`). **PROOF:** suite **769 passed/2 skip**
++ 10 closer tests (overnight math · resolve-driven end · find/close round-trip on staging); deployed BY TAG (gm
+active, NRestarts=0, `gm_session_closer` registered in the running log). **Ran once on prod with before/after
+independent proof → the 3 stale sessions CLOSED** (Tra→Jun17 06:00, Davy→Jun18 06:00 overnight ends; Anan→Jun16
+17:00 normal end via the day-off fix) → **FINAL `run_audit` = 0 problems** (ledger fully clean). The day-off edge
+was caught BY the first prod run (Anan skipped) → fixed (close at scheduled hours when a session exists) →
+redeployed → Anan closed. **▶ Possible follow-up (not built):** the closer settles pre-authorized OT for a
+redefined-but-uncheckedout shift — none existed in the 3; watch for it. → `docs/ACTIONS_LEDGER.md` Done.
+**▶ LIVE WATCHDOG — BUILT · DEPLOYED · VERIFIED (gm, tag `live-watchdog-20260619`=`cfa8ca3`; READ-ONLY, no
+balance path touched):** the live attendance/AL/OT ledger now gets a near-instant integrity check, not just
+the daily 07:30 audit. New `_live_watchdog_job` (`gm_bot/bot.py`) runs the SAME invariant `run_audit` over the
+REAL rows **every 3 min** while attendance is live (no-op in test mode — exactly one watchdog runs at a time)
+and DMs the owner the moment a NEW inconsistency appears (✅ when one clears), de-duped via a shared pure
+helper `_watchdog_delta` (8 unit tests). This is **Option 1 of "phased both"**: owner picked ship-the-broad-
+zero-risk-monitor-now; the full **per-event exact-delta verifier is deferred to a possible phase 2** (only the
+1–2 money paths — AL approve/deduct, OT settle/bank — needs surgery on live balance paths + a 2nd-opinion
+pass). **Honest ceiling:** catches an inconsistent OUTCOME (a number that didn't move, a cross-row collision)
+the next cycle reads; does NOT catch a wrong-but-self-consistent delta (that's phase 2). **PROOF:** suite **760
+passed / 2 skip**; deployed BY TAG (server HEAD==tag, gm active, NRestarts=0, **`gm_live_watchdog` registered in
+the running process's startup log**, no Traceback/REFUSING/409); `live_watchdog_last` **pre-seeded** with the 3
+current stale rows so the first cycle fired SILENT (independent re-read confirms). Batched the accumulated main
+delta to gm — vetted each piece first: inert **C3 stock button** (hidden, DB-free, gated on `STOCK_APPSHEET_URL`),
+additive `ai_client`/`stock_shared` gm never calls, off-shift-feedback churn reverted net-zero. Other 4 services
+untouched (still on the old tag). A new `gm_stock_order` job is also now scheduled on gm (from the stock lane;
+inert without the AppSheet URL).
+**▶ STALE OPEN-SESSION FINDING (read-only prod investigation — owner: "investigate first"):** the audit's 3
+flagged rows = **Tra**(Jun16)/**Anan**(Jun16)/**Davy**(Jun17) sessions "still OPEN, never checked out". ROOT
+CAUSE: staff **stop sharing live-location early** (Davy: 49 in-zone pings 21:01→21:16 then stopped, 15 min into
+a 9h shift) → auto-checkout (needs a live in-zone share AT shift end) never fires → the session dangles open →
+flagged stale after 2 days. **All present, pay-safe (late=0, nothing to settle), benign — but RECURS daily.**
+Real fix = a **fallback end-of-shift session-closer** — **NOW BUILT + DEPLOYED (see the closer block above);
+the 3 were closed on prod with before/after proof, FINAL audit = 0 problems.** Going forward the daily 07:00 PP
+job closes them automatically so they never reach 'stale'.
+**(prev, session 45) ▶ LANE_GUARD v4 — CONTENTION-SCOPED SHARED-WARN (hub, tooling; INERT — nothing live, lanes `pull` to get it):** the blanket "warn on every shared edit" noise is GONE. A lone shared edit is now **silent**; the guard WARNs only when **another worktree has that exact file uncommitted right now** (same-machine live race), naming the lane → "let it commit + push, then `pull` before you edit". WARN not auto-block (a lane abandoning a dirty file must never deadlock another). New pure helpers `_sibling_contention` (git) + `_gate_shared` (decision); `tests/test_lane_guard.py` **13 pass** (pure only — never `main()`, which would pollute the event sink); real-path proven on all 4 worktrees (clean→silent · gm-dirty→names `gm` · cleanup→silent). **Shared-file RULE added to playbook:** pull-before-touch · commit-on-its-own · push-at-a-boundary (pulling-before-shared, not faster commits, is what stops divergence; `push`≠commit so per-edit pushing is waste). **Backlog PRUNED (prevention-at-source redundancy sweep):** DROP sparse-checkout (guard-block + valued cross-lane reads make it counterproductive); DEFER server-side commit-scope CI (guard prevents + audit detects). Files: `scripts/lane_guard.py` · `docs/MULTI_LANE_PLAYBOOK.md` §3/§4/§8/§9 · `tests/test_lane_guard.py`. **▶ NEXT (paused, resume after this): trim this CLAUDE.md** (move sessions 32–43 → `docs/HISTORY.md`, keep latest + open loops + rules).
+**(prev, session 44)** INTEGRATOR CROSS-LANE VERIFY: full suite 738✓ on merged `main`, GM↔stock seam clean, drift guard added.
+**▶ INTEGRATOR VERIFY (hub on `main` `3937b0b`) — the checks no single lane can do (they're blind to each other):** **full suite 738 passed / 2 skipped / 0 failed on merged main** (closes the "merged-main not suite-verified" gap). **GM↔stock handover CLEAN:** stock builds on the B1 shared tables (`acc_items`/`stock_movements`, no fork); `gm_bot/stock.py` ≡ `stock/order_brain.py` (AST-identical, faithful port); **no lane wrote another lane's code** (guard held). Added **`tests/test_stock_brain_no_drift.py`** — the two brain copies must stay logic-identical until the GM cutover (drift → red suite; auto-skips post-cutover). **⚠ HYGIENE FINDING:** lanes have been editing the tracked Current Status during their pushes (the `(prev)` line below included) — against the multi-lane rule (hub owns Current Status; lanes → `CLAUDE.local.md`). No conflict yet (sequential pushes) but latent → fix = lanes skip the Current-Status step (+ optional lane_guard `CLAUDE.md` hard-block).
+**▶ LANES MACHINERY HARDENED + CAPTURED (hub, session 44 cont):** **(1)** `lane_guard` now **HARD-BLOCKS `CLAUDE.md`** in any lane (HUB_ONLY → lanes use `CLAUDE.local.md`; `.lane_ack` still overrides). **(2)** NEW **`scripts/integration_audit.py`** — the integrator's cross-lane sweep (map integrity = every file owned/shared · no cross-lane commit · optional `--suite`); **map COMPLETED** (`parallel_lanes.json` now covers all 29 prev-unowned root scripts/dirs → audit CLEAN). **(3)** dashboard gained **`/audit`** (runs it on demand). **(4)** ▶▶ **`docs/MULTI_LANE_PLAYBOOK.md`** — the full PORTABLE method (model · the whole toolkit · workflow · 8 safety layers · the self-review + integration-audit rituals · how to set this up in a NEW project · the up-our-game backlog · hard-won lessons). **Keep it updated as we improve the setup.** Monitor cmds now: `/board /health /issues /crossings /audit`.
+**(prev, session 44 — accountant lane)** ACCOUNTANT P1.5: "Received Yet?" supplier-candidate forward flow + symmetric duplicate guard. BUILT + checkpointed to main (`8059f03`); INERT — the accountant bot is NOT a live server service, nothing deployed; staging only.
+**▶▶ RESUME (accountant lane, session 44):** the bridge between P1 capture and the HIGH-RISK P2 money matcher — **moves no money** (creates *candidate* rows, promotes to a normal `captured` draft; the paid-flip + lump matcher stay untouched P2 stubs).
+• **Flow:** a supplier posts a photo in their **linked** group → bot stays **silent there** → posts a **candidate card** to the Expense group headed `📨 From <vendor> · <group>` (routing verifiable) → owner forks: **🆕 New&received** → 1 lazy Sonnet read → **look-alike guard** (same vendor+amount ≤7d → "Same as #N / New?") → **claim-first promote** to a numbered receipt (atomic `open→promoting`, so a double-tap can't create two #s) → living receipt card · **🔗 Already-logged** → pick from the vendor's recent receipts → link to #N · **📦 Not-yet** → park `expected` · **✕ Ignore**.
+• **Symmetric dup guard:** the DIRECT Expense-group capture now ALSO flags a same-vendor+amount-within-7d receipt as `⚠ possible duplicate of #N` (informational; new `acc_receipts.dup_suspect_of`). Candidate-promoted rows are NOT re-flagged (owner already chose "New").
+• **Files:** `accountant/{db,capture,bot}.py` + `tests/test_accountant_candidates.py` (+`tests/test_accountant_capture.py`). Lane scratch in `CLAUDE.local.md` (gitignored). Design marker in `docs/REPORT_SYSTEM_DESIGN.md §E3`.
+• **⚠ SCHEMA ADDITIONS (idempotent, self-applied by `init_accounting_db()` at bot startup — no manual migration):** new table **`acc_receipt_candidates`** + column **`acc_receipts.dup_suspect_of`**. Applied on **staging** when the bot/tests run; **NOT on prod** (accountant bot is not deployed).
+• **PROOF (DB now DONE on staging — self-review session 44):** **35/35 accountant tests PASS on staging** (24.5s, real Postgres) incl. all candidate DB-lifecycle (atomic claim · sha-dedup · look-alike window/exclude · `dup_suspect_of` flag · link · unclaim) + P1 regressions. **Independent schema read** confirms `acc_receipt_candidates` (17 cols) + `acc_receipts.dup_suspect_of` + indexes (`uq_acc_cand_sha`, `idx_acc_cand_status`); **0 rows left** (fixtures clean — no staging pollution). Static: 27 db imports + 9 `capture.*` all resolve · SQL params balanced · claim-first ordering verified · P2 stubs (`open_receipts_for_vendor`/`record_payment_and_match`) uncalled. **▶ Gotcha:** the **lane worktree lacks the gitignored `secrets.py`** (`make_lane` doesn't copy it) so DB tests SKIP there — **run them from the main worktree**: `cd C:/Users/Papa/TWBshop && python -m pytest tests/test_accountant_candidates.py tests/test_accountant_capture.py -q`. **STILL UNPROVEN (owner live-walk only):** the Telegram/bot orchestration + OCR (need a live token + a real image).
+**▶ NEXT:** (1) **live-walk** on staging (the one unproven layer): `python scripts/run_accountant_local.py`, `/vendor link <name>` the TEST Supplier group `-5406470751`, post a photo there → candidate card appears in Expenses TWB `-5417163768` → walk the four forks + promote. (2) Then **P2 (HEART, HIGH-RISK money)** — owner→bot→supplier slip relay + wrong-amount txn-ref ladder + subset-sum/FIFO lump matcher + anti-double-pay paid-flips; per-step owner approval, no live money until each step signs off.
+
+**▶ STOCK LANE (session 44) — C2 FOUNDATION BUILT + consolidated to main; INERT (no service runs it, nothing deployed). Full suite 721/2-skip.** The headless stock worker (no chat bot — staff use the GM gateway button → AppSheet; Postgres = source of truth).
+• **Catalog → shared `acc_items`** (`stock/catalog{,_data}.py`): 50 items migrated from GM's `_STOCK_SEED`; `run_stock.py --seed` (idempotent); read-model `overview/low_stock/reorder_list` (on-hand via the ONE `stock_movements` resolver, is_test-scoped).
+• **Count model** (`stock/db.py` `stock_count_events`): one count/item/day; `reconciled` flag; `sync.apply_count` writes the count event + reconciling movement; `sync.reconcile_counts` turns AppSheet-direct writes into ledger movements (idempotent) — run every worker tick.
+• **Order brain** ported to `stock/order_brain.py` (GM's `gm_bot/stock.py` removed at the integrator cutover — coordinate w/ gm lane).
+• **GM C3 seam** (shipped by gm lane: `gm_bot/stock_gateway.py`): staff button gated on **`STOCK_APPSHEET_URL`** (env/config) — set once → button lights up + worker reconciles AppSheet counts.
+• **⚠ SCHEMA (idempotent, self-applied at worker start):** `acc_items`+`stock_movements` (B1) + `stock_count_events`. Staging only; **prod migration at go-live.**
+**▶ NEXT (owner gate — C2 first unknown):** create the AppSheet app over the DO Postgres per **`docs/STOCK_APPSHEET_SETUP.md`** (security-first: AppSheet gets ONLY a least-privilege role on `acc_items`+`stock_count_events`, NEVER payroll). Choose **direct-bind** (scoped role) vs **API** (DB stays private → wire `AppSheetClient`). Then: migrate GM stock code out (integrator cutover) · D2 accountant read-only cross-check.
+
+
 ## Old session logs (sessions 19–28) — moved from Current Status
 
 **Session 28 (Jun 7) additions on top of the block below:**

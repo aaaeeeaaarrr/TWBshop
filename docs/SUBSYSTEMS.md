@@ -36,7 +36,7 @@ mark+report only — promote an admin account to enable auto-kick). Paperless /s
 
 ---
 
-## Private-DM Attendance Overhaul — IN BUILD (current focus)
+## Private-DM Attendance Overhaul — LIVE (since 2026-06-16)
 Button-driven private-DM attendance: check-in (live-location geofence) · late+payback (time-bank) ·
 AL + senior approval · Special Leave (sick/marriage/death/birth) · day-off swap · Give-OT time-bank ·
 points · no-shows · payroll. Replaces the silenced group ladder. Full spec → docs/ATTENDANCE_SYSTEM_DETAILED.md
