@@ -1,14 +1,17 @@
-"""MAP.md integrity — the map must never lie (the mechanical half of the map-discipline).
+"""MAP.md integrity — catch the map's drift mechanically (most of it).
 
-MAP.md routes any task to the files/laws/history that concern it. A pointer to a moved/renamed file
-is WORSE than no map — it sends you confidently wrong (the exact 2026-06-19 failure, automated). So
-this guards the two dangerous drift modes mechanically:
-  1. every dir-qualified path MAP.md references must exist  → no dead pointers;
-  2. every top-level code package must be mentioned          → no whole-subsystem omission.
+MAP.md routes any task to its files/laws/history. A pointer that lies (moved file, relocated logic,
+unlisted new file) is worse than no map — it sends you confidently wrong (the 2026-06-19 failure,
+automated). This guards the catchable drift:
 
-What it CANNOT check (stays human): that a *new file inside an existing area* was added to the map,
-or that a ⚠ gotcha is still accurate. ~100% on "no dead pointers + no missing subsystem", not on
-"complete + accurate". Index only — never let MAP.md grow into prose.
+  1. dead path            — a `path` that doesn't exist                         -> FAIL
+  2. relocated logic      — a `path::symbol` whose symbol left the file         -> FAIL  (Fault 3)
+  3. unlisted file        — a package .py neither indexed nor MAP-IGNOREd       -> FAIL  (Fault 1)
+  4. unmapped package     — a whole code package missing from the map           -> FAIL
+
+CANNOT be caught (stays human, now a tiny surface): a gotcha whose file+symbol still exist but whose
+*behaviour* silently changed. Mitigation: gotchas POINT to the law/test that owns the truth (checks 1/2
+verify those pointers resolve), so a stale hint is caught when you read the destination. Index only.
 """
 import os
 import re
@@ -16,10 +19,8 @@ import re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP = os.path.join(ROOT, "MAP.md")
 
-# A path token = inside backticks, ends in a known extension. We only enforce DIR-QUALIFIED paths
-# (contain '/') — that targets the real risk (package/doc files moving) and avoids gitignored
-# root files like secrets.py that won't exist on a fresh clone.
-_PATH_RE = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|md|ps1|json|sh))`")
+# `path` or `path::symbol`, path ending in a known extension.
+_TOKEN_RE = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|md|ps1|json|sh))(?:::([A-Za-z0-9_]+))?`")
 _PACKAGES = ("gm_bot", "accountant", "stock", "b2b_bot", "hire_bot", "shared", "ops_intelligence")
 
 
@@ -28,8 +29,8 @@ def _map_text() -> str:
         return f.read()
 
 
-def _referenced_paths() -> list[str]:
-    return sorted({m for m in _PATH_RE.findall(_map_text()) if "/" in m})
+def _tokens():
+    return _TOKEN_RE.findall(_map_text())   # [(path, symbol_or_'')]
 
 
 def test_map_file_exists():
@@ -37,10 +38,47 @@ def test_map_file_exists():
 
 
 def test_every_referenced_path_exists():
-    paths = _referenced_paths()
+    paths = sorted({p for p, _ in _tokens() if "/" in p})   # dir-qualified only (skip gitignored root files)
     assert paths, "MAP.md references no files — parsing broke or the map is empty"
     missing = [p for p in paths if not os.path.exists(os.path.join(ROOT, p))]
     assert not missing, "MAP.md points to files that don't exist — update the map: %s" % missing
+
+
+def test_every_symbol_anchor_resolves():
+    """Fault 3: a `file::symbol` anchor whose symbol is no longer in that file = logic moved out."""
+    bad = []
+    for path, sym in _tokens():
+        if not sym:
+            continue
+        fp = os.path.join(ROOT, path)
+        if not os.path.exists(fp):
+            continue   # the path test already flags this
+        with open(fp, encoding="utf-8") as f:
+            content = f.read()
+        defined = (re.search(r"(?:async def|def|class)\s+%s\b" % re.escape(sym), content)
+                   or re.search(r"(?m)^\s*%s\s*=" % re.escape(sym), content))
+        if not defined:
+            bad.append("%s::%s" % (path, sym))
+    assert not bad, ("MAP.md anchors symbols that aren't in their file — logic moved, update the map: %s"
+                     % bad)
+
+
+def test_every_package_py_is_indexed_or_ignored():
+    """Fault 1: every package .py must appear in MAP.md (an area entry OR the MAP-IGNORE block)."""
+    text = _map_text()
+    miss = []
+    for pkg in _PACKAGES:
+        d = os.path.join(ROOT, pkg)
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
+            if not f.endswith(".py") or f == "__init__.py":
+                continue
+            rel = "%s/%s" % (pkg, f)
+            if rel not in text:
+                miss.append(rel)
+    assert not miss, ("package files neither indexed nor MAP-IGNOREd — add to an area or the "
+                      "MAP-IGNORE block: %s" % miss)
 
 
 def test_every_code_package_is_mapped():

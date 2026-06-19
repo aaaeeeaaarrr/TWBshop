@@ -39,8 +39,10 @@ code with simpler files — to escape past bugs. How dangerous?
 ## The MAP mechanism (built this session)
 - `MAP.md` (index only — never prose) + `CLAUDE.md` top-pointer ("open MAP.md for any task") +
   `tests/test_map_integrity.py` (fails the build on a dead pointer or an unmapped package).
-- **Mechanical ceiling:** ~100% on "no dead pointers + no missing subsystem"; NOT 100% on "complete +
-  accurate" (a new file inside an existing area, or a stale gotcha, stays human discipline).
+- **Mechanical ceiling (strengthened 2026-06-19):** the test catches dead pointers, **relocated logic**
+  (`file::symbol` anchors), **new unlisted files** (indexed-or-MAP-IGNORE), and unmapped packages. Only
+  residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — caught at the
+  destination (gotchas point to the law/test that owns the truth, not bare claims).
 - **Rule:** any file move/rename/new subsystem updates `MAP.md` in the SAME commit. With the map in
   place, `CLAUDE.md` can be trimmed further (detail lives behind the map), but only carefully.
 

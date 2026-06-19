@@ -285,10 +285,13 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (this session, INERT — docs/test only, nothing live):**
 Built **`MAP.md`** — the task→files/laws/HISTORY/gotcha index every cold session opens FIRST (closes the
 2026-06-19 "claimed gaps without checking" failure). Mechanical guard **`tests/test_map_integrity.py`**
-(75 paths enforced; fails the build on a dead pointer or unmapped package — proven to bite). `CLAUDE.md`
-top-pointer added so a fresh session is told to use it. **RULE: any file move/rename/new subsystem updates
-`MAP.md` in the same commit.** Ceiling: ~100% on "no dead pointers/missing subsystem", NOT on "complete+
-accurate" (new file in an existing area / stale gotcha = human). **DECISION (owner): a full rewrite-and-
+(5 checks, proven to bite) now catches ALL 3 prior human-faults: **dead pointer** · **relocated logic**
+(`file::symbol` anchors — symbol gone from the file = FAIL) · **new unlisted file** (every package `.py`
+must be indexed OR in the MAP-IGNORE block) — plus unmapped package. `CLAUDE.md` top-pointer tells a cold
+session to use it. **RULE: any file move/rename/new file updates `MAP.md` in the same commit.** Gotchas now
+POINT to the law/test that owns the truth (so a stale note is caught when you read the destination). Only
+TRUE residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — unmechanizable,
+but a tiny surface caught at the destination. **DECISION (owner): a full rewrite-and-
 replace is too dangerous (it re-lives every solved bug); do "map, don't remodel" — understand via the map,
 delete only provably-dead code, refactor only what actively hurts, otherwise keep shipping.** Full reasoning
 + bonus ideas → `docs/SIMPLIFICATION_STRATEGY.md`. With the map in place, `CLAUDE.md` can be trimmed further
