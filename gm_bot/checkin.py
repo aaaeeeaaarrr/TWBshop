@@ -95,28 +95,3 @@ def shift_for_now(now_min: int, candidates: list[tuple[int, bool, int | None, in
         if ws - pre <= now_abs < we2 + post:
             return off, ws % 1440
     return None, None
-
-
-def offshift_reason(now_min: int, today_dec: dict,
-                    pre: int = CHECKIN_PRE_MIN, post: int = CHECKIN_POST_MIN) -> str:
-    """Why a live-location ping did NOT bind to a shift (i.e. shift_for_now returned None) — so the bot
-    can give a short, kind reply instead of SILENCE. Silence reads to staff as "the bot is broken" and,
-    worse, would hide a genuinely wrong schedule (it looks identical to a real day-off bug). `today_dec`
-    = resolve_day() for today. Returns:
-      'off'       — not scheduled to work today (day off / approved leave / no shift times set);
-      'too_early' — scheduled today but the check-in window hasn't opened yet (>pre min before start);
-      'over'      — scheduled today but the window has already closed (shift done / missed).
-    This is only ever reached on the no-bind path, so 'working today AND now inside the window' cannot
-    occur here (shift_for_now would have bound it). Pure — no DB/Telegram."""
-    if not today_dec or not today_dec.get("working"):
-        return "off"
-    ws = today_dec.get("start_min")
-    we = today_dec.get("end_min")
-    if ws is None or we is None:
-        return "off"
-    we2 = we + 1440 if we <= ws else we          # overnight end rolls past midnight
-    if now_min < ws - pre:
-        return "too_early"
-    if now_min >= we2 + post:
-        return "over"
-    return "over"          # within-window is unreachable here; safe catch-all

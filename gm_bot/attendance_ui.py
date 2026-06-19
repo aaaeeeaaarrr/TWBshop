@@ -375,10 +375,6 @@ def build_catalogue(p: dict) -> list[tuple[str, str, InlineKeyboardMarkup | None
         ("⑨ shift-end check-out request", _CI_MSG_OUT, None),
         ("⑩ +10min leave-early ask (only if no check-out)", _CI_MSG_OUT2, None),
         ("⑪ checked out ✓ — shift closed", _CO_DONE, None),   # the LIVE constant — can't drift
-        # off-shift replies (instead of silence) when a live share doesn't bind to a shift
-        ("⑫ live share — but it's their DAY OFF", offshift_notice_text("off"), None),
-        ("⑬ live share — too early (before window)", offshift_notice_text("too_early", 1260), None),
-        ("⑭ live share — not on a shift right now", offshift_notice_text("over"), None),
         # (former ⑫⑬ — "left zone mid-shift" + "outside too long / 30-min allowance" — DELETED
         # session 32: both belong to the DROPPED whole-shift-tracking model. v2 is check-in-only:
         # stopping a share mid-shift gets SILENCE; the leave-early ask fires only at checkout.)
@@ -2319,28 +2315,6 @@ _CI_MSG_OUT2 = ("Did you leave early? If not, share your location to check out.\
 # Sent on EVERY successful checkout — manual share-to-checkout AND silent auto-checkout (owner).
 _CO_DONE = ("Checked out ✓ Thank you, have a nice day! 🤍\n"
             "ចុះវត្តមានចេញរួច ✓ អរគុណ សូមឱ្យថ្ងៃនេះល្អៗ 🤍")
-
-
-def offshift_notice_text(code: str, start_min=None) -> str:
-    """Staffer-facing reply when a live-location share does NOT bind to a shift — instead of silence.
-    `code` from checkin.offshift_reason ('off' | 'too_early' | 'over'); `start_min` = today's shift
-    start (only used for 'too_early'). Bilingual. Pure. (KH is a DRAFT — see docs/KH_REVIEW.md,
-    pending a native pass.)"""
-    if code == "too_early" and start_min is not None:
-        t = "%02d:%02d" % (int(start_min) // 60, int(start_min) % 60)
-        return ("Got your location 📍 — you're a little early. Your shift starts at %s.\n"
-                "Share your live location again at check-in time and I'll count you in. 🤍\n"
-                "ទទួលបានទីតាំងហើយ 📍 — ប្អូនមកលឿនបន្តិច។ វេនរបស់ប្អូនចាប់ផ្តើមម៉ោង %s។\n"
-                "សូមចែករំលែកទីតាំងផ្ទាល់ម្តងទៀតនៅពេលចុះវត្តមាន ខ្ញុំនឹងកត់ត្រាឱ្យ។ 🤍") % (t, t)
-    if code == "off":
-        return ("Got your location 📍 — but the system has you OFF today, so there's no shift to "
-                "check in to.\nIf that's not right, please tell a supervisor and they'll fix it. 🤍\n"
-                "ទទួលបានទីតាំងហើយ 📍 — ប៉ុន្តែប្រព័ន្ធកត់ត្រាថាថ្ងៃនេះប្អូនឈប់សម្រាក ដូច្នេះគ្មានវេនត្រូវចុះវត្តមានទេ។\n"
-                "បើមិនត្រឹមត្រូវ សូមប្រាប់ប្រធានក្រុម ពួកគាត់នឹងកែតារាងវេនឱ្យ។ 🤍")
-    return ("Got your location 📍 — but you're not on a shift right now.\n"
-            "If you think this is wrong, please tell a supervisor. 🤍\n"
-            "ទទួលបានទីតាំងហើយ 📍 — ប៉ុន្តែឥឡូវនេះប្អូនមិននៅក្នុងវេនទេ។\n"
-            "បើគិតថាមិនត្រឹមត្រូវ សូមប្រាប់ប្រធានក្រុម។ 🤍")
 
 
 def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
