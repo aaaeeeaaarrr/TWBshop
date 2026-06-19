@@ -5702,6 +5702,20 @@ async def _pay_restore_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.error("pay restore notify failed: %s", e)
 
 
+def _watchdog_delta(prev_json: str | None, problems: list[str]) -> tuple[list[str], list[str], str]:
+    """Pure diff shared by both audit watchdogs. Given the previous cycle's stored problem set
+    (JSON string) and this cycle's `problems`, return (new_sorted, cleared_sorted, cur_json) — the
+    problems that JUST appeared, the ones that JUST cleared, and the JSON to store for next cycle.
+    A corrupt/empty prev is treated as 'no problems seen yet'. No I/O, so it is unit-testable."""
+    import json as _json
+    cur = set(problems)
+    try:
+        prev = set(_json.loads(prev_json or "[]"))
+    except Exception:
+        prev = set()
+    return sorted(cur - prev), sorted(prev - cur), _json.dumps(sorted(cur))
+
+
 async def _auto_audit_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily 07:30 PP: the invariant audit over the REAL ledger — SILENT when clean, owner DM only
     when something is up (so data-law violations chase the owner instead of waiting to be asked).
@@ -5737,7 +5751,6 @@ async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     no-op when test mode is off. Catches the SILENT class (a number that didn't update, or updated
     wrong relative to the buttons pressed). It does NOT know intent — a self-consistent but
     unintended number won't ping; the owner still eyeballs that."""
-    import json as _json
     from shared.database import gm_get_state, gm_set_state
     if not _att_test_mode():
         if gm_get_state("test_watchdog_last"):
@@ -5749,16 +5762,11 @@ async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error("test-watchdog audit failed: %s", e)
         return
-    cur = set(problems)
-    try:
-        prev = set(_json.loads(gm_get_state("test_watchdog_last") or "[]"))
-    except Exception:
-        prev = set()
-    new = cur - prev
-    cleared = prev - cur
+    new, cleared, cur_json = _watchdog_delta(gm_get_state("test_watchdog_last"), problems)
+    still_open = len(set(problems))
     if new:
         body = ("🚨 TEST WATCHDOG — %d new inconsistency(ies) just appeared in your test rows "
-                "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in sorted(new))
+                "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in new)
         for i in range(0, len(body), 3500):
             try:
                 await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
@@ -5769,10 +5777,53 @@ async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             await context.bot.send_message(
                 config.OWNER_TELEGRAM_ID,
                 "✅ Test watchdog: %d issue(s) cleared%s." %
-                (len(cleared), "" if not cur else " (%d still open)" % len(cur)))
+                (len(cleared), "" if not still_open else " (%d still open)" % still_open))
         except Exception:
             pass
-    gm_set_state("test_watchdog_last", _json.dumps(sorted(cur)))
+    gm_set_state("test_watchdog_last", cur_json)
+
+
+async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """LIVE WATCHDOG (go-live hardening, owner-requested Jun 14): while attendance is LIVE and NOT
+    in test mode, run the invariant audit over the REAL ledger every few minutes and DM the owner
+    the INSTANT a NEW inconsistency appears — de-duped against the previous cycle (one ping per new
+    problem; a ✅ when they clear). The fast complement to the daily 07:30 auto-audit: it cuts live
+    detection of a data-law violation from ~24h to minutes, with ZERO change to any balance-write
+    path (read-only). Catches the SILENT class the next cycle reads (a number that didn't move, or a
+    cross-row collision). It does NOT know intent — a self-consistent-but-unintended number won't
+    ping; per-event delta checks (a possible phase 2) would cover the money paths for that.
+    Exactly one watchdog runs at a time: this one is a no-op in test mode (the test watchdog owns
+    that), and the test watchdog is a no-op when live."""
+    from shared.database import gm_get_state, gm_set_state
+    if _att_test_mode() or not _attendance_live():
+        if gm_get_state("live_watchdog_last"):
+            gm_set_state("live_watchdog_last", "[]")   # reset so re-entry re-pings from a clean slate
+        return
+    from gm_bot.audit import run_audit
+    try:
+        problems, _stats = run_audit(datetime.now(finance.PP_TZ).date(), test_rows=False)
+    except Exception as e:
+        logger.error("live-watchdog audit failed: %s", e)
+        return
+    new, cleared, cur_json = _watchdog_delta(gm_get_state("live_watchdog_last"), problems)
+    still_open = len(set(problems))
+    if new:
+        body = ("🚨 LIVE WATCHDOG — %d new data inconsistency(ies) just appeared in the REAL ledger "
+                "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in new)
+        for i in range(0, len(body), 3500):
+            try:
+                await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
+            except Exception:
+                break
+    elif cleared:
+        try:
+            await context.bot.send_message(
+                config.OWNER_TELEGRAM_ID,
+                "✅ Live watchdog: %d issue(s) cleared%s." %
+                (len(cleared), "" if not still_open else " (%d still open)" % still_open))
+        except Exception:
+            pass
+    gm_set_state("live_watchdog_last", cur_json)
 
 
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -7319,6 +7370,11 @@ def build_app() -> Application:
     # the INSTANT a NEW inconsistency appears (de-duped; cheap no-op when test mode is off)
     app.job_queue.run_repeating(_test_watchdog_job, interval=60, first=20,
                                 name="gm_test_watchdog")
+    # LIVE watchdog: every 3 min while attendance is LIVE (and not mid-walk), audit the REAL ledger
+    # and DM the owner the INSTANT a new inconsistency appears — the fast complement to the daily
+    # 07:30 auto-audit (minutes vs ~24h to detect). Read-only; no balance path touched.
+    app.job_queue.run_repeating(_live_watchdog_job, interval=180, first=45,
+                                name="gm_live_watchdog")
     # bounded reason-nudge ladder (10/20/30): every 5 min, gated
     app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
                                 name="gm_reason_nudge")
