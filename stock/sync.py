@@ -6,7 +6,8 @@ Postgres vs syncing via the AppSheet API + key). The approach decides what `AppS
 it stays a contract for now and fails LOUDLY rather than silently no-op'ing.
 
 The Postgres SIDE is built + tested today and is needed under EITHER approach:
-  - `apply_count` turns a staff count into a `stock_movements` row (on-hand reconciliation);
+  - `apply_count` records a count event AND its reconciling `stock_movements` row (inline);
+  - `reconcile_counts` turns counts written directly (AppSheet direct-bind) into ledger movements;
   - `pull_overview` is the data AppSheet consumes (= `catalog.overview`).
 
 State-integrity (S5): on-hand is an append-only ledger with ONE resolver. A count never mutates a
