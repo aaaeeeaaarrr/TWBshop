@@ -62,7 +62,7 @@ real work never softens. The user may demand the evidence block at ANY time; its
 ### TWBshop HIGH-RISK paths (no shortcuts, real-path proof mandatory)
 - Payments / KHQR / Bakong · payroll & salary (staff_registry, slips, pays) · staff records &
   ex-staff offboarding / bans / permissions · DB migrations & deletions · deploys to the twbshop-*
-  services (retail / b2b / gm / listener / hire) · attendance go-live (`attendance_live`).
+  services (retail / b2b / gm / listener / hire) · the attendance live path (`attendance_live`, LIVE since 2026-06-16).
 - Attendance test harness design: `docs/ATTENDANCE_TEST_MODE.md`.
 
 ---
@@ -131,8 +131,8 @@ dropped one makes the shop's numbers wrong. The rule:
    where the owner gave instructions, **state the open loops** — "Open items: none" or the list.
 
 Why: an instruction acknowledged only in chat, never executed or written to a file, gets buried by
-context compaction and the numbers silently go wrong. Files are truth; chat is disposable. (Once
-`attendance_live` flips, most of these happen through the bot's audited button flows, not by hand —
+context compaction and the numbers silently go wrong. Files are truth; chat is disposable. (Now that
+`attendance_live` is ON (since 2026-06-16), most of these happen through the bot's audited button flows, not by hand —
 which shrinks this risk on its own.)
 
 ---
@@ -265,7 +265,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - **Supervisors/Management — lateness·AL·tagging:** mostly BUILT; group ladder SILENCED (moved to private-DM).
 - **Delivery System (WOC):** SHELVED.
 - **Staff Registry · Ex-staff offboarding · Paperless /stock:** BUILT (stock overhaul + 143-item CSV import PENDING).
-- **Private-DM Attendance Overhaul:** IN BUILD, gated OFF (current focus) → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`.
+- **Private-DM Attendance Overhaul:** **LIVE since 2026-06-16** (`attendance_live`=true, test mode off) → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`.
 - **STRATEGIC — POS convergence:** keep our Postgres source-of-truth; AppSheet is a throwaway stock front-end.
 - **GM Backlog & Roadmap:** → `docs/ROADMAP.md` (reference, not an auto-run list).
 - **Operations Intelligence System:** mostly BUILT (Phase 3 — listener + import + AI tiers + hire bot).
@@ -301,7 +301,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 1. **Multi-lane operation (current focus)** — hub (`twbshop`/`main`) + 3 lane worktrees (`twbshop-accountant`/`-gm`/`-stock`). Portable method · toolkit · build sequence (Phases A–F) · lane layout/recreate → **`docs/MULTI_LANE_PLAYBOOK.md`** + `docs/PARALLEL_LANES.md`. Monitor (`scripts/monitor_bot.py`, owner-only): `/board /health /issues /crossings /audit`.
 2. **Accountant bot** — P1.5 done (above); **NEXT = live-walk on staging → then P2 (HIGH-RISK money matcher)**. INERT (no server service imports it; nothing deployed). Design → `docs/REPORT_SYSTEM_DESIGN.md`. Key IDs: Expense group `-5417163768` · TEST Supplier `-5406470751`.
 3. **Stock lane** — C2 foundation done (above); **NEXT (owner gate) = create the AppSheet app** → `docs/STOCK_APPSHEET_SETUP.md`. INERT. Then the GM↔stock cutover (remove `gm_bot/stock.py`; drift-guarded by `tests/test_stock_brain_no_drift.py` until then).
-4. **Attendance / AL / OT / schedule system** — fully BUILT + staging-proven but **gated OFF (`attendance_live`=None)** — nothing live for real staff. **NEXT = owner `/test` re-walk → `/testreset` → flip `attendance_live`.** Live design → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`; build blow-by-blow (sessions 31–42) → `docs/HISTORY.md`.
+4. **Attendance / AL / OT / schedule system — LIVE since 2026-06-16 11:08 PP** (`attendance_live`=true, test mode OFF): real staff check in by live-location; AL/OT/no-show/points/schedule-changes all active on real data. **HIGH-RISK live path (payroll-adjacent)** — any change: investigate read-only on prod first, prove on staging, deploy-by-TAG in a quiet window + verify (never a casual restart). Live design → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`; build blow-by-blow (sessions 31–42) → `docs/HISTORY.md`; open data ops → `docs/ACTIONS_LEDGER.md`.
 **At session start also read `docs/ACTIONS_LEDGER.md`** (open real-data instructions; Parked items are rare/behind-go-live).
 
 **⏰ DATED CHECKPOINT (set 2026-06-08): stand up a staging/local Postgres so the prod DATABASE_URL
@@ -310,7 +310,7 @@ migration/query in dev hits live payroll/staff data. The HIGH-RISK hook (.claude
 is a BACKSTOP, not the fix; the real lock is a missing prod credential in dev. Target: before the next
 migration/payroll/payment task, and no later than **2026-06-30**. Don't let it become "never."
 
-**Phase:** Retail complete · B2B Phases 1+2 · GM Manager live · Ops listener live · Hiring intake+quiz+assessment built. Attendance system in build (gated OFF).
+**Phase:** Retail complete · B2B Phases 1+2 · GM Manager live · Ops listener live · Hiring intake+quiz+assessment built. **Attendance LIVE (since 2026-06-16).**
 
 **Known issues:** None
 **Notes:**
