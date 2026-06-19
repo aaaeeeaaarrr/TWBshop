@@ -16,10 +16,13 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           MessageHandler, filters)
 
 from accountant import capture
-from accountant.db import (add_receipt, confirm_receipt, delete_receipt, edit_receipt,
-                           get_receipt, get_receipt_by_sha, get_receipt_lines, learn_item_alias,
-                           rename_receipt_line, save_receipt_lines, set_payment, to_usd_cents,
-                           vendor_by_group, vendor_by_name, vendor_link)
+from accountant.db import (add_candidate, add_receipt, claim_candidate, confirm_receipt,
+                           delete_receipt, edit_receipt, finalize_promote, find_lookalike_receipt,
+                           get_candidate, get_candidate_by_sha, get_receipt, get_receipt_by_sha,
+                           flag_dup_suspect, get_receipt_lines, learn_item_alias, link_candidate,
+                           recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
+                           save_receipt_lines, set_candidate_card, set_payment, to_usd_cents,
+                           unclaim_candidate, vendor_by_group, vendor_by_name, vendor_link)
 from shared.ai_client import extract_receipt
 
 try:
@@ -48,13 +51,24 @@ def _allowed(update):
     return False
 
 
-def _kb(r):
+def _rows_kb(rows):
+    """Build an InlineKeyboardMarkup from (label, callback_data) rows, or None if empty."""
+    if not rows:
+        return None
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(label, callback_data=data) for (label, data) in row]
-         for row in capture.card_buttons(r)])
+        [[InlineKeyboardButton(label, callback_data=data) for (label, data) in row] for row in rows])
 
 
-async def _send_card(update, rid):
+def _kb(r):
+    return _rows_kb(capture.card_buttons(r))
+
+
+def _cand_kb(c):
+    return _rows_kb(capture.candidate_buttons(c))
+
+
+def _card_text_kb(rid):
+    """The living receipt card (text, keyboard) for receipt #rid — shared by reply + group send."""
     r = get_receipt(rid)
     r["lines"] = get_receipt_lines(rid)
     items_sum = sum(li["line_total_cents"] for li in r["lines"]
@@ -62,7 +76,22 @@ async def _send_card(update, rid):
     if r["lines"] and items_sum and r.get("amount_cents"):
         ok, msg = capture.math_check(items_sum + (r.get("tax_cents") or 0), r["amount_cents"])
         r["math_msg"] = msg if not ok else "✓ items add up"
-    await update.effective_message.reply_text(capture.render_card(r), reply_markup=_kb(r))
+    return capture.render_card(r), _kb(r)
+
+
+async def _send_card(update, rid):
+    text, kb = _card_text_kb(rid)
+    await update.effective_message.reply_text(text, reply_markup=kb)
+
+
+async def _download(context, file_id):
+    """Fetch photo bytes by file_id (a bot file_id works across chats). None on a network hiccup."""
+    try:
+        f = await context.bot.get_file(file_id)
+        return bytes(await f.download_as_bytearray())
+    except Exception:
+        logger.exception("photo fetch failed (network)")
+        return None
 
 
 async def cmd_start(update, context):
@@ -87,9 +116,47 @@ async def cmd_vendor(update, context):
 
 
 async def on_photo(update, context):
-    """Receipt photo → one focused Sonnet read → numbered living card. Cash/ABA + ✏️ Fix from the card."""
+    """Photo router. A LINKED supplier group → the bot stays SILENT there and forwards a
+    'Received Yet?' candidate to the Expense group (§E3). Otherwise (Expense group / owner DM) →
+    P1 capture as a numbered living receipt card."""
+    chat = update.effective_chat
+    if chat and chat.type in ("group", "supergroup") and chat.id != EXPENSE_GROUP_ID:
+        v = vendor_by_group(chat.id)            # only linked supplier groups produce candidates
+        if v:
+            await _on_supplier_photo(update, context, v)
+        return                                   # never capture or post in a non-Expense group
     if not _allowed(update):
         return
+    await _capture_expense_photo(update, context)
+
+
+async def _on_supplier_photo(update, context, vendor):
+    """A supplier posted a photo in their group → forward it to the Expense group as a CANDIDATE
+    (never auto-numbered). The bot stays silent in the supplier group; the card + buttons land in
+    the Expense group, headed with the supplier NAME + GROUP so routing is verifiable."""
+    msg = update.effective_message
+    photo = msg.photo[-1]
+    raw = await _download(context, photo.file_id)
+    if raw is None:
+        return                                   # transient fetch fail → silent (it's a supplier group)
+    sha = hashlib.sha256(raw).hexdigest()
+    if get_candidate_by_sha(sha):
+        return                                   # same supplier photo again → one candidate, no re-post
+    chat = update.effective_chat
+    cid = add_candidate(vendor_id=vendor["id"], src_chat_id=chat.id, src_msg_id=msg.message_id,
+                        src_chat_title=(chat.title or vendor["name"]), photo_file_id=photo.file_id,
+                        photo_sha=sha, posted_by=update.effective_user.id)
+    c = get_candidate(cid)
+    try:
+        sent = await context.bot.send_photo(EXPENSE_GROUP_ID, photo.file_id,
+                                            caption=capture.candidate_card(c), reply_markup=_cand_kb(c))
+        set_candidate_card(cid, EXPENSE_GROUP_ID, sent.message_id)
+    except Exception:
+        logger.exception("posting candidate card to the Expense group failed")
+
+
+async def _capture_expense_photo(update, context):
+    """Receipt photo → one focused Sonnet read → numbered living card. Cash/ABA + ✏️ Fix from the card."""
     msg = update.effective_message
     photo = msg.photo[-1]
     try:
@@ -140,6 +207,11 @@ async def on_photo(update, context):
         captured_by=update.effective_user.id,
     )
     save_receipt_lines(rid, rec.get("line_items"), cur, vendor_id=(v["id"] if v else None))
+    # anti-double-pay heads-up (§E3 layer 3): a prior receipt, same vendor+amount within 7 days →
+    # flag THIS one as a possible duplicate (informational; excludes the row just created).
+    look = find_lookalike_receipt((v["id"] if v else None), cents, 7, exclude_id=rid)
+    if look:
+        flag_dup_suspect(rid, look["id"])
     await _send_card(update, rid)
 
 
@@ -172,6 +244,158 @@ async def on_callback(update, context):
         return
     r = get_receipt(rid)
     await q.edit_message_text(capture.render_card(r), reply_markup=_kb(r))
+
+
+# ─────────────── "Received Yet?" candidate card taps (Expense group, §E3) ───────────────
+
+async def _edit_cand(q, cid):
+    """Re-render a candidate card in place from its current DB state ('not modified' is benign)."""
+    c = get_candidate(cid)
+    if not c:
+        return
+    try:
+        await q.edit_message_caption(caption=capture.candidate_card(c), reply_markup=_cand_kb(c))
+    except Exception:
+        pass
+
+
+async def _show_link_picker(q, c):
+    """🔗 Already logged → pick which existing receipt # this candidate duplicates."""
+    cid = c["id"]
+    recents = recent_receipts_for_vendor(c.get("vendor_id"), 8)
+    if not recents:
+        try:
+            await q.edit_message_caption(
+                caption=capture.candidate_card(c) + "\n(no receipts logged for this supplier yet — "
+                "promote as 🆕 New, or ✕ Ignore)", reply_markup=_cand_kb(c))
+        except Exception:
+            pass
+        return
+    rows = [[(capture.receipt_pick_label(r), f"accand:lpick:{cid}:{r['id']}")] for r in recents]
+    rows.append([("← Back", f"accand:back:{cid}")])
+    try:
+        await q.edit_message_caption(caption="🔗 Which receipt is this the same as?",
+                                     reply_markup=_rows_kb(rows))
+    except Exception:
+        pass
+
+
+async def _candidate_new(q, context, c):
+    """🆕 New & received → OCR → look-alike guard (anti-double-pay §E3); promote if clear."""
+    cid = c["id"]
+    if c["status"] != "open":
+        await _edit_cand(q, cid)
+        return
+    raw = await _download(context, c.get("photo_file_id"))
+    if raw is None:
+        return
+    rec = await extract_receipt(raw)
+    context.user_data[f"cand_extract:{cid}"] = rec
+    cents = to_usd_cents(rec.get("total_amount"), rec.get("total_currency") or "USD")
+    look = find_lookalike_receipt(c.get("vendor_id"), cents, 7)
+    if look:
+        context.user_data[f"cand_look:{cid}"] = look["id"]
+        try:
+            await q.edit_message_caption(caption=capture.lookalike_prompt(look),
+                                         reply_markup=_rows_kb(capture.lookalike_buttons(cid, look["id"])))
+        except Exception:
+            pass
+        return
+    await _candidate_promote(q, context, c, rec=rec)
+
+
+async def _candidate_promote(q, context, c, rec=None):
+    """Create the numbered receipt from a candidate. Claim-first (atomic 'open'→'promoting') so a
+    double-tap can NEVER create two numbered receipts from one supplier photo."""
+    cid = c["id"]
+    uid = q.from_user.id
+    if rec is None:
+        rec = context.user_data.get(f"cand_extract:{cid}")
+    if rec is None:                              # stash lost (e.g. restart) → re-read
+        raw = await _download(context, c.get("photo_file_id"))
+        if raw is None:
+            return
+        rec = await extract_receipt(raw)
+    if not rec.get("is_receipt"):                # not a receipt → don't number it
+        resolve_candidate(cid, "ignored", uid, note="not a receipt")
+        await _edit_cand(q, cid)
+        return
+    if not claim_candidate(cid):                 # lost the race / already handled
+        await _edit_cand(q, cid)
+        return
+    try:
+        vid = c.get("vendor_id")
+        total, cur = rec.get("total_amount"), (rec.get("total_currency") or "USD")
+        cents = to_usd_cents(total, cur) if total is not None else None
+        rid = add_receipt(
+            vendor_id=vid, amount_cents=cents, orig_currency=cur, orig_amount=total,
+            items_text=(rec.get("items_text") or None), is_handwritten=rec.get("is_handwritten", False),
+            invoice_no=rec.get("invoice_no"), receipt_date=rec.get("date"),
+            tax_cents=(to_usd_cents(rec["tax_amount"], cur) if rec.get("tax_amount") else None),
+            supplier_account=rec.get("supplier_account"), bank_name=rec.get("bank_name"),
+            photo_file_id=c.get("photo_file_id"), photo_sha=c.get("photo_sha"),
+            tg_chat_id=c.get("src_chat_id"), tg_msg_id=c.get("src_msg_id"), captured_by=uid)
+        save_receipt_lines(rid, rec.get("line_items"), cur, vendor_id=vid)
+    except Exception:
+        unclaim_candidate(cid)                   # revert the claim; row stays 'open' for a retry
+        logger.exception("candidate promote failed")
+        return
+    finalize_promote(cid, rid, uid)
+    context.user_data.pop(f"cand_extract:{cid}", None)
+    context.user_data.pop(f"cand_look:{cid}", None)
+    await _edit_cand(q, cid)                      # candidate card → "✅ Logged as #N"
+    try:                                          # the living receipt card → owner confirms/cash/aba/fix
+        text, kb = _card_text_kb(rid)
+        await context.bot.send_message(EXPENSE_GROUP_ID, text, reply_markup=kb)
+    except Exception:
+        logger.exception("sending the promoted receipt card failed")
+
+
+async def on_candidate_callback(update, context):
+    """Taps on a 'Received Yet?' candidate card. Actor-gated (Expense group → owner / listener)."""
+    q = update.callback_query
+    await q.answer()
+    if not _allowed(update):
+        return
+    parts = (q.data or "").split(":")
+    if len(parts) < 3:
+        return
+    action, sid = parts[1], parts[2]
+    try:
+        cid = int(sid)
+    except ValueError:
+        return
+    c = get_candidate(cid)
+    if not c:
+        return
+    uid = update.effective_user.id
+    if action == "exp":
+        resolve_candidate(cid, "expected", uid)
+    elif action == "ig":
+        resolve_candidate(cid, "ignored", uid)
+    elif action == "link":
+        await _show_link_picker(q, c)
+        return
+    elif action == "back":
+        await _edit_cand(q, cid)
+        return
+    elif action == "lpick":
+        if len(parts) >= 4:
+            try:
+                link_candidate(cid, int(parts[3]), uid)
+            except ValueError:
+                pass
+    elif action == "new":
+        await _candidate_new(q, context, c)
+        return
+    elif action == "pnew":
+        await _candidate_promote(q, context, c)
+        return
+    elif action == "psame":
+        rid = context.user_data.get(f"cand_look:{cid}")
+        if rid:
+            link_candidate(cid, rid, uid)
+    await _edit_cand(q, cid)
 
 
 async def on_text(update, context):
@@ -213,6 +437,7 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("vendor", cmd_vendor))
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
+    app.add_handler(CallbackQueryHandler(on_candidate_callback, pattern=r"^accand:"))
     app.add_handler(CallbackQueryHandler(on_callback, pattern=r"^acc:"))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE & ~filters.COMMAND, on_text))
     return app

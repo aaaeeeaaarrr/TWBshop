@@ -108,6 +108,8 @@ def render_card(r: dict) -> str:
         lines.append(" · ".join(meta))
     if r.get("math_msg"):
         lines.append(r["math_msg"])
+    if r.get("dup_suspect_of"):
+        lines.append(f"⚠ possible duplicate of #{r['dup_suspect_of']} (same vendor + amount, recent)")
     if r.get("is_handwritten"):
         lines.append("✍️ handwritten")
     for issue in (r.get("issues") or []):
@@ -132,3 +134,67 @@ def card_buttons(r: dict):
     # confirmed + ABA → awaiting the P2 slip (no manual "mark paid" in P1)
     rows.append([("✏️ Fix", f"acc:fix:{rid}")])
     return rows
+
+
+# ─────────────── "Received Yet?" candidate flow (design §E3) — pure card logic ───────────────
+# A supplier-posted photo, forwarded to the Expense group as a CANDIDATE (never auto-numbered).
+# Callback space is 'accand:<action>:<id>' (distinct from the 'acc:' receipt cards).
+
+def candidate_card(c: dict) -> str:
+    """The candidate card text for row `c` (keys: id, vendor_name, src_chat_title, status,
+    receipt_id). Header shows supplier NAME + GROUP so routing is verifiable (owner's ask)."""
+    vendor = c.get("vendor_name") or "❓ unmapped supplier"
+    group = c.get("src_chat_title") or "supplier group"
+    head = f"📨 From {vendor} · {group}"
+    status = c.get("status", "open")
+    n = c.get("receipt_id")
+    if status == "open":
+        return head + "\nA supplier posted this. Received yet?"
+    if status == "promoting":
+        return head + "\n⏳ Reading the receipt…"
+    if status == "promoted":
+        return head + (f"\n✅ Logged as receipt #{n}." if n else "\n✅ Promoted to a receipt.")
+    if status == "linked":
+        return head + (f"\n🔗 Same as #{n} — already logged." if n else "\n🔗 Already logged.")
+    if status == "expected":
+        return head + "\n📦 Parked as expected (order / quote — not received yet)."
+    if status == "ignored":
+        return head + "\n✕ Ignored."
+    return head
+
+
+def candidate_buttons(c: dict):
+    """Fork buttons for an OPEN candidate, as (label, callback_data) rows; resolved → no buttons."""
+    cid = c.get("id")
+    if c.get("status") != "open":
+        return []
+    return [
+        [("🆕 New & received", f"accand:new:{cid}")],
+        [("🔗 Already logged", f"accand:link:{cid}"), ("📦 Not yet", f"accand:exp:{cid}")],
+        [("✕ Ignore", f"accand:ig:{cid}")],
+    ]
+
+
+def lookalike_prompt(receipt: dict) -> str:
+    """Shown when promoting a candidate that matches a recent receipt (anti-double-pay §E3)."""
+    n = receipt.get("id")
+    vendor = receipt.get("vendor_name") or "this supplier"
+    amt = fmt_money(receipt.get("amount_cents"))
+    return (f"⚠ Looks like #{n} ({vendor} {amt}, already logged recently).\n"
+            f"Same receipt, or a genuinely new one?")
+
+
+def lookalike_buttons(cid, receipt_id):
+    """Same-vs-new choice after a look-alike hit (callbacks carry only the candidate id; the matched
+    receipt id is recalled bot-side)."""
+    return [
+        [("✅ New receipt", f"accand:pnew:{cid}")],
+        [(f"🔗 No, same as #{receipt_id}", f"accand:psame:{cid}")],
+    ]
+
+
+def receipt_pick_label(r: dict) -> str:
+    """One line for the 'Already logged → which #?' picker button."""
+    amt = fmt_money(r.get("amount_cents"))
+    state = {"paid": "paid", "confirmed": "unpaid", "captured": "draft"}.get(r.get("status"), r.get("status") or "")
+    return f"#{r.get('id')} · {amt} · {state}".strip(" ·")
