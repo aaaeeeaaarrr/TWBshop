@@ -106,14 +106,21 @@ async def cmd_health(update, context):
 async def cmd_issues(update, context):
     if not _owner(update):
         return
-    items = mon.issues(mon.lane_board(), mon.service_health())
-    if not items:
-        await update.message.reply_text("✅ Nothing needs you — all clean.")
-        return
-    icon = {"DOWN": "🔴", "WORK": "✏️", "PUSH": "⬆️"}
-    lines = ["❗ NEEDS YOU"]
-    for tag, text, fix in items:
-        lines.append("%s %s\n   → %s" % (icon.get(tag, "•"), text, fix))
+    rows = mon.lane_board()
+    svc = mon.service_health()
+    items = mon.issues(rows, svc)
+    behind = [r for r in rows if r["behind"] > 0]
+    if items:
+        icon = {"DOWN": "🔴", "WORK": "✏️", "PUSH": "⬆️"}
+        lines = ["❗ NEEDS YOU"]
+        for tag, text, fix in items:
+            lines.append("%s %s\n   → %s" % (icon.get(tag, "•"), text, fix))
+    else:
+        lines = ["✅ Nothing needs you — no problems."]
+    if behind:
+        lines.append("\nℹ️ FYI (optional, not a problem): " +
+                     ", ".join("%s %d behind" % (r["name"], r["behind"]) for r in behind) +
+                     " — run `pull` in each to get the latest (e.g. guard v3).")
     await update.message.reply_text("\n".join(lines))
 
 
