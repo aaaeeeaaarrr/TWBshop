@@ -860,3 +860,30 @@ Tap below to open the stock app, then count each item and save.
 
 ### 4. Back button (matches existing convention)
 ← Back · ត្រឡប់ក្រោយ
+
+## Off-shift check-in feedback (no more silence) — Jun 19  ⏳ PENDING native review
+
+> Context: when a staffer shares live location but the system finds no scheduled shift to bind it to,
+> the bot USED TO stay silent (`gm_bot/bot.py` `_handle_staff_location`) — staff read that as "the bot
+> is broken" and it hid a genuinely wrong schedule (the Jun 19 Tra false alarm). It now replies once
+> (on the FIRST share only, never on the live-location heartbeats). Three variants live in
+> `gm_bot/attendance_ui.offshift_notice_text` (`gm_bot/checkin.offshift_reason` picks which). These are
+> my DRAFT Khmer — needs a native pass. They go to LIVE staff, so vet before the next gm deploy.
+
+### 1. Day off — system has them off today (`off`)
+Got your location 📍 — but the system has you OFF today, so there's no shift to check in to.
+If that's not right, please tell a supervisor and they'll fix it. 🤍
+ទទួលបានទីតាំងហើយ 📍 — ប៉ុន្តែប្រព័ន្ធកត់ត្រាថាថ្ងៃនេះប្អូនឈប់សម្រាក ដូច្នេះគ្មានវេនត្រូវចុះវត្តមានទេ។
+បើមិនត្រឹមត្រូវ សូមប្រាប់ប្រធានក្រុម ពួកគាត់នឹងកែតារាងវេនឱ្យ។ 🤍
+
+### 2. Too early — before the check-in window (`too_early`; %s = start time, e.g. 21:00)
+Got your location 📍 — you're a little early. Your shift starts at 21:00.
+Share your live location again at check-in time and I'll count you in. 🤍
+ទទួលបានទីតាំងហើយ 📍 — ប្អូនមកលឿនបន្តិច។ វេនរបស់ប្អូនចាប់ផ្តើមម៉ោង 21:00។
+សូមចែករំលែកទីតាំងផ្ទាល់ម្តងទៀតនៅពេលចុះវត្តមាន ខ្ញុំនឹងកត់ត្រាឱ្យ។ 🤍
+
+### 3. Not on a shift right now — generic fallback (`over`)
+Got your location 📍 — but you're not on a shift right now.
+If you think this is wrong, please tell a supervisor. 🤍
+ទទួលបានទីតាំងហើយ 📍 — ប៉ុន្តែឥឡូវនេះប្អូនមិននៅក្នុងវេនទេ។
+បើគិតថាមិនត្រឹមត្រូវ សូមប្រាប់ប្រធានក្រុម។ 🤍
