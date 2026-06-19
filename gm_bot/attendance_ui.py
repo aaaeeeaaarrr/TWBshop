@@ -1068,9 +1068,13 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     ]
     # C3 stock-count gateway (gm_bot/stock_gateway.py): a link to the AppSheet stock app. Shown ONLY
     # when the URL is configured, so staff never see a 'coming soon' stub before the stock lane is ready.
-    from gm_bot import stock_gateway
-    if stock_gateway.stock_enabled():
-        rows.append([InlineKeyboardButton("📦 Stock count · រាប់ស្តុក", callback_data="att:stock")])
+    # Isolated in try/except: a stock-gateway problem must NEVER break the core staff menu (check-in).
+    try:
+        from gm_bot import stock_gateway
+        if stock_gateway.stock_enabled():
+            rows.append([InlineKeyboardButton("📦 Stock count · រាប់ស្តុក", callback_data="att:stock")])
+    except Exception:
+        pass
     if not p.get("_live"):
         rows.append([InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")])
     line = ("What would you like to do? · តើអ្នកចង់ធ្វើអ្វី?" if p.get("_live")

@@ -36,6 +36,13 @@ def test_config_fallback_when_env_absent(monkeypatch):
     assert stock_gateway.appsheet_url() == "https://from.config"
 
 
+def test_stock_enabled_for_uppercase_scheme(monkeypatch):
+    # case-insensitive scheme check, but the URL is returned exactly as written (path is case-sensitive)
+    monkeypatch.setenv("STOCK_APPSHEET_URL", "HTTPS://App.AppSheet.com/Start/Abc")
+    assert stock_gateway.stock_enabled() is True
+    assert stock_gateway.appsheet_url() == "HTTPS://App.AppSheet.com/Start/Abc"
+
+
 # ---- the staff-facing card ----------------------------------------------------
 
 def test_gateway_message_has_working_url_button():
@@ -76,3 +83,15 @@ def test_main_menu_shows_stock_when_enabled(monkeypatch):
     _, kb = ui.main_menu(_PERSONA)
     flat = [b.callback_data for row in kb.inline_keyboard for b in row]
     assert "att:stock" in flat
+
+
+def test_main_menu_survives_gateway_failure(monkeypatch):
+    # a stock-gateway problem must NEVER break the core staff menu (check-in is critical)
+    def boom():
+        raise RuntimeError("gateway broken")
+    monkeypatch.setattr(stock_gateway, "stock_enabled", boom)
+    _, kb = ui.main_menu(_PERSONA)   # must not raise
+    flat = [b.callback_data for row in kb.inline_keyboard for b in row]
+    for cd in ("att:ci", "att:late", "att:aw", "att:am"):
+        assert cd in flat            # core menu intact
+    assert "att:stock" not in flat   # broken gateway -> button simply absent

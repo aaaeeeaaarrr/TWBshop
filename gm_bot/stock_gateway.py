@@ -31,7 +31,8 @@ def appsheet_url() -> str:
     u = (os.environ.get("STOCK_APPSHEET_URL")
          or getattr(config, "STOCK_APPSHEET_URL", "")
          or "").strip()
-    return u if u.startswith(("http://", "https://")) else ""
+    # scheme check is case-insensitive, but return the URL as-written (the path is case-sensitive).
+    return u if u.lower().startswith(("http://", "https://")) else ""
 
 
 def stock_enabled() -> bool:
