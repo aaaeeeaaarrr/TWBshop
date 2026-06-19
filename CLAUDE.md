@@ -316,8 +316,12 @@ mostly mechanical staleness + **1 real contradiction** — `docs/SUBSYSTEMS.md` 
 while CLAUDE says LIVE → **fixed to LIVE**. Stamped `docs/VERIFICATION_RECORD.md` as a session-33 historical
 snapshot (its "564 passed / attendance_live=OFF" figures are frozen-in-time, not current). **Migrated session
 44–46 blocks → `docs/HISTORY.md`** (current-truth vs history-log typing — that's why Current Status is short
-now). Verified: moved phrases now in HISTORY only, boundary clean, dangling `(above)` refs repointed. STILL
-OPEN: deeper design-doc sweep + the duplication detector (→ `docs/SIMPLIFICATION_STRATEGY.md`).
+now). Verified: moved phrases now in HISTORY only, boundary clean, dangling `(above)` refs repointed.
+**▶ STALENESS GUARD BUILT (session 47):** `tests/test_doc_refs.py` — current-truth docs can't cite a
+deleted/moved file or a gone `file::symbol` (proven to bite on the deleted `al_cancel_day`; history-logs
+excluded). The structural half of the duplication detector; the semantic "same prose-fact in 2 places" half
+stays human-adjudicated (a prose detector would false-positive — noise worse than the disease). STILL OPEN:
+the deeper design-doc semantic sweep (→ `docs/SIMPLIFICATION_STRATEGY.md`).
 
 **▶ STANDING OPEN LOOPS — the live threads (detail for completed work → `docs/HISTORY.md`):**
 1. **Multi-lane operation (current focus)** — hub (`twbshop`/`main`) + 3 lane worktrees (`twbshop-accountant`/`-gm`/`-stock`). Portable method · toolkit · build sequence (Phases A–F) · lane layout/recreate → **`docs/MULTI_LANE_PLAYBOOK.md`** + `docs/PARALLEL_LANES.md`. Monitor (`scripts/monitor_bot.py`, owner-only): `/board /health /issues /crossings /audit`.

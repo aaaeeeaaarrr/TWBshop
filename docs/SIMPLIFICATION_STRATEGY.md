@@ -80,7 +80,11 @@ directive + the design we agreed (this is what "perfect" actually is — and its
 - **Machines fix/remove STRUCTURE only** (dead pointer · missing file · stale index — the 2 guards). A human
   adjudicates SEMANTIC conflict; never auto-delete meaning (could delete a TRUE thing). So "no human after
   this" is literally true for structure, and ~never-needed for meaning — but not zero. That's the real ceiling.
-- **MISSING mechanical piece (to build):** a lightweight DUPLICATION detector — flag when one fact is
-  documented in 2+ current-truth places, so contradictions can't even form.
+- **DUPLICATION/STALENESS detector — structural half BUILT** (`tests/test_doc_refs.py`, session 47): a
+  current-truth doc can no longer cite a deleted/moved file or a gone `file::symbol` (proven to bite on the
+  just-deleted `al_cancel_day`; history-logs excluded). The SEMANTIC half — the same prose-fact restated in
+  2 places — stays human-adjudicated ON PURPOSE: a reliable prose-duplication detector isn't achievable
+  without false positives, and noise would be worse than the disease. Prevention is the one-home-pointer
+  discipline + this guard + pinning each human correction as a fact/test.
 - **END-OF-PASS STEP (owner-requested):** list every spot with 2+ differing infos → owner says which is true
   → remove the untrue → trim map/CLAUDE.md to pointers-only. Do this AFTER re-verifying the 6 orphans.
