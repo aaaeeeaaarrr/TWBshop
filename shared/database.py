@@ -4770,13 +4770,6 @@ def staff_mark_ex(staff_id: int, reason: str | None = None) -> None:
             """, (reason, staff_id))
 
 
-def staff_active_uids() -> set:
-    uids = set()
-    for rec in staff_all("active"):
-        uids.update(rec.get("telegram_ids", []))
-    return uids
-
-
 # ── Stock items knowledge + daily counts (for the 7am order list) ───────────────
 
 def init_stock_db() -> None:
@@ -4838,18 +4831,6 @@ _STOCK_CATEGORIES = {
 }
 STOCK_CATEGORY_ORDER = ["Baking & Dry", "Dairy & Butter", "Chocolate",
                         "Sauces & Condiments", "Packaging", "Cleaning"]
-
-
-def categorize_stock_items() -> int:
-    """Assign each seeded item to its category (one-time). Returns rows updated."""
-    n = 0
-    with _db() as conn:
-        with conn.cursor() as cur:
-            for cat, items in _STOCK_CATEGORIES.items():
-                for it in items:
-                    cur.execute("UPDATE stock_items SET category = %s WHERE item = %s", (cat, it))
-                    n += cur.rowcount
-    return n
 
 
 def stock_categories() -> list[str]:
@@ -5327,57 +5308,6 @@ def init_receipt_clarifications_db() -> None:
                     created_at      TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
-
-
-# ── Hiring ────────────────────────────────────────────────────────────────────
-
-def hiring_save_candidate(name: str, candidate_type: str = "applicant", **kwargs) -> int:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            fields = ["name", "candidate_type"] + list(kwargs.keys())
-            values = [name, candidate_type] + list(kwargs.values())
-            placeholders = ", ".join(["%s"] * len(values))
-            cols = ", ".join(fields)
-            cur.execute(
-                f"INSERT INTO hiring_candidates ({cols}) VALUES ({placeholders}) RETURNING id",
-                values
-            )
-            return cur.fetchone()["id"]
-
-
-def hiring_save_feedback(candidate_name: str, points: list[dict],
-                          candidate_id: int = None, score_range: str = None,
-                          is_generic: bool = False):
-    """points: list of {point_number, topic, english_text, khmer_text}"""
-    with _db() as conn:
-        with conn.cursor() as cur:
-            for p in points:
-                cur.execute("""
-                    INSERT INTO hiring_feedback_templates
-                        (candidate_id, candidate_name, score_range, topic,
-                         point_number, english_text, khmer_text, is_generic)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (candidate_id, candidate_name, score_range, p.get("topic"),
-                      p["point_number"], p["english_text"], p["khmer_text"], is_generic))
-
-
-def hiring_get_feedback(candidate_name: str = None, score_range: str = None,
-                         generic_only: bool = False) -> list[dict]:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            if generic_only:
-                cur.execute("""
-                    SELECT * FROM hiring_feedback_templates
-                    WHERE is_generic = TRUE AND (score_range = %s OR score_range IS NULL)
-                    ORDER BY point_number
-                """, (score_range,))
-            else:
-                cur.execute("""
-                    SELECT * FROM hiring_feedback_templates
-                    WHERE candidate_name = %s
-                    ORDER BY point_number
-                """, (candidate_name,))
-            return cur.fetchall()
 
 
 def receipt_save_clarification(chat_id: int, photo_msg_id: int, bot_msg_id: int,

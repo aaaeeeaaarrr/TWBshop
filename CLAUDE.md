@@ -283,8 +283,24 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–43) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-19 (session 46 — **watchdog + session-closer deployed · MAP.md router built**).
-**▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (this session, INERT — docs/test only, nothing live):**
+**Last updated:** 2026-06-19 (session 47 — **simplification pass started: measured surface + tiny safe dead-code cleanup**).
+**▶ SIMPLIFICATION PASS — STARTED (session 47, INERT — `shared/database.py` only, nothing live changed; no deploy).**
+Measured the whole surface read-only first (file sizes + a zero-caller scan, corrected for dotted/qualified
+calls). **HONEST FINDING — there is no big *safe* win, which validates "map, don't remodel":** the only
+genuinely-overloaded files are the LIVE HIGH-RISK core (`gm_bot/bot.py` 7554 lines, `shared/database.py`
+5844) — splitting them is the dangerous thing the strategy doc says NOT to do; and the "dead code" pool is
+only ~50 safely-removable lines. **DONE this session — the tiny safe pilot:** removed **5 confirmed
+zero-caller, superseded, non-money functions** from `shared/database.py` — `staff_active_uids` (trivial
+unused wrapper) · `categorize_stock_items` (superseded by the stock lane; kept `_STOCK_CATEGORIES`) · the 3
+`hiring_*` (hire_bot wires those tables its own way across 11 files). **PROOF:** suite **775 passed/2 skip,
+identical to the pre-change baseline** (zero regression) · `git diff` = 70 deletions, only those 5 fns + the
+orphaned `# ── Hiring ──` header, nothing else · grep = **0 references anywhere** · `MAP_INDEX.md` regenerated
+(freshness+integrity guards green). **▶ NEXT — DISCUSS BEFORE ACTING (owner: "let's talk about 3 before we
+do anything"):** the MONEY/HIGH-RISK orphans left in place — `ot_grant_*` (gated "Give OT"), `update_b2b_payment_status`/`get_b2b_payment`, `al_cancel_day`, `gm_award_points` — each is the *only* writer
+to its table yet uncalled → likely gated/partial features. Do NOT delete; do a careful read-only "gap vs
+superseded?" audit, owner-gated, NOT claimed as a gap without proof. Kept deliberately: `seed_staff_registry`,
+`recompute_all_superseded` (callerless by design — manual setup/recovery tools). → `docs/SIMPLIFICATION_STRATEGY.md`.
+**▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (session 46, INERT — docs/test only, nothing live):**
 Built **`MAP.md`** — the task→files/laws/HISTORY/gotcha index every cold session opens FIRST (closes the
 2026-06-19 "claimed gaps without checking" failure). **TWO LAYERS:** **Layer 1 `MAP.md`** = curated wisdom (entry files + `file::symbol` anchors + laws +
 gotchas), kept SLIM. **Layer 2 `MAP_INDEX.md`** = AUTO-generated complete inventory (every file → docstring
