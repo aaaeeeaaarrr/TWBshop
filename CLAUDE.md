@@ -294,7 +294,11 @@ construction — it dissolves the old MAP-IGNORE hand-classification (which I go
 proven to bite) · **new unlisted file is now IMPOSSIBLE** (a new file makes Layer 2 stale →
 `tests/test_map_index_fresh.py` FAILS — proven). Gotchas POINT to the law/test that owns the truth. Only
 residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — unmechanizable, tiny,
-caught at the destination. **RULE: on any file add/move, run `python scripts/gen_map_index.py` + commit.** **DECISION (owner): a full rewrite-and-
+caught at the destination. **RULE: on any file add/move, run `python scripts/gen_map_index.py` + commit.**
+**▶ NEXT (owner-requested 2026-06-19, NOT started): the SIMPLIFICATION PASS** — read everything via the
+two-layer map, make it short-reached + simpler (combine/split/simplify files), **behavior-preserving, ZERO
+accuracy loss, not one new problem**; characterization-test before each refactor, one module at a time,
+HIGH-RISK rigor on live/money modules. Safest wins first (dead code, tiny facades). → `docs/SIMPLIFICATION_STRATEGY.md` "NEXT ACTION". **DECISION (owner): a full rewrite-and-
 replace is too dangerous (it re-lives every solved bug); do "map, don't remodel" — understand via the map,
 delete only provably-dead code, refactor only what actively hurts, otherwise keep shipping.** Full reasoning
 + bonus ideas → `docs/SIMPLIFICATION_STRATEGY.md`. With the map in place, `CLAUDE.md` can be trimmed further

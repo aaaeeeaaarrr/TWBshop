@@ -51,6 +51,17 @@ code with simpler files — to escape past bugs. How dangerous?
 - **Rule:** any file move/rename/new subsystem updates `MAP.md` in the SAME commit. With the map in
   place, `CLAUDE.md` can be trimmed further (detail lives behind the map), but only carefully.
 
+## ▶ NEXT ACTION (owner-requested 2026-06-19, not yet started) — the simplification pass
+Using the two-layer map, read everything we have and make it **short-reached + simpler** — combine /
+split / simplify files, tidy navigation — **without harming accuracy one bit vs. what we have now.**
+Bonuses welcome ONLY if they fix more and create **not a single new problem.** HOW (binding):
+- It is the incremental-refactor program above, NOT a rewrite. Behavior-preserving, ONE module at a time.
+- **Characterization-test the module FIRST** (lock current behavior) → refactor → tests green → ship+verify.
+  Never big-bang. LIVE/money modules (attendance/AL/OT/pay) get the full HIGH-RISK rigor + staging proof.
+- After any file combine/split/move: `python scripts/gen_map_index.py` + fix Layer-1 entries (guards enforce).
+- Start with the safest wins: delete provably-dead code, merge a tiny facade, split a genuinely-overloaded
+  file — measure the pain on a pilot, then decide how far to go. Stop if a change can't prove zero-regression.
+
 ## Honest caveat that drove all this
 Cross-session memory is unreliable (it failed on 2026-06-19 — claimed gaps that were already solved
 and documented). So lessons must live in **docs + tests** (artifacts that travel), not in "Claude will
