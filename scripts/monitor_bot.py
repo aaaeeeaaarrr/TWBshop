@@ -14,6 +14,7 @@ deploys, or restarts anything. Reuses scripts/monitor.py for all data (one sourc
 Run:  python scripts/monitor_bot.py     (ONE poller per token — do NOT also run `monitor.py --watch`)
 """
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -40,6 +41,7 @@ except Exception:
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("monitor_bot")
+EVENTS_FILE = os.path.expanduser("~/.twbshop_lane_events.jsonl")  # lane_guard appends here (shared sink)
 
 
 def _owner(update) -> bool:
@@ -84,8 +86,9 @@ async def cmd_start(update, context):
         "🖥 TWB Monitor — your dashboard.\n"
         "/board — lanes (dirty / ahead / behind)\n"
         "/health — the services\n"
-        "/issues — what needs you, with the fix\n\n"
-        "I also DM you if a live service goes down. Silence = healthy.")
+        "/issues — what needs you, with the fix\n"
+        "/crossings — recent cross-lane edits\n\n"
+        "I DM you on a service-down OR a cross-lane edit. Silence = healthy.")
 
 
 async def cmd_board(update, context):
@@ -112,6 +115,63 @@ async def cmd_issues(update, context):
     for tag, text, fix in items:
         lines.append("%s %s\n   → %s" % (icon.get(tag, "•"), text, fix))
     await update.message.reply_text("\n".join(lines))
+
+
+def _read_events():
+    """All recorded cross-lane events (newest last). lane_guard appends them; empty if none."""
+    try:
+        with open(EVENTS_FILE, encoding="utf-8") as f:
+            return [json.loads(l) for l in f.read().splitlines() if l.strip()]
+    except Exception:
+        return []
+
+
+def _ev_line(e):
+    tag = "🛑 BLOCKED" if e.get("verdict") == "block" else "⚠️ shared"
+    return "%s: %s → %s (%s)" % (tag, e.get("lane"), e.get("file"), e.get("concerns"))
+
+
+async def cmd_crossings(update, context):
+    if not _owner(update):
+        return
+    evs = _read_events()[-10:]
+    if not evs:
+        await update.message.reply_text("✅ No cross-lane edits recorded.")
+        return
+    await update.message.reply_text("📛 RECENT CROSS-LANE EDITS\n" + "\n".join(_ev_line(e) for e in evs))
+
+
+async def _events_tick(context):
+    """DM the owner about NEW cross-lane edits (lane_guard appends them to EVENTS_FILE). Skips the
+    backlog on first run so a restart doesn't replay history. Byte-offset tracked in binary mode."""
+    try:
+        size = os.path.getsize(EVENTS_FILE)
+    except OSError:
+        return
+    pos = context.bot_data.get("events_pos")
+    if pos is None:
+        context.bot_data["events_pos"] = size   # skip the backlog on first tick
+        return
+    if size <= pos:
+        return
+    try:
+        with open(EVENTS_FILE, "rb") as f:
+            f.seek(pos)
+            chunk = f.read().decode("utf-8", "replace")
+            context.bot_data["events_pos"] = f.tell()
+    except OSError:
+        return
+    evs = []
+    for ln in chunk.splitlines():
+        try:
+            evs.append(json.loads(ln))
+        except Exception:
+            pass
+    if evs:
+        await context.bot.send_message(
+            OWNER_TELEGRAM_ID,
+            "🚨🔴 CROSS-LANE EDIT 🔴🚨\n" + "\n".join(_ev_line(e) for e in evs) +
+            "\n→ pause the named lane(s) if you're working them.")
 
 
 async def _watch_tick(context):
@@ -147,8 +207,10 @@ def build_application(token):
     app.add_handler(CommandHandler("board", cmd_board))
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("issues", cmd_issues))
+    app.add_handler(CommandHandler("crossings", cmd_crossings))
     app.add_error_handler(make_error_handler("Monitor"))   # crashes are never silent
     app.job_queue.run_repeating(_watch_tick, interval=300, first=15)
+    app.job_queue.run_repeating(_events_tick, interval=60, first=20)   # cross-lane edit alerts
     return app
 
 

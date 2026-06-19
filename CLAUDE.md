@@ -297,6 +297,14 @@ loop fix): **owner-only** `/board` (lanes dirty/ahead/behind) · `/health` (serv
 per token — old --watch stopped). `monitor.py` gained `issues()` (richer needs-you with fixes).
 **Session-bound for now → server-host in Phase F** (own systemd unit, deploy-from-tag). **Resilience
 parity confirmed:** poll-guard + fail-closed DB + `make_error_handler` are on every bot incl. accountant.
+• **CROSS-LANE ALERTS NOW REACH YOU (lane_guard v3 + monitor):** `scripts/lane_guard.py` v3 — LOUD
+ASCII banner (BLOCK = big `!!!` block; WARN = heads-up) + a `CLAUDE.md → CLAUDE.local.md` hint + it
+appends every cross-lane edit to `~/.twbshop_lane_events.jsonl` (shared sink, outside all worktrees).
+The dashboard polls it every 60s → **DMs you `🚨🔴 CROSS-LANE EDIT`** + `/crossings` shows recent ones —
+so a crossing reaches you even if the lane's Claude never relays it. Dashboard cmds: `/board` `/health`
+`/issues` `/crossings`. **Lanes must `pull` to get v3** (they run v2 till then — still warns/blocks, just
+no Telegram yet). **RULE re-confirmed:** lanes NEVER edit tracked `CLAUDE.md` (use `CLAUDE.local.md`,
+gitignored); only the hub does — the guard now hints this on a CLAUDE.md edit.
 • **STOCK ARCHITECTURE LOCKED (design only):** Postgres = source of truth; **staff use ONE bot (GM) → AppSheet** (gateway button; GM owns no stock data); **stock lane = worker (AppSheet⇄Postgres sync + cron), no chat bot**; **accountant = goods-in + READ-ONLY discrepancy/unit-mismatch cross-check** (alerts staff before errors stick); seam = shared tables (`acc_items`/`acc_item_aliases`/`stock_movements`), **no cross-lane code**.
 • **▶ MASTER BUILD SEQUENCE → `docs/PARALLEL_LANES.md` "Build sequence" (Phases A–F):** A infra (≈done) · B fan-out (define shared stock tables on main FIRST, then open gm+stock worktrees) · C product (accountant **P2 matcher** · stock AppSheet+sync+143-item catalog + migrate GM stock out · GM gateway button) · D cross-checks · E owner bonuses (**unified Needs-You inbox** · morning digest · `status` word · auto-refresh Stop-hook) · F hardening.
 **▶ LANE LAYOUT SET (this machine):** hub = `twbshop`/`main` (run `push`/`pull-all`, shared edits, and the monitor here); lanes = sibling worktrees **`twbshop-accountant`** (lane/accountant) · **`twbshop-gm`** (lane/gm) · **`twbshop-stock`** (lane/stock), each guarded by lane_guard (auto from the branch). Worktrees are LOCAL — a fresh machine recreates them with `scripts/make_lane.ps1` (accountant: `git branch -f lane/accountant main` then `git worktree add ..\twbshop-accountant lane/accountant`). **▶ NEXT:** open each lane terminal as needed (`cd` + `claude`, brief it to read Current Status + the build sequence) → **B1** define the shared stock tables on `main` when the stock lane needs them → accountant **P1→P2** (in its own terminal). accountant P1 already on main (session 42), staging-proven, inert.
