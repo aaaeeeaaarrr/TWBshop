@@ -74,6 +74,11 @@ twbshop            (main)            ← HUB: push / pull-all / shared edits / m
 - **The shared-file dance** (only when two lanes need the *same* shared file): the others commit → one
   `push` → the editor `pull`s, edits, `push`es → others `pull`. Usually unneeded — just edit + push;
   checkpoint auto-merges non-overlapping changes and only stops on a real conflict.
+- **Sync-before-build rhythm:** to start fresh work on a lane, **`push` → `pull` → build**. `push`
+  saves/integrates what the lane has; `pull` brings `main`'s latest in (the guard, shared modules,
+  other lanes' merged work); then build on the current base. `pull` only merges `main` when the lane is
+  **clean**, so the push/commit is what *lets* the pull bring `main` in — skipping it means building on
+  a stale `main` and a bigger merge later.
 - **Gotcha:** the **hub must be clean** before a lane can `push` (checkpoint needs the main worktree
   clean to merge into). Commit/stash hub work first.
 
@@ -123,6 +128,15 @@ Do lanes one at a time if test runs get flaky (they share the staging DB).
 
 ### C. Deploy-from-tag — see §4.8.
 
+### D. When a lane changes LIVE or HIGH-RISK code
+Lane isolation protects the *codebase*; this protects the *running system*. A lane editing a path that
+runs in production (a live bot handler, a payment / attendance / auth path) follows the project's
+real-path standard on top of the lane rules: **investigate read-only on prod first** (confirm the
+problem is real — it's often a false alarm, not a bug), **propose + get owner sign-off before building**
+(never auto-ship a live change), **prove on staging**, then **deploy by TAG in a quiet window + verify**
+(§4.8) — not a casual restart. *(Worked example: a lane found a "no response" report was actually a
+correct check-in, proposed a small UX fix to the live handler, and asked before building — exactly right.)*
+
 ---
 
 ## 6. The monitor / dashboard (your single pane of glass)
@@ -164,6 +178,9 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
 - **Unified "Needs-You" inbox** — every lane writes owner-decisions to one shared `pending_decisions`
   table; one digest, batch-clear.
 - **Morning digest** DM; **sparse-checkout** (other-lane files absent); **server-side commit-scope CI**.
+- **Cap/rotate the cross-lane event sink** (`~/.twbshop_lane_events.jsonl`) — it grows unbounded today,
+  and a manual truncate needs a monitor restart (the read-offset goes stale). A size cap + offset reset
+  makes it self-maintaining.
 
 ---
 
