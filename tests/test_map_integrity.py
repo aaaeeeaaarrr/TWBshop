@@ -1,15 +1,15 @@
-"""MAP.md integrity — catch the map's drift mechanically (most of it).
+"""MAP.md (Layer 1) integrity — the curated router must not lie.
 
-MAP.md routes any task to its files/laws/history. A pointer that lies (moved file, relocated logic,
-unlisted new file) is worse than no map — it sends you confidently wrong (the 2026-06-19 failure,
-automated). This guards the catchable drift:
+Layer 1 = MAP.md (hand-curated wisdom: entry files + symbols + laws + gotchas). Layer 2 = MAP_INDEX.md
+(auto-generated complete inventory; its freshness is guarded by tests/test_map_index_fresh.py, which is
+what now owns COMPLETENESS — so Layer 1 no longer has to list every file). This test guards Layer 1's
+catchable drift:
 
-  1. dead path            — a `path` that doesn't exist                         -> FAIL
-  2. relocated logic      — a `path::symbol` whose symbol left the file         -> FAIL  (Fault 3)
-  3. unlisted file        — a package .py neither indexed nor MAP-IGNOREd       -> FAIL  (Fault 1)
-  4. unmapped package     — a whole code package missing from the map           -> FAIL
+  1. dead path        — a `path` that doesn't exist                     -> FAIL
+  2. relocated logic  — a `path::symbol` whose symbol left the file     -> FAIL
+  3. unmapped package — a whole code package missing from the map       -> FAIL
 
-CANNOT be caught (stays human, now a tiny surface): a gotcha whose file+symbol still exist but whose
+CANNOT be caught (stays human, a tiny surface): a gotcha whose file+symbol still exist but whose
 *behaviour* silently changed. Mitigation: gotchas POINT to the law/test that owns the truth (checks 1/2
 verify those pointers resolve), so a stale hint is caught when you read the destination. Index only.
 """
@@ -61,24 +61,6 @@ def test_every_symbol_anchor_resolves():
             bad.append("%s::%s" % (path, sym))
     assert not bad, ("MAP.md anchors symbols that aren't in their file — logic moved, update the map: %s"
                      % bad)
-
-
-def test_every_package_py_is_indexed_or_ignored():
-    """Fault 1: every package .py must appear in MAP.md (an area entry OR the MAP-IGNORE block)."""
-    text = _map_text()
-    miss = []
-    for pkg in _PACKAGES:
-        d = os.path.join(ROOT, pkg)
-        if not os.path.isdir(d):
-            continue
-        for f in os.listdir(d):
-            if not f.endswith(".py") or f == "__init__.py":
-                continue
-            rel = "%s/%s" % (pkg, f)
-            if rel not in text:
-                miss.append(rel)
-    assert not miss, ("package files neither indexed nor MAP-IGNOREd — add to an area or the "
-                      "MAP-IGNORE block: %s" % miss)
 
 
 def test_every_code_package_is_mapped():

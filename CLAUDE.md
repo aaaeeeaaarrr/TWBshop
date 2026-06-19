@@ -1,10 +1,12 @@
 # Bakery Automation System — Project Rules & Status
 
-> **🗺️ START HERE — open `MAP.md` for ANY task.** It routes you to the files · the law-doc to read ·
-> the `docs/HISTORY.md` section · the ⚠ gotcha for your area. **Before claiming anything exists / works /
-> is missing / is a gap, check the records `MAP.md` points to and cite them — or say "let me check" and
-> check.** An unverified gap-claim is a violation, same as a false "done" (the 2026-06-19 lesson). Any file
-> move / rename / new subsystem updates `MAP.md` in the SAME commit — enforced by `tests/test_map_integrity.py`.
+> **🗺️ START HERE — open `MAP.md` for ANY task** (Layer 1: entry files · law-doc · `docs/HISTORY.md`
+> section · ⚠ gotcha per area). **Need any other file / "where's function X"? → `MAP_INDEX.md`** (Layer 2:
+> auto-generated complete inventory). **Before claiming anything exists / works / is missing / is a gap,
+> check the records the map points to and cite them — or say "let me check" and check.** An unverified
+> gap-claim is a violation, same as a false "done" (2026-06-19). On any file add/move/rename: run
+> `python scripts/gen_map_index.py` (Layer 2 freshness is build-enforced) and fix any Layer-1 entry you
+> changed — guards: `tests/test_map_integrity.py` + `tests/test_map_index_fresh.py`.
 
 ---
 
@@ -284,14 +286,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 **Last updated:** 2026-06-19 (session 46 — **watchdog + session-closer deployed · MAP.md router built**).
 **▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (this session, INERT — docs/test only, nothing live):**
 Built **`MAP.md`** — the task→files/laws/HISTORY/gotcha index every cold session opens FIRST (closes the
-2026-06-19 "claimed gaps without checking" failure). Mechanical guard **`tests/test_map_integrity.py`**
-(5 checks, proven to bite) now catches ALL 3 prior human-faults: **dead pointer** · **relocated logic**
-(`file::symbol` anchors — symbol gone from the file = FAIL) · **new unlisted file** (every package `.py`
-must be indexed OR in the MAP-IGNORE block) — plus unmapped package. `CLAUDE.md` top-pointer tells a cold
-session to use it. **RULE: any file move/rename/new file updates `MAP.md` in the same commit.** Gotchas now
-POINT to the law/test that owns the truth (so a stale note is caught when you read the destination). Only
-TRUE residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — unmechanizable,
-but a tiny surface caught at the destination. **DECISION (owner): a full rewrite-and-
+2026-06-19 "claimed gaps without checking" failure). **TWO LAYERS:** **Layer 1 `MAP.md`** = curated wisdom (entry files + `file::symbol` anchors + laws +
+gotchas), kept SLIM. **Layer 2 `MAP_INDEX.md`** = AUTO-generated complete inventory (every file → docstring
++ symbols) via `scripts/gen_map_index.py`. Layer 2 being generated makes completeness FREE + current by
+construction — it dissolves the old MAP-IGNORE hand-classification (which I got wrong, the owner caught it).
+**All 3 human-faults now mechanical:** dead pointer + relocated logic (`tests/test_map_integrity.py`,
+proven to bite) · **new unlisted file is now IMPOSSIBLE** (a new file makes Layer 2 stale →
+`tests/test_map_index_fresh.py` FAILS — proven). Gotchas POINT to the law/test that owns the truth. Only
+residual: a gotcha whose file+symbol exist but whose *behaviour* silently changed — unmechanizable, tiny,
+caught at the destination. **RULE: on any file add/move, run `python scripts/gen_map_index.py` + commit.** **DECISION (owner): a full rewrite-and-
 replace is too dangerous (it re-lives every solved bug); do "map, don't remodel" — understand via the map,
 delete only provably-dead code, refactor only what actively hurts, otherwise keep shipping.** Full reasoning
 + bonus ideas → `docs/SIMPLIFICATION_STRATEGY.md`. With the map in place, `CLAUDE.md` can be trimmed further
