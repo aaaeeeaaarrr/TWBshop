@@ -1,5 +1,11 @@
 # Bakery Automation System — Project Rules & Status
 
+> **🗺️ START HERE — open `MAP.md` for ANY task.** It routes you to the files · the law-doc to read ·
+> the `docs/HISTORY.md` section · the ⚠ gotcha for your area. **Before claiming anything exists / works /
+> is missing / is a gap, check the records `MAP.md` points to and cite them — or say "let me check" and
+> check.** An unverified gap-claim is a violation, same as a false "done" (the 2026-06-19 lesson). Any file
+> move / rename / new subsystem updates `MAP.md` in the SAME commit — enforced by `tests/test_map_integrity.py`.
+
 ---
 
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
@@ -275,7 +281,18 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–43) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-19 (session 46 — **LIVE audit-watchdog + fallback session-closer deployed to gm**).
+**Last updated:** 2026-06-19 (session 46 — **watchdog + session-closer deployed · MAP.md router built**).
+**▶ MAP.md ROUTER + "MAP, DON'T REMODEL" DECISION (this session, INERT — docs/test only, nothing live):**
+Built **`MAP.md`** — the task→files/laws/HISTORY/gotcha index every cold session opens FIRST (closes the
+2026-06-19 "claimed gaps without checking" failure). Mechanical guard **`tests/test_map_integrity.py`**
+(75 paths enforced; fails the build on a dead pointer or unmapped package — proven to bite). `CLAUDE.md`
+top-pointer added so a fresh session is told to use it. **RULE: any file move/rename/new subsystem updates
+`MAP.md` in the same commit.** Ceiling: ~100% on "no dead pointers/missing subsystem", NOT on "complete+
+accurate" (new file in an existing area / stale gotcha = human). **DECISION (owner): a full rewrite-and-
+replace is too dangerous (it re-lives every solved bug); do "map, don't remodel" — understand via the map,
+delete only provably-dead code, refactor only what actively hurts, otherwise keep shipping.** Full reasoning
++ bonus ideas → `docs/SIMPLIFICATION_STRATEGY.md`. With the map in place, `CLAUDE.md` can be trimmed further
+(carefully). **▶ Owner continuing this thread on ANOTHER MACHINE — pull there to get MAP.md + the strategy.**
 **▶ FALLBACK END-OF-SHIFT SESSION-CLOSER — BUILT · DEPLOYED · VERIFIED (gm, tag `session-closer-20260619b`=
 `15f2575`):** kills the recurring stale-open-session class the watchdog surfaced. Auto-checkout only fires if
 the live-share is on+in-zone AT shift end; staff stop sharing early, so a checked-in session otherwise dangles
