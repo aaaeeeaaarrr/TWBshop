@@ -55,9 +55,11 @@ def test_current_truth_docs_have_no_stale_file_refs():
 
 
 if __name__ == "__main__":
+    import sys
     docs = _current_truth_docs()
     v = _violations()
     print("scanned %d current-truth docs" % len(docs))
     for d, r in v:
         print("STALE:  %s  ->  %s" % (d, r))
     print("violations: %d" % len(v))
+    sys.exit(1 if v else 0)  # usable as a gate (e.g. .githooks/pre-push), mirrors reconcile_facts.py

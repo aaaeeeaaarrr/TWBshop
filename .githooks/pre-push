@@ -47,4 +47,17 @@ if command -v python >/dev/null 2>&1 && [ -f scripts/reconcile_facts.py ]; then
   fi
 fi
 
+# --- Doc staleness (doc_refs) ---------------------------------------------------------
+# A current-truth doc that cites a deleted/moved file or a gone file::symbol. Same contract as
+# the reconcile above: runs every push, surfaces loudly, exits 0 (never blocks; `exit 1` = gate).
+# Fast — a plain script (no pytest, no secrets.py). Closes the gap that doc_refs was suite-only.
+if command -v python >/dev/null 2>&1 && [ -f tests/test_doc_refs.py ]; then
+  docrefs_out=$(python tests/test_doc_refs.py 2>&1)
+  if [ $? -ne 0 ]; then
+    printf '\n  +- DOC STALENESS: a current-truth doc cites a file that is gone ----\n' >&2
+    printf '%s\n' "$docrefs_out" | sed 's/^/  | /' >&2
+    printf '  +- update the doc. push NOT blocked (add `exit 1` here to gate) ----------\n\n' >&2
+  fi
+fi
+
 exit 0
