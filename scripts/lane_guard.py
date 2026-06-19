@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""PreToolUse LANE GUARD (v3) — read any lane, write only your own + shared.
+"""PreToolUse LANE GUARD (v4) — read any lane, write only your own + shared.
 
 Reads parallel_lanes.json. Derives THIS worktree's lane from its git branch (lane/<name>).
 Fires only on file-EDIT tools (Edit/Write/MultiEdit/NotebookEdit) — READS are NEVER touched.
   - your own lane            -> silent.
-  - a SHARED file            -> WARN (loud banner), allowed; coordinate the lanes.
+  - a SHARED file            -> silent UNLESS another worktree is editing the SAME file right now
+                                (live contention) -> WARN (loud); coordinate before you both diverge.
   - ANOTHER lane's file      -> BLOCK (exit 2) unless `.lane_ack` is present.
   - an unowned/new file      -> WARN, allowed.
   - on main / non-lane branch-> silent (you're the integrator).
@@ -13,6 +14,14 @@ Fires only on file-EDIT tools (Edit/Write/MultiEdit/NotebookEdit) — READS are 
 v3 adds two things so a crossing actually REACHES YOU instead of relying on the lane's Claude to
 relay it: (1) a LOUD banner; (2) every cross-lane edit is appended to ~/.twbshop_lane_events.jsonl
 (a shared sink OUTSIDE all worktrees) which the monitor bot reads and DMs you (with red lights).
+
+v4 makes the SHARED warning CONTENTION-SCOPED: a lone shared edit is silent; the guard warns only
+when ANOTHER worktree has that exact file uncommitted RIGHT NOW (same-machine live race). That kills
+the blanket-shared-warn noise and is the precise "the lanes are aware of each other". It WARNS, never
+auto-blocks (a lane that walks away from a dirty file must never deadlock another) — you coordinate
+via the warn: let the first lane commit + push, then `pull` here before editing. Cross-machine safety
+still comes from pull-before-touch + frozen shared contracts (uncommitted work isn't visible across
+machines, so the dirty-check only sees same-machine siblings).
 
 ACK (deliberate cross-lane WRITE): create an empty `.lane_ack` in this worktree, redo the edit,
 then delete it. SAFETY: on its OWN error it exits 0 (a guard bug must never lock the workflow).
@@ -28,6 +37,7 @@ import time
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 SOFT_LANES = {"docs"}        # can't break a build -> cross-lane edits WARN, never block
 HUB_ONLY = {"CLAUDE.md"}     # hub-owned: lanes put notes in CLAUDE.local.md, never the tracked file
+SHARED_MARK = "ALL lanes (shared file)"   # _decide's shared-file concern; _gate_shared keys off it
 EVENTS_FILE = os.path.expanduser("~/.twbshop_lane_events.jsonl")  # shared sink, outside all worktrees
 
 
@@ -80,13 +90,63 @@ def _decide(lane, path, m, ack):
     if _under(path, lanes.get(lane, [])):
         return ("silent", "")
     if _under(path, m.get("shared", [])):
-        return ("warn", "ALL lanes (shared file)")
+        return ("warn", SHARED_MARK)
     owners = [ln for ln, paths in lanes.items() if _under(path, paths)]
     if owners:
         concerns = ", ".join(o.upper() for o in owners)
         soft = all(o in SOFT_LANES for o in owners)  # docs etc. -> warn, not block
         return ("warn" if (ack or soft) else "block", concerns)
     return ("warn", "the SHARED / unowned area")
+
+
+def _sibling_contention(path, root):
+    """Other worktrees (lanes) that have THIS exact file uncommitted RIGHT NOW (same-machine live
+    edit). Returns lane labels. Best-effort: ANY error -> [] (a guard must never block the workflow).
+    Only meaningful same-machine; a sibling worktree on another machine isn't visible here (and its
+    UNcommitted work wouldn't be anyway) — that case is covered by pull-before-touch, not this check."""
+    found = []
+    try:
+        wl = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                            cwd=root, capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return found
+    here = os.path.abspath(root)
+    blocks, cur = [], {}
+    for line in wl.splitlines():
+        if line.startswith("worktree "):
+            if cur:
+                blocks.append(cur)
+            cur = {"path": line[len("worktree "):].strip()}
+        elif line.startswith("branch "):
+            cur["branch"] = line[len("branch "):].strip()
+    if cur:
+        blocks.append(cur)
+    for b in blocks:
+        wt = os.path.abspath(b.get("path", ""))
+        if not wt or wt == here:
+            continue   # never count ourselves
+        try:
+            st = subprocess.run(["git", "status", "--porcelain", "--", path],
+                                cwd=wt, capture_output=True, text=True, timeout=5).stdout.strip()
+        except Exception:
+            continue
+        if st:   # any porcelain line (modified / staged / untracked) = this file is in play there
+            mm = re.match(r"refs/heads/lane/(.+)$", b.get("branch", "") or "")
+            found.append(mm.group(1) if mm else (os.path.basename(wt) or "another worktree"))
+    return found
+
+
+def _gate_shared(verdict, concerns, contenders):
+    """Pure: a LONE shared-file edit is fine (silent) — the guard only WARNS when another worktree is
+    editing the SAME file right now (real contention -> real divergence risk). Non-shared verdicts
+    (own/block/unowned/docs/hub) pass through untouched. This is what makes shared-warns high-signal."""
+    if verdict == "warn" and concerns == SHARED_MARK:
+        if not contenders:
+            return ("silent", "")
+        return ("warn",
+                "LIVE CONTENTION -- %s editing this same file now; let that lane commit + push, then "
+                "`pull` here before you edit (otherwise you both diverge)" % ", ".join(contenders))
+    return (verdict, concerns)
 
 
 def _log_event(lane, verdict, path, concerns):
@@ -163,6 +223,9 @@ def main(raw):
         return 0  # main / non-lane branch = integrator; allowed to cross
 
     verdict, concerns = _decide(lane, path, _load_map(), _ack_present())
+    if verdict == "warn" and concerns == SHARED_MARK:
+        # A shared edit is only worth a warning when ANOTHER worktree has this exact file dirty NOW.
+        verdict, concerns = _gate_shared(verdict, concerns, _sibling_contention(path, root))
     if verdict == "silent":
         return 0
 

@@ -71,9 +71,16 @@ twbshop            (main)            ← HUB: push / pull-all / shared edits / m
   `push` sweeps it all up).
 - **`pull`** (in a lane) = get everything — its own branch **and** `main` (other lanes' merged work).
 - **`pull-all`** (from the hub) = refresh every clean worktree at once.
-- **The shared-file dance** (only when two lanes need the *same* shared file): the others commit → one
-  `push` → the editor `pull`s, edits, `push`es → others `pull`. Usually unneeded — just edit + push;
-  checkpoint auto-merges non-overlapping changes and only stops on a real conflict.
+- **The shared-file rule** (what keeps two lanes from forking the same shared file):
+  **pull-before-touch · commit-on-its-own · push-at-a-boundary.** Before editing a shared file, `pull`
+  so you sit on top of any other lane's change — *this*, not committing faster, is what makes their work
+  your **base** instead of a divergence. Commit the shared edit as its own small commit. `push` at a
+  natural stop, **not** after every edit: committing is ~free, but `push`/checkpoint merges every lane +
+  verifies, so per-edit pushing is wasted cycles *and* it publishes half-built shared files. The
+  `lane_guard` backs this up — if another worktree is editing the *same* shared file right now you get a
+  LIVE-CONTENTION warn naming the lane; let it commit + push, then `pull`, then edit. (Cheaper still:
+  freeze shared contracts on the hub **before** fan-out (§7.5) so lanes rarely edit the same shared file
+  at all — and `checkpoint` auto-merges non-overlapping changes, only stopping on a real conflict.)
 - **Sync-before-build rhythm:** to start fresh work on a lane, **`push` → `pull` → build**. `push`
   saves/integrates what the lane has; `pull` brings `main`'s latest in (the guard, shared modules,
   other lanes' merged work); then build on the current base. `pull` only merges `main` when the lane is
@@ -88,7 +95,8 @@ twbshop            (main)            ← HUB: push / pull-all / shared edits / m
 
 1. **Worktree isolation** — separate folders → no on-disk clobber. The only collision is at git merge.
 2. **`lane_guard`** — read any lane, write only your own + shared; block another lane / `CLAUDE.md`;
-   warn on shared; **alert every crossing to Telegram**. (`.lane_ack` = deliberate override.)
+   **contention-scoped warn** on shared (silent unless another worktree has that exact file dirty *now*
+   — high-signal, no blanket noise); **alert every crossing to Telegram**. (`.lane_ack` = override.)
 3. **The monitor** — `/board` `/issues` on demand; DMs you on a service-down or a cross-lane edit.
 4. **`checkpoint`** — merge is serialized, **abort-on-conflict**, never force-push/reset; verifies
    `main == origin`.
@@ -169,25 +177,37 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
 
 ## 8. The "up our game" backlog (build as demand pulls)
 
-- **⭐ Contention-only warnings (sibling-worktree dirty check) — NEXT.** Today the guard warns on EVERY
-  shared-file edit, so every `tests/test_x.py` a lane adds pings you (noise). Upgrade: at edit-time the
-  guard checks whether that exact file is **uncommitted (dirty) in another worktree right now** — warn/
-  block only on real overlap, silent otherwise (a brand-new file is dirty nowhere → silent). This is the
-  precise "make the lanes aware of each other": instant, no time-window to tune (an edit is a snapshot,
-  not a 10/30-min span; the committed-divergent overlap is caught at merge by checkpoint). The broad
-  shared-warn becomes a contention-warn.
 - **E4 auto-refresh Stop-hook** — a stale/skipped lane self-heals when it goes idle: if behind main →
   merge; clean → silent; conflict → flag (the lane's Claude resolves with context; money-path → pause).
-  Never blind-resolves. Opt-out marker per lane.
+  Never blind-resolves. Opt-out marker per lane. *(Lower urgency now that pull-before-touch is the
+  standing habit — convenience, not a safety gap.)*
 - **Server-host** the monitor + the serverless bots (systemd, deploy-from-tag) so they're always-on.
 - **Merge-queue / suite-on-merge** — `checkpoint` runs the suite before a merge lands (needs the
   test-suite rollback refactor so concurrent lane test runs don't collide on the staging DB).
 - **Unified "Needs-You" inbox** — every lane writes owner-decisions to one shared `pending_decisions`
   table; one digest, batch-clear.
-- **Morning digest** DM; **sparse-checkout** (other-lane files absent); **server-side commit-scope CI**.
+- **Morning digest** DM.
 - **Cap/rotate the cross-lane event sink** (`~/.twbshop_lane_events.jsonl`) — it grows unbounded today,
   and a manual truncate needs a monitor restart (the read-offset goes stale). A size cap + offset reset
   makes it self-maintaining.
+
+**Shipped (graduated out of this backlog):** **contention-scoped shared-warn** (guard v4, §4.2) — the
+sibling-worktree dirty check. The blanket "warn on every shared edit" is gone; you now hear about a
+shared file only when another worktree is editing the *same* file right now. An edit is a snapshot, not
+a time-window, so there's nothing to tune; the committed-divergent overlap is still caught at merge by
+`checkpoint`.
+
+**Pruned — prevention-at-source made these redundant (don't build them):**
+- **sparse-checkout (other-lane files absent)** — **DROP.** `lane_guard` already blocks cross-lane
+  *writes*, and we lean on cross-lane *reads* constantly (the integrator verifying a seam, a lane
+  importing a shared module, a clean hand-off between two lanes). Hiding other lanes' files would break
+  those reads for no real gain — now counterproductive, not merely redundant.
+- **server-side commit-scope CI** — **DEFER (maybe never, this team size).** The guard *prevents* the
+  cross-lane write at the source and `integration_audit` *detects* a cross-lane commit after the fact; a
+  remote pre-receive gate only earns its weight once human collaborators push to the remote directly.
+- *(Pattern: as we move checks from "detect after" to "prevent at source", reactive layers downgrade.
+  The monitor's cross-lane DM, likewise, shifted from "catch the write" — now prevented — to "surface
+  real contention to coordinate". Re-ask this question each time we add a preventive layer.)*
 
 ---
 
@@ -201,6 +221,12 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
 - **One poller per token;** never run a live bot locally (the poll-guard enforces it).
 - **Lanes never edit the tracked `CLAUDE.md`** — it conflicts across lanes. Lane notes → `CLAUDE.local.md`;
   only the hub updates Current Status. (Enforced by the `lane_guard` HUB-ONLY hard-block.)
+- **Committing faster doesn't prevent conflicts — pulling before you touch shared does.** A conflict is
+  overlapping line-edits on divergent history; the lever is *sync-before-edit*, not commit speed. And
+  `push` ≠ commit: per-edit pushing burns checkpoint cycles and publishes half-built shared files.
+- **Test the guard's PURE helpers, never `main()`.** `main()` appends to the real event sink, so a test
+  run would DM the owner fake "cross-lane edits". `tests/test_lane_guard.py` exercises `_decide` /
+  `_gate_shared` only; the git half (`_sibling_contention`) is proven with a throwaway probe, not the suite.
 - **Hub clean before a lane pushes** (checkpoint needs the main worktree clean).
 - **The map must be complete** — an unowned file means the guard can't reason about it. The audit
   enforces it.
