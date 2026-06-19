@@ -16,7 +16,9 @@ running total — it appends the delta (counted - current). Re-applying the SAME
 from __future__ import annotations
 
 from shared import stock_shared as ss
+from shared.clock import pp_today
 from stock import catalog
+from stock import db as stockdb
 
 
 class AppSheetClient:
@@ -44,22 +46,32 @@ class AppSheetClient:
             "AppSheet client not wired — confirm AppSheet<->DO-Postgres connectivity (C2).")
 
 
-def apply_count(item_id: int, counted_qty, *, is_test: bool = False,
+def apply_count(item_id: int, counted_qty, *, count_date=None, is_test: bool = False,
                 source: str = "count", ref_id: int | None = None,
                 note: str | None = None) -> dict:
-    """Reconcile on-hand to a physical count by APPENDING the delta as a 'counted' movement.
-    The count is truth at count time; delta = counted - current on-hand. A matching count appends
-    nothing (delta 0). Returns {item_id, before, counted, delta, movement_id}."""
+    """Record a physical count. The count is truth at count time, so it writes BOTH:
+      - a `stock_count_events` row (always — answers "when did we last count?" + the counted figure);
+      - a reconciling `stock_movements` row for the delta = counted - current on-hand (only when it
+        moves on-hand, so a matching re-count appends no movement).
+    `count_date` defaults to the Phnom-Penh day; one count per item per day (a re-count upserts).
+    Returns {item_id, before, counted, delta, movement_id, event_id, count_date}."""
+    if count_date is None:
+        count_date = pp_today()
+    item = ss.get_item(item_id)
+    unit = (item or {}).get("unit")
     before = ss.on_hand(item_id, is_test=is_test)
     delta = float(counted_qty) - before
     movement_id = None
     if delta != 0:
-        item = ss.get_item(item_id)
         movement_id = ss.add_movement(
-            item_id, delta, reason="counted", unit=(item or {}).get("unit"),
+            item_id, delta, reason="counted", unit=unit,
             source=source, ref_id=ref_id, note=note, is_test=is_test)
+    event_id = stockdb.record_count_event(
+        item_id, counted_qty, count_date, unit=unit, source=source,
+        ref_id=ref_id, movement_id=movement_id, note=note, is_test=is_test)
     return {"item_id": item_id, "before": before, "counted": float(counted_qty),
-            "delta": delta, "movement_id": movement_id}
+            "delta": delta, "movement_id": movement_id, "event_id": event_id,
+            "count_date": count_date}
 
 
 def apply_counts(rows: list[dict], *, is_test: bool = False, source: str = "count") -> list[dict]:

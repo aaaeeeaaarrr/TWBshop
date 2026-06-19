@@ -34,7 +34,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from shared import stock_shared as ss
+from shared.clock import pp_today
 from stock import catalog, sync
+from stock import db as stockdb
+from stock import order_brain
 
 
 def seed() -> None:
@@ -43,8 +46,10 @@ def seed() -> None:
 
 
 def tick() -> None:
-    """One worker pass: ensure schema, sync (if the AppSheet client is wired), log the reorder list."""
+    """One worker pass: ensure schema, sync (if the AppSheet client is wired), report count
+    freshness + the reorder list."""
     ss.init_stock_shared_db()
+    stockdb.init_stock_db()
 
     client = sync.AppSheetClient()  # unconfigured until C2 connectivity is confirmed (owner)
     result = sync.run_sync(client)
@@ -54,8 +59,15 @@ def tick() -> None:
     else:
         logger.info("AppSheet sync skipped: %s.", result.get("reason"))
 
+    days = stockdb.days_since_last_count(pp_today())
+    if days is None:
+        logger.info("Count freshness: no counts recorded yet.")
+    else:
+        logger.info("Count freshness: last count %d day(s) ago -> %s.",
+                    days, order_brain.no_sheet_decision(days))
+
     rows = catalog.reorder_list()
-    msg = catalog.order_brain.format_order_message(rows)
+    msg = order_brain.format_order_message(rows)
     if msg:
         logger.info("Reorder check:\n%s", msg)
     else:

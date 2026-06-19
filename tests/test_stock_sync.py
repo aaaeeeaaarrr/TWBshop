@@ -9,14 +9,17 @@ import pytest
 from shared.database import _db
 from shared import stock_shared as ss
 from stock import sync
+from stock import db as stockdb
 
 
 @pytest.fixture
 def zz_item():
     ss.init_stock_shared_db()
+    stockdb.init_stock_db()
     iid = ss.upsert_item("ZZTEST_sync_" + uuid.uuid4().hex[:8], unit="kg", min_qty=5)
     yield iid
     with _db() as c, c.cursor() as cur:
+        cur.execute("DELETE FROM stock_count_events WHERE item_id=%s", (iid,))
         cur.execute("DELETE FROM stock_movements WHERE item_id=%s", (iid,))
         cur.execute("DELETE FROM acc_items WHERE id=%s", (iid,))
 
@@ -25,15 +28,19 @@ def test_apply_count_appends_delta_then_noop_on_match(zz_item):
     iid = zz_item
     r1 = sync.apply_count(iid, 10, is_test=True)         # 0 -> 10
     assert r1["before"] == 0.0 and r1["delta"] == 10.0 and r1["movement_id"] is not None
+    assert r1["event_id"] is not None                    # the count event is always recorded
     assert ss.on_hand(iid, is_test=True) == 10.0
 
-    r2 = sync.apply_count(iid, 10, is_test=True)         # same count -> no movement
+    r2 = sync.apply_count(iid, 10, is_test=True)         # same count -> no movement, event upserts
     assert r2["delta"] == 0.0 and r2["movement_id"] is None
+    assert r2["event_id"] == r1["event_id"]              # same item+day -> same event row
     assert ss.on_hand(iid, is_test=True) == 10.0
 
     r3 = sync.apply_count(iid, 7, is_test=True)          # down to 7 -> delta -3
     assert r3["delta"] == -3.0
     assert ss.on_hand(iid, is_test=True) == 7.0
+    # on-hand and the recorded count agree (S4: the shown number == the true number)
+    assert stockdb.counts_on(r3["count_date"], is_test=True)[iid] == 7.0
 
 
 def test_apply_count_is_test_isolated(zz_item):
