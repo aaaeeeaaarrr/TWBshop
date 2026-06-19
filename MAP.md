@@ -14,7 +14,7 @@
 ---
 
 ## Attendance — check-in / check-out / no-show  ·  ⚠ LIVE (real staff, payroll-adjacent)
-- **Files:** `gm_bot/bot.py` (scheduler, location handler, jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout` · `gm_bot/attendance.py`
+- **Files:** `gm_bot/bot.py` (scheduler, location handler, jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout` · `gm_bot/attendance.py` · `gm_bot/flow.py` (flow-state engine under every ladder)
 - **Read-first:** `docs/ATTENDANCE_SYSTEM_DETAILED.md` · `docs/ATTENDANCE_SYSTEM_MAP.md` · `docs/ATTENDANCE_TEST_MODE.md` · `docs/STATEFUL_MENU_PATTERNS.md`
 - **History:** grep `docs/HISTORY.md` sessions 31–42.
 - **⚠ Gotchas:** overnight shifts bind to the SHIFT-START date, not the calendar day · go-live grace · everything is `is_test`-scoped · LIVE since 2026-06-16 → read-only on prod first, prove on staging, deploy by TAG in a quiet window.
@@ -31,12 +31,12 @@
 - **⚠ Gotchas:** self-heal first (systemd `Restart=always`), alarm only on PERSISTENT failure · live watchdog vs test watchdog — exactly one runs · `/audit` is the cross-row backstop the watchdog can't replace · session-closer closes dangling sessions at the resolved shift end.
 
 ## REPORT finance (daily cash/sales reconciliation)  ·  LIVE (GM bot)
-- **Files:** `gm_bot/finance.py` (parser + recompute) · `gm_bot/reconcile.py` (cash/POS cross-check)
+- **Files:** `gm_bot/finance.py` (parser + recompute) · `gm_bot/reconcile.py` (cash/POS cross-check) · `gm_bot/sales.py` (sales-anomaly framework)
 - **History:** grep `docs/HISTORY.md` "REPORT Finance".
 - **⚠ Gotcha:** business day = 06:00→06:00 · a small "Over" is BY DESIGN (4000៛=$1 FX margin) — never flag it; flag "Lost".
 
 ## GM monitoring — clarify · coverage · tagging · roll-call
-- **Files:** `gm_bot/clarify.py` (clarification ladder) · `gm_bot/coverage.py` · `gm_bot/mentions.py` (staff @-tagging) · `gm_bot/rollcall.py` (uid binding)
+- **Files:** `gm_bot/clarify.py` (clarification ladder) · `gm_bot/coverage.py` · `gm_bot/mentions.py` (staff @-tagging) · `gm_bot/rollcall.py` (uid binding) · `gm_bot/analyzer.py` (ops-message concern scanner → gm_concerns) · `gm_bot/frequency.py` (call-out pattern detection)
 - **⚠ Gotcha:** tag staff via the canonical `_staff_mention` (call-name + ping); GM only ever engages STAFF, never ex-staff/strangers.
 
 ## Accountant (expense / receipts / payments)  ·  staging only, INERT (no live service)
@@ -45,12 +45,12 @@
 - **⚠ Gotchas:** P2 money matcher is HIGH-RISK, per-step owner approval, no live money · uses `shared/ai_client.py::extract_receipt` (Sonnet) · Expense group `-5417163768`, TEST supplier `-5406470751`.
 
 ## Stock (catalog / counts / reorder)  ·  staging only, INERT
-- **Files:** `stock/catalog.py` · `stock/catalog_data.py` · `stock/db.py` · `stock/order_brain.py` · `stock/sync.py` · `gm_bot/stock_gateway.py` (GM seam) · `shared/stock_shared.py` (shared tables) · `run_stock.py`
+- **Files:** `stock/catalog.py` · `stock/catalog_data.py` · `stock/db.py` · `stock/order_brain.py` · `stock/sync.py` · `gm_bot/stock_gateway.py` (GM seam) · `gm_bot/stock_entry.py` (paperless /stock entry) · `shared/stock_shared.py` (shared tables) · `run_stock.py`
 - **Read-first:** `docs/STOCK_APPSHEET_SETUP.md`
 - **⚠ Gotchas:** `gm_bot/stock.py` is a soon-to-be-removed duplicate of `stock/order_brain.py` (drift-guarded by `tests/test_stock_brain_no_drift.py`) · gateway hidden until `STOCK_APPSHEET_URL` set · builds on shared `acc_items`/`stock_movements`.
 
 ## B2B wholesale bot  ·  LIVE (customer-facing)
-- **Files:** `b2b_bot/bot.py` · `b2b_bot/orders.py` · `b2b_bot/order_parsing.py` · `b2b_bot/menu_handlers.py` · `b2b_bot/recurring.py` · `b2b_bot/billing.py` · `b2b_bot/summaries.py` · `b2b_bot/customers.py` · `run_b2b_bot.py` (other `b2b_bot/*` = the ordering-flow internals, MAP-IGNOREd)
+- **Files:** `b2b_bot/bot.py` · `b2b_bot/orders.py` · `b2b_bot/order_parsing.py` · `b2b_bot/order_handlers.py` · `b2b_bot/menu_handlers.py` · `b2b_bot/menu_keyboards.py` (cart state + keyboards) · `b2b_bot/menu.py` + `b2b_bot/cake_menu.py` (menu DATA — edit for items/prices) · `b2b_bot/pricing.py` · `b2b_bot/recurring.py` · `b2b_bot/billing.py` · `b2b_bot/summaries.py` · `b2b_bot/customers.py` · `b2b_bot/staff_commands.py` (/markpaid, /balance, …) · `b2b_bot/dispatch_reminder.py` · `b2b_bot/delivery.py` · `run_b2b_bot.py`
 - **Read-first:** `docs/B2B.md`
 - **⚠ Gotchas:** PP-clock dates via `shared/clock.py` · b2b service is intentionally stopped at times — check before assuming live.
 
@@ -59,12 +59,12 @@
 - **⚠ Gotcha:** oldest subsystem; grep before editing. (Map entry thin — enrich when next worked on.)
 
 ## Hiring intake + quiz + assessment bot
-- **Files:** `hire_bot/bot.py` · `hire_bot/intake.py` · `hire_bot/sessions.py` · `hire_bot/questions.py` · `hire_bot/scorer.py` · `hire_bot/assessment_runner.py` · `hire_bot/correction_flow.py` · `hire_bot/offer_flow.py` · `run_hire_bot.py` (other `hire_bot/*` = assessment helpers, MAP-IGNOREd)
+- **Files:** `hire_bot/bot.py` · `hire_bot/intake.py` · `hire_bot/sessions.py` · `hire_bot/questions.py` · `hire_bot/scorer.py` · `hire_bot/followups.py` · `hire_bot/assessment_runner.py` · `hire_bot/assessment_package.py` (Sonnet evidence builder) · `hire_bot/assessment_pipeline.py` · `hire_bot/assessment_notify.py` · `hire_bot/correction_flow.py` · `hire_bot/offer_flow.py` · `hire_bot/khmer_validator.py` · `hire_bot/readtime.py` · `run_hire_bot.py`
 - **History:** grep `docs/HISTORY.md` sessions 18–22.
 - **⚠ Gotcha:** AI-call budget rules (max 2 Haiku/applicant pre-test) — see CLAUDE.md Arch Rule 1.
 
 ## Listener / ops-intelligence (the read-only eyes)
-- **Files:** `ops_intelligence/listener.py` · `ops_intelligence/importer.py` · `ops_intelligence/analyze_chats.py` · `ops_intelligence/price_list_fetcher.py` · `run_listener.py`
+- **Files:** `ops_intelligence/listener.py` · `ops_intelligence/importer.py` · `ops_intelligence/analyze_chats.py` · `ops_intelligence/price_list_fetcher.py` · `ops_intelligence/price_extractor.py` (read supplier price PDFs/photos) · `ops_intelligence/price_report.py` · `run_listener.py`
 - **⚠ Gotchas:** Telethon session file is auth — NEVER run two clients on one session · session backed up to the secrets repo (not in `bootstrap.py --sync`).
 
 ## Shared infrastructure
@@ -88,11 +88,8 @@
 
 ---
 
-## MAP-IGNORE — package files intentionally NOT indexed above
-> Reached via their area, or peripheral. Listed so the coverage test passes AND so "what exists but
-> isn't a routing target" is explicit. Every `__init__.py` is auto-ignored. Add a new file here only if
-> it genuinely needs no routing entry — otherwise put it in an area above.
-- gm_bot: `gm_bot/analyzer.py` · `gm_bot/flow.py` · `gm_bot/frequency.py` · `gm_bot/sales.py` · `gm_bot/stock_entry.py`
-- b2b_bot: `b2b_bot/cake_menu.py` · `b2b_bot/delivery.py` · `b2b_bot/dispatch_reminder.py` · `b2b_bot/menu.py` · `b2b_bot/menu_flow.py` · `b2b_bot/menu_keyboards.py` · `b2b_bot/order_handlers.py` · `b2b_bot/pricing.py` · `b2b_bot/staff_commands.py`
-- hire_bot: `hire_bot/assessment_notify.py` · `hire_bot/assessment_package.py` · `hire_bot/assessment_pipeline.py` · `hire_bot/followups.py` · `hire_bot/khmer_validator.py` · `hire_bot/readtime.py`
-- ops_intelligence: `ops_intelligence/price_extractor.py` · `ops_intelligence/price_report.py`
+## MAP-IGNORE — package files intentionally NOT a routing target
+> Every `__init__.py` is auto-ignored. Beyond that, a file goes here ONLY after being read and judged
+> genuinely trivial (a tiny facade/helper reached transitively) — never as a lazy "make the test pass".
+> If unsure, index it in an area above. (Verified by reading each one, 2026-06-19.)
+- `b2b_bot/menu_flow.py` — 10-line back-compat facade that just re-exports from `b2b_bot/menu_keyboards.py` + `b2b_bot/menu_handlers.py`.
