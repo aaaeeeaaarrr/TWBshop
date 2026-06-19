@@ -304,11 +304,15 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 4. **Attendance / AL / OT / schedule system — LIVE since 2026-06-16 11:08 PP** (`attendance_live`=true, test mode OFF): real staff check in by live-location; AL/OT/no-show/points/schedule-changes all active on real data. **HIGH-RISK live path (payroll-adjacent)** — any change: investigate read-only on prod first, prove on staging, deploy-by-TAG in a quiet window + verify (never a casual restart). Live design → `docs/ATTENDANCE_SYSTEM_DETAILED.md` + `..._MAP.md` + `..._TEST_MODE.md`; build blow-by-blow (sessions 31–42) → `docs/HISTORY.md`; open data ops → `docs/ACTIONS_LEDGER.md`.
 **At session start also read `docs/ACTIONS_LEDGER.md`** (open real-data instructions; Parked items are rare/behind-go-live).
 
-**⏰ DATED CHECKPOINT (set 2026-06-08): stand up a staging/local Postgres so the prod DATABASE_URL
-is NOT present during normal development.** Today dev and prod share the managed DO Postgres — every
-migration/query in dev hits live payroll/staff data. The HIGH-RISK hook (.claude/hooks/highrisk_guard.py)
-is a BACKSTOP, not the fix; the real lock is a missing prod credential in dev. Target: before the next
-migration/payroll/payment task, and no later than **2026-06-30**. Don't let it become "never."
+**✅ RESOLVED (2026-06-19, was the ⏰ 2026-06-08 dated checkpoint) — dev can no longer silently hit prod.**
+Superseded by the **Phase-0 fail-closed switch** (not the originally-planned "flip dev default"): `shared/
+database.py::active_database_url()` REQUIRES `TWBSHOP_ENV` set explicitly to `prod`/`staging` — unset/unknown
+**RAISES** (no silent prod fallback). Verified LIVE 2026-06-19: all 5 server units pinned `TWBSHOP_ENV=prod`
+(and the running gm process's `/proc/PID/environ` carries it) · `tests/conftest.py` forces `staging` · staging
+DB `twbshop_staging` exists with a distinct `STAGING_DATABASE_URL`. **Accepted residual:** the prod URL is
+still physically in dev `secrets.py` (a human could deliberately set `TWBSHOP_ENV=prod`) — the *accidental/
+silent* risk is closed; the deliberate path is by design. (Separate ledger item: fold `hire_bot/*` + `run_*.py`
+raw connections through `raw_connect()` — not on the payroll path.)
 
 **Phase:** Retail complete · B2B Phases 1+2 · GM Manager live · Ops listener live · Hiring intake+quiz+assessment built. **Attendance LIVE (since 2026-06-16).**
 
