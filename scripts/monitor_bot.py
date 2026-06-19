@@ -27,6 +27,7 @@ sys.path.insert(0, HERE)    # monitor
 from telegram.ext import Application, CommandHandler
 
 import monitor as mon
+import integration_audit as ia
 from shared.error_handler import make_error_handler
 
 try:
@@ -87,7 +88,8 @@ async def cmd_start(update, context):
         "/board — lanes (dirty / ahead / behind)\n"
         "/health — the services\n"
         "/issues — what needs you, with the fix\n"
-        "/crossings — recent cross-lane edits\n\n"
+        "/crossings — recent cross-lane edits\n"
+        "/audit — integrator cross-lane sweep (map + no-cross-lane)\n\n"
         "I DM you on a service-down OR a cross-lane edit. Silence = healthy.")
 
 
@@ -146,6 +148,16 @@ async def cmd_crossings(update, context):
         await update.message.reply_text("✅ No cross-lane edits recorded.")
         return
     await update.message.reply_text("📛 RECENT CROSS-LANE EDITS\n" + "\n".join(_ev_line(e) for e in evs))
+
+
+async def cmd_audit(update, context):
+    """Run the integrator's cross-lane sweep (fast checks; the heavy --suite is CLI-only)."""
+    if not _owner(update):
+        return
+    rep = ia.audit(with_suite=False)
+    text, total = ia.format_report(rep, with_suite=False)
+    head = "✅ Integration CLEAN" if total == 0 else "⚠️ Integration: %d finding(s)" % total
+    await update.message.reply_text(head + "\n" + text)
 
 
 async def _events_tick(context):
@@ -215,6 +227,7 @@ def build_application(token):
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("issues", cmd_issues))
     app.add_handler(CommandHandler("crossings", cmd_crossings))
+    app.add_handler(CommandHandler("audit", cmd_audit))
     app.add_error_handler(make_error_handler("Monitor"))   # crashes are never silent
     app.job_queue.run_repeating(_watch_tick, interval=300, first=15)
     app.job_queue.run_repeating(_events_tick, interval=60, first=20)   # cross-lane edit alerts

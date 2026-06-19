@@ -26,7 +26,8 @@ import sys
 import time
 
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-SOFT_LANES = {"docs"}  # can't break a build -> cross-lane edits WARN, never block
+SOFT_LANES = {"docs"}        # can't break a build -> cross-lane edits WARN, never block
+HUB_ONLY = {"CLAUDE.md"}     # hub-owned: lanes put notes in CLAUDE.local.md, never the tracked file
 EVENTS_FILE = os.path.expanduser("~/.twbshop_lane_events.jsonl")  # shared sink, outside all worktrees
 
 
@@ -73,6 +74,8 @@ def _ack_present():
 
 def _decide(lane, path, m, ack):
     """Pure decision. Returns (verdict, concerns) with verdict in silent|warn|block."""
+    if _norm(path) in HUB_ONLY:                       # CLAUDE.md etc. — lanes are blocked outright
+        return ("warn" if ack else "block", "HUB-ONLY (put lane notes in CLAUDE.local.md)")
     lanes = m.get("lanes", {})
     if _under(path, lanes.get(lane, [])):
         return ("silent", "")

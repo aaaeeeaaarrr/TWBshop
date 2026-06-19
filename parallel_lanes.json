@@ -12,8 +12,15 @@
     "docs":       ["docs/"]
   },
   "shared": [
-    "shared/", "migrations/", "tests/", "scripts/", "config.py",
-    "requirements.txt", "bootstrap.py", "setup_staging.py",
-    ".claude/", ".githooks/", "CLAUDE.md", "parallel_lanes.json", ".gitignore"
+    "shared/", "migrations/", "tests/", "scripts/", "config.py", "config.example.py",
+    "requirements.txt", "bootstrap.py", "setup_staging.py", "conftest.py", "verify_staging.py",
+    ".claude/", ".githooks/", "CLAUDE.md", "parallel_lanes.json", ".gitignore",
+    "pull.ps1", "deploy/", "archive/", "COVERAGE_STUDY.md", "seed_fake_customer.py",
+    "run_backfill_clarifications.py", "run_check_report_photos.py", "run_collection_watchdog.py",
+    "run_extract_prices.py", "run_fetch_pricelists.py", "run_generate_quiz_seed.py", "run_import.py",
+    "run_import_lyhouy_assessment.py", "run_import_seth_assessment.py", "run_import_seth_message_refs.py",
+    "run_import_vannary_assessment.py", "run_live_test.py", "run_quiz_audit.py",
+    "run_scoring_schema_migration.py", "run_send_historical_photos.py", "run_test_b2b_chaos.py",
+    "run_test_hire_chaos.py", "run_test_intake.py", "run_test_scoring_engine.py"
   ]
 }
