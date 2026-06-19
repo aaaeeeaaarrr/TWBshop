@@ -4633,6 +4633,20 @@ def att_check_out(staff_id: int, shift_date: str, at_iso: str) -> None:
                            WHERE staff_id=%s AND shift_date=%s""", (at_iso, staff_id, shift_date))
 
 
+def att_open_past_sessions(today_iso: str, is_test: bool = False) -> list[dict]:
+    """Sessions a staffer CHECKED INTO but never checked out of, whose shift_date is strictly before
+    `today_iso` (so the shift has fully ended — even an overnight one). Feeds the fallback end-of-shift
+    closer: auto-checkout only fires when the live-share is still on+in-zone at shift end, so a session
+    where the staffer stopped sharing early otherwise dangles 'open' forever. is_test-scoped."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT * FROM attendance_sessions
+                           WHERE status='open' AND checked_in_at IS NOT NULL AND checked_out_at IS NULL
+                             AND shift_date < %s AND is_test=%s
+                           ORDER BY shift_date""", (today_iso, is_test))
+            return [dict(r) for r in cur.fetchall()]
+
+
 def flow_save(uid: int, flow: str, step: str, data: dict | None = None,
               ttl_min: int | None = None) -> None:
     """Start/replace the active flow for a uid (one active flow per uid — last wins)."""

@@ -1198,6 +1198,31 @@ def _shift_start_dt(shift_date: str, ws_min: int) -> datetime:
         + timedelta(minutes=ws_min or 0)
 
 
+def _shift_end_from_mins(shift_date: str, start_min, end_min) -> datetime | None:
+    """Pure: the PP-tz END datetime of a shift, OVERNIGHT-AWARE (end<=start ⇒ it lands the next day,
+    via the length on the 24h circle). None for an empty window. No DB — unit-testable."""
+    if start_min is None or end_min is None:
+        return None
+    length = (int(end_min) - int(start_min)) % 1440
+    if length == 0:
+        return None
+    return _shift_start_dt(shift_date, int(start_min)) + timedelta(minutes=length)
+
+
+def _shift_end_dt(staff: dict, shift_date: str) -> datetime | None:
+    """The resolved (redefine + overnight aware) end datetime of `staff`'s shift on `shift_date`, via
+    the ONE resolver. None if the day doesn't resolve to a worked shift with known times (leave /
+    day-off / missing work hours) — the closer then skips rather than guess a checkout time."""
+    from gm_bot import attendance_ui as ui
+    try:
+        dec = ui.resolve_day(staff, shift_date)
+    except Exception:
+        return None
+    if not dec.get("working"):
+        return None
+    return _shift_end_from_mins(shift_date, dec.get("start_min"), dec.get("end_min"))
+
+
 def _resolve_checkin_shift(staff: dict, now_pp: datetime) -> tuple[str | None, int | None]:
     """Pick the (shift_date_iso, start_min) a live-location ping at `now_pp` belongs to — OVERNIGHT-AWARE.
     A baker's 06:00 end-ping lands on the next calendar day, so binding to now.date() filed it under the
@@ -5826,6 +5851,50 @@ async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     gm_set_state("live_watchdog_last", cur_json)
 
 
+async def _session_closer_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily FALLBACK end-of-shift closer (go-live hardening, Jun 19). Auto-checkout only fires when the
+    live-share is still ON + IN-ZONE at shift end; staff routinely stop sharing early, so a checked-in
+    session otherwise dangles OPEN forever (the audit flags it 'stale' after 2 days, and it recurs daily).
+    This closes any still-open session whose shift has FULLY ended — at the RESOLVED shift end (fair:
+    present-till-end, NOT the last ping, which would shortchange someone who worked the shift but shared
+    for 15 min) — and settles EXACTLY like auto-checkout: a no-op for a normal shift, banks the
+    PRE-AUTHORIZED OT for an approved redefine, idempotent (atomic claim). No behavior fork (Rule 1).
+    Live rows only; real wall clock. SILENT to staff (a retroactive 'checked out ✓' the next morning would
+    confuse) — the live watchdog's ✅ tells the owner the stale rows cleared."""
+    if not _attendance_live():
+        return
+    from shared.database import att_open_past_sessions, att_check_out, staff_all
+    now_pp = datetime.now(finance.PP_TZ)
+    today = now_pp.date().isoformat()
+    try:
+        rows = att_open_past_sessions(today, is_test=False)
+    except Exception as e:
+        logger.error("session-closer: query failed: %s", e)
+        return
+    staff_by_id = {s["id"]: s for s in staff_all(None)}
+    n = 0
+    for r in rows:
+        staff = staff_by_id.get(r["staff_id"])
+        if not staff:
+            continue
+        sd = str(r["shift_date"])
+        end_dt = _shift_end_dt(staff, sd)
+        # Close only a shift that has TRULY ended (belt: shift_date<today already guarantees it; this
+        # also skips a day that doesn't resolve to a known worked window rather than guess a bad time).
+        if end_dt is None or end_dt >= now_pp:
+            continue
+        try:
+            att_check_out(staff["id"], sd, end_dt.isoformat())
+            _settle_redefined_shift(staff, sd, end_dt)   # no-op for a normal shift; banks pre-approved OT
+            n += 1
+            logger.info("session-closer: closed %s %s at shift end %s",
+                        (staff.get("call_name") or staff.get("canonical_name")), sd, end_dt.isoformat())
+        except Exception as e:
+            logger.error("session-closer: failed for staff %s %s: %s", staff["id"], sd, e)
+    if n:
+        logger.info("session-closer: closed %d stale open session(s)", n)
+
+
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/audit — owner: cross-check that every button input translated to the right stored result.
     Runs all data invariants (AL deductions, payback math, OT banking/cap, sessions, no-shows,
@@ -7375,6 +7444,12 @@ def build_app() -> Application:
     # 07:30 auto-audit (minutes vs ~24h to detect). Read-only; no balance path touched.
     app.job_queue.run_repeating(_live_watchdog_job, interval=180, first=45,
                                 name="gm_live_watchdog")
+    # fallback end-of-shift session closer: daily 07:00 PP (00:00 UTC) — after overnight shifts end,
+    # before the 07:30 audit. Closes still-open sessions whose shift has fully ended (auto-checkout
+    # never fired because the staffer stopped sharing early), at the resolved shift end. See the job.
+    app.job_queue.run_daily(_session_closer_job,
+                            time=__import__("datetime").time(hour=0, minute=0),
+                            name="gm_session_closer")
     # bounded reason-nudge ladder (10/20/30): every 5 min, gated
     app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
                                 name="gm_reason_nudge")
