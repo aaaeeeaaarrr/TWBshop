@@ -839,3 +839,24 @@ Quick note 🤍 last time you let us know you were sick very late — that's −
 កត់សម្គាល់បន្តិច 🤍 លើកមុនប្អូនប្រាប់ថាឈឺយឺតពេលណាស់ — នោះគឺ −15 Late Informing 🔻។ លើកក្រោយ ប្រាប់ឱ្យបានឆាប់ជាងនេះ ដើម្បីរក្សា points របស់ប្អូន។
 
 Key terminology fix: use **ការប្តូរកាលវិភាគ**, not **ការប្តូរវេន**, for the mandatory-reason line, because this applies to both **Change time +OT** and **Change day off**.
+
+## Stock-count gateway (C3) — Jun 19  ⏳ PENDING native review
+
+> Context: the new staff stock-count gateway button in the GM menu (`gm_bot/stock_gateway.py` +
+> `gm_bot/attendance_ui.py` `main_menu`). It routes staff to the AppSheet stock app. Strings below
+> are my DRAFT Khmer — needs a ChatGPT/native pass before the button goes live (the button is HIDDEN
+> until the AppSheet URL is configured, so there is time). "stock"/"app" can stay loanwords
+> (កម្មវិធី / ស្តុក) as elsewhere; check the naturalness of រាប់ទំនិញម្តងមួយៗ.
+
+### 1. Menu button
+📦 Stock count · រាប់ស្តុក
+
+### 2. Gateway card body
+Tap below to open the stock app, then count each item and save.
+ចុចខាងក្រោម ដើម្បីបើកកម្មវិធីស្តុក រួចរាប់ទំនិញម្តងមួយៗ ហើយរក្សាទុក។
+
+### 3. Open-app button
+📲 Open stock app · បើកកម្មវិធីស្តុក
+
+### 4. Back button (matches existing convention)
+← Back · ត្រឡប់ក្រោយ

@@ -1066,6 +1066,15 @@ def main_menu(p: dict) -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("🧰 About Work · កិច្ចការហាង", callback_data="att:aw")],
         [InlineKeyboardButton("👤 About Me · របស់ខ្ញុំ", callback_data="att:am")],
     ]
+    # C3 stock-count gateway (gm_bot/stock_gateway.py): a link to the AppSheet stock app. Shown ONLY
+    # when the URL is configured, so staff never see a 'coming soon' stub before the stock lane is ready.
+    # Isolated in try/except: a stock-gateway problem must NEVER break the core staff menu (check-in).
+    try:
+        from gm_bot import stock_gateway
+        if stock_gateway.stock_enabled():
+            rows.append([InlineKeyboardButton("📦 Stock count · រាប់ស្តុក", callback_data="att:stock")])
+    except Exception:
+        pass
     if not p.get("_live"):
         rows.append([InlineKeyboardButton("🎭 Switch persona", callback_data="att:pick")])
     line = ("What would you like to do? · តើអ្នកចង់ធ្វើអ្វី?" if p.get("_live")
@@ -2763,6 +2772,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return await show(main_menu(p))
     if action == "am":
         return await show(about_me_menu(p))
+    if action == "stock":
+        # C3 gateway: route the staffer to the AppSheet stock app. The button is hidden when no URL
+        # is set, so this is normally only reached when a URL exists; a stale tap just reopens the menu.
+        from gm_bot import stock_gateway
+        url = stock_gateway.appsheet_url()
+        if not url:
+            return await show(main_menu(p))
+        return await show(stock_gateway.gateway_message(url))
     if action == "sp":
         sub = data[2] if len(data) > 2 else ""
         if sub == "":
