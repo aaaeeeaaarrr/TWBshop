@@ -1692,6 +1692,21 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     # judged vs the REDEFINED start. ws None = no scheduled shift near now → ping logged above, done.
     shift_date, ws = _resolve_checkin_shift(staff, now_pp)
     if ws is None:
+        # No scheduled shift binds to this ping. Don't go SILENT (staff read silence as "the bot is
+        # broken", and it hides a genuinely wrong schedule — the exact false alarm of Jun 19). Reply
+        # ONLY on the FIRST share, never on the live-location heartbeats (those are edited messages —
+        # replying to each would spam 30+ times). Tell them why + how to fix it.
+        if not update.edited_message:
+            today_iso = now_pp.date().isoformat()
+            try:
+                today_dec = ui.resolve_day(staff, today_iso)
+            except Exception:
+                today_dec = None
+            code = ci.offshift_reason(now_pp.hour * 60 + now_pp.minute, today_dec or {})
+            try:
+                await msg.reply_text(ui.offshift_notice_text(code, (today_dec or {}).get("start_min")))
+            except Exception:
+                pass
         return True
     if not in_zone:
         if not update.edited_message:
