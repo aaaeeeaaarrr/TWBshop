@@ -447,6 +447,10 @@ Risk: a supplier posts their own receipt copy a day later → re-logged → paid
   group is forwarded to the Expense group as a **CANDIDATE (never auto-numbered)**. First question forks:
   `Not yet received → park as "expected" (order/quote)` · `Already logged → link to #14, ignore` ·
   `New & received → run the look-alike guard → THEN promote to a numbered receipt`.
+  **▶ BUILT 2026-06-19** (lane/accountant, not deployed): `acc_receipt_candidates` table + the four forks +
+  look-alike guard (same vendor+amount ≤7d) + claim-first promote (no double-#) in `accountant/{db,capture,
+  bot}.py`; bot stays silent in the supplier group, candidate card headed "From <vendor> · <group>". Pure
+  logic proven (21 tests); DB lifecycle tests written (run on the staging machine). NEXT = P2 (HIGH-RISK).
 
 ### E4. Listener — free eyes in supplier groups (verified in code 2026-06-18)
 - `ops_intelligence/listener.py` is a Telethon **user account**: streams every message to `ops_messages`,

@@ -71,6 +71,12 @@ def test_render_card_missing_amount_warns():
     assert "amount not read" in txt
 
 
+def test_render_card_flags_suspected_duplicate():
+    txt = capture.render_card({"id": 20, "vendor_name": "Atlas", "amount_cents": 6800,
+                               "status": "captured", "dup_suspect_of": 14})
+    assert "possible duplicate of #14" in txt
+
+
 def test_card_buttons_fix_is_always_present():
     for status in ("captured", "confirmed", "paid"):
         rows = capture.card_buttons({"id": 1, "status": status})

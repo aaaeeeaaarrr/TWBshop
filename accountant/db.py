@@ -84,7 +84,7 @@ def init_accounting_db() -> None:
             # additive detail columns (read off the receipt; cheap to capture, valuable for the books)
             for _col, _typ in (("invoice_no", "TEXT"), ("receipt_date", "TEXT"),
                                ("tax_cents", "INTEGER"), ("supplier_account", "TEXT"),
-                               ("bank_name", "TEXT")):
+                               ("bank_name", "TEXT"), ("dup_suspect_of", "INTEGER")):
                 cur.execute(f"ALTER TABLE acc_receipts ADD COLUMN IF NOT EXISTS {_col} {_typ}")
 
             # ── acc_payments + acc_payment_allocations — the lump matcher (design §D3) ──
@@ -149,6 +149,35 @@ def init_accounting_db() -> None:
                 )
             """)
 
+            # ── acc_receipt_candidates — the "Received Yet?" forward flow (design §E3) ──
+            # A photo a supplier posts in THEIR group is forwarded to the Expense group as a
+            # CANDIDATE (never auto-numbered). The owner forks it: New&received → promote to a
+            # numbered receipt · Already-logged → link to an existing # · Not-yet → park expected ·
+            # Ignore. Kept OUT of acc_receipts so the numbered ledger means "a real logged receipt".
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS acc_receipt_candidates (
+                    id             SERIAL PRIMARY KEY,
+                    vendor_id      INTEGER REFERENCES acc_vendors(id),  -- from the supplier group (zero-read)
+                    src_chat_id    BIGINT,         -- the supplier group it was posted in
+                    src_msg_id     BIGINT,
+                    src_chat_title TEXT,           -- group title → the card's "name + group" header
+                    photo_file_id  TEXT,
+                    photo_sha      TEXT,           -- dedup (same supplier photo twice = one candidate)
+                    status         TEXT DEFAULT 'open',  -- open|promoting|promoted|linked|expected|ignored
+                    receipt_id     INTEGER REFERENCES acc_receipts(id),  -- set on promote / link
+                    card_chat_id   BIGINT,         -- the Expense-group card (edited in place)
+                    card_msg_id    BIGINT,
+                    posted_by      BIGINT,
+                    note           TEXT,
+                    created_at     TIMESTAMPTZ DEFAULT NOW(),
+                    resolved_at    TIMESTAMPTZ,
+                    resolved_by    BIGINT,
+                    is_test        BOOLEAN DEFAULT FALSE
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_cand_status ON acc_receipt_candidates (status)")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_cand_sha ON acc_receipt_candidates (photo_sha) WHERE photo_sha IS NOT NULL")
+
 
 # ── Vendor master / group map — P0 (`/vendor link <name>` run inside each supplier group) ──
 
@@ -209,6 +238,153 @@ def list_vendors(active_only: bool = True) -> list[dict]:
             cur.execute(
                 "SELECT * FROM acc_vendors %s ORDER BY name" % ("WHERE active" if active_only else ""))
             return list(cur.fetchall())
+
+
+# ── "Received Yet?" candidate flow — supplier-group photos (design §E3) ──
+# A candidate is NOT a numbered receipt: it carries no money and never auto-pays. Every fork
+# CLAIMS the row atomically from 'open' (S2/S3: flip-status-first) so a double-tap can't double-act
+# — critically, can't create two numbered receipts from one supplier photo.
+
+def add_candidate(vendor_id=None, src_chat_id=None, src_msg_id=None, src_chat_title=None,
+                  photo_file_id=None, photo_sha=None, posted_by=None, is_test=False) -> int:
+    """Log a supplier-posted photo as an OPEN candidate. Dedup on photo_sha: the same image
+    re-posted returns the EXISTING candidate id (one supplier photo, one candidate)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if photo_sha:
+                cur.execute("SELECT id FROM acc_receipt_candidates WHERE photo_sha=%s", (photo_sha,))
+                row = cur.fetchone()
+                if row:
+                    return row["id"]
+            cur.execute("""
+                INSERT INTO acc_receipt_candidates
+                    (vendor_id, src_chat_id, src_msg_id, src_chat_title, photo_file_id, photo_sha,
+                     posted_by, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (vendor_id, src_chat_id, src_msg_id, src_chat_title, photo_file_id, photo_sha,
+                  posted_by, is_test))
+            return cur.fetchone()["id"]
+
+
+def get_candidate(cid: int) -> dict | None:
+    """A candidate row joined to its vendor name (for the card)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT c.*, v.name AS vendor_name FROM acc_receipt_candidates c
+                           LEFT JOIN acc_vendors v ON v.id = c.vendor_id WHERE c.id = %s""", (cid,))
+            return cur.fetchone()
+
+
+def get_candidate_by_sha(photo_sha: str) -> dict | None:
+    """The candidate already logged for this exact supplier photo (dedup), or None."""
+    if not photo_sha:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_receipt_candidates WHERE photo_sha = %s", (photo_sha,))
+            return cur.fetchone()
+
+
+def set_candidate_card(cid: int, card_chat_id: int, card_msg_id: int) -> None:
+    """Remember where the candidate's card lives (the Expense group) so forks edit it in place."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_receipt_candidates SET card_chat_id=%s, card_msg_id=%s WHERE id=%s",
+                        (card_chat_id, card_msg_id, cid))
+
+
+def resolve_candidate(cid: int, status: str, resolved_by=None, note=None) -> bool:
+    """Terminal fork (expected / ignored) — atomically claim from 'open'. True if THIS call resolved
+    it (a double-tap returns False, never re-resolves)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE acc_receipt_candidates
+                           SET status=%s, resolved_by=%s, note=COALESCE(%s, note), resolved_at=NOW()
+                           WHERE id=%s AND status='open' RETURNING id""",
+                        (status, resolved_by, note, cid))
+            return cur.fetchone() is not None
+
+
+def link_candidate(cid: int, receipt_id: int, resolved_by=None) -> bool:
+    """'Already logged' fork — point the candidate at an existing receipt #, atomically from 'open'.
+    No money moves (just records that this supplier photo == receipt #N). True if it claimed."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE acc_receipt_candidates
+                           SET status='linked', receipt_id=%s, resolved_by=%s, resolved_at=NOW()
+                           WHERE id=%s AND status='open' RETURNING id""",
+                        (receipt_id, resolved_by, cid))
+            return cur.fetchone() is not None
+
+
+def claim_candidate(cid: int) -> bool:
+    """Begin a promote — atomically move 'open' → 'promoting' (the claim). Only the winner of a
+    double-tap gets True, so exactly one numbered receipt is ever created from one candidate."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE acc_receipt_candidates SET status='promoting'
+                           WHERE id=%s AND status='open' RETURNING id""", (cid,))
+            return cur.fetchone() is not None
+
+
+def finalize_promote(cid: int, receipt_id: int, resolved_by=None) -> None:
+    """Finish a promote — 'promoting' → 'promoted', stamping the numbered receipt it became."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE acc_receipt_candidates
+                           SET status='promoted', receipt_id=%s, resolved_by=%s, resolved_at=NOW()
+                           WHERE id=%s AND status='promoting'""", (receipt_id, resolved_by, cid))
+
+
+def unclaim_candidate(cid: int) -> None:
+    """Revert a claim back to 'open' if the promote failed (OCR/insert error) — no orphaned claim."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_receipt_candidates SET status='open' "
+                        "WHERE id=%s AND status='promoting'", (cid,))
+
+
+def recent_receipts_for_vendor(vendor_id: int, limit: int = 8, is_test: bool = False) -> list[dict]:
+    """Recent receipts for a vendor — the 'Already logged → which #?' link picker (a read, no money).
+    Distinct from the P2 payable-run open list (open_receipts_for_vendor)."""
+    if vendor_id is None:
+        return []
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id, amount_cents, orig_currency, orig_amount, status, pay_method,
+                                  created_at
+                           FROM acc_receipts WHERE vendor_id=%s AND is_test=%s
+                           ORDER BY id DESC LIMIT %s""", (vendor_id, is_test, limit))
+            return list(cur.fetchall())
+
+
+def find_lookalike_receipt(vendor_id, amount_cents, within_days: int = 7,
+                           is_test: bool = False, exclude_id=None) -> dict | None:
+    """Anti-double-pay look-alike (design §E3 layer 3): the most recent receipt with the SAME vendor
+    and SAME amount within N days, or None. The owner confirms (Same / New) — never silent.
+    exclude_id skips a given row (used on the direct path to ignore the just-created receipt)."""
+    if vendor_id is None or amount_cents is None:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT r.*, v.name AS vendor_name FROM acc_receipts r
+                           LEFT JOIN acc_vendors v ON v.id = r.vendor_id
+                           WHERE r.vendor_id=%s AND r.amount_cents=%s AND r.is_test=%s
+                             AND (%s IS NULL OR r.id <> %s)
+                             AND r.created_at >= NOW() - make_interval(days => %s)
+                           ORDER BY r.id DESC LIMIT 1""",
+                        (vendor_id, amount_cents, is_test, exclude_id, exclude_id, within_days))
+            return cur.fetchone()
+
+
+def flag_dup_suspect(rid: int, dup_of: int) -> None:
+    """Mark a freshly-captured receipt as a possible duplicate of #dup_of (same vendor+amount,
+    recent) — a heads-up surfaced on the card. Informational only; the owner decides (the real
+    double-pay PREVENTION is the P2 paid-flip / txn-ref dedup). Distinct path so the candidate
+    flow, which already asked, never re-flags."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_receipts SET dup_suspect_of=%s WHERE id=%s", (dup_of, rid))
 
 
 # ── P1 / P2 interface (build-the-interface-first, Arch-Rule-2; implemented in later phases) ──
