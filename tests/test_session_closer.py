@@ -50,11 +50,19 @@ def test_end_dt_overnight_working_day():
     assert _shift_end_dt(staff, d).isoformat().startswith("2026-06-17T06:00")
 
 
-def test_end_dt_day_off_is_none():
+def test_end_dt_day_off_still_closes_at_normal_hours():
+    # a session EXISTS on a resolver-day-off (they picked up the shift, e.g. go-live day) ⇒ a check-in
+    # means they worked, so close at their normal end — NOT skip (which would dangle it forever).
     d = "2026-06-16"
-    off = date.fromisoformat(d).strftime("%a")          # their day off = this weekday ⇒ not working
+    off = date.fromisoformat(d).strftime("%a")          # their day off = this weekday
     staff = {"id": 990903, "work_start": "07:00", "work_end": "17:00", "day_off": off}
-    assert _shift_end_dt(staff, d) is None
+    assert _shift_end_dt(staff, d).isoformat().startswith(d + "T17:00")
+
+
+def test_end_dt_none_only_when_no_work_hours():
+    d = "2026-06-16"
+    staff = {"id": 990904, "work_start": None, "work_end": None, "day_off": "Sun"}
+    assert _shift_end_dt(staff, d) is None              # genuine data gap ⇒ skip rather than guess
 
 
 # ── find → close round-trip on the isolated staging DB ─────────────────────

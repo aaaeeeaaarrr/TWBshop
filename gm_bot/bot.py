@@ -1210,17 +1210,20 @@ def _shift_end_from_mins(shift_date: str, start_min, end_min) -> datetime | None
 
 
 def _shift_end_dt(staff: dict, shift_date: str) -> datetime | None:
-    """The resolved (redefine + overnight aware) end datetime of `staff`'s shift on `shift_date`, via
-    the ONE resolver. None if the day doesn't resolve to a worked shift with known times (leave /
-    day-off / missing work hours) — the closer then skips rather than guess a checkout time."""
+    """The end datetime to record when closing `staff`'s dangling session on `shift_date`. Uses the
+    APPROVED redefine's window if the day resolved to one (so OT settles to the right end); OTHERWISE
+    the staff's NORMAL scheduled hours — because the session EXISTS (a check-in means they worked), so
+    we close at their scheduled end even on a day the resolver calls a day-off (e.g. they picked up the
+    shift, like the go-live day). Overnight-aware. None only when there are no usable hours at all
+    (a genuine data gap) — the closer then skips rather than guess."""
     from gm_bot import attendance_ui as ui
     try:
         dec = ui.resolve_day(staff, shift_date)
     except Exception:
-        return None
-    if not dec.get("working"):
-        return None
-    return _shift_end_from_mins(shift_date, dec.get("start_min"), dec.get("end_min"))
+        dec = None
+    if dec and dec.get("reason") == "redefine" and dec.get("start_min") is not None:
+        return _shift_end_from_mins(shift_date, dec.get("start_min"), dec.get("end_min"))
+    return _shift_end_from_mins(shift_date, ui.to_min(staff.get("work_start")), ui.to_min(staff.get("work_end")))
 
 
 def _resolve_checkin_shift(staff: dict, now_pp: datetime) -> tuple[str | None, int | None]:
