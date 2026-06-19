@@ -9,6 +9,20 @@
 
 ## Done (with proof)
 
+- **2026-06-19 — FALLBACK END-OF-SHIFT SESSION-CLOSER built + deployed + the 3 stale sessions CLOSED on prod
+  (HIGH-RISK: closes live attendance sessions; before/after independent proof + final clean audit).** Daily
+  07:00 PP `_session_closer_job` (`gm_bot/bot.py`) closes any still-open session whose shift has fully ended
+  (`att_open_past_sessions`), at the resolved shift end (redefine window if any, else normal hours — overnight
+  aware; a check-in means they worked, so it closes even a resolver-day-off shift), settling EXACTLY like
+  auto-checkout (no-op for a normal shift; banks pre-authorized OT idempotently; no behavior fork). Belt: only
+  `shift_date<today` AND `end_dt<now`. PROOF: suite **769 passed/2 skip** + 10 closer tests; deployed by tag
+  `session-closer-20260619b` (`15f2575`); gm active, NRestarts=0, `gm_session_closer` registered in the running
+  log. **Ran once on prod, before/after independent re-read:** BEFORE 3 open (Tra/Anan Jun16, Davy Jun17) →
+  AFTER 0 open → Tra closed Jun17 06:00, Davy Jun18 06:00 (overnight ends), Anan Jun16 17:00 (normal end) →
+  **`run_audit` = 0 problems.** The day-off edge (Anan) was caught BY the first prod run (skipped) → fixed
+  (close at scheduled hours when a session exists, not skip) → redeployed → Anan closed. No OT banked (the 3
+  were normal shifts). Reversible if ever needed (re-open + null checked_out_at) but no reason to.
+
 - **2026-06-19 — LIVE audit-watchdog built + deployed to gm (go-live hardening; READ-ONLY, no balance path
   touched) + 3 stale sessions investigated read-only.** Owner chose Option 1 ("phased both"). `_live_watchdog_job`
   (`gm_bot/bot.py`) runs `run_audit` over the REAL ledger every 3 min while live, DMs the owner the instant a NEW
@@ -74,15 +88,9 @@
   remains. Build AFTER the owner /test walk (touches live write-paths; don't risk them pre-walk). HIGH-RISK
   (balance paths) → real before/after proof on a staging row + a second-opinion pass.
 
-- **🌙 2026-06-19 (owner decision pending): FALLBACK END-OF-SHIFT SESSION-CLOSER.** Surfaced by the
-  live-watchdog investigation: staff stop sharing live-location early, so auto-checkout (needs a live in-zone
-  share AT shift end) never fires → sessions dangle OPEN forever → the audit flags them "stale" after 2 days,
-  and this **recurs daily**. Today's residue: Tra(Jun16)/Anan(Jun16)/Davy(Jun17), all present/pay-safe (late=0,
-  nothing to settle), seeded-past in the watchdog. **The real fix = a daily/end-of-shift job that CLOSES any
-  still-open past session at its scheduled end** (settling OT/payback if any — most have none), so sessions stop
-  dangling and the audit/watchdog stay quiet. Alternative (lighter) = teach the watchdog to treat the stale-open
-  class as daily-audit-only (not an instant alert). Owner to choose. HIGH-RISK-adjacent (it closes attendance
-  sessions) → staging proof first. NOT urgent (benign), but do it before the daily stale-open noise piles up.
+- **🌙 2026-06-19 — FALLBACK END-OF-SHIFT SESSION-CLOSER → BUILT + DEPLOYED + the 3 closed with proof.**
+  Owner chose the real fix (not "quiet the warning"). See Done below. (Daily 07:00 PP job; closes dangling
+  past sessions at the resolved shift end; settles like auto-checkout.) Nothing left open here.
 
 - **🔓 2026-06-14 (owner-gated — guard blocks Claude from editing `.claude/hooks/`): the command-pattern
   guard has a known BYPASS CLASS.** DB write-path audit (advisor grep, `psycopg2.connect` + raw DDL/DELETE

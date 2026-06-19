@@ -275,7 +275,23 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–43) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-19 (session 46 — **LIVE audit-watchdog deployed to gm (go-live hardening)**).
+**Last updated:** 2026-06-19 (session 46 — **LIVE audit-watchdog + fallback session-closer deployed to gm**).
+**▶ FALLBACK END-OF-SHIFT SESSION-CLOSER — BUILT · DEPLOYED · VERIFIED (gm, tag `session-closer-20260619b`=
+`15f2575`):** kills the recurring stale-open-session class the watchdog surfaced. Auto-checkout only fires if
+the live-share is on+in-zone AT shift end; staff stop sharing early, so a checked-in session otherwise dangles
+OPEN forever. New daily **07:00 PP** `_session_closer_job` (`gm_bot/bot.py`) closes any still-open session whose
+shift has FULLY ended, at the **resolved shift end** (redefine window if any, else normal hours — overnight-aware;
+a check-in means they worked, so it closes even a resolver-day-off shift), settling EXACTLY like auto-checkout
+(no-op for a normal shift; banks pre-authorized OT idempotently; **no behavior fork**, Rule 1). Live rows only,
+SILENT to staff (the watchdog's ✅ tells the owner). Belt: only closes `shift_date<today` AND `end_dt<now`
+(never a running shift). `att_open_past_sessions` (`shared/database.py`). **PROOF:** suite **769 passed/2 skip**
++ 10 closer tests (overnight math · resolve-driven end · find/close round-trip on staging); deployed BY TAG (gm
+active, NRestarts=0, `gm_session_closer` registered in the running log). **Ran once on prod with before/after
+independent proof → the 3 stale sessions CLOSED** (Tra→Jun17 06:00, Davy→Jun18 06:00 overnight ends; Anan→Jun16
+17:00 normal end via the day-off fix) → **FINAL `run_audit` = 0 problems** (ledger fully clean). The day-off edge
+was caught BY the first prod run (Anan skipped) → fixed (close at scheduled hours when a session exists) →
+redeployed → Anan closed. **▶ Possible follow-up (not built):** the closer settles pre-authorized OT for a
+redefined-but-uncheckedout shift — none existed in the 3; watch for it. → `docs/ACTIONS_LEDGER.md` Done.
 **▶ LIVE WATCHDOG — BUILT · DEPLOYED · VERIFIED (gm, tag `live-watchdog-20260619`=`cfa8ca3`; READ-ONLY, no
 balance path touched):** the live attendance/AL/OT ledger now gets a near-instant integrity check, not just
 the daily 07:30 audit. New `_live_watchdog_job` (`gm_bot/bot.py`) runs the SAME invariant `run_audit` over the
@@ -298,9 +314,9 @@ flagged rows = **Tra**(Jun16)/**Anan**(Jun16)/**Davy**(Jun17) sessions "still OP
 CAUSE: staff **stop sharing live-location early** (Davy: 49 in-zone pings 21:01→21:16 then stopped, 15 min into
 a 9h shift) → auto-checkout (needs a live in-zone share AT shift end) never fires → the session dangles open →
 flagged stale after 2 days. **All present, pay-safe (late=0, nothing to settle), benign — but RECURS daily.**
-Real fix = a **fallback end-of-shift session-closer** (close any still-open session at its scheduled end) — NOT
-built; logged Open in `docs/ACTIONS_LEDGER.md` (vs. quieting the stale-open class in the watchdog). The 3 are
-seeded-past (won't re-alert); NOT closed (owner chose investigate-first — closing is a separate real-data op).
+Real fix = a **fallback end-of-shift session-closer** — **NOW BUILT + DEPLOYED (see the closer block above);
+the 3 were closed on prod with before/after proof, FINAL audit = 0 problems.** Going forward the daily 07:00 PP
+job closes them automatically so they never reach 'stale'.
 **(prev, session 45) ▶ LANE_GUARD v4 — CONTENTION-SCOPED SHARED-WARN (hub, tooling; INERT — nothing live, lanes `pull` to get it):** the blanket "warn on every shared edit" noise is GONE. A lone shared edit is now **silent**; the guard WARNs only when **another worktree has that exact file uncommitted right now** (same-machine live race), naming the lane → "let it commit + push, then `pull` before you edit". WARN not auto-block (a lane abandoning a dirty file must never deadlock another). New pure helpers `_sibling_contention` (git) + `_gate_shared` (decision); `tests/test_lane_guard.py` **13 pass** (pure only — never `main()`, which would pollute the event sink); real-path proven on all 4 worktrees (clean→silent · gm-dirty→names `gm` · cleanup→silent). **Shared-file RULE added to playbook:** pull-before-touch · commit-on-its-own · push-at-a-boundary (pulling-before-shared, not faster commits, is what stops divergence; `push`≠commit so per-edit pushing is waste). **Backlog PRUNED (prevention-at-source redundancy sweep):** DROP sparse-checkout (guard-block + valued cross-lane reads make it counterproductive); DEFER server-side commit-scope CI (guard prevents + audit detects). Files: `scripts/lane_guard.py` · `docs/MULTI_LANE_PLAYBOOK.md` §3/§4/§8/§9 · `tests/test_lane_guard.py`. **▶ NEXT (paused, resume after this): trim this CLAUDE.md** (move sessions 32–43 → `docs/HISTORY.md`, keep latest + open loops + rules).
 **(prev, session 44)** INTEGRATOR CROSS-LANE VERIFY: full suite 738✓ on merged `main`, GM↔stock seam clean, drift guard added.
 **▶ INTEGRATOR VERIFY (hub on `main` `3937b0b`) — the checks no single lane can do (they're blind to each other):** **full suite 738 passed / 2 skipped / 0 failed on merged main** (closes the "merged-main not suite-verified" gap). **GM↔stock handover CLEAN:** stock builds on the B1 shared tables (`acc_items`/`stock_movements`, no fork); `gm_bot/stock.py` ≡ `stock/order_brain.py` (AST-identical, faithful port); **no lane wrote another lane's code** (guard held). Added **`tests/test_stock_brain_no_drift.py`** — the two brain copies must stay logic-identical until the GM cutover (drift → red suite; auto-skips post-cutover). **⚠ HYGIENE FINDING:** lanes have been editing the tracked Current Status during their pushes (the `(prev)` line below included) — against the multi-lane rule (hub owns Current Status; lanes → `CLAUDE.local.md`). No conflict yet (sequential pushes) but latent → fix = lanes skip the Current-Status step (+ optional lane_guard `CLAUDE.md` hard-block).
