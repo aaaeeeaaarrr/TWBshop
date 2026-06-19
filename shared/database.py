@@ -1108,23 +1108,6 @@ def is_payment_already_processed(group_chat_id: int, message_id: int, file_uniqu
             return False
 
 
-def get_b2b_payment(payment_id: int) -> dict | None:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM b2b_payments WHERE id = %s", (payment_id,))
-            return cur.fetchone()
-
-
-def update_b2b_payment_status(payment_id: int, status: str) -> None:
-    now = datetime.utcnow().isoformat()
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE b2b_payments SET status = %s, applied_at = %s WHERE id = %s",
-                (status, now, payment_id),
-            )
-
-
 def get_b2b_payment_history(group_chat_id: int) -> list[dict]:
     with _db() as conn:
         with conn.cursor() as cur:
@@ -3172,16 +3155,6 @@ def ot_bank_add(staff_id: int, minutes: int) -> int:
             return int(cur.fetchone()["balance_min"])
 
 
-def ot_grant_create(senior_id, staff_id, kind, minutes, when_date, start_min, reason) -> int:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""INSERT INTO ot_grants
-                (senior_id, staff_id, kind, minutes, when_date, start_min, reason, is_test)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                (senior_id, staff_id, kind, minutes, when_date, start_min, reason, _ATT_TEST))
-            return cur.fetchone()["id"]
-
-
 def ot_now_end_times(today_iso: str, tz) -> dict:
     """For each staffer with an ACCEPTED Now-OT whose end falls on `today` — INCLUDING an overnight
     OT granted yesterday that ends after midnight today — the LATEST OT-end as a tz-aware DATETIME.
@@ -3204,23 +3177,6 @@ def ot_now_end_times(today_iso: str, tz) -> dict:
                 if r["staff_id"] not in out or end > out[r["staff_id"]]:
                     out[r["staff_id"]] = end
     return out
-
-
-def ot_grant_get(grant_id: int) -> dict | None:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ot_grants WHERE id=%s", (grant_id,))
-            r = cur.fetchone()
-            return dict(r) if r else None
-
-
-def ot_grant_set(grant_id: int, status: str | None = None, staff_ok: bool | None = None) -> None:
-    with _db() as conn:
-        with conn.cursor() as cur:
-            if status is not None:
-                cur.execute("UPDATE ot_grants SET status=%s WHERE id=%s", (status, grant_id))
-            if staff_ok is not None:
-                cur.execute("UPDATE ot_grants SET staff_ok=%s WHERE id=%s", (staff_ok, grant_id))
 
 
 def ot_buyback_book(staff_id, slot_date, start_min, end_min, minutes) -> int:
@@ -3854,28 +3810,6 @@ def al_set_status(req_id: int, status: str) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE al_requests SET status=%s, decided_at=NOW() WHERE id=%s",
                         (status, req_id))
-
-
-def al_cancel_day(req_id: int, iso: str) -> tuple[int, int | None]:
-    """Cancel ONE day from a multi-day AL request: drop `iso` from its days, keep the rest. Only
-    mark the whole request 'cancelled' when it was the LAST day. Returns (remaining_days, staff_id).
-    (Caller refunds the single day via al_deduct.)"""
-    import json as _json
-    with _db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT days, staff_id, is_test FROM al_requests WHERE id=%s", (req_id,))
-            row = cur.fetchone()
-            if not row:
-                return (-1, None)
-            if bool(row["is_test"]) != _ATT_TEST:
-                return (-1, None)   # never cross modes: test can't cancel real, live can't cancel test
-            days = [d for d in _json.loads(row["days"] or "[]") if d != iso]
-            if days:
-                cur.execute("UPDATE al_requests SET days=%s WHERE id=%s", (_json.dumps(days), req_id))
-            else:
-                cur.execute("UPDATE al_requests SET status='cancelled', decided_at=NOW() WHERE id=%s",
-                            (req_id,))
-            return (len(days), row["staff_id"])
 
 
 def al_pending_requests() -> list[dict]:

@@ -21,9 +21,9 @@
 - **⚠ Gotchas:** overnight shifts bind to the SHIFT-START date, not the calendar day · go-live grace · everything `is_test`-scoped · LIVE since 2026-06-16 → read-only on prod first, prove on staging, deploy by TAG in a quiet window.
 
 ## AL · OT · payback · sick · swap · special-leave · points · pay  ·  ⚠ LIVE, MONEY/BALANCE
-- **Entry:** `gm_bot/payback.py` · `gm_bot/ot.py` · `gm_bot/al.py` · `gm_bot/attendance_ui.py::resolve_day` · `shared/database.py` (al_*, payback_*, ot_*) — siblings (sick/swap/special/points/late/pay) in `MAP_INDEX.md`
+- **Entry:** `gm_bot/payback.py` · `gm_bot/ot.py` · `gm_bot/al.py` · `gm_bot/attendance_ui.py::resolve_day` · `shared/database.py` (al_*, payback_*, ot_*, `points_record`) · `gm_bot/points.py` (LIVE points rules/compute) — siblings (sick/swap/special/late/pay) in `MAP_INDEX.md`
 - **Read-first (TRIPWIRE):** `docs/STATE_INTEGRITY_LAWS.md` (S1–S5) BEFORE any balance/state change · `docs/SCHEDULE_RESOLUTION_MODEL.md` · `docs/AL_DEDUCTION_REDESIGN.md` · `docs/ACTIONS_LEDGER.md` (open data ops)
-- **⚠ Gotchas (read the law, don't trust this line):** deduct-at-approval + refund-on-cancel · F14 same-date claims under a pg advisory lock · settle banks via an atomic claim — all per `docs/STATE_INTEGRITY_LAWS.md`.
+- **⚠ Gotchas (read the law, don't trust this line):** deduct-at-approval + refund-on-cancel · F14 same-date claims under a pg advisory lock · settle banks via an atomic claim — all per `docs/STATE_INTEGRITY_LAWS.md`. **TWO "points" systems — DON'T confuse:** LIVE = `points_events`/`points_rules` (`gm_bot/points.py` + `shared/database.py::points_record`; early/late/no-show/sick/AL) · DORMANT = `gm_staff_points` (`gm_award_points` + `/points`, old GM-recognition, never wired to award).
 
 ## Audit · watchdog · session-closer · resilience
 - **Entry:** `gm_bot/audit.py::run_audit` · `gm_bot/bot.py::_live_watchdog_job` · `gm_bot/bot.py::_session_closer_job` · `run_collection_watchdog.py`
