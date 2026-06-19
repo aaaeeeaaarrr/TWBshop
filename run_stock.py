@@ -51,6 +51,12 @@ def tick() -> None:
     ss.init_stock_shared_db()
     stockdb.init_stock_db()
 
+    # Reconcile counts written directly into Postgres (AppSheet direct-bind path) into the ledger.
+    rec = sync.reconcile_counts()
+    if rec["pending"]:
+        logger.info("Reconciled %d direct count(s) into the ledger (%d moved on-hand).",
+                    rec["pending"], rec["changed"])
+
     client = sync.AppSheetClient()  # unconfigured until C2 connectivity is confirmed (owner)
     result = sync.run_sync(client)
     if result.get("synced"):

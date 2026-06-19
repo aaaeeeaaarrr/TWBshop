@@ -16,6 +16,11 @@ from stock import db as stockdb
 def item_id():
     ss.init_stock_shared_db()
     stockdb.init_stock_db()
+    # last_count_date / days_since are GLOBAL by design (the whole-shop sheet). Control the is_test
+    # scope so those assertions are deterministic on the shared staging DB. (Only the stock lane
+    # touches this table; suites run serially.) Real (is_test=FALSE) rows are never touched.
+    with _db() as c, c.cursor() as cur:
+        cur.execute("DELETE FROM stock_count_events WHERE is_test=TRUE")
     iid = ss.upsert_item("ZZTEST_cnt_" + uuid.uuid4().hex[:8], unit="kg", min_qty=5)
     yield iid
     with _db() as c, c.cursor() as cur:
@@ -54,6 +59,10 @@ def test_last_count_and_days_since(item_id):
 
 
 def test_is_test_isolation_and_never_counted(item_id):
+    # the is_test scope starts empty (fixture cleaned it) -> the never-counted case
+    assert stockdb.last_count_date(is_test=True) is None
+    assert stockdb.days_since_last_count(date(2026, 6, 19), is_test=True) is None
     stockdb.record_count_event(item_id, 5, date(2026, 6, 17), is_test=True)
-    assert stockdb.last_count_date(is_test=False) is None            # real side untouched
-    assert stockdb.days_since_last_count(date(2026, 6, 19), is_test=False) is None
+    # item/date-scoped isolation (robust on shared staging): the test count is not on the real side
+    assert item_id not in stockdb.counts_on(date(2026, 6, 17), is_test=False)
+    assert stockdb.counts_on(date(2026, 6, 17), is_test=True)[item_id] == 5.0
