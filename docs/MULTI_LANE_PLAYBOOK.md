@@ -185,4 +185,9 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
   on merged `main` proves the whole.
 - **Out-of-repo writes are silent.** A scratch file in the system Temp dir (or any path outside the
   worktree) isn't lane-relevant — the guard only reasons about repo files. (Early versions warned on
-  these as "unowned"; fixed to resolve the path and skip anything outside the repo root.)
+  these as "unowned"; fixed to resolve the path and skip anything outside the repo root.) The monitor
+  also filters out-of-repo events as a second line of defense (in case a lane runs an old guard).
+- **Don't test the guard's `main()` against the live event sink.** `main()` *logs* every crossing to
+  the shared file the monitor watches — testing it pollutes the alert channel (it once DM'd test
+  inputs to the owner as if a lane had done them). Test the **pure `_decide()`** instead; only
+  `main()` does I/O.
