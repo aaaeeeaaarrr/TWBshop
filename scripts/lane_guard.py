@@ -140,7 +140,21 @@ def main(raw):
     if data.get("tool_name") not in EDIT_TOOLS:
         return 0  # only file-edit tools are lane-scoped; reads are never touched
     ti = data.get("tool_input") or {}
-    path = _norm(ti.get("file_path") or ti.get("notebook_path") or "")
+    raw_path = ti.get("file_path") or ti.get("notebook_path") or ""
+    if not raw_path:
+        return 0
+
+    # Resolve to a repo-relative path. A write OUTSIDE the repo worktree (a scratch file in the system
+    # Temp dir, a log somewhere, etc.) is NOT lane-relevant -> silent: it can't affect any lane.
+    root = _repo_root()
+    abspath = os.path.abspath(raw_path if os.path.isabs(raw_path) else os.path.join(root, raw_path))
+    try:
+        rel = os.path.relpath(abspath, root)
+    except ValueError:
+        return 0  # different drive -> outside the repo
+    if rel.startswith(".."):
+        return 0  # outside the repo -> not lane-relevant
+    path = _norm(rel)
     if not path:
         return 0
 

@@ -183,3 +183,6 @@ cross-lane edits) · `/audit` (the integrator sweep). Run it on the hub; server-
 - **"Behind main" is normal churn**, not an alert — show it on the board, never DM it.
 - **A lane passing ≠ the system is correct.** Only the integrator's cross-lane sweep + the full suite
   on merged `main` proves the whole.
+- **Out-of-repo writes are silent.** A scratch file in the system Temp dir (or any path outside the
+  worktree) isn't lane-relevant — the guard only reasons about repo files. (Early versions warned on
+  these as "unowned"; fixed to resolve the path and skip anything outside the repo root.)
