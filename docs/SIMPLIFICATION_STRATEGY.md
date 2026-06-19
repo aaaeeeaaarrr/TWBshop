@@ -106,21 +106,68 @@ directive + the design we agreed (this is what "perfect" actually is — and its
   re-creates distrust. It also can't safely AUTO-PICK which of two copies is true → could delete a TRUE thing.
   This is why the semantic half is human-adjudicated and we DON'T fake it.
 
-**Built so far:** the structural file/`::symbol` staleness guard (`tests/test_doc_refs.py`, proven to bite).
+**Built (session 47):** the structural file/`::symbol` staleness guard (`tests/test_doc_refs.py`, proven to bite).
 
-**▶ THE PROMISING PATH to ~100% (the thing to explore next):** *make the high-value facts STRUCTURAL and
-GENERATED from ONE source* — the same trick that makes `MAP_INDEX.md` impossible to be wrong (it's generated,
-not hand-kept, so it can't drift). Put the facts that actually bite into a single machine-readable source, e.g.
-`facts.json`: subsystem **statuses** (LIVE/BUILT/SHELVED), key **dates** (attendance go-live 2026-06-16),
-**group/chat IDs**, **owner IDs**. Then either (a) a test asserts no doc contradicts it, or — BETTER — (b) the
-doc status lines are GENERATED from it (can't drift by construction). **Generation beats assertion.** This drives
-the points/attendance-status class of conflict to **0 by construction**. The residual un-mechanizable prose is
-then small and low-stakes — that's the realistic "100% on what actually matters."
+### ▶ BUILT (session 48, 2026-06-20) — the truth registry + lineage. The discussion above is now CODE.
+Three artifacts (entry in `MAP.md` → "Truth registry"):
+- **`facts.json`** — THE one home. Each fact: `value · source(config|code|runtime|human) · locator · asserted_on
+  · status · [mentions] · [freshness/check]`. Seeded with the facts that actually bit us: attendance status +
+  go-live date + live-flag, owner id, expense/report/stock group ids.
+- **`scripts/facts.py`** — the library. `reconcile()` (read-only checker), `explain()` (value+provenance+lineage),
+  `set_fact()`/`append_lineage()` (the only writers; append-only history).
+- **`facts_lineage.jsonl`** — append-only, PAST-tense "how we got to each truth"; merge-safe (lines don't collide).
+- **Guard:** `tests/test_facts_reconcile.py` (9 tests, proven to bite on planted value-drift / doc-drift / bad-pointer).
 
-**Honest ceiling:** pure-meaning claims not reducible to a value can't be machine-judged → stay human-adjudicated
-(rare). "No human EVER" isn't literally reachable for meaning — but "no human for any fact we put in `facts.json`"
-IS. That's the line to settle together.
+**▶ DESIGN REVERSAL (owner, session 48) — ASSERT, not GENERATE.** The line above ("Generation beats assertion")
+is **superseded.** Under "zero new mistakes vs. now", generation is *more* dangerous: it can silently overwrite a
+true hand-edit and launder a wrong value into EVERY doc, looking consistent. **A read-only assert can only FLAG a
+divergence, never cause one** → it cannot make us less accurate in any situation. So: **assert** for anything a
+human might also author; **generate** only the 100%-derived, no-human-meaning artifacts (like `MAP_INDEX.md`).
+Tradeoff named: docs don't auto-fix — the checker DEMANDS the fix, a human applies it. That's the price of
+zero-overwrite-risk, and it's the right price.
 
-**RESUME HERE (owner, other PC):** decide — (1) build the `facts.json` generated-single-source? (2) which facts
-go in first (statuses · go-live date · group/owner IDs)? (3) generate-vs-assert? Plus the other open thread: the
-deeper design-doc SEMANTIC sweep (human-adjudicated, I bring cited conflicts).
+**The four source types (how each is kept accurate):** `config`/`code` = AST-read the real literal, value-assert
+(infallible, no import → no `secrets.py` coupling) · `runtime` = NOT value-asserted; freshness-flag + point to the
+live `check` (a volatile fact's accurate home is the command to check it, never a cached number) · `human` =
+cross-doc `mentions` agreement only (a status has no machine source; we never auto-judge meaning).
+
+**The structural trigger (not felt-uncertainty):** lineage is surfaced on a *detected contradiction* (the CLI
+auto-prints `explain()` for a disputed fact), or when restating a seeded fact — NOT when one happens to feel
+unsure (confident hallucinations don't feel unsure). That's what stops re-hallucinating a value we already superseded.
+
+**Leftover holes (honest — what this still can't do):** (1) traversal isn't *enforced* — maps make the right path
+cheapest but nothing locks out a random grep; (2) **chat is unchecked** — only WRITTEN claims hit the guard, a
+spoken aside about an unseeded fact still slips; (3) **wrong-at-birth** — reconcile proves agreement, not truth (a
+fact seeded from a bad read is authoritatively wrong until a real re-read); (4) **unseeded facts** are as exposed as
+before — plus the meta-risk of *believing* truth is "handled" when only the seeded slice is. Net: this catches dead
+*values* (new class) on top of the old guard's dead *references*, with every op a read-only infallible compare.
+
+**Honest ceiling:** pure-meaning prose ("why X", "what a feature is FOR") can't be value-typed → stays human-owned,
+one home, pointer-referenced. "No human for any fact in `facts.json`" is achieved; "no human for meaning" is not (rare).
+
+**▶ ENFORCEMENT BUILT (session 48 cont) — moving links from "disciplinary" to "mechanical".** The holes are
+all forms of *the structure only works if consulted*; the fix is to make landings safe + written claims checked,
+not to police the path. Two zero-token, zero-new-risk builds:
+- **`.githooks/pre-push` reconcile** — runs the read-only checker on EVERY push (incl. docs-only); surfaces a
+  doc/config↔`facts.json` contradiction loudly with its lineage, **exits 0** (honours the hook's never-block rule
+  + cross-machine reality; one-line `exit 1` makes it a hard gate). Free + automatic — no reliance on memory.
+- **`scripts/whatis.py <topic>`** — ONE call returns registry fact (value+provenance+lineage) + MAP area + INDEX
+  hits, so consulting is cheaper than recall. Proven: `whatis points` surfaces the very "two points systems"
+  gotcha that caused the original slip. Costs tokens only when invoked (pull-don't-recall), zero standing tax.
+
+**▶ THE 4 LEFTOVER HOLES + how each is bounded (honest — none fully closes):**
+1. *Traversal not enforced* → can't hook reasoning; bounded by **coverage** (a random landing on a seeded fact is
+   reconciled ground) + the **output gate** (what I write is checked regardless of path). Residual: spoken word.
+2. *Chat unchecked* → only WRITTEN claims hit the guard. Fix = **pull-don't-recall** (`whatis`/`explain`, then cite)
+   so chat inherits registry accuracy. Residual: a memory-recited aside about an unseeded fact.
+3. *Wrong-at-birth (agreement ≠ truth)* → **mostly closed for config/code** (source = running code, re-derived every
+   run; a bad seed can't even go green). **runtime** = time-bounded by the freshness window; **human** = owner-/two-
+   source birth + lineage makes the basis inspectable in seconds. Residual: a human fact confirmed wrong (traceable).
+4. *Unseeded facts (+ false-safety meta-risk)* → **coverage by accretion** (every bite/correction → a new fact or
+   test); never overclaim (reconcile says "NOT a claim they are true"). Optional later: a heuristic candidate
+   surfacer (advisory-only, human picks — noise can't corrupt data).
+
+**▶ STILL OPEN:** (1) grow the seed as facts bite/are corrected (don't pre-load — earn it); (2) the deeper
+design-doc SEMANTIC sweep (human-adjudicated, I bring cited conflicts); (3) OPTIONAL candidate surfacer (defer
+until the unseeded set bites). **Honest ceiling unchanged:** a confident verbal aside about a never-seeded fact
+can be shrunk to near-nothing but not to literal zero without weighing every word.

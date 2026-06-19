@@ -32,4 +32,19 @@ if [ "$code_changed" = "1" ]; then
   printf '  |  - walk-ready (if owner will test): built.pushed.deployed.KH.audit\n' >&2
   printf '  +-------------------------------------------------------------------\n\n' >&2
 fi
+
+# --- Truth-registry reconcile (2026-06-20) --------------------------------------------
+# Deterministic check: a doc/config value that CONTRADICTS facts.json (the one home). Runs on
+# EVERY push (incl. docs-only — doc drift is the likeliest case). Surfaces loudly but exits 0
+# (never blocks — honours this hook's rule + the cross-machine reality). Needs no secrets.py
+# (the checker AST-reads, never imports). To make it a HARD gate, add `exit 1` where marked.
+if command -v python >/dev/null 2>&1 && [ -f scripts/reconcile_facts.py ]; then
+  reconcile_out=$(python scripts/reconcile_facts.py 2>&1)
+  if [ $? -ne 0 ]; then
+    printf '\n  +- TRUTH REGISTRY: a value contradicts facts.json -----------------\n' >&2
+    printf '%s\n' "$reconcile_out" | sed 's/^/  | /' >&2
+    printf '  +- fix the doc or the registry. push NOT blocked (add `exit 1` here to gate) --\n\n' >&2
+  fi
+fi
+
 exit 0

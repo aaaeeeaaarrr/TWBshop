@@ -84,3 +84,8 @@
 ## Governance / standards / what-was-decided
 - **Entry:** `CLAUDE.md` (Standard + Arch Rules + Current Status) · `docs/BEDROCK.md` · `docs/STATE_INTEGRITY_LAWS.md` · `docs/STATEFUL_MENU_PATTERNS.md` · `docs/SIMPLIFICATION_STRATEGY.md` · `docs/ACTIONS_LEDGER.md` · `docs/HISTORY.md` (the full archive — grep it)
 - **⚠ Gotcha:** before claiming anything is missing/broken/a-gap, grep `docs/HISTORY.md` + the area's doc and cite it, or say "let me check" and check. An unverified gap-claim is a violation, same as a false "done."
+
+## Truth registry — one fact, one home (statuses · dates · group/owner IDs)
+- **Entry:** `facts.json` (THE one home) · `scripts/whatis.py` (ONE-CALL lookup: registry + map + index for a topic — use this instead of recalling) · `scripts/facts.py::reconcile` (read-only checker) · `scripts/facts.py::explain` (value + provenance + lineage — read this on a contradiction, don't guess) · `facts_lineage.jsonl` (append-only "how we got here") · `scripts/reconcile_facts.py` (CLI)
+- **Read-first:** `docs/SIMPLIFICATION_STRATEGY.md` → "TRUTH-CONSOLIDATION"
+- **⚠ Gotchas:** the checker only ASSERTS (reads a real source, compares) — never generates/overwrites a doc · a runtime fact (`attendance_live_flag`) is freshness-flagged, never value-asserted (no prod hit) · a status is human-adjudicated (cross-doc agreement only) · `.githooks/pre-push` surfaces a contradiction on every push (loud, non-blocking) · guard `tests/test_facts_reconcile.py`. Change a fact in `facts.json`, never in a copy.

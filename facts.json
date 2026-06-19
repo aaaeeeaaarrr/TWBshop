@@ -1,0 +1,77 @@
+{
+  "_doc": "THE ONE HOME for machine-knowable facts (truth-consolidation, session 48, 2026-06-20). Edit a fact HERE; every other mention is a pointer checked against this by tests/test_facts_reconcile.py. A human adjudicates MEANING; machines only compare values. Library + design: scripts/facts.py. Lineage (how each got true): facts_lineage.jsonl.",
+  "_schema": "value · source(config|code|runtime|human) · locator(path::NAME) · asserted_on(YYYY-MM-DD) · status(live|superseded|disputed) · [mentions:[{file,template}]] · [freshness_days] · [check] · [note]",
+  "facts": {
+    "attendance_go_live_date": {
+      "value": "2026-06-16",
+      "source": "human",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "frozen": true,
+      "mentions": [
+        {"file": "CLAUDE.md", "template": "LIVE since {value}"},
+        {"file": "MAP.md", "template": "LIVE since {value}"},
+        {"file": "docs/SUBSYSTEMS.md", "template": "since {value}"}
+      ],
+      "note": "Historical/frozen — the day the attendance live path was switched on. An event, not a 'now' claim; can't drift. Lineage anchor."
+    },
+    "attendance_live_flag": {
+      "value": "true",
+      "source": "runtime",
+      "locator": "gm_bot/bot.py::_attendance_live",
+      "check": "gm_get_state('attendance_live') == 'true' on prod",
+      "freshness_days": 60,
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "VOLATILE runtime flag (DB-backed master switch). Value NOT asserted by any checker — no prod connection from a doc-check. Freshness-flagged only; the accurate source is the live check above."
+    },
+    "attendance_status": {
+      "value": "LIVE",
+      "source": "human",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "mentions": [
+        {"file": "CLAUDE.md", "template": "Attendance {value}"},
+        {"file": "docs/SUBSYSTEMS.md", "template": "Attendance Overhaul — {value}"}
+      ],
+      "note": "The exact contradiction that bit us (SUBSYSTEMS said 'IN BUILD' while CLAUDE said LIVE). No machine source for a subsystem status → protected ONLY by cross-doc agreement (assert, not generate). Honest limit: a coincidental 'LIVE' elsewhere isn't caught; the phrase anchor narrows that."
+    },
+    "daily_report_chat_id": {
+      "value": -5136886404,
+      "source": "config",
+      "locator": "config.py::DAILY_REPORT_CHAT_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "mentions": [{"file": "CLAUDE.md", "template": "{value}"}],
+      "note": "TWB REPORT group. Derived (AST read of config.py) AND checked in the doc — protected both ways."
+    },
+    "expense_group_id": {
+      "value": -5417163768,
+      "source": "code",
+      "locator": "accountant/bot.py::EXPENSE_GROUP_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "mentions": [
+        {"file": "MAP.md", "template": "{value}"},
+        {"file": "CLAUDE.md", "template": "{value}"}
+      ],
+      "note": "Accountant 'Expenses TWB' group, hardcoded in accountant/bot.py. Derived AND doc-checked."
+    },
+    "owner_telegram_id": {
+      "value": 1313155971,
+      "source": "config",
+      "locator": "config.py::OWNER_TELEGRAM_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "Owner's Telegram user id (approval routing). Derived from config.py by AST read."
+    },
+    "stock_checks_chat_id": {
+      "value": -1003952029131,
+      "source": "config",
+      "locator": "config.py::STOCK_CHECKS_CHAT_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "'Stock Checks +Cleans +Mistakes' group the GM bot monitors. Derived from config.py by AST read."
+    }
+  }
+}

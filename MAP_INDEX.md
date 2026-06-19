@@ -178,6 +178,8 @@
     · compare, summary, cheapest, report
 
 ## scripts/
+- `scripts/facts.py` — facts.py — the truth registry: one home per machine-knowable fact, + its lineage.
+    · load, _save, _read_literal, derive, _render, reconcile, _bad_pointers, append_lineage, lineage_for, set_fact, explain
 - `scripts/fetch_report_receipts.py` — Download photo media from a chat using the read-only ops_listener session.
     · run
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
@@ -194,12 +196,16 @@
     · _owner, _fmt_lanes, _fmt_services, cmd_start, cmd_board, cmd_health, cmd_issues, _is_repo_event, _read_events, _ev_line, cmd_crossings, cmd_audit, _events_tick, _watch_tick, _on_start  …(+1, grep)
 - `scripts/ocr_catalogue.py` — Batch-classify every archived report photo with the PRODUCTION OCR function
     · classify, run
+- `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.
+    · main
 - `scripts/run_accountant_local.py` — LOCAL TEST launcher for the accountant bot — staging DB + dev poller + the Python-3.14
 - `scripts/seed_vendors.py` — Seed acc_vendors from scripts/vendor_seed.py.
     · main
 - `scripts/vendor_seed.py` — Curated supplier-vendor -> Telegram-group seed for acc_vendors (P0 populate).
 - `scripts/verify_live.py` — Deploy/live verification (Hook 2) — TWBshop.
     · run, main, _q
+- `scripts/whatis.py` — whatis.py — one call, all map layers: "what's true + where to look" for a topic.
+    · _matching_facts, _map_blocks, _index_lines, main
 
 ## (root entry points)
 - `run_accountant.py` — Entry point for the accountant bot. systemd: twbshop-accountant

@@ -1516,15 +1516,17 @@ def test_parse_testclock():
 
 def test_now_pp_only_overrides_in_test_mode(monkeypatch):
     from gm_bot import bot
-    frozen = "2026-06-20T06:00:00+07:00"
+    # Fixed HISTORICAL sentinel so the wall clock can never coincidentally equal it (the old
+    # "2026-06-20" sentinel broke on that real date — a calendar-coupled false failure).
+    frozen = "2017-01-02T06:00:00+07:00"
     monkeypatch.setattr(bot, "gm_get_state", lambda k: frozen if k == "att_test_now" else None)
     # test mode ON → frozen pretend-now is used
     monkeypatch.setattr(bot, "_att_test_mode", lambda: True)
-    assert bot._now_pp().date().isoformat() == "2026-06-20"
-    assert bot._today_pp().isoformat() == "2026-06-20"
+    assert bot._now_pp().date().isoformat() == "2017-01-02"
+    assert bot._today_pp().isoformat() == "2017-01-02"
     # test mode OFF → the wall clock, never the override (live staff are never time-warped)
     monkeypatch.setattr(bot, "_att_test_mode", lambda: False)
-    assert bot._now_pp().date().isoformat() != "2026-06-20"
+    assert bot._now_pp().date().isoformat() != "2017-01-02"
 
 
 def test_job_gate_force_run(monkeypatch):
