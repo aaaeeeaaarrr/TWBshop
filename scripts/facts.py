@@ -28,6 +28,11 @@ source types:
             command to check it, not a cached number.
   human   — a decision/status with no machine source; protected ONLY by cross-doc `mentions` agreement.
 
+MONEY RULE (HIGH-RISK — keeps wrong-at-birth harmless): a live balance / payroll / price VALUE NEVER enters as a
+cached `human` fact (no source to self-verify → it could be authoritatively wrong on money). Money is `runtime`
+(point to the live DB read, freshness-flagged) or it stays OUT. Derived `config`/`code` money constants are fine
+(they self-verify against the source every run). See docs/SIMPLIFICATION_STRATEGY.md → "PIN — money never cached".
+
 Layered with the maps: MAP.md (where) · MAP_INDEX.md (what exists) · facts.json head (what's true NOW)
 · facts_lineage.jsonl (how it got true). The lineage is consulted on a CONTRADICTION (a structural
 trigger), not on felt uncertainty — confident hallucinations don't feel uncertain. See explain().

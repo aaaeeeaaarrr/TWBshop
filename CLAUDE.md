@@ -232,7 +232,7 @@ honesty · reset on entry · always a backstop, never a silent nothing) and the 
 ---
 
 ## Repo Structure
-*Need the file layout? → `docs/REPO_STRUCTURE.md` (or just read the filesystem).*
+*Need the file layout / "where's function X"? → `MAP_INDEX.md` (auto-generated, never stale) + `MAP.md` (the curated router). Or just read the filesystem.*
 
 ---
 
@@ -289,6 +289,7 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 - **Key decisions:** **ASSERT > GENERATE** (a read-only checker can FLAG a wrong value but never WRITE one — reverses the earlier "generate beats assert"; generate only 100%-derived no-meaning artifacts like `MAP_INDEX.md`) · config/code facts AST-self-verify (no `secrets.py` coupling) · runtime (`attendance_live_flag`) freshness-flagged not value-asserted (no prod hit) · human statuses = cross-doc agreement only.
 - **Proof:** suite **789 passed/2 skip/0 fail** (9 facts + 4 whatis tests, proven to bite on planted value/doc/pointer drift) · integration audit CLEAN (also mapped the prev-unowned `MAP.md`/`MAP_INDEX.md`) · pre-push hook real-path tested (clean→silent · contradiction→surfaces+exit0 · restored). Fixed a pre-existing calendar-coupled test (`test_now_pp_only_overrides_in_test_mode` false-failed on the real date 2026-06-20).
 - **4 LEFTOVER HOLES (bounded, not closed):** traversal-not-enforced · chat-unchecked · wrong-at-birth (mostly closed for config/code) · unseeded-facts. Ceiling: a confident verbal aside about a never-seeded fact (shrinkable, not zero). **▶ NEXT:** grow the seed as facts bite/are corrected (don't pre-load) · deeper design-doc SEMANTIC sweep (human-adjudicated) · OPTIONAL candidate surfacer (defer until it bites).
+- **PINS + CLEANUP (session 48 cont):** the holes were stress-tested → verdict **they're load-bearing (features of our own lean/earn-it/honest philosophy), do NOT "fix" them** — pinned in `docs/SIMPLIFICATION_STRATEGY.md` so a future session can't over-fix; candidate surfacer **permanently deferred**. **Money rule pinned** (HIGH-RISK): a live balance/payroll/price never enters as a cached `human` fact — money is `runtime` (point to live read) or omitted (keeps wrong-at-birth harmless). **MAP.md clarified** (post second-opinion pass): "the map points to truth, it is NOT the truth — verify VALUES against the code/`facts.json`; ground-truth-first" (additive, backstop intact). **Retired the old hand-kept repo tree REPO_STRUCTURE.md** — already stale (missing gm_bot/accountant/stock/hire_bot/ops_intelligence), now fully subsumed by the generated `MAP_INDEX.md`; its one good sentence ("one repo, one business…") lifted into `MAP.md`.
 **(prev, session 47)**
 **▶ SIMPLIFICATION PASS (session 47, INERT — `shared/database.py` + MAP only; nothing live changed, no deploy).**
 **HONEST FINDING (validates "map, don't remodel"):** no big *safe* win exists — the only overloaded files are

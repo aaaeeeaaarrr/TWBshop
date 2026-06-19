@@ -168,6 +168,40 @@ not to police the path. Two zero-token, zero-new-risk builds:
    surfacer (advisory-only, human picks — noise can't corrupt data).
 
 **▶ STILL OPEN:** (1) grow the seed as facts bite/are corrected (don't pre-load — earn it); (2) the deeper
-design-doc SEMANTIC sweep (human-adjudicated, I bring cited conflicts); (3) OPTIONAL candidate surfacer (defer
-until the unseeded set bites). **Honest ceiling unchanged:** a confident verbal aside about a never-seeded fact
-can be shrunk to near-nothing but not to literal zero without weighing every word.
+design-doc SEMANTIC sweep (human-adjudicated, I bring cited conflicts); (3) candidate surfacer **— now PERMANENTLY
+DEFERRED** (the why-analysis below shows eager surfacing is the remodel-urge; revisit only if the unseeded set
+actually bites). **Honest ceiling unchanged:** a confident verbal aside about a never-seeded fact can be shrunk to
+near-nothing but not to literal zero without weighing every word.
+
+### ▶ WHY THE 4 HOLES ARE LOAD-BEARING — do NOT "fix" them (owner + Claude, session 48, evidence-checked)
+The holes were stress-tested by asking *why* each exists and *whether it serves us*. Verdict: **most are the system
+correctly expressing this project's own philosophy; plugging them re-imports the exact ceremony / remodel-noise /
+false-confidence we've fought.** A future session must NOT "helpfully" close them. Evidence per hole:
+- **H1 traversal-not-enforced = a FEATURE for values/structure.** The map is a *derived copy*; the code is the
+  *territory* — and a copy can go stale against its source. Going straight to ground truth is more accurate (Rule 2:
+  an independent read of the code *is* the proof) and faster. *Evidence:* the registry is trustworthy because each
+  fact was seeded from a direct AST read of the code, NOT copied from the map's gotcha line. **Load-bearing caveat:**
+  the map's **gotcha/scar layer** ("two points systems", "overnight binds to shift-start", "small Over is BY DESIGN")
+  is NOT in any single file and remains irreplaceable — grab it cheaply via `whatis <topic>` in scarred areas.
+- **H2 chat-unchecked = the LEAN LANE.** Gating every utterance kills what chat is *for* (fast, low-ceremony thinking).
+  *Evidence:* the standing rules "FILES ARE TRUTH, CHAT IS DISPOSABLE" + "lean by default, rigor on demand." The fix
+  is never "check chat" — it's "let consequence graduate to a file." The hole *is* the leanness.
+- **H3 wrong-at-birth = the HONEST BOUNDARY** between mechanizable-consistency (cheap, everywhere) and external-truth
+  (needs a human/observation). *Evidence:* config/code facts already self-verify (source = running code); the design
+  deliberately keeps the dangerous value OUT of the cache (`attendance_live_flag` is `runtime`/pointed, never a cached
+  number); and the system stays honest ("NOT a claim they are true"), which preserves trust.
+- **H4 unseeded-facts = "EARN IT, don't pre-build."** A 7-fact high-bite registry is trustworthy + cheap; 700
+  speculative facts would be a *new* liability (mostly wrong-at-birth, costly to keep). *Evidence:* "do less, understand
+  more" · "the urge to remodel for cleanliness is itself the noise" · "delete only provably-dead code." Pre-loading IS
+  that urge. Coverage-by-accretion is correct.
+**The real enemy is NOT any hole — it's `assert-before-check` / `check-too-narrowly`** (the points slip's own root
+cause: "grepped one table instead of drilling the map"). That is independent of the holes and already guarded by
+`whatis` + the output gate + pull-don't-recall + the breadth/full-scans habit. **Confirmation of restraint:** the
+things we *didn't* build — traversal enforcement, eager surfacer, a chat gate — are exactly what this analysis says we
+*shouldn't* build.
+
+### ▶ PIN — money never enters as a cached value (keeps H3 permanently harmless) — HIGH-RISK rule
+A live **balance / payroll / price** VALUE must NEVER be seeded as a cached `human` fact (no source to self-verify →
+wrong-at-birth could be *authoritatively wrong on money*). Money is `runtime` (point to the live DB read, freshness-
+flagged) or it stays OUT of the registry entirely. Derived `config`/`code` money constants are acceptable (they
+self-verify against the source every run). This is the one line that makes H3's honest-limit unable to harm.

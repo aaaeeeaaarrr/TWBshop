@@ -1,5 +1,5 @@
 {
-  "_doc": "THE ONE HOME for machine-knowable facts (truth-consolidation, session 48, 2026-06-20). Edit a fact HERE; every other mention is a pointer checked against this by tests/test_facts_reconcile.py. A human adjudicates MEANING; machines only compare values. Library + design: scripts/facts.py. Lineage (how each got true): facts_lineage.jsonl.",
+  "_doc": "THE ONE HOME for machine-knowable facts (truth-consolidation, session 48, 2026-06-20). Edit a fact HERE; every other mention is a pointer checked against this by tests/test_facts_reconcile.py. A human adjudicates MEANING; machines only compare values. MONEY RULE (HIGH-RISK): never seed a live balance/payroll/price as a cached 'human' value — money is 'runtime' (point to the live read) or omitted; derived config/code constants self-verify and are fine. Library + design: scripts/facts.py. Lineage (how each got true): facts_lineage.jsonl.",
   "_schema": "value · source(config|code|runtime|human) · locator(path::NAME) · asserted_on(YYYY-MM-DD) · status(live|superseded|disputed) · [mentions:[{file,template}]] · [freshness_days] · [check] · [note]",
   "facts": {
     "attendance_go_live_date": {

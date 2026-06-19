@@ -2,10 +2,14 @@
 
 > **Open this FIRST for any task.** Find your area → the *entry* files + the *Read-first* law/doc →
 > `grep docs/HISTORY.md` for the area → heed the ⚠ gotcha. This is curated WISDOM, kept slim.
+> **The map points to truth — it is NOT the truth:** use it for WHERE + the ⚠ gotcha (hard-won, in no single
+> file); verify VALUES against the code / `facts.json` (ground truth — an independent read IS the proof, Rule 2).
+> Never assert a cross-cutting fact from memory — check ground truth or the gotcha (`whatis <topic>`) first.
 >
 > **Need a file that isn't here, or "where's function X"? → `MAP_INDEX.md` (Layer 2).** That's the
 > AUTO-generated complete inventory (every file → docstring + symbols); it can't omit a new file.
 > So Layer 1 only lists *entry points* — completeness lives in Layer 2, by construction.
+> **Repo shape:** one repo, one business; each system gets its own folder; shared infra lives in `shared/`.
 >
 > **RULES (mechanical):** any file move/rename/new file → run `python scripts/gen_map_index.py` and
 > commit `MAP_INDEX.md` (the build fails if it's stale — `tests/test_map_index_fresh.py`). Any Layer-1
