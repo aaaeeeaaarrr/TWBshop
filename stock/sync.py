@@ -68,10 +68,31 @@ def apply_count(item_id: int, counted_qty, *, count_date=None, is_test: bool = F
             source=source, ref_id=ref_id, note=note, is_test=is_test)
     event_id = stockdb.record_count_event(
         item_id, counted_qty, count_date, unit=unit, source=source,
-        ref_id=ref_id, movement_id=movement_id, note=note, is_test=is_test)
+        ref_id=ref_id, movement_id=movement_id, note=note, reconciled=True, is_test=is_test)
     return {"item_id": item_id, "before": before, "counted": float(counted_qty),
             "delta": delta, "movement_id": movement_id, "event_id": event_id,
             "count_date": count_date}
+
+
+def reconcile_counts(is_test: bool = False) -> dict:
+    """Turn count events written directly into Postgres (the AppSheet direct-bind path) into ledger
+    movements. `apply_count` reconciles inline, so this only processes the rows it didn't (reconciled
+    = FALSE). For each, append the delta (counted - current on-hand) and mark it reconciled.
+    Idempotent: a second pass finds nothing pending. Returns {pending, changed}."""
+    pending = stockdb.pending_counts(is_test=is_test)
+    changed = 0
+    for ev in pending:
+        before = ss.on_hand(ev["item_id"], is_test=is_test)
+        delta = float(ev["counted_qty"]) - before
+        movement_id = None
+        if delta != 0:
+            movement_id = ss.add_movement(
+                ev["item_id"], delta, reason="counted", unit=ev.get("unit"),
+                source=ev.get("source") or "appsheet", ref_id=ev.get("ref_id"),
+                note=ev.get("note"), is_test=is_test)
+            changed += 1
+        stockdb.mark_reconciled(ev["id"], movement_id)
+    return {"pending": len(pending), "changed": changed}
 
 
 def apply_counts(rows: list[dict], *, is_test: bool = False, source: str = "count") -> list[dict]:

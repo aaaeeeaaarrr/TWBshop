@@ -34,25 +34,34 @@ def init_stock_db() -> None:
                     ref_id      INTEGER,               -- soft ref (AppSheet row / sheet msg id)
                     movement_id INTEGER,               -- the reconciling stock_movements row (NULL if no change)
                     note        TEXT,
+                    reconciled  BOOLEAN DEFAULT FALSE,  -- is its effect in the stock_movements ledger yet?
                     at          TIMESTAMPTZ DEFAULT NOW(),
                     is_test     BOOLEAN DEFAULT FALSE,
                     UNIQUE (item_id, count_date, is_test)
                 )
             """)
+            cur.execute("ALTER TABLE stock_count_events ADD COLUMN IF NOT EXISTS reconciled BOOLEAN DEFAULT FALSE")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_count_date "
                         "ON stock_count_events (count_date, is_test)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_count_pending "
+                        "ON stock_count_events (is_test) WHERE NOT reconciled")
 
 
 def record_count_event(item_id, counted_qty, count_date, *, unit=None, source=None,
-                       ref_id=None, movement_id=None, note=None, is_test=False) -> int:
+                       ref_id=None, movement_id=None, note=None, reconciled=False,
+                       is_test=False) -> int:
     """Upsert the day's count for an item (the latest figure of the day wins). COALESCE keeps an
-    existing field when the new value is None (a partial re-count never blanks data). Returns the id."""
+    existing field when the new value is None (a partial re-count never blanks data). `reconciled`
+    is set by the writer: apply_count reconciles inline (True); a direct AppSheet write leaves it
+    False so the worker's reconcile pass picks it up. A re-count carries the writer's reconciled
+    state, so a fresh AppSheet figure (False) re-arms reconciliation. Returns the id."""
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO stock_count_events
-                    (item_id, counted_qty, unit, count_date, source, ref_id, movement_id, note, is_test)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    (item_id, counted_qty, unit, count_date, source, ref_id, movement_id, note,
+                     reconciled, is_test)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (item_id, count_date, is_test) DO UPDATE SET
                     counted_qty = EXCLUDED.counted_qty,
                     unit        = COALESCE(EXCLUDED.unit, stock_count_events.unit),
@@ -60,9 +69,11 @@ def record_count_event(item_id, counted_qty, count_date, *, unit=None, source=No
                     ref_id      = COALESCE(EXCLUDED.ref_id, stock_count_events.ref_id),
                     movement_id = COALESCE(EXCLUDED.movement_id, stock_count_events.movement_id),
                     note        = COALESCE(EXCLUDED.note, stock_count_events.note),
+                    reconciled  = EXCLUDED.reconciled,
                     at          = NOW()
                 RETURNING id
-            """, (item_id, counted_qty, unit, count_date, source, ref_id, movement_id, note, is_test))
+            """, (item_id, counted_qty, unit, count_date, source, ref_id, movement_id, note,
+                  reconciled, is_test))
             return cur.fetchone()["id"]
 
 
@@ -93,3 +104,22 @@ def counts_on(count_date, is_test: bool = False) -> dict:
             cur.execute("SELECT item_id, counted_qty FROM stock_count_events "
                         "WHERE count_date=%s AND is_test=%s", (count_date, is_test))
             return {r["item_id"]: float(r["counted_qty"]) for r in cur.fetchall()}
+
+
+def pending_counts(is_test: bool = False) -> list[dict]:
+    """Count events whose effect isn't in the ledger yet (reconciled=FALSE), oldest first — what the
+    worker's reconcile pass consumes (counts written directly by AppSheet under the direct-bind path)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, item_id, counted_qty, count_date, unit, source, ref_id, note "
+                        "FROM stock_count_events WHERE NOT reconciled AND is_test=%s "
+                        "ORDER BY count_date, id", (is_test,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def mark_reconciled(event_id, movement_id=None) -> None:
+    """Mark a count event reflected in the ledger, linking the reconciling movement (if any)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE stock_count_events SET reconciled=TRUE, "
+                        "movement_id=COALESCE(%s, movement_id) WHERE id=%s", (movement_id, event_id))
