@@ -9,6 +9,26 @@
 
 ## Done (with proof)
 
+- **2026-06-19 — LIVE audit-watchdog built + deployed to gm (go-live hardening; READ-ONLY, no balance path
+  touched) + 3 stale sessions investigated read-only.** Owner chose Option 1 ("phased both"). `_live_watchdog_job`
+  (`gm_bot/bot.py`) runs `run_audit` over the REAL ledger every 3 min while live, DMs the owner the instant a NEW
+  inconsistency appears (✅ when cleared), de-duped via the pure `_watchdog_delta` (8 unit tests). PROOF: suite
+  **760 passed/2 skip**; deployed by tag `live-watchdog-20260619` (`cfa8ca3`) — server HEAD==tag, gm active,
+  NRestarts=0, `gm_live_watchdog` registered in the running process's startup log, no Traceback/REFUSING/409;
+  `live_watchdog_last` pre-seeded with the 3 current stale rows so the first cycle fired SILENT (independent
+  re-read). Batched main delta to gm (inert C3 stock button + additive ai_client/stock_shared gm never calls);
+  other 4 services untouched. **Read-only investigation of the 3 flagged stale sessions** (Tra/Anan Jun16, Davy
+  Jun17): all PRESENT (Davy 49 in-zone pings then stopped sharing 15 min in), pay-safe (late=0, nothing to
+  settle); cause = auto-checkout needs a live in-zone share at shift end which they'd turned off → session never
+  closes. Benign + recurring → the fallback-closer is logged Open above. The 3 were NOT closed (owner chose
+  investigate-first; closing is a separate real-data op).
+
+- **2026-06-19 — retired the resolved 2026-06-08 dated checkpoint (dev-DB isolation).** Verified LIVE that dev
+  can no longer silently hit prod — superseded by the Phase-0 fail-closed switch (`active_database_url()` raises
+  on unset `TWBSHOP_ENV`), all 5 server units pinned `TWBSHOP_ENV=prod` (confirmed via the running gm process
+  environ), `conftest.py` forces staging, distinct `STAGING_DATABASE_URL` present. Accepted residual: prod URL
+  still physically in dev secrets (deliberate set is possible; accidental/silent is closed). CLAUDE.md updated.
+
 - **2026-06-17 — REVERSED bug-created attendance data (overnight check-in binding bug).** Owner
   authorized "reverse all of it" after the deep read confirmed all 5 Jun-16 no-show flags were FALSE.
   Applied to PROD with explicit-ID rowcount asserts (mismatch → rollback) + independent fresh-process
@@ -32,7 +52,11 @@
 ## Open (not yet done)
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
-  COMMIT-VERIFIER.** Upgrade of the 60s test-watchdog: instead of polling, verify AT THE MOMENT each
+  COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
+  below); owner picked "phased both". **Only the per-event exact-delta version remains (phase 2): wire an
+  independent re-read + scoped assertion into the 1–2 highest-money paths (AL approve/deduct, OT settle/bank)
+  — surgery on live balance paths, needs staging before/after proof + a 2nd-opinion pass. DEFERRED.** Original
+  spec below. Upgrade of the 60s test-watchdog: instead of polling, verify AT THE MOMENT each
   state-change commits. **What:** at each balance/state commit, do an INDEPENDENT re-read and assert the
   action's expected delta; on failure, DM the owner with SPECIFICS — e.g. "🚨 staff X's AL (3 days) was
   approved but al_left didn't move (still 14)". This is Rule 2 (WRITTEN≠SAVED) made automatic per action:
@@ -49,6 +73,16 @@
   number won't fire). **Coverage caveat:** only the wired sites are covered → that's exactly why /audit
   remains. Build AFTER the owner /test walk (touches live write-paths; don't risk them pre-walk). HIGH-RISK
   (balance paths) → real before/after proof on a staging row + a second-opinion pass.
+
+- **🌙 2026-06-19 (owner decision pending): FALLBACK END-OF-SHIFT SESSION-CLOSER.** Surfaced by the
+  live-watchdog investigation: staff stop sharing live-location early, so auto-checkout (needs a live in-zone
+  share AT shift end) never fires → sessions dangle OPEN forever → the audit flags them "stale" after 2 days,
+  and this **recurs daily**. Today's residue: Tra(Jun16)/Anan(Jun16)/Davy(Jun17), all present/pay-safe (late=0,
+  nothing to settle), seeded-past in the watchdog. **The real fix = a daily/end-of-shift job that CLOSES any
+  still-open past session at its scheduled end** (settling OT/payback if any — most have none), so sessions stop
+  dangling and the audit/watchdog stay quiet. Alternative (lighter) = teach the watchdog to treat the stale-open
+  class as daily-audit-only (not an instant alert). Owner to choose. HIGH-RISK-adjacent (it closes attendance
+  sessions) → staging proof first. NOT urgent (benign), but do it before the daily stale-open noise piles up.
 
 - **🔓 2026-06-14 (owner-gated — guard blocks Claude from editing `.claude/hooks/`): the command-pattern
   guard has a known BYPASS CLASS.** DB write-path audit (advisor grep, `psycopg2.connect` + raw DDL/DELETE
