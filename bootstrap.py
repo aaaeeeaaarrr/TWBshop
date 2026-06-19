@@ -274,6 +274,13 @@ def _gh_put(repo_path, raw_bytes, message):
 
 
 if __name__ == "__main__":
+    # Windows consoles default to cp1252 (Py 3.14); a non-ASCII char (⚠) in a print would crash
+    # mid-sync, before the SSH-config + global-guard refresh. Degrade unencodable chars instead.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+        except Exception:
+            pass
     if "--sync" in sys.argv:
         sync(silent=True)
     elif "--push-session" in sys.argv:

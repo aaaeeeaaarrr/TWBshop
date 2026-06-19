@@ -58,6 +58,9 @@ CLAUDE.local.md
 # Lane-guard cross-lane override marker (per-worktree, deliberate, never commit)
 .lane_ack
 
+# Scratch diagnostic from the --push-secrets workflow (delete-after; never commit)
+_keycheck.py
+
 # Telethon session files (contain auth tokens — never commit)
 *.session
 *.session-journal
