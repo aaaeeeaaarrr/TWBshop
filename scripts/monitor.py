@@ -86,15 +86,35 @@ def service_health():
 
 
 def anomalies(rows, svc):
+    """What actually warrants a DM: a service that should be up is down. Lane behind/ahead/dirty is
+    normal workflow churn -> shown on the board, NEVER DM'd (no spam on every push). Silence = healthy."""
     a = []
-    for r in rows:
-        if r["behind"] > 0:
-            a.append("%s is %d behind main (pull it)" % (r["branch"], r["behind"]))
     if svc:
         for name, state in svc.items():
             if state != "active" and name not in EXPECTED_INACTIVE:
-                a.append("service %s is %s" % (name, state))
+                a.append("service %s is %s (was up, now down)" % (name, state))
     return a
+
+
+def issues(rows, svc):
+    """The richer 'what needs you' for the /issues command — each item carries a one-line FIX.
+    Distinct from anomalies() (the spam-free DM trigger = service-down only). 'behind main' is normal
+    churn so it's omitted here too. Order = severity: a down service, then unsaved work, then unpushed."""
+    out = []  # (tag, text, fix)
+    if svc:
+        for name, state in svc.items():
+            if state != "active" and name not in EXPECTED_INACTIVE:
+                out.append(("DOWN", "%s is %s" % (name, state),
+                            "restart it on the server + verify (it normally auto-restarts)"))
+    for r in rows:
+        if r["dirty"]:
+            out.append(("WORK", "%s: %d uncommitted file(s)" % (r["name"], r["dirty"]),
+                        "commit it in that terminal before closing the window, or the work is unsaved"))
+    for r in rows:
+        if r["ahead"]:
+            out.append(("PUSH", "%s: %d commit(s) not yet on main" % (r["branch"], r["ahead"]),
+                        "run `push` to merge it into main"))
+    return out
 
 
 def fmt(rows, svc):
@@ -168,6 +188,8 @@ def main():
         i = args.index("--watch")
         secs = int(args[i + 1]) if len(args) > i + 1 and args[i + 1].isdigit() else 300
         print("watching every %ds (Ctrl-C to stop)..." % secs)
+        notify("TWB monitor: started watching (every %ds). I'll DM only on a real problem - "
+               "a service that was up going down. Silence = healthy." % secs)
         last = None
         while True:
             rows, svc = lane_board(), service_health()

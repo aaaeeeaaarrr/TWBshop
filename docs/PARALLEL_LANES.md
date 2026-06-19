@@ -100,7 +100,13 @@ shared / HIGH-RISK work earns full rigor. Mark items done as they ship.
 ### Phase E — Owner-time bonuses (demand-pulled, once lanes run)
 - [ ] E1 — Unified **"Needs You" inbox**: every lane writes owner-decisions to ONE shared
       `pending_decisions` table; one digest/menu, batch-clear. (Generalize `acc_pending_decisions`.)
-- [ ] E2 — **Morning digest** from the watcher (lane board + services + pending count, one DM).
+- [ ] E2 — **Interactive monitor dashboard** (graduates the send-only watcher into an owner-only
+      bot): Telegram commands — `/board` (lanes: dirty/ahead/behind), `/health` (services), `/issues`
+      (everything needing you, each with a one-line FIX under it: "lane X has uncommitted work → commit
+      or it's lost"; "service Y down → restart"; later: stuck attendance sessions, pending decisions).
+      Optional live-updating message (edit-in-place every few seconds). Owner-gated — ignores every
+      other sender (kills the Russian-spam class). Merges E1's Needs-You inbox + the health board into
+      one queryable bot. Still a one-time **morning digest** push as a fallback.
 - [ ] E3 — **`status` word**: glance all terminals from one place.
 - [ ] E4 — **Auto-refresh Stop-hook** (seamless): when a lane goes idle, **only if it's behind main**
       → merge (≈zero overhead otherwise). **Clean → silent/auto.** **Conflict → the lane's own Claude
@@ -109,7 +115,15 @@ shared / HIGH-RISK work earns full rigor. Mark items done as they ship.
       "🛑 needs you"** — never auto-resolved. Safe because it all happens on a lane branch (pre-deploy);
       deploys stay manual/tagged/verified. Opt-out per lane via a `.no_autorefresh` marker.
       `.needs_pull` / `.no_autorefresh` are gitignored.
+- [ ] E5 — **Resilience parity for every bot** (mostly already shared — this is wiring, not building):
+      poll-guard (`assert_polling_allowed`) + fail-closed DB are ALREADY on every bot incl. accountant ✓.
+      Remaining: wire `shared/error_handler` into the accountant + monitor; **the monitor GENERALIZES the
+      watchdog** (it already watches all services → extend to restart-loops + surfacing the error-handler
+      DMs → no per-bot watchdog needed). Owned by the hub (shared infra); each lane does a one-line wire-in.
 
-### Phase F — Deferred hardening (only if scaling past ~3 lanes)
+### Phase F — Deferred hardening (only if scaling past ~3 lanes) + SERVER-HOSTING
+- **Server-host the serverless bots** (monitor + accountant, later stock) like the 5 GM/retail units:
+  deploy-from-TAG, own systemd unit (`TWBSHOP_ENV=prod` + `TWBSHOP_POLL_OK=1` + `TimeoutStopSec=15`),
+  verify HEAD==tag + active. Monitor is lowest-risk (read-only) → can go first. One poller per token still.
 - sparse-checkout · merge queue + auto-merge · server-side commit-scope CI · test-suite rollback
   refactor · monitor autonomy.
