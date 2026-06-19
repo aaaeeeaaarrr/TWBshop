@@ -126,11 +126,19 @@ async def cmd_issues(update, context):
     await update.message.reply_text("\n".join(lines))
 
 
+def _is_repo_event(e):
+    """True if the event's file is a repo-relative path. Out-of-repo scratch files (a Temp diag
+    script, a log elsewhere) aren't lane-relevant — skip them even if an old-guard lane logged one."""
+    f = e.get("file") or ""
+    return not (":" in f or f.startswith("/"))  # a drive letter or leading / => absolute => out-of-repo
+
+
 def _read_events():
-    """All recorded cross-lane events (newest last). lane_guard appends them; empty if none."""
+    """Recorded cross-lane events (newest last), out-of-repo scratch writes filtered out."""
     try:
         with open(EVENTS_FILE, encoding="utf-8") as f:
-            return [json.loads(l) for l in f.read().splitlines() if l.strip()]
+            evs = [json.loads(l) for l in f.read().splitlines() if l.strip()]
+        return [e for e in evs if _is_repo_event(e)]
     except Exception:
         return []
 
@@ -186,6 +194,7 @@ async def _events_tick(context):
             evs.append(json.loads(ln))
         except Exception:
             pass
+    evs = [e for e in evs if _is_repo_event(e)]   # ignore out-of-repo scratch (old-guard lanes)
     if evs:
         await context.bot.send_message(
             OWNER_TELEGRAM_ID,
