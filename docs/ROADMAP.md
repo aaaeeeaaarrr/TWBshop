@@ -137,4 +137,9 @@
   bandwidth/time/rate-limits). Real cost at 124k: Haiku script ~$250 the lot · Sonnet ~$870 · through-me ~$0 but
   thousands of turns (pilot/sample only). Numbers yielded = hit-rate x 124k (hit-rate TBD by a sample; many photos
   are food-only or duplicates).
+  **DATA MODEL (owner, session 49):** the PHONE NUMBER is the stable key — customers change their
+  Telegram/display names over time, so a number must keep ALL names ever seen under it (one number -> many
+  names; accumulate distinct, NEVER overwrite). Same shape as staff `config.STAFF_ALIAS_MAP` (one person, many
+  display names) but for customers. Extraction output = UPSERT by number: add a new name to that number's
+  name-set if unseen, keep first_seen/last_seen + source photo ids. Record = number -> {names[], dates, sources}.
 
