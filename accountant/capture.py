@@ -91,7 +91,17 @@ def render_card(r: dict) -> str:
     lines = [f"🧾 #{r.get('id', '?')} · {vendor} · {amt} · {pay} · {state}"]
     if r.get("lines"):
         for i, li in enumerate(r["lines"], 1):
-            seg = f"  {i}. {li.get('raw_name') or '?'}"
+            name = li.get("raw_name") or "?"
+            orig = (li.get("orig_name") or "").strip()
+            # A fresh translation we haven't had confirmed is a GUESS, not a fact — show the
+            # as-written original + a ? so staff verify the translation against the paper, instead
+            # of a confident invented English word. A learned/confirmed alias (li['confident']) is
+            # trusted, so it drops the ? and shows the clean English name.
+            if orig and orig != name and not li.get("confident"):
+                label = f"{orig} → {name}?"
+            else:
+                label = name
+            seg = f"  {i}. {label}"
             if li.get("qty"):
                 seg += f" ×{float(li['qty']):g}"
             if li.get("line_total_cents") is not None:

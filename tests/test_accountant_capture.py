@@ -77,6 +77,34 @@ def test_render_card_flags_suspected_duplicate():
     assert "possible duplicate of #14" in txt
 
 
+def test_render_card_tentative_translation_shows_original_and_question():
+    # handwritten Khmer read → fresh, unconfirmed translation = a GUESS: show the as-written
+    # original + a ? so staff verify it (not a confident invented English word).
+    txt = capture.render_card({"id": 50, "vendor_name": "Mrk", "amount_cents": 13530,
+                               "status": "captured",
+                               "lines": [{"raw_name": "Chicken", "orig_name": "សាច់មាន់",
+                                          "qty": 4, "line_total_cents": 7680}]})
+    assert "សាច់មាន់ → Chicken?" in txt
+    assert "×4" in txt and "$76.80" in txt          # the stable numbers still show plainly
+
+
+def test_render_card_confirmed_alias_drops_the_question():
+    # once a translation is a learned/confirmed alias, trust it: clean English name, no original, no ?
+    txt = capture.render_card({"id": 51, "status": "captured",
+                               "lines": [{"raw_name": "Potato", "orig_name": "ដំឡូង",
+                                          "confident": True, "qty": 3, "line_total_cents": 5850}]})
+    assert "Potato" in txt and "ដំឡូង" not in txt and "Potato?" not in txt
+
+
+def test_render_card_printed_name_no_question():
+    # printed Latin name (orig == name, nothing translated) → plain line, no "→ ...?" guess marker
+    txt = capture.render_card({"id": 52, "status": "captured",
+                               "lines": [{"raw_name": "Cheese", "orig_name": "Cheese",
+                                          "qty": 2, "line_total_cents": 2400}]})
+    assert "1. Cheese ×2" in txt                     # name shown directly, no original, no guess
+    assert "Cheese?" not in txt and "→" not in txt
+
+
 def test_card_buttons_fix_is_always_present():
     for status in ("captured", "confirmed", "paid"):
         rows = capture.card_buttons({"id": 1, "status": status})

@@ -19,7 +19,7 @@ from accountant import capture
 from accountant.db import (add_candidate, add_receipt, claim_candidate, confirm_receipt,
                            delete_receipt, edit_receipt, finalize_promote, find_lookalike_receipt,
                            get_candidate, get_candidate_by_sha, get_receipt, get_receipt_by_sha,
-                           flag_dup_suspect, get_receipt_lines, learn_item_alias, link_candidate,
+                           flag_dup_suspect, get_item_alias, get_receipt_lines, learn_item_alias, link_candidate,
                            recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
                            save_receipt_lines, set_candidate_card, set_payment, to_usd_cents,
                            unclaim_candidate, vendor_by_group, vendor_by_name, vendor_link)
@@ -71,6 +71,14 @@ def _card_text_kb(rid):
     """The living receipt card (text, keyboard) for receipt #rid — shared by reply + group send."""
     r = get_receipt(rid)
     r["lines"] = get_receipt_lines(rid)
+    vid = r.get("vendor_id")
+    for li in r["lines"]:
+        # A line is "confident" (no ? on the card) when nothing was translated, OR a learned/
+        # confirmed alias backs this exact English name. A fresh, never-confirmed translation
+        # stays tentative so staff eyeball it (see capture.render_card).
+        orig = (li.get("orig_name") or "").strip()
+        li["confident"] = (not orig) or (orig == (li.get("raw_name") or "")) or \
+                          (get_item_alias(vid, orig) == li.get("raw_name"))
     items_sum = sum(li["line_total_cents"] for li in r["lines"]
                     if li.get("line_total_cents") is not None)
     if r["lines"] and items_sum and r.get("amount_cents"):

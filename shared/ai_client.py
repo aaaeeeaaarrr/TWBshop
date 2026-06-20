@@ -1093,6 +1093,10 @@ async def extract_receipt(image_bytes: bytes) -> dict:
         resp = await _get_client().messages.create(
             model="claude-sonnet-4-6",
             max_tokens=500,
+            temperature=0,           # OCR/extraction → take the single most-likely read, not a
+                                     # creative sample. Same receipt → same output every time; the
+                                     # Khmer-handwriting wobble (same receipt read differently each
+                                     # call) was default temp=1.0 re-guessing low-confidence names.
             messages=[{
                 "role": "user",
                 "content": [
