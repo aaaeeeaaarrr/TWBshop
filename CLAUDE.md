@@ -283,7 +283,13 @@ Claude Code permissions sync automatically via `.claude/settings.json` in this r
 ## Current Status
 > Update this at the end of every session. The only source of truth for what's next. Old session logs (19–46) → docs/HISTORY.md.
 
-**Last updated:** 2026-06-20 (session 48 — **TRUTH REGISTRY built + pre-push gate + `whatis`; the duplication-detector discussion is now CODE**).
+**Last updated:** 2026-06-20 (session 49 — **due-diligence read-only sweep: registry/maps verified vs ground truth; +4 group-ID facts; hire-bot-LIVE finding**).
+**▶ DUE-DILIGENCE SWEEP (session 49, read-only — code+docs only, ZERO prod connection, ZERO data writes; no deploy).** Owner asked: is our data mapped correctly for the new (truth-registry) system? **Verdict: YES** — registry internally consistent AND matches code ground truth (config.py eyeballed); subsystem statuses agree across CLAUDE/MAP/SUBSYSTEMS/registry; map-integrity + doc-staleness + integration-audit + full suite (789p/2s) all green; the old attendance contradiction stays uniformly LIVE. The registry is a deliberate seed, not a census (earn-it) — design, not a gap.
+- **SEEDED +4 group-ID facts** (`supervisors_chat_id` -4980513319 · `management_chat_id` -865916135 · `comms_chat_id` -4248492531 · `staff_group_id` -1003457945308), all `config`-sourced (AST-self-verify), money-free. reconcile now **11 facts clean**; 13 registry tests pass. Honest value = **reference + mirror-drift** (none are doc-copied → no doc-drift surface): a queryable `whatis` home, not high-stakes protection.
+- **AUTO-SEED future groups = NO (pinned).** It's the GENERATE pattern we rejected: a machine can only write the low-value half (no `mentions`), it bloats the curated registry into noise, and it cracks the "checker NEVER writes" invariant. Future groups earn a hand-seed WHEN their value starts living in 2+ places. (Candidate surfacer stays permanently deferred.)
+- **FINDING — `twbshop-hire` is LIVE/running on the server** (`systemctl`, 2026-06-20), yet the subsystem narrative says only "built" and the Notes list had omitted it → Notes corrected. **OWNER: confirm hire is intentionally live.** Also `twbshop-b2b` is currently DISABLED/stopped (the known "intentionally stopped" state).
+- **`CUSTOMER_GROUP_ID` is dead** (0 code refs; customers order by DM — there is no customer group). Delete was **BLOCKED by the HIGH-RISK guard on config.py** and left in place: a cosmetic dead-constant cleanup does NOT justify a deliberate HIGH-RISK override of live config. Remove by hand if tidiness matters.
+**(prev, session 48)**
 **▶ TRUTH REGISTRY (session 48, INERT — tooling/docs only, nothing live, no deploy).** One home for machine-knowable facts so a fact can't live in 2+ places and drift (the disease behind the "points" slip). Full design + the 4 holes → `docs/SIMPLIFICATION_STRATEGY.md` "TRUTH-CONSOLIDATION".
 - **Artifacts:** `facts.json` (THE one home; 7 seeded facts that have bitten us — attendance status/go-live/live-flag, owner id, expense/report/stock group ids) · `scripts/facts.py` (`reconcile` read-only checker · `explain` value+provenance+lineage · `set_fact`/`append_lineage` the only writers) · `facts_lineage.jsonl` (append-only "how we got to each truth", merge-safe) · `scripts/whatis.py` (ONE-call lookup: registry+map+index) · `scripts/reconcile_facts.py` (CLI) · `.githooks/pre-push` (surfaces a doc↔registry contradiction + doc-staleness `tests/test_doc_refs.py` every push — loud, exits 0/never-blocks; `exit 1` = hard gate).
 - **Key decisions:** **ASSERT > GENERATE** (a read-only checker can FLAG a wrong value but never WRITE one — reverses the earlier "generate beats assert"; generate only 100%-derived no-meaning artifacts like `MAP_INDEX.md`) · config/code facts AST-self-verify (no `secrets.py` coupling) · runtime (`attendance_live_flag`) freshness-flagged not value-asserted (no prod hit) · human statuses = cross-doc agreement only.
@@ -355,8 +361,9 @@ raw connections through `raw_connect()` — not on the payroll path.)
 **Known issues:** None
 **Notes:**
 - Retail bot: `python run_bot.py` — systemd: `twbshop-retail`
-- B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b`
+- B2B bot: `python run_b2b_bot.py` — systemd: `twbshop-b2b` (installed but DISABLED/stopped as of 2026-06-20 — the "intentionally stopped at times" state; start it when b2b goes live again)
 - Listener: `python run_listener.py` — systemd: `twbshop-listener`
+- Hire bot: `python run_hire_bot.py` — systemd: `twbshop-hire` (RUNNING on the server as of 2026-06-20, verified by `systemctl` — confirm whether intentionally live; the subsystem narrative still says "built")
 - GM bot: `python run_gm_bot.py` — systemd: `twbshop-gm`
   Groups the GM bot is IN: Stock Checks (-1003952029131), Supervisors, Management, COMMS & Transfers, TWB REPORT (-5136886404)
   Groups it monitors but does NOT post to (except TWB REPORT receipt checks): all of the above

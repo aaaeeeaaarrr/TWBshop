@@ -72,6 +72,38 @@
       "status": "live",
       "asserted_on": "2026-06-20",
       "note": "'Stock Checks +Cleans +Mistakes' group the GM bot monitors. Derived from config.py by AST read."
+    },
+    "supervisors_chat_id": {
+      "value": -4980513319,
+      "source": "config",
+      "locator": "config.py::SUPERVISORS_CHAT_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "'SUPERVISORS TWB' group the GM bot monitors. Derived from config.py by AST read. Reference + mirror-drift only (not copied as a literal into any doc, so no doc-drift surface)."
+    },
+    "management_chat_id": {
+      "value": -865916135,
+      "source": "config",
+      "locator": "config.py::MANAGEMENT_CHAT_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "'MANAGEMENT' group the GM bot monitors. Derived from config.py by AST read. Reference + mirror-drift only."
+    },
+    "comms_chat_id": {
+      "value": -4248492531,
+      "source": "config",
+      "locator": "config.py::COMMS_CHAT_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "'COMMS & Transfers' group the GM bot monitors. Derived from config.py by AST read. Reference + mirror-drift only."
+    },
+    "staff_group_id": {
+      "value": -1003457945308,
+      "source": "config",
+      "locator": "config.py::STAFF_GROUP_ID",
+      "status": "live",
+      "asserted_on": "2026-06-20",
+      "note": "Staff group for production summaries (retail + b2b summaries both post here). NOTE: B2B_STAFF_GROUP_ID is a SEPARATE config constant currently equal to this but allowed to differ — this fact tracks STAFF_GROUP_ID only. Derived from config.py by AST read."
     }
   }
 }
