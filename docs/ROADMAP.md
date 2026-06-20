@@ -143,3 +143,24 @@
   display names) but for customers. Extraction output = UPSERT by number: add a new name to that number's
   name-set if unseen, keep first_seen/last_seen + source photo ids. Record = number -> {names[], dates, sources}.
 
+---
+
+## G. Food money (staff meal allowance) — auto-post LATER. ⛔ DO NOT BUILD until the model is locked (owner, 2026-06-21).
+**Today: MANUAL** — a line staff write on the daily expense sheet. There is NO calculation in code (verified
+by grep 2026-06-21; "daily staff food money" appears only as an example expense-sheet format, HISTORY.md:364).
+Owner wants it eventually **posted AUTOMATICALLY** on the report, error-free, despite staff taking it at
+random times + extended shifts making naive timing wrong.
+**What the owner described (2026-06-21):**
+- Amount = **per hour of the person's work day**.
+- A person's meal belongs to the report tied to the shift that **STARTS AFTER the previous report was done** —
+  e.g. 6am+ starters go on the NEXT report, not the prior night's, even if they leave 3pm and that next report
+  is done at 4pm.
+- Owner is considering: food money can only be **taken when their work is DONE** (not mid-shift / random).
+**Claude's recommendation (discuss, not build):** "take-when-done" + compute from **ACTUAL checkout hours**
+(the attendance system already records real check-in/checkout, LIVE since 2026-06-16) + **assign to the report
+whose window contains the CHECKOUT** → this removes the randomness / extended-shift / which-report ambiguity,
+and each person's meal posts exactly **ONCE at checkout** (idempotent, flip-status-first — the OT-banking lesson).
+**OPEN QUESTIONS to lock first:** (1) the per-hour RATE; (2) actual hours vs scheduled hours; (3) any daily
+cap / extended-shift handling; (4) confirm "assign by checkout window" matches the 6am-starter rule; (5)
+no-show / half-day / AL behaviour. **HIGH-RISK (payroll-adjacent)** → staging proof + idempotency when built.
+

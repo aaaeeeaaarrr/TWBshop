@@ -726,3 +726,23 @@ asset: the LISTENER already sees every chat (groups + DMs) and stores `chat_id`+
   (pure) + `listener_channels_matching` (defensive `ops_messages` read) · `channel_picker_buttons` · vok now
   offers channel suggestions · `lch`/`lskip`/`1off`/`lsug` callbacks · `/vendors` = Confirm + Link. Tests:
   pure picker + ranking + kind/channel lifecycle.
+
+---
+
+## H. PARKED NEXT-WAVE (owner brainstorm 2026-06-21 — DESIGN ONLY, not built)
+Captured so they survive context; build later, after the P1/vendor + §G read work.
+
+### H1. "Why is this higher now?" — price-increase prompt (own + supplier receipts)
+When a recognised item's unit price is HIGHER than its recent history for that source → ask the buyer
+**"why is <item> more expensive now?"** (one tap: supplier raised it · smaller pack · one-off · mistake).
+**NEVER prompt on a price DROP** (lower is good — owner). Depends on the canonical-item price history (§G8)
+so the SAME item is comparable over time; a tolerance band stops normal wobble from nagging. The logged
+reason feeds the supplier price-trend + cheapest-supplier comparison. Pure-logic detection, ~no extra API.
+
+### H2. Own handwritten / local-market receipts (no printed receipt) — record + new-item watch
+Some own-written buys are ad-hoc local-market purchases (extremely rare, no supplier receipt). Goal: RECORD
+what they are (item + price + date, on a "Misc / market" `oneoff` vendor, §G9) and FLAG when staff start
+buying a **NEW item** ("first time we've logged <X>") for the owner to notice. Reuses the existing capture
+(a handwritten own-receipt photo → lines) + the pending-queue "recurring or once-off?" fork (§E8); the
+new-item flag = an item not yet in the catalog/alias history. Voice-note capture (§C3-D) suits the
+receiptless market buys.
