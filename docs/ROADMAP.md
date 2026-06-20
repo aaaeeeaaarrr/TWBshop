@@ -128,4 +128,13 @@
   through-me vs script by the real photo count. **WARNING - privacy/legal flag on the OUTREACH stage**
   (data-protection + anti-spam + Grab/Foodpanda terms): extraction is cheap; messaging the numbers is the
   part to clear first.
+  **DISCOVERED (session 49, read-only DB):** group = `WOC DELIVERY PICTURES` (chat_id `-715759659`); our
+  `ops_messages` ALREADY holds the full history backfill — **123,776 photos, 2022-01-07 -> now, continuous**
+  (2022: 5.2k · 2023: 8.7k · 2024: 27k · 2025: 49k · 2026: 34k-so-far). So "how far back / how many" is answered
+  from our own DB — no Telegram re-fetch needed for the count, no listener stop needed. CAVEAT: `ops_messages`
+  stores METADATA only (message_id + date + media_type), NOT the image files — actual extraction must first
+  DOWNLOAD the ~124k photos from Telegram (the session step: brief listener stop or separate login;
+  bandwidth/time/rate-limits). Real cost at 124k: Haiku script ~$250 the lot · Sonnet ~$870 · through-me ~$0 but
+  thousands of turns (pilot/sample only). Numbers yielded = hit-rate x 124k (hit-rate TBD by a sample; many photos
+  are food-only or duplicates).
 
