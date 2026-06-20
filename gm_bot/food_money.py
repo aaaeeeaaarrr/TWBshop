@@ -43,6 +43,26 @@ def next_report_kind(last_kind):
     return None
 
 
+def food_menu_rows(arrived, given_ids):
+    """The Food-allowance menu rows. `arrived` = staff who have ACTUALLY CHECKED IN (the caller passes
+    only checked-in sessions) — a staffer scheduled but NOT YET ARRIVED simply isn't in `arrived`, so can
+    never appear on the menu (owner's rule, 2026-06-21). Then drop anyone already given this period
+    (`given_ids` → the name 'disappears'), and a staffer with no valid standard shift. Each remaining one
+    gets their STANDARD-shift amount. `arrived` items: {staff_id, name, work_start, work_end}.
+    Returns [(staff_id, name, amount_cents)]."""
+    from gm_bot.attendance_ui import shift_len_min
+    rows = []
+    for a in (arrived or []):
+        sid = a.get("staff_id")
+        if sid in given_ids:
+            continue
+        cents = food_money_cents(shift_len_min(a.get("work_start"), a.get("work_end")))
+        if cents <= 0:
+            continue                       # no valid standard shift → not payable, not shown
+        rows.append((sid, a.get("name"), cents))
+    return rows
+
+
 def food_list_title(report_kind) -> str:
     """'final' (dawn close) → 'Night staff food'; anything else (the daytime mid) → 'Day staff food'."""
     return "Night staff food" if report_kind == "final" else "Day staff food"

@@ -4,7 +4,7 @@ import datetime as dt
 
 import pytest
 
-from gm_bot.food_money import food_money_cents, next_report_kind, render_food_list
+from gm_bot.food_money import food_menu_rows, food_money_cents, next_report_kind, render_food_list
 
 
 def test_nine_hours_is_owner_worked_example():
@@ -51,6 +51,29 @@ def test_render_food_list_mirrors_the_handwritten_sheet():
     assert "total = $11.92" in out
 
 
+# ─────────────── menu: ARRIVED-only, exclude already-given, standard-shift amount (pure) ──────────────
+def test_food_menu_amount_from_standard_shift():
+    rows = food_menu_rows([{"staff_id": 1, "name": "Heng", "work_start": "19:00", "work_end": "06:00"},
+                           {"staff_id": 2, "name": "Chanda", "work_start": "18:00", "work_end": "06:00"}],
+                          given_ids=set())
+    assert rows == [(1, "Heng", 138), (2, "Chanda", 150)]   # 11h→$1.38, 12h→$1.50
+
+
+def test_food_menu_excludes_already_given_and_no_shift():
+    arrived = [{"staff_id": 1, "name": "Heng", "work_start": "21:00", "work_end": "06:00"},
+               {"staff_id": 2, "name": "Chanda", "work_start": "18:00", "work_end": "06:00"},
+               {"staff_id": 3, "name": "NoShift", "work_start": None, "work_end": None}]
+    rows = food_menu_rows(arrived, given_ids={2})
+    assert rows == [(1, "Heng", 113)]                        # Chanda given → gone; NoShift no schedule → gone
+
+
+def test_food_menu_only_arrived_can_appear():
+    # the owner's rule: a scheduled-but-not-arrived staffer is never passed in `arrived`, so the menu
+    # cannot show them — only Heng (who checked in) is here.
+    rows = food_menu_rows([{"staff_id": 1, "name": "Heng", "work_start": "21:00", "work_end": "06:00"}], set())
+    assert rows == [(1, "Heng", 113)]
+
+
 # ─────────────── gives: open → idempotent → close-on-report → reopen (staging) ───────────────
 @pytest.fixture
 def food_db():
@@ -90,3 +113,9 @@ def test_close_attaches_open_gives_then_reopens(food_db):
     assert food_money_open_ids(is_test=True) == set()                         # nothing open now
     # after close, the SAME staff can be given again for the NEXT report (not blocked)
     assert record_food_money_give(9002, "Chanda", 150, is_test=True) is True
+
+
+def test_food_arrived_staff_is_readonly_and_listy(food_db):
+    # read-only query of CHECKED-IN staff (joins attendance_sessions + staff_registry); never raises
+    from gm_bot.food_money_db import food_arrived_staff
+    assert isinstance(food_arrived_staff([dt.date(2099, 1, 1)], is_test=True), list)

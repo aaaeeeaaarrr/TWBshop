@@ -40,6 +40,28 @@ def init_food_money_db() -> None:
                         "ON food_money_gives (staff_id, is_test) WHERE report_id IS NULL")
 
 
+def food_arrived_staff(shift_dates, is_test=False) -> list:
+    """ARRIVED staff for the menu = those with a CHECKED-IN attendance session (checked_in_at NOT NULL)
+    on any of `shift_dates` (pass today + yesterday to cover an overnight shift). A scheduled-but-not-
+    arrived staffer has no check-in → excluded (owner's rule). Joins staff_registry for the call-name +
+    standard shift. Returns [{staff_id, name, work_start, work_end}], earliest check-in first. Read-only."""
+    if not shift_dates:
+        return []
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT a.staff_id,
+                                  COALESCE(r.call_name, r.canonical_name) AS name,
+                                  r.work_start, r.work_end
+                           FROM attendance_sessions a JOIN staff_registry r ON r.id = a.staff_id
+                           WHERE a.checked_in_at IS NOT NULL
+                             AND a.shift_date = ANY(%s) AND a.is_test=%s
+                           ORDER BY a.checked_in_at""",
+                        (list(shift_dates), is_test))
+            return [{"staff_id": x["staff_id"], "name": x["name"],
+                     "work_start": x["work_start"], "work_end": x["work_end"]}
+                    for x in cur.fetchall()]
+
+
 def record_food_money_give(staff_id, staff_name, amount_cents, given_by=None, is_test=False) -> bool:
     """Record an OPEN give (counts toward the next report stored). Idempotent: a second give while still
     open is a NO-OP (returns False) -> the name 'disappears' from the menu. True if newly recorded."""

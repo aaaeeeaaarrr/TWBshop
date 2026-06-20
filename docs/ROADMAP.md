@@ -167,16 +167,21 @@ pre/post-report gives must not miscount the money). Needs no staff conversation 
 4. **Menu = the LISTENER↔bot PRIVATE DM only** (not the owner); listener already pressed Start.
 
 **✅ BUILT (staging, INERT — nothing imports it, no deploy):** `gm_bot/food_money.py` (`food_money_cents`
-half-up · `next_report_kind` · `render_food_list`) + `gm_bot/food_money_db.py` (open gives · partial-UNIQUE
-idempotency so a re-tap can't double-count · `close_food_period` attaches open gives to a stored report ·
-self-migrating init). 10 tests incl. the $11.92 sheet + close-then-reopen.
+half-up · `next_report_kind` · `render_food_list` · **`food_menu_rows` = ARRIVED-only + exclude-given +
+standard-shift amount**) + `gm_bot/food_money_db.py` (open gives · partial-UNIQUE so a re-tap can't
+double-count · `close_food_period` · **`food_arrived_staff` = CHECKED-IN staff** from `attendance_sessions`
+⋈ `staff_registry` · self-migrating init). **19 tests** incl. the $11.92 sheet, close-then-reopen, and the
+arrived-only rule. **ARRIVED RULE (owner 2026-06-21):** the menu is built from `checked_in_at IS NOT NULL`
+(actually arrived) — NOT `_present_now` (schedule); a scheduled-but-not-arrived staffer never appears.
 
 **⛔ REMAINING before go-live (the HIGH-RISK live wiring):**
-- **Menu** in the listener DM (scope: private chat + listener id `1271537077`): list on-shift staff (minus
-  already-open) → tap → `record_food_money_give` → confirm "Recorded for the coming Day/Night report."
+- **Menu UI** in the listener DM (scope: private chat + listener id `1271537077`): assemble via
+  `food_menu_rows(food_arrived_staff(dates), food_money_open_ids())` → tap → `record_food_money_give` →
+  confirm "Recorded for the coming Day/Night report." (Data layer done; this is the Telegram handlers.)
 - **Close hook:** after `save_daily_report` in `gm_bot/bot.py::_store_daily_report_if_any` (~line 1055), call
   `close_food_period(report_id, business_day, report_kind)` → post the rendered list.
-- On-shift staff source (reuse `attendance_ui._present_now` / roster) — verify read-only on prod first.
-- **Deploy = a LIVE GM-bot restart** (payroll-adjacent) → quiet window + verify (HEAD==origin, active, code carries it).
+- **`shift_dates` window** for `food_arrived_staff` (today + yesterday to cover overnight) — confirm on the walk.
+- **Deploy = a LIVE GM-bot restart** (payroll-adjacent) → gate behind an OFF-by-default flag + owner walk in
+  `is_test` first, then quiet window + verify (HEAD==origin, active, code carries it).
 **PARKED:** checkout-only timing (owner will discuss with staff) — the button approach doesn't need it.
 
