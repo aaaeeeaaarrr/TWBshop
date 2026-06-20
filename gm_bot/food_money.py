@@ -26,3 +26,32 @@ def food_money_cents(standard_minutes) -> int:
     riel = Decimal(standard_minutes) * RIEL_PER_HOUR / 60          # standard hours × 500៛
     cents = (riel / KHR_PER_USD * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP)
     return int(cents)
+
+
+# The day ('mid') report lands ~4pm; a give at/after this hour counts toward the COMING night report.
+# Configurable — the ~16:00 split is my reading of the owner's "~4pm"; confirm before go-live.
+DAY_FOOD_END_HOUR = 16
+
+
+def food_period_for(now):
+    """Which report a food-money give counts toward (owner: 'given before a report → the coming report').
+    Returns (business_day, period): period 'day' = the ~4pm mid report, 'night' = the ~5am dawn final.
+    business_day reuses finance's 06:00→06:00 anchor, so an overnight give (e.g. given 23:00 or 03:00)
+    files under the SAME business day as its dawn 'night' report — no split, no gap."""
+    from gm_bot.finance import business_day_for
+    period = "day" if 6 <= now.hour < DAY_FOOD_END_HOUR else "night"
+    return business_day_for(now), period
+
+
+def render_food_list(period, biz_date, rows) -> str:
+    """The 'Day/Night staff food' sheet, mirroring the handwritten one: title + date + numbered
+    name · amount + total. `rows` = [(name, cents), ...] in give order. Pure."""
+    title = "Night staff food" if period == "night" else "Day staff food"
+    date_str = biz_date.strftime("%d/%m/%y") if hasattr(biz_date, "strftime") else str(biz_date)
+    lines = [f"🍚 {title}   {date_str}"]
+    total = 0
+    for i, (name, cents) in enumerate(rows, 1):
+        total += cents
+        lines.append(f"{i}. {name} · ${cents / 100:.2f}")
+    lines.append(f"— total = ${total / 100:.2f}")
+    return "\n".join(lines)
