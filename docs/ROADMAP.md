@@ -113,4 +113,19 @@
   - TikTok = most gated (Content Posting API needs approval) → likely lean on TikTok's own scheduler first.
   - Highest-value CUSTOM work = connect marketing -> the order system (post -> DM the bot -> order), where
     in-house beats generic schedulers. Mass-DM / cold outreach is OFF the table (ToS + ban + spam).
+- **WOC customer-number extraction — METHOD DECIDED (session 49), PARKED for later.** Goal: pull customer
+  phone numbers (+ names) from the years of Grab/Foodpanda receipt photos in the listener's archive, for
+  outreach once the Telegram Channel is live. **Decided path:** extract via Claude-on-subscription
+  interactively, batch-by-batch ("next...next"), in a **dedicated isolated session/worktree that writes
+  ONLY to its own output file** (e.g. `woc_numbers.csv`) — reads photos read-only, never touches live
+  bots / other lanes; **marginal cost ~$0**. **Cost facts (this session):** billed PER PHOTO, not per
+  number; a repeat number OR a food-only/no-number photo costs the SAME on the paid path (the bill is the
+  image; dedupe is free in our own code). Through-me path = ~$0 but low throughput (~dozens/turn,
+  context-bound -> many rounds for a big archive); automated alternative = Haiku script ~$0.002/photo
+  (~$100 per 50k). Grab photos: instruct "customer number ONLY, ignore driver" (negligible cost; validate
+  on a sample). **First step when unparked:** fetch a SAMPLE out of Telegram to local files -> pilot to
+  measure hit-rate (% photos with a usable customer number) + driver-vs-customer accuracy -> THEN size
+  through-me vs script by the real photo count. **WARNING - privacy/legal flag on the OUTREACH stage**
+  (data-protection + anti-spam + Grab/Foodpanda terms): extraction is cheap; messaging the numbers is the
+  part to clear first.
 
