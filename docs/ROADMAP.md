@@ -174,7 +174,7 @@ self-migrating init). 10 tests incl. the $11.92 sheet + close-then-reopen.
 **⛔ REMAINING before go-live (the HIGH-RISK live wiring):**
 - **Menu** in the listener DM (scope: private chat + listener id `1271537077`): list on-shift staff (minus
   already-open) → tap → `record_food_money_give` → confirm "Recorded for the coming Day/Night report."
-- **Close hook:** after `save_daily_report` in `gm_bot/bot.py::_maybe_store_daily_report` (~line 1055), call
+- **Close hook:** after `save_daily_report` in `gm_bot/bot.py::_store_daily_report_if_any` (~line 1055), call
   `close_food_period(report_id, business_day, report_kind)` → post the rendered list.
 - On-shift staff source (reuse `attendance_ui._present_now` / roster) — verify read-only on prod first.
 - **Deploy = a LIVE GM-bot restart** (payroll-adjacent) → quiet window + verify (HEAD==origin, active, code carries it).
