@@ -95,5 +95,22 @@
 - **Proactive supplier price-change alerts** — price fetcher → compare to last → flag increases to owner.
 - **Recognition/morale trend** — extend the points leaderboard into a morale/retention signal.
 
----
+### F. Marketing & customer acquisition (PARKED, session 49 — owner ideas, NOT started, no build)
+> Parked for later. No code yet. The design reasoning lives in chat / CLAUDE.md session-49.
+- **AI order-taker for customer DMs (retail side — NOT the listener).** Customers already order by private
+  DM. Goal: AI helps take/parse orders. SAFE pattern = **AI-assist BEHIND A HUMAN** on a real staff number:
+  AI reads + parses + drafts, a human presses send → no automated-userbot ban risk, and non-customers are
+  filtered by the human. Keep the confirmation gate (Arch Rule 3) + free-first. Do NOT auto-reply from a
+  user account (Telegram bans automated userbots that message strangers — same risk flagged for the listener).
+- **Telegram marketing Channel.** A public Channel for marketing posts; the bot can auto-post there on a
+  schedule, and a `t.me/<bot>` link lets readers start a chat with the order bot → Channel = reach, bot =
+  conversion. Fully in our stack, no platform approval needed. Likely the easiest first marketing win.
+- **FB / Instagram / TikTok automation (owner asked what's possible).** Buildable, but each needs the OWNER's
+  platform accounts + API access first (Claude builds the automation; it cannot conjure access):
+  - FB + IG = Meta Graph API (a Page + an IG Business account + a Meta app with review) → schedule/publish
+    posts, pull insights, route Page DMs into the order system. Native Meta Business Suite scheduling = a
+    no-code starting point.
+  - TikTok = most gated (Content Posting API needs approval) → likely lean on TikTok's own scheduler first.
+  - Highest-value CUSTOM work = connect marketing -> the order system (post -> DM the bot -> order), where
+    in-house beats generic schedulers. Mass-DM / cold outreach is OFF the table (ToS + ban + spam).
 
