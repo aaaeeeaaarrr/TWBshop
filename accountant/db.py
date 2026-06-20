@@ -15,6 +15,9 @@ State-integrity (STATE_INTEGRITY_LAWS / design §D4): paid-flip is idempotent (f
 atomically) with `slip_sha` / `photo_sha` UNIQUE as structural dedup backstops; the matcher
 CAS-claims a receipt before allocating; the `#` shown in chat IS `acc_receipts.id` (shown == true).
 """
+import difflib
+import json
+
 from shared.database import _db
 
 # Fixed books conversion (design §D / §B4). Riel amounts convert to USD cents at this rate.
@@ -215,20 +218,79 @@ def vendor_by_group(tg_group_id: int) -> dict | None:
             return cur.fetchone()
 
 
+def _vnorm(s: str) -> str:
+    """Normalise a vendor/alias string for matching: lowercase, collapse whitespace."""
+    return " ".join((s or "").strip().lower().split())
+
+
+def _vendor_aliases(v: dict) -> list[str]:
+    """A vendor row's saved alternate spellings (the `aliases` JSON TEXT '[]'), normalised; [] on junk."""
+    try:
+        items = json.loads(v.get("aliases") or "[]")
+    except (ValueError, TypeError):
+        items = []
+    return [_vnorm(a) for a in items if str(a).strip()]
+
+
 def vendor_by_name(name: str) -> dict | None:
-    """Vendor-learning (lite): match a printed receipt name to a seeded vendor by case-insensitive
-    substring (either direction), e.g. read 'SONG HENG' → seeded 'Song Heng Gas'. None if no match.
-    (Full printed-name learning — storing each receipt's exact spelling — comes later.)"""
-    if not name:
-        return None
-    n = " ".join(name.strip().lower().split())
+    """Auto-resolve a printed/typed name to an existing vendor by case-insensitive SUBSTRING (either
+    direction) on the vendor name OR any saved alias — e.g. 'SONG HENG' → 'Song Heng Gas', or a
+    learned alias 'atlas beer' → Atlas. DETERMINISTIC, no fuzzy guessing: this silently attributes a
+    receipt's vendor (and its money), so it must never mis-match (project no-silent-guess rule).
+    Typo/transposition matching is HUMAN-confirmed in find_similar_vendors, not here. None if no match."""
+    n = _vnorm(name)
     if len(n) < 3:
         return None
     for v in list_vendors(active_only=False):
-        vn = " ".join((v["name"] or "").lower().split())
-        if vn and (vn in n or n in vn):
-            return v
+        for c in [_vnorm(v["name"])] + _vendor_aliases(v):
+            if c and (c in n or n in c):
+                return v
     return None
+
+
+def find_similar_vendors(name: str, limit: int = 3, cutoff: float = 0.6) -> list[dict]:
+    """Ranked 'did you mean?' candidates for a typed supplier name — the DEDUP GATE shown before a
+    staffer creates a NEW vendor, so a typo can't birth a duplicate of the key everything keys on
+    (design §G7). Fuzzy (difflib) over each vendor's name + aliases; looser than vendor_by_name because
+    a HUMAN confirms the pick. Best score per vendor, highest first."""
+    n = _vnorm(name)
+    if len(n) < 2:
+        return []
+    scored = []
+    for v in list_vendors(active_only=False):
+        best = 0.0
+        for c in [_vnorm(v["name"])] + _vendor_aliases(v):
+            if not c:
+                continue
+            r = 1.0 if (c in n or n in c) else difflib.SequenceMatcher(None, n, c).ratio()
+            best = max(best, r)
+        if best >= cutoff:
+            scored.append((best, v))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [v for _, v in scored[:limit]]
+
+
+def add_vendor_alias(vendor_id: int, alias: str) -> None:
+    """Remember an alternate spelling for a vendor (SELF-HEALING: a corrected wrong spelling becomes an
+    alias, so the next receipt that prints it auto-resolves via vendor_by_name). Case-insensitive dedup;
+    no-op if it already equals the vendor's name or an existing alias."""
+    a = _vnorm(alias)
+    if not vendor_id or len(a) < 2:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name, aliases FROM acc_vendors WHERE id=%s", (vendor_id,))
+            row = cur.fetchone()
+            if not row or a == _vnorm(row["name"]):
+                return
+            try:
+                aliases = json.loads(row["aliases"] or "[]")
+            except (ValueError, TypeError):
+                aliases = []
+            if any(_vnorm(x) == a for x in aliases):
+                return
+            aliases.append(alias.strip())
+            cur.execute("UPDATE acc_vendors SET aliases=%s WHERE id=%s", (json.dumps(aliases), vendor_id))
 
 
 def list_vendors(active_only: bool = True) -> list[dict]:

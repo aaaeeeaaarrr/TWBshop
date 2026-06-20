@@ -591,3 +591,114 @@ On-demand only (owner at the terminal): scan recent photos+messages of the BROAD
 (`scripts/vendor_seed.py::BROADCAST`) and compare to our current product prices → flag cheaper
 options. "No API for these spammers": text promos are free (regex); photo promos need vision, so do
 it SELECTIVELY + on demand, never as routine spend. Do NOT bulk-store their photos.
+
+---
+
+## G. STEP 2 — vendor-aware reading (priors-in + price "did-you-mean")  (2026-06-21 — DESIGN; owner-locked choices; NOT built)
+
+> Follows the **session-50 read fix** (`temperature=0` + honest `?` display, commit `ef818cc`). That made
+> the read STABLE; this makes it SMARTER over 1–3 receipts. **Owner-locked (2026-06-21):** (i) **cold-read
+> + post-read did-you-mean** — NO two-pass re-read · the **"did-you-mean" lives in the ✏️ Fix flow**, the
+> card stays clean. Builds on what already exists — **NO new tables, NO new API call.**
+
+### G0. The problem this closes
+The session-50 fix stopped the SAME receipt reading differently each time, but the read is still **cold**:
+`extract_receipt` knows nothing about the vendor. A learned alias only helps if the *next* read produces
+the byte-identical `orig_name` — brittle (this was "Gap 1"). Step 2 gives the read memory.
+
+### G1. Mechanism A — vendor priors INTO the read (fix the error at source)
+- `extract_receipt` gains an optional `vendor_priors` arg (interface-first per Arch-Rule-2; `None` = today's
+  cold read, unchanged).
+- Priors `= {vendor_name, aliases:[{orig,english}], items:[{english, typ_price_cents, unit}]}`, built from
+  `acc_item_aliases` (`orig→english`) + a price/items query over `acc_receipt_lines`. Keep it **SHORT**
+  (this vendor's actual history, top ~N by frequency) — long context anchors AND costs tokens.
+- Prompt block (soft-hint, **anti-anchor**): *"Likely from <vendor>. Bought before: ដំឡូង=potato (~$1.20)…
+  Read TOWARD these when ambiguous, but read what is ACTUALLY written — they may sell something new."*
+- **Applied ONLY when the vendor is known BEFORE the read** — supplier-group capture (zero-read: the group
+  IS the vendor) or after a vendor tap. The first untapped Expense-group photo stays a **cold read**
+  (decision i) → Mechanism B covers it.
+
+### G2. Mechanism B — price/attribute "did you mean?" in the ✏️ Fix flow (graceful failure)
+- Targets **exactly the lines that render with a `?` today** (handwritten + no confirmed alias — reuse the
+  session-50 confidence signal in `capture.render_card`; no new heuristic).
+- **Pure-Python ranking (zero API):** for a `?` line, rank this vendor's historical items by price proximity
+  (`|line unit/total − item typical|`) + qty/unit plausibility → top 1–3 candidates.
+- **UX (Fix flow — card stays clean):** today ✏️ Fix sets `acc_fix` and asks for a typed reply
+  (`1 Apple` = rename line 1 + `learn_item_alias`, `bot.py::on_text`). Step 2 adds, on tapping ✏️ Fix, a
+  **suggestion-button layer** for each `?` line — e.g. line 1: `[potato $1.20] [onion $1.10] [⌨ type it]`.
+  One tap = `rename_receipt_line` + `learn_item_alias` (same effect as typing "1 potato", but one tap).
+  Typing stays the fallback.
+- A ranked guess is a **suggestion shown to a human** — it NEVER auto-applies and NEVER overrides a
+  confident (alias-backed) read.
+
+### G3. New vs reused (scope honesty)
+- **NEW (small, read-side):** `vendor_priors_for(vendor_id)` (read-only: aliases + item/price history over
+  existing tables; may reuse `recent_receipts_for_vendor`) · the priors prompt-builder · the pure ranking
+  function · Fix-flow suggestion buttons + their callback.
+- **REUSED:** `acc_item_aliases` + `learn_item_alias`/`get_item_alias` (learn path unchanged → the
+  "human-only learning" guardrail is free) · `acc_receipt_lines` (prices already persisted → price history
+  is a QUERY, not a new table) · the `?` confidence signal · the ✏️ Fix entry point.
+- **NEW SCHEMA: none. NEW API CALLS: none** (A adds a few tokens to the existing call; B is pure Python).
+
+### G4. Guardrails = build invariants (carry from the step-2 discussion)
+1. A ranked guess never overrides a confident read. 2. Learn ONLY from human-confirmed corrections (the `?`
+must stay visible enough that staff *look*, not rubber-stamp). 3. Priors are soft hints, not anchors (the
+prompt says "read what's written"). 4. Prices are a signal; the receipt's printed number is truth.
+
+### G5. Build order (each step testable; DESIGN until owner says build)
+1. `vendor_priors_for()` read-only query + staging tests. 2. `extract_receipt(vendor_priors=…)` param +
+prompt-builder (pure prompt-shape test) + wire the pre-known-vendor callers to pass it. 3. pure ranking
+function + tests. 4. Fix-flow suggestion buttons + callback (rename + learn) + tests. 5. staging walk: the
+same hard receipt across 1–3 corrections → names firm up; verify a confident read is never overridden.
+
+### G6. Deferred (NOT MVP — add only if it bites)
+Per-line model self-confidence flag · two-pass re-read for cold hard receipts (decision ii) · inline card
+suggestions (kept in Fix per owner) · cross-vendor / global item priors.
+
+### G7. Vendor identity — the key everything hangs off (new-supplier handling; owner-locked A, 2026-06-21)
+Priors / aliases / price-history ALL key on `vendor_id`, so a wrong or duplicate vendor fragments ALL of
+it (worse than a wrong item name — vendor is the parent key). **Principle: a typed name SEARCHES or
+PROPOSES, it NEVER becomes the key.** A vendor is ONE `acc_vendors` row referenced by id; spellings are
+`name` + `aliases` ON that row; corrections edit the one row so every receipt/alias/price re-points
+automatically. (This is the S5 "one home / one resolver" law applied to vendors — same family as the
+truth-consolidation work.)
+- **Auto-resolve (conservative, no guessing):** `vendor_by_name` matches by case-insensitive SUBSTRING on
+  the vendor name OR any saved alias — deterministic, NO fuzzy (it silently attributes a receipt's money;
+  a loose match would mis-attribute). Typo/transposition matching is HUMAN-confirmed, not here.
+- **New-supplier capture flow:** (1) PICK from existing (tap / type-to-search over name+aliases) — the
+  front-line anti-dup; (2) "+ New supplier" → **dedup gate** `find_similar_vendors` (looser fuzzy, because
+  a human confirms) → "Did you mean Atlas? [Use Atlas] [No, it's new]" → only "new" creates a row.
+- **DECISION A (owner, 2026-06-21):** on "it's new", staff create it IMMEDIATELY (capture not blocked); it
+  lands UNCONFIRMED for a one-tap owner name-confirm. **Dependency:** the ❗ Pending queue
+  (`acc_pending_decisions`, §E8/E11) is NOT built yet → lean interim = a `needs_review`/`unconfirmed` flag
+  on `acc_vendors` + an owner confirm list; fold into the full Pending queue when it lands.
+- **Repair — "can another staff fix?" YES, safe by construction (shared record):**
+  - rename / add-alias = ANY allowed staff: edits the ONE row, so everything keyed on `vendor_id` follows;
+    the wrong spelling becomes an ALIAS → self-healing next time. Same ergonomics as the item ✏️ Fix.
+  - MERGE two vendor RECORDS = OWNER only: moves financial history (audit + undo; repoint `vendor_id`
+    dup→canonical, deactivate dup). The risky op, so it's gated.
+- **Group-signal removes most of this:** a supplier WITH a Telegram group has vendor = the group
+  (`tg_group_id` UNIQUE, named once by owner at `/vendor link`) → zero staff typing. Typed names only matter
+  for groupless (cash / market / one-off) suppliers — a small set.
+- **Permission tiers:** staff = pick · propose-new (behind dedup) · rename · add-alias. Owner = `/vendor
+  link` group map · confirm a new canonical name · merge duplicates.
+- **Build slices:** **V1** alias-aware (+ deterministic) `vendor_by_name` ✅ **BUILT 2026-06-21** ·
+  **V2** `find_similar_vendors` dedup helper ✅ **BUILT** · `add_vendor_alias` (self-healing) ✅ **BUILT**
+  (6 tests, accountant suite 49/49) · **V3** pick/propose-new capture UX + create-immediately →
+  **LEAN INTERIM `needs_review` flag on `acc_vendors`** (owner-chosen 2026-06-21; fold into the full
+  Pending queue when it lands) · **V4** rename/add-alias (staff) + merge (owner). V1+V2 were the
+  unblocked read-side foundation; V3 is next.
+
+### G8. Prices are a PRIMARY goal — keep the door open (owner emphasis, 2026-06-21)
+Prices aren't just a did-you-mean signal; they're a headline feature in their own right (ties to §E5/E6,
+§F3, §H): (a) **per-supplier price TREND** ("Atlas onion $1.20→$1.50, +25%") and (b) **cross-supplier
+COMPARISON** ("who's cheapest for onions") to drive ordering. Design constraints so the build never closes
+this door:
+- keep **per-line prices** in `acc_receipt_lines` (already there: `unit_price_cents` / `line_total_cents`)
+  with vendor (via the receipt) and date — raw and queryable, never a lossy per-vendor cache;
+- keep the path to a **canonical `item_id`** open (the `acc_item_aliases` → `acc_items` seam, §E7) so the
+  SAME real item is comparable ACROSS suppliers — cross-supplier comparison is impossible without it;
+- both trend and comparison are then QUERIES over that, not new stored/duplicated numbers (money stays
+  point-in-time truth on the receipt line — the money-pin).
+Step 2's vendor price-priors are a READ of this same data → building them must lean on / populate the
+per-line + canonical-item structure, **not** a vendor-only shortcut.
