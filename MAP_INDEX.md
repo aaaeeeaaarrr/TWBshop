@@ -27,6 +27,8 @@
     · _parse_number, _alias_list, _match_field, is_daily_report, parse_report_text, looks_like_report_attempt, lost_exceeds, business_day_for, classify_report, recompute, format_correction, parse_full
 - `gm_bot/flow.py` — Flow-state engine — the foundation under every real attendance ladder (H1, session 28).
     · now_utc, new_expiry, is_expired, merge_data, ttl_for
+- `gm_bot/food_money.py` — Staff meal allowance ('food money') — PURE calculation (no DB, no Telegram).
+    · food_money_cents
 - `gm_bot/frequency.py` — Frequency / pattern detection for autonomous call-outs (session 28). No DB/Telegram/AI.
     · _within, detect
 - `gm_bot/late.py` — Late-declaration pure logic (session 28). No DB/Telegram.

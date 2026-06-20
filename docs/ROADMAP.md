@@ -145,22 +145,27 @@
 
 ---
 
-## G. Food money (staff meal allowance) — auto-post LATER. ⛔ DO NOT BUILD until the model is locked (owner, 2026-06-21).
-**Today: MANUAL** — a line staff write on the daily expense sheet. There is NO calculation in code (verified
-by grep 2026-06-21; "daily staff food money" appears only as an example expense-sheet format, HISTORY.md:364).
-Owner wants it eventually **posted AUTOMATICALLY** on the report, error-free, despite staff taking it at
-random times + extended shifts making naive timing wrong.
-**What the owner described (2026-06-21):**
-- Amount = **per hour of the person's work day**.
-- A person's meal belongs to the report tied to the shift that **STARTS AFTER the previous report was done** —
-  e.g. 6am+ starters go on the NEXT report, not the prior night's, even if they leave 3pm and that next report
-  is done at 4pm.
-- Owner is considering: food money can only be **taken when their work is DONE** (not mid-shift / random).
-**Claude's recommendation (discuss, not build):** "take-when-done" + compute from **ACTUAL checkout hours**
-(the attendance system already records real check-in/checkout, LIVE since 2026-06-16) + **assign to the report
-whose window contains the CHECKOUT** → this removes the randomness / extended-shift / which-report ambiguity,
-and each person's meal posts exactly **ONCE at checkout** (idempotent, flip-status-first — the OT-banking lesson).
-**OPEN QUESTIONS to lock first:** (1) the per-hour RATE; (2) actual hours vs scheduled hours; (3) any daily
-cap / extended-shift handling; (4) confirm "assign by checkout window" matches the 6am-starter rule; (5)
-no-show / half-day / AL behaviour. **HIGH-RISK (payroll-adjacent)** → staging proof + idempotency when built.
+## G. Food money (staff meal allowance) — calc BUILT (inert); button INTEGRATION pending owner decisions (2026-06-21).
+**Today: MANUAL** — a line staff write on the daily expense sheet (no calc existed in code before this).
+**✅ CONFIRMED MODEL (owner) + BUILT:** `gm_bot/food_money.py::food_money_cents(minutes)` — **500៛ per
+STANDARD work hour ÷ 4000, HALF-UP** (9h → $1.13); standard hours = the day's **scheduled shift length**
+(`shift_len_min(work_start, work_end)`); **OT/PB NOT counted**; **no-show → $0**. Pure, tested (6 cases),
+INERT (nothing imports it; no deploy).
+**▶ BUTTON APPROACH (owner now prefers this over checkout-only):** a GM-bot **"Food allowance"** menu →
+shows staff **on shift** → tap a staff → records their standard-hours amount as a **cash expense**, the name
+**disappears** (no double-give for that report period) → reply **"Recorded for mid-day report ~4:00pm"** or
+**"night report ~5:00am"**. So a give done before/after a report **counts with the next report** — and it
+needs NO staff conversation (unlike checkout-only).
+**⛔ STILL PENDING OWNER DECISION (do NOT wire/deploy until answered):**
+1. Confirm **standard hours = scheduled shift length** (the payroll input — `shift_len_min`).
+2. **Report-window assignment** — propose: a give attaches to the **NEXT report** (mid if before the mid
+   report, else the dawn final). Confirm the precise boundary (or "attach to the next report actually posted").
+3. **Cash-expense tie-in** — reports are TYPED by staff today (no itemized cash ledger). How should the food
+   total combine: (a) auto-add to that report's `cash_expense`, (b) a "food = $X, include it" reminder, or
+   (c) tracked separately + cross-checked? (owner's call — it's the books).
+4. **Menu location + who may press** (which chat; staff / owner / the shop-listener account).
+5. **Go-live = a LIVE GM-bot deploy** (HIGH-RISK, payroll-adjacent) → quiet window + verify, AFTER 1–4.
+**PARKED:** checkout-only timing (owner will discuss with staff) — the button approach doesn't need it.
+**HIGH-RISK** → staging proof + idempotency (UNIQUE give per staff+report-period, flip-status-first) when the
+integration is built.
 
