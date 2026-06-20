@@ -117,6 +117,48 @@ def test_card_buttons_draft_offers_confirm_and_both_pay_methods():
     assert {"acc:ok:1", "acc:cash:1", "acc:aba:1"} <= set(data)
 
 
+# ─────────────────────────── V3 vendor picker (pure) ───────────────────────────
+def test_card_offers_set_supplier_when_vendor_unknown():
+    data = [d for row in capture.card_buttons({"id": 7, "status": "captured"}) for (_, d) in row]
+    assert "acc:setv:7" in data
+
+
+def test_card_no_set_supplier_when_vendor_known():
+    data = [d for row in capture.card_buttons({"id": 7, "status": "captured", "vendor_name": "Atlas"})
+            for (_, d) in row]
+    assert "acc:setv:7" not in data
+
+
+def test_vendor_picker_buttons_carry_both_ids_plus_add_and_back():
+    rows = capture.vendor_picker_buttons(7, [{"id": 3, "name": "Atlas"}, {"id": 5, "name": "Beer Co"}],
+                                         read_vendor="Atlass")
+    data = [d for row in rows for (_, d) in row]
+    assert "acc:usev:7_3" in data and "acc:usev:7_5" in data    # callback carries receipt AND vendor id
+    assert "acc:addv:7" in data and "acc:back:7" in data        # add-the-read-name-as-new + back
+
+
+def test_vendor_picker_no_add_button_without_a_read_name():
+    rows = capture.vendor_picker_buttons(7, [{"id": 3, "name": "Atlas"}], read_vendor=None)
+    data = [d for row in rows for (_, d) in row]
+    assert "acc:addv:7" not in data and "acc:back:7" in data
+
+
+# ─────────────────────────── V3.5 channel picker (pure) ───────────────────────────
+def test_channel_picker_links_groups_and_dms_plus_skip_oneoff():
+    rows = capture.channel_picker_buttons(9, [{"chat_id": -100123, "title": "Atlas Orders"},
+                                              {"chat_id": 555, "title": "Veggie Guy"}])
+    flat = [(lbl, d) for row in rows for (lbl, d) in row]
+    data = [d for _, d in flat]
+    assert "acc:lch:9_-100123" in data and "acc:lch:9_555" in data   # callback carries vendor + chat id
+    assert any("(DM)" in lbl for lbl, _ in flat)                     # positive chat_id labelled a DM
+    assert "acc:lskip:9" in data and "acc:1off:9" in data            # skip + once-off always offered
+
+
+def test_channel_picker_empty_still_offers_skip_and_oneoff():
+    data = [d for row in capture.channel_picker_buttons(9, []) for (_, d) in row]
+    assert data == ["acc:lskip:9", "acc:1off:9"]                     # never a dead end
+
+
 # ─────────────────────────── DB lifecycle (staging) ───────────────────────────
 @pytest.fixture
 def vendor():

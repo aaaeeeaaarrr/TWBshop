@@ -142,7 +142,35 @@ def card_buttons(r: dict):
     elif status == "confirmed" and pm != "aba":
         rows.append([("🏦 For ABA", f"acc:aba:{rid}"), ("💵 Cash-paid", f"acc:cash:{rid}")])
     # confirmed + ABA → awaiting the P2 slip (no manual "mark paid" in P1)
+    if not r.get("vendor_name"):                  # unresolved vendor → offer the §G7 picker
+        rows.append([("🏷 Set supplier", f"acc:setv:{rid}")])
     rows.append([("✏️ Fix", f"acc:fix:{rid}")])
+    return rows
+
+
+def vendor_picker_buttons(rid, candidates, read_vendor=None):
+    """Supplier picker for an unresolved receipt (design §G7), as (label, callback) rows. Existing-vendor
+    candidates become [✓ Name] buttons whose callback carries BOTH ids (the button never trusts the
+    on-screen list — menu-law); plus an 'add the read name as new' button when the model read a name;
+    plus Back. Pure → the bot layer turns these into Telegram buttons."""
+    rows = [[(f"✓ {c['name']}", f"acc:usev:{rid}_{c['id']}")] for c in (candidates or [])]
+    rv = (read_vendor or "").strip()
+    if rv:
+        rows.append([(f'➕ Add "{rv}" as new', f"acc:addv:{rid}")])
+    rows.append([("← Back", f"acc:back:{rid}")])
+    return rows
+
+
+def channel_picker_buttons(vid, channels):
+    """Owner picker to link a vendor's paid-signal channel from the listener's known chats (§G9), as
+    (label, callback) rows. The callback carries vendor id + chat id (button never trusts the screen);
+    DMs (chat_id > 0) are labelled. 'skip' is always offered — linking is optional (works groupless)."""
+    rows = []
+    for c in (channels or []):
+        cid = c.get("chat_id")
+        tag = " (DM)" if (cid or 0) > 0 else ""
+        rows.append([(f"🔗 {c.get('title') or cid}{tag}", f"acc:lch:{vid}_{cid}")])
+    rows.append([("skip (groupless)", f"acc:lskip:{vid}"), ("🗑 once-off", f"acc:1off:{vid}")])
     return rows
 
 

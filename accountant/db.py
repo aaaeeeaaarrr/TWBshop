@@ -57,6 +57,12 @@ def init_accounting_db() -> None:
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_acc_vendors_group ON acc_vendors (tg_group_id)")
+            # additive: a staff-proposed vendor is usable at once but awaits a one-tap owner confirm (§G7, A);
+            # kind = supplier(AP) | oneoff(throwaway market buy) | internal(Homemade/Delis, not paid); §G9.
+            # channel_kind labels the linked paid-signal chat (group | dm) the listener sees it in.
+            for _col, _typ in (("needs_review", "BOOLEAN DEFAULT FALSE"), ("created_by", "BIGINT"),
+                               ("kind", "TEXT DEFAULT 'supplier'"), ("channel_kind", "TEXT")):
+                cur.execute(f"ALTER TABLE acc_vendors ADD COLUMN IF NOT EXISTS {_col} {_typ}")
 
             # ── acc_receipts — the spine: numbered AP rows (design §D2) ──
             cur.execute("""
@@ -87,7 +93,8 @@ def init_accounting_db() -> None:
             # additive detail columns (read off the receipt; cheap to capture, valuable for the books)
             for _col, _typ in (("invoice_no", "TEXT"), ("receipt_date", "TEXT"),
                                ("tax_cents", "INTEGER"), ("supplier_account", "TEXT"),
-                               ("bank_name", "TEXT"), ("dup_suspect_of", "INTEGER")):
+                               ("bank_name", "TEXT"), ("dup_suspect_of", "INTEGER"),
+                               ("read_vendor", "TEXT")):   # the vendor NAME the model read (seeds the §G7 picker)
                 cur.execute(f"ALTER TABLE acc_receipts ADD COLUMN IF NOT EXISTS {_col} {_typ}")
 
             # ── acc_payments + acc_payment_allocations — the lump matcher (design §D3) ──
@@ -293,6 +300,100 @@ def add_vendor_alias(vendor_id: int, alias: str) -> None:
             cur.execute("UPDATE acc_vendors SET aliases=%s WHERE id=%s", (json.dumps(aliases), vendor_id))
 
 
+def get_vendor(vendor_id: int) -> dict | None:
+    """A vendor row by id (None if gone)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_vendors WHERE id=%s", (vendor_id,))
+            return cur.fetchone()
+
+
+def propose_vendor(name: str, created_by: int | None = None) -> int:
+    """Staff create a NEW supplier on the spot (design §G7, decision A): usable IMMEDIATELY but flagged
+    needs_review=TRUE for a one-tap owner confirm. The caller runs find_similar_vendors FIRST (the dedup
+    gate) so this only fires on a genuinely new name. Returns the new vendor id (0 on an empty name)."""
+    nm = (name or "").strip()
+    if not nm:
+        return 0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO acc_vendors (name, created_by, needs_review) VALUES (%s,%s,TRUE) "
+                        "RETURNING id", (nm, created_by))
+            return cur.fetchone()["id"]
+
+
+def confirm_vendor(vendor_id: int) -> None:
+    """Owner accepts a staff-proposed vendor's name → clears needs_review (§G7). Idempotent."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_vendors SET needs_review=FALSE WHERE id=%s", (vendor_id,))
+
+
+def list_unconfirmed_vendors() -> list[dict]:
+    """Staff-proposed vendors still awaiting the owner's one-tap confirm (the interim ❗ list, §G7)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_vendors WHERE needs_review ORDER BY created_at")
+            return list(cur.fetchall())
+
+
+def set_vendor_kind(vendor_id: int, kind: str) -> None:
+    """Tag a vendor (§G9): 'supplier' (AP, default) · 'oneoff' (throwaway market buy — kept OFF the
+    payable run / recurring views, still on the books) · 'internal' (Homemade/Delis — not an AP vendor
+    we pay). Unknown kinds are ignored."""
+    if kind not in ("supplier", "oneoff", "internal"):
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_vendors SET kind=%s WHERE id=%s", (kind, vendor_id))
+
+
+def attach_vendor_channel(vendor_id: int, chat_id: int) -> None:
+    """Link a vendor to the chat the listener sees it in — a supplier GROUP or a 1:1 DM (§G9), the
+    paid-signal channel. Reuses tg_group_id (any listener-visible chat_id); channel_kind is inferred
+    from the id sign (Telegram: users > 0 = DM, groups/channels < 0). Owner action, non-blocking
+    (a vendor works fine groupless)."""
+    kind = "dm" if (chat_id or 0) > 0 else "group"
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_vendors SET tg_group_id=%s, channel_kind=%s WHERE id=%s",
+                        (chat_id, kind, vendor_id))
+
+
+def _rank_channels(name, channels, limit=4, cutoff=0.4):
+    """Pure: rank listener channels [{chat_id, title}] by fuzzy title-match to `name`, best first
+    (substring = strong). Powers the §G9 'link the right group/DM with a tap' suggestion. Looser cutoff
+    than auto-resolve because the owner confirms the pick."""
+    n = _vnorm(name)
+    if len(n) < 2:
+        return []
+    scored = []
+    for c in channels or []:
+        t = _vnorm(c.get("title"))
+        if not t:
+            continue
+        r = 1.0 if (t in n or n in t) else difflib.SequenceMatcher(None, n, t).ratio()
+        if r >= cutoff:
+            scored.append((r, c))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [c for _, c in scored[:limit]]
+
+
+def listener_channels_matching(name, limit=4):
+    """Suggest the listener's chats (groups + DMs) whose title matches `name`, so a vendor's existing
+    channel links with a TAP instead of scrolling hundreds (§G9). Reads the listener's ops_messages
+    (latest title per chat); DEFENSIVE — returns [] if that table isn't present/populated yet."""
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT ON (chat_id) chat_id, chat_title AS title "
+                            "FROM ops_messages ORDER BY chat_id, sent_at DESC")
+                chans = list(cur.fetchall())
+    except Exception:
+        return []
+    return _rank_channels(name, chans, limit=limit)
+
+
 def list_vendors(active_only: bool = True) -> list[dict]:
     """All vendors (for an owner overview / the payable run)."""
     with _db() as conn:
@@ -455,7 +556,7 @@ def add_receipt(vendor_id=None, amount_cents=None, pay_method=None, orig_currenc
                 orig_amount=None, category=None, items_text=None, is_handwritten=False,
                 photo_file_id=None, photo_sha=None, tg_chat_id=None, tg_msg_id=None,
                 captured_by=None, is_test=False, invoice_no=None, receipt_date=None,
-                tax_cents=None, supplier_account=None, bank_name=None) -> int:
+                tax_cents=None, supplier_account=None, bank_name=None, read_vendor=None) -> int:
     """P1 — capture a numbered receipt row. status='captured' (DRAFT); pay_method/paid are set
     later from the living card. Dedup on photo_sha: the same photo returns the EXISTING row's id
     (S2 — one photo, one row; the uq_acc_receipts_sha index is the structural backstop)."""
@@ -471,13 +572,13 @@ def add_receipt(vendor_id=None, amount_cents=None, pay_method=None, orig_currenc
                     (vendor_id, amount_cents, pay_method, orig_currency, orig_amount, category,
                      items_text, is_handwritten, status, photo_file_id, photo_sha, tg_chat_id,
                      tg_msg_id, captured_by, is_test, invoice_no, receipt_date, tax_cents,
-                     supplier_account, bank_name)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'captured',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                     supplier_account, bank_name, read_vendor)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'captured',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (vendor_id, amount_cents, pay_method, orig_currency, orig_amount, category,
                   items_text, is_handwritten, photo_file_id, photo_sha, tg_chat_id, tg_msg_id,
                   captured_by, is_test, invoice_no, receipt_date, tax_cents, supplier_account,
-                  bank_name))
+                  bank_name, read_vendor))
             return cur.fetchone()["id"]
 
 

@@ -53,6 +53,54 @@ def test_find_similar_vendors_empty_when_nothing_close(vendors):
     assert find_similar_vendors("Qwerty Zxcvb Nomatch") == []
 
 
+def test_propose_then_confirm_vendor(vendors):
+    # decision A: staff create immediately (needs_review=TRUE, usable now) → owner one-tap clears it
+    from accountant.db import propose_vendor, get_vendor, list_unconfirmed_vendors, confirm_vendor
+    from shared.database import _db
+    vid = propose_vendor("ZZ Brand New Supplier", created_by=42)
+    try:
+        v = get_vendor(vid)
+        assert v["needs_review"] is True and v["created_by"] == 42
+        assert any(x["id"] == vid for x in list_unconfirmed_vendors())   # shows in the confirm-list
+        confirm_vendor(vid)
+        assert get_vendor(vid)["needs_review"] is False
+        assert all(x["id"] != vid for x in list_unconfirmed_vendors())   # cleared after confirm
+    finally:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM acc_vendors WHERE id=%s", (vid,))
+
+
+def test_rank_channels_orders_by_title_match_and_drops_unrelated():
+    from accountant.db import _rank_channels                          # pure — no DB
+    chans = [{"chat_id": -1, "title": "Atlas Beer Orders"},
+             {"chat_id": -2, "title": "Random Unrelated Chat"},
+             {"chat_id": -3, "title": "ATLAS 🍺"}]
+    titles = [c["title"] for c in _rank_channels("Atlas", chans)]
+    assert "Random Unrelated Chat" not in titles                     # below cutoff → dropped
+    assert titles[0] in ("Atlas Beer Orders", "ATLAS 🍺")            # a strong title match leads
+
+
+def test_listener_channels_matching_is_defensive(vendors):
+    from accountant.db import listener_channels_matching
+    assert isinstance(listener_channels_matching("Atlas"), list)     # never raises (ops_messages or not)
+
+
+def test_set_vendor_kind_and_attach_channel(vendors):
+    from accountant.db import set_vendor_kind, attach_vendor_channel, get_vendor, vendor_by_group
+    atlas = vendors[0]
+    set_vendor_kind(atlas, "oneoff")
+    assert get_vendor(atlas)["kind"] == "oneoff"
+    set_vendor_kind(atlas, "bogus")                                  # unknown kind ignored
+    assert get_vendor(atlas)["kind"] == "oneoff"
+    attach_vendor_channel(atlas, -1009990001)                       # group (negative id)
+    v = get_vendor(atlas)
+    assert v["tg_group_id"] == -1009990001 and v["channel_kind"] == "group"
+    assert vendor_by_group(-1009990001)["id"] == atlas              # now resolves from that chat
+    attach_vendor_channel(atlas, 42420001)                          # DM (positive id) → relink
+    assert get_vendor(atlas)["channel_kind"] == "dm"
+
+
 def test_add_vendor_alias_dedups_case_insensitively(vendors):
     from accountant.db import add_vendor_alias
     from shared.database import _db

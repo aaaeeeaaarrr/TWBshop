@@ -16,13 +16,17 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           MessageHandler, filters)
 
 from accountant import capture
-from accountant.db import (add_candidate, add_receipt, claim_candidate, confirm_receipt,
-                           delete_receipt, edit_receipt, finalize_promote, find_lookalike_receipt,
-                           get_candidate, get_candidate_by_sha, get_receipt, get_receipt_by_sha,
-                           flag_dup_suspect, get_item_alias, get_receipt_lines, learn_item_alias, link_candidate,
+from accountant.db import (add_candidate, add_receipt, attach_vendor_channel, claim_candidate,
+                           confirm_receipt, confirm_vendor, delete_receipt, edit_receipt,
+                           finalize_promote, find_lookalike_receipt, find_similar_vendors,
+                           flag_dup_suspect, get_candidate, get_candidate_by_sha, get_item_alias,
+                           get_receipt, get_receipt_by_sha, get_receipt_lines, get_vendor,
+                           learn_item_alias, link_candidate, list_unconfirmed_vendors,
+                           listener_channels_matching, list_vendors, propose_vendor,
                            recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
-                           save_receipt_lines, set_candidate_card, set_payment, to_usd_cents,
-                           unclaim_candidate, vendor_by_group, vendor_by_name, vendor_link)
+                           save_receipt_lines, set_candidate_card, set_payment, set_vendor_kind,
+                           to_usd_cents, unclaim_candidate, vendor_by_group, vendor_by_name,
+                           vendor_link)
 from shared.ai_client import extract_receipt
 
 try:
@@ -123,6 +127,21 @@ async def cmd_vendor(update, context):
         await update.message.reply_text("Usage: /vendor link <name>  (run inside the supplier group)")
 
 
+async def cmd_vendors(update, context):
+    """/vendors — owner: the interim confirm-list of staff-proposed suppliers, each a one-tap ✅ (§G7)."""
+    if update.effective_user.id != OWNER_TELEGRAM_ID:
+        return
+    pending = list_unconfirmed_vendors()
+    if not pending:
+        await update.message.reply_text("✅ No suppliers awaiting confirm.")
+        return
+    for v in pending:
+        await update.message.reply_text(
+            f"🆕 {v['name']} (vendor #{v['id']})",
+            reply_markup=_rows_kb([[("✅ Confirm", f"acc:vok:{v['id']}"),
+                                    ("🔗 Link channel", f"acc:lsug:{v['id']}")]]))
+
+
 async def on_photo(update, context):
     """Photo router. A LINKED supplier group → the bot stays SILENT there and forwards a
     'Received Yet?' candidate to the Expense group (§E3). Otherwise (Expense group / owner DM) →
@@ -213,6 +232,7 @@ async def _capture_expense_photo(update, context):
         tg_chat_id=update.effective_chat.id,
         tg_msg_id=msg.message_id,
         captured_by=update.effective_user.id,
+        read_vendor=(rec.get("vendor") or None),    # seeds the §G7 picker when the vendor doesn't resolve
     )
     save_receipt_lines(rid, rec.get("line_items"), cur, vendor_id=(v["id"] if v else None))
     # anti-double-pay heads-up (§E3 layer 3): a prior receipt, same vendor+amount within 7 days →
@@ -223,15 +243,122 @@ async def _capture_expense_photo(update, context):
     await _send_card(update, rid)
 
 
+async def _safe_edit(q, text, kb=None):
+    """Edit a message's text/keyboard, swallowing Telegram's benign 'not modified' / edit races."""
+    try:
+        await q.edit_message_text(text, reply_markup=kb)
+    except Exception:
+        pass
+
+
+async def _rerender(q, rid):
+    """Re-draw receipt #rid's living card in place from current DB state (full lines + confidence)."""
+    text, kb = _card_text_kb(rid)
+    await _safe_edit(q, text, kb)
+
+
+async def _show_channel_suggestions(q, vid, head=None):
+    """§G9 — offer to link a vendor's paid-signal channel from the listener's known chats (groups + DMs),
+    fuzzy-matched by name so the owner taps instead of scrolling hundreds. Always offers skip / once-off,
+    so it NEVER blocks (a vendor works fine groupless)."""
+    v = get_vendor(vid)
+    if not v:
+        return
+    chans = listener_channels_matching(v["name"])
+    head = head or f"Link a channel for {v['name']}?"
+    if not chans:
+        head += "\n(no matching channel the listener sees — skip to leave it groupless)"
+    await _safe_edit(q, head, _rows_kb(capture.channel_picker_buttons(vid, chans)))
+
+
+async def _show_vendor_picker(q, rid):
+    """🏷 Set supplier → fuzzy candidates for the READ name (the §G7 dedup gate) + 'add as new' + Back.
+    Button-driven so it works in the Expense group (text replies are owner-DM only)."""
+    r = get_receipt(rid)
+    if not r:
+        return
+    read_vendor = r.get("read_vendor")
+    cands = find_similar_vendors(read_vendor) if read_vendor else list_vendors()[:6]
+    head = "🏷 Which supplier?" + (f'  (read: "{read_vendor}")' if read_vendor else "")
+    try:
+        await q.edit_message_text(head, reply_markup=_rows_kb(capture.vendor_picker_buttons(rid, cands, read_vendor)))
+    except Exception:
+        pass
+
+
+async def _add_new_vendor(q, context, rid):
+    """➕ Add the READ name as a NEW supplier (decision A): create it usable-now + needs_review, attach
+    it to the receipt, re-draw the card, and DM the owner a one-tap confirm. No typing → works in-group."""
+    r = get_receipt(rid)
+    if not r:
+        return
+    name = (r.get("read_vendor") or "").strip()
+    if not name:                                  # nothing was read → can't name it here; owner does it in DM
+        try:
+            await q.edit_message_text("No supplier name was read — owner, set it from your DM.",
+                                      reply_markup=_rows_kb([[("← Back", f"acc:back:{rid}")]]))
+        except Exception:
+            pass
+        return
+    vid = propose_vendor(name, created_by=q.from_user.id)   # the dedup gate was the picker the staffer just left
+    edit_receipt(rid, vendor_id=vid)
+    await _rerender(q, rid)
+    try:                                          # the interim ❗ confirm lives here until the Pending queue exists
+        await context.bot.send_message(
+            OWNER_TELEGRAM_ID,
+            f'🆕 New supplier added by staff: "{name}" (vendor #{vid}, on receipt #{rid}).\n'
+            "Confirm the name, or rename later.",
+            reply_markup=_rows_kb([[("✅ Confirm", f"acc:vok:{vid}")]]))
+    except Exception:
+        logger.exception("owner new-vendor notify failed")
+
+
 async def on_callback(update, context):
     q = update.callback_query
     await q.answer()
     if not _allowed(update):
         return
     parts = (q.data or "").split(":")
-    if len(parts) != 3:
+    if len(parts) < 3:
         return
-    _, action, sid = parts
+    action, sid = parts[1], parts[2]
+    # ── composite callbacks (carry a chat/vendor id beyond the receipt id) ──
+    if action == "usev":                          # sid = "rid_vid" → attach an existing vendor
+        try:
+            rid, vid = (int(x) for x in sid.split("_"))
+        except ValueError:
+            return
+        edit_receipt(rid, vendor_id=vid)
+        await _rerender(q, rid)
+        return
+    if action == "lch":                           # sid = "vid_chatid" → link a listener channel (§G9)
+        try:
+            vid, cid = (int(x) for x in sid.split("_"))
+        except ValueError:
+            return
+        attach_vendor_channel(vid, cid)
+        v = get_vendor(vid)
+        await _safe_edit(q, f"🔗 Linked {v['name'] if v else vid} → channel {cid}.")
+        return
+    # ── vendor-id actions (sid = a vendor id) ──
+    if action in ("vok", "lsug", "lskip", "1off"):
+        try:
+            vid = int(sid)
+        except ValueError:
+            return
+        if action == "vok":                       # owner one-tap confirm → then offer channel-link
+            confirm_vendor(vid)
+            v = get_vendor(vid)
+            await _show_channel_suggestions(q, vid, head=f"✅ Confirmed: {v['name'] if v else vid}. Link its channel?")
+        elif action == "lsug":                    # 🔗 Link channel (from /vendors)
+            await _show_channel_suggestions(q, vid)
+        elif action == "lskip":
+            await _safe_edit(q, "👍 Left groupless — link a channel later via /vendors.")
+        elif action == "1off":
+            set_vendor_kind(vid, "oneoff")
+            await _safe_edit(q, "🗑 Marked once-off (groupless, kept off the payable run).")
+        return
+    # ── receipt-id actions ──
     try:
         rid = int(sid)
     except ValueError:
@@ -250,8 +377,14 @@ async def on_callback(update, context):
             "• `1 Apple` = rename item 1 (I'll remember it for next time)\n"
             "• anything else = a note")
         return
-    r = get_receipt(rid)
-    await q.edit_message_text(capture.render_card(r), reply_markup=_kb(r))
+    elif action == "setv":
+        await _show_vendor_picker(q, rid)
+        return
+    elif action == "addv":
+        await _add_new_vendor(q, context, rid)
+        return
+    # "back" + the pay/confirm actions fall through to a fresh full-card render
+    await _rerender(q, rid)
 
 
 # ─────────────── "Received Yet?" candidate card taps (Expense group, §E3) ───────────────
@@ -444,6 +577,7 @@ def build_application(token: str) -> Application:
     app.add_error_handler(make_error_handler("Accountant"))   # crashes are never silent
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("vendor", cmd_vendor))
+    app.add_handler(CommandHandler("vendors", cmd_vendors))
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(CallbackQueryHandler(on_candidate_callback, pattern=r"^accand:"))
     app.add_handler(CallbackQueryHandler(on_callback, pattern=r"^acc:"))

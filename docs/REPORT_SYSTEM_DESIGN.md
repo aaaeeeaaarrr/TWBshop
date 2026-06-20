@@ -702,3 +702,27 @@ this door:
   point-in-time truth on the receipt line — the money-pin).
 Step 2's vendor price-priors are a READ of this same data → building them must lean on / populate the
 per-line + canonical-item structure, **not** a vendor-only shortcut.
+
+### G9. Channel attach (listener-powered) + once-off / contact-only suppliers (owner-locked, 2026-06-21)
+Owner ask: link a supplier's EXISTING group without scrolling 100s; handle groupless / once-off / a
+supplier reachable only as a listener DM contact — **without the work ever halting for an approval.** Key
+asset: the LISTENER already sees every chat (groups + DMs) and stores `chat_id`+`chat_title` in `ops_messages`.
+- **One concept — "attach a channel" = search the listener's known chats by name → tap.** `_rank_channels`
+  fuzzy-matches the vendor name against `ops_messages` titles; the owner taps the right group/DM. No
+  `/vendor link` inside the group, no scrolling. Read-only over the listener's data; defensive if
+  `ops_messages` is absent/empty.
+- **Channel = group OR DM.** A DM is just a `chat_id` too → reuse `tg_group_id` for any listener-visible
+  chat; `channel_kind` inferred ('dm' if id > 0 else 'group'). DM attach is owner-only + deliberate (privacy).
+- **Groupless is first-class; once-off = a `kind` flag** (`supplier` | `oneoff` | `internal`). The picker
+  ALWAYS offers skip (groupless) + 🗑 once-off, so it's never a dead end. `oneoff`/`internal` stay off the
+  payable run.
+- **NON-BLOCKING throughout (owner ask, 2026-06-21):** staff create a vendor usable IMMEDIATELY; the owner's
+  confirm + channel-link are optional taps (vok → suggestions → tap or skip; `/vendors` shows Confirm + 🔗
+  Link). The work never halts waiting on the owner to approve a name or a channel.
+- **Honest split:** the listener DETECTS that a slip/photo exists + its text in the channel; the bot OCRs the
+  IMAGE only where it is itself a member (a finite set the owner adds the bot to). Once-off / contact-only
+  lean on detection + the reply/relay path.
+- **BUILT 2026-06-21 (V3.5):** `set_vendor_kind` · `attach_vendor_channel` (group/DM) · `_rank_channels`
+  (pure) + `listener_channels_matching` (defensive `ops_messages` read) · `channel_picker_buttons` · vok now
+  offers channel suggestions · `lch`/`lskip`/`1off`/`lsug` callbacks · `/vendors` = Confirm + Link. Tests:
+  pure picker + ranking + kind/channel lifecycle.
