@@ -28,9 +28,9 @@
 - `gm_bot/flow.py` — Flow-state engine — the foundation under every real attendance ladder (H1, session 28).
     · now_utc, new_expiry, is_expired, merge_data, ttl_for
 - `gm_bot/food_money.py` — Staff meal allowance ('food money') — PURE calculation (no DB, no Telegram).
-    · food_money_cents, food_period_for, render_food_list
-- `gm_bot/food_money_db.py` — Food-money gives — the per-report-period record behind the 'Day/Night staff food' list (who took
-    · init_food_money_db, record_food_money_give, food_money_given_ids, food_money_list
+    · food_money_cents, next_report_kind, food_list_title, render_food_list
+- `gm_bot/food_money_db.py` — Food-money gives — EVENT-DRIVEN (owner: a give counts toward the report that's done NEXT, not a clock
+    · init_food_money_db, record_food_money_give, food_money_open_ids, food_money_open_list, close_food_period, food_money_list_for_report
 - `gm_bot/frequency.py` — Frequency / pattern detection for autonomous call-outs (session 28). No DB/Telegram/AI.
     · _within, detect
 - `gm_bot/late.py` — Late-declaration pure logic (session 28). No DB/Telegram.

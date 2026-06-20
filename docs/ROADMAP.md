@@ -151,21 +151,32 @@
 STANDARD work hour ÷ 4000, HALF-UP** (9h → $1.13); standard hours = the day's **scheduled shift length**
 (`shift_len_min(work_start, work_end)`); **OT/PB NOT counted**; **no-show → $0**. Pure, tested (6 cases),
 INERT (nothing imports it; no deploy).
-**▶ BUTTON APPROACH (owner now prefers this over checkout-only):** a GM-bot **"Food allowance"** menu →
-shows staff **on shift** → tap a staff → records their standard-hours amount as a **cash expense**, the name
-**disappears** (no double-give for that report period) → reply **"Recorded for mid-day report ~4:00pm"** or
-**"night report ~5:00am"**. So a give done before/after a report **counts with the next report** — and it
-needs NO staff conversation (unlike checkout-only).
-**⛔ STILL PENDING OWNER DECISION (do NOT wire/deploy until answered):**
-1. Confirm **standard hours = scheduled shift length** (the payroll input — `shift_len_min`).
-2. **Report-window assignment** — propose: a give attaches to the **NEXT report** (mid if before the mid
-   report, else the dawn final). Confirm the precise boundary (or "attach to the next report actually posted").
-3. **Cash-expense tie-in** — reports are TYPED by staff today (no itemized cash ledger). How should the food
-   total combine: (a) auto-add to that report's `cash_expense`, (b) a "food = $X, include it" reminder, or
-   (c) tracked separately + cross-checked? (owner's call — it's the books).
-4. **Menu location + who may press** (which chat; staff / owner / the shop-listener account).
-5. **Go-live = a LIVE GM-bot deploy** (HIGH-RISK, payroll-adjacent) → quiet window + verify, AFTER 1–4.
+**▶ BUTTON APPROACH (owner-locked):** a GM-bot **"Food allowance"** menu → shows staff **on shift** → tap a
+staff → records their standard-hours amount, the name **disappears** → bot confirms which report it lands on.
+Shown SEPARATELY as a "Day/Night staff food" list — **never added to the drawer/report money count** (owner:
+pre/post-report gives must not miscount the money). Needs no staff conversation (unlike checkout-only).
+
+**✅ OWNER ANSWERS LOCKED (2026-06-21):**
+1. **Standard hours = scheduled shift length** (`shift_len_min`); late arrival doesn't reduce it; a 12h
+   person = $1.50. (Validated against the real handwritten sheet: $1.38/$1.50/$1.13 = 11h/12h/9h, total $11.92.)
+2. **Report assignment = EVENT-DRIVEN, not a clock** ("better when the report is done"): a give is recorded
+   OPEN and attaches to the **next daily report STORED** (`gm_daily_reports` via `save_daily_report`). The
+   bot predicts the coming report (day↔night alternate) for the confirm message.
+3. **Cash-expense tie-in = SHOW only** — the bot reproduces the "Day/Night staff food" list; it does NOT
+   touch the typed report's cash count.
+4. **Menu = the LISTENER↔bot PRIVATE DM only** (not the owner); listener already pressed Start.
+
+**✅ BUILT (staging, INERT — nothing imports it, no deploy):** `gm_bot/food_money.py` (`food_money_cents`
+half-up · `next_report_kind` · `render_food_list`) + `gm_bot/food_money_db.py` (open gives · partial-UNIQUE
+idempotency so a re-tap can't double-count · `close_food_period` attaches open gives to a stored report ·
+self-migrating init). 10 tests incl. the $11.92 sheet + close-then-reopen.
+
+**⛔ REMAINING before go-live (the HIGH-RISK live wiring):**
+- **Menu** in the listener DM (scope: private chat + listener id `1271537077`): list on-shift staff (minus
+  already-open) → tap → `record_food_money_give` → confirm "Recorded for the coming Day/Night report."
+- **Close hook:** after `save_daily_report` in `gm_bot/bot.py::_maybe_store_daily_report` (~line 1055), call
+  `close_food_period(report_id, business_day, report_kind)` → post the rendered list.
+- On-shift staff source (reuse `attendance_ui._present_now` / roster) — verify read-only on prod first.
+- **Deploy = a LIVE GM-bot restart** (payroll-adjacent) → quiet window + verify (HEAD==origin, active, code carries it).
 **PARKED:** checkout-only timing (owner will discuss with staff) — the button approach doesn't need it.
-**HIGH-RISK** → staging proof + idempotency (UNIQUE give per staff+report-period, flip-status-first) when the
-integration is built.
 
