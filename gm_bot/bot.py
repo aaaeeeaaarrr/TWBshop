@@ -1814,6 +1814,14 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if first:
         _gm_log("checkin", staff["id"], detail={"date": shift_date, "state": state,
                                                 "late": late, "early": early})
+        # SHADOW-RUN (gated off by default; best-effort + fully isolated — see core/shadow_hook.py):
+        # run the new platform core on this SAME real check-in + record new-vs-live. A shadow failure is
+        # logged as [SHADOW] and can NEVER affect this live check-in (it's the LAST thing + swallows all).
+        try:
+            from core.shadow_hook import shadow_checkin
+            shadow_checkin(staff, now_pp, state, late, early)
+        except Exception:
+            pass
         # record raw points events (values derived later — owner-tuned; nothing connected yet)
         try:
             if state == "early":
