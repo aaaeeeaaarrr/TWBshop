@@ -192,6 +192,10 @@
     · load, _save, _read_literal, derive, _render, reconcile, _bad_pointers, append_lineage, lineage_for, set_fact, explain
 - `scripts/fetch_report_receipts.py` — Download photo media from a chat using the read-only ops_listener session.
     · run
+- `scripts/fix_heng_overbook.py` — VETTED DATA-FIX — Heng (staff 37) payback over-book + uncredited 7-min tail (owner Jun 21).
+    · _snap, _show, main
+- `scripts/fix_long_late_sick.py` — VETTED DATA-FIX — Long (staff 1) retroactive -15 late-sick-informing (owner Jun 21).
+    · _events, main
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
     · _info, _entry, render, main
 - `scripts/integration_audit.py` — integration_audit.py - the INTEGRATOR's cross-lane sweep (what no single lane can see).
