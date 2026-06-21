@@ -166,22 +166,27 @@ pre/post-report gives must not miscount the money). Needs no staff conversation 
    touch the typed report's cash count.
 4. **Menu = the LISTENER↔bot PRIVATE DM only** (not the owner); listener already pressed Start.
 
-**✅ BUILT (staging, INERT — nothing imports it, no deploy):** `gm_bot/food_money.py` (`food_money_cents`
-half-up · `next_report_kind` · `render_food_list` · **`food_menu_rows` = ARRIVED-only + exclude-given +
-standard-shift amount**) + `gm_bot/food_money_db.py` (open gives · partial-UNIQUE so a re-tap can't
-double-count · `close_food_period` · **`food_arrived_staff` = CHECKED-IN staff** from `attendance_sessions`
-⋈ `staff_registry` · self-migrating init). **19 tests** incl. the $11.92 sheet, close-then-reopen, and the
-arrived-only rule. **ARRIVED RULE (owner 2026-06-21):** the menu is built from `checked_in_at IS NOT NULL`
-(actually arrived) — NOT `_present_now` (schedule); a scheduled-but-not-arrived staffer never appears.
+**✅ BUILT — core + LIVE WIRING, but GATED OFF (safe even when deployed; nothing live yet):**
+- Core: `gm_bot/food_money.py` (`food_money_cents` half-up · `next_report_kind` · `render_food_list` ·
+  `food_menu_rows` = ARRIVED-only + exclude-given + standard-shift amount) + `gm_bot/food_money_db.py`
+  (open gives · partial-UNIQUE no-double · `close_food_period` · `food_arrived_staff` = CHECKED-IN staff
+  from `attendance_sessions` ⋈ `staff_registry` · self-migrating init).
+- Wiring: **`gm_bot/food_money_ui.py`** — `/menu` listener branch (1 button "🍚 Food Allowance") · the
+  give flow (list → tap → `record_food_money_give`, server-recomputed amount, name disappears) · the
+  close hook `post_food_list_on_report`. `gm_bot/bot.py`: 3 minimal touch-points (cmd_menu listener
+  branch · `food:` callback handler · close-hook call after `save_daily_report`).
+- **GATE — `_food_gate_on()` = `att_test_on()` OR `gm_state 'food_money_live'='on'`. OFF by default** →
+  deployed-but-off is fully inert (listener /menu = "nothing here yet"; callback returns; hook no-ops).
+  Access = listener (`1271537077`) + owner, PRIVATE only. `is_test` follows the attendance test switch.
+- **Proof:** 24 food/UI tests (incl. $11.92 sheet · close-then-reopen · arrived-only · gate off-by-default
+  · server-recomputed give · blocked-when-off) + **full suite 827p/2s** (no regression from the live edits);
+  `gm_bot.bot` imports clean. **ARRIVED RULE:** `checked_in_at IS NOT NULL`, never `_present_now` (schedule).
 
-**⛔ REMAINING before go-live (the HIGH-RISK live wiring):**
-- **Menu UI** in the listener DM (scope: private chat + listener id `1271537077`): assemble via
-  `food_menu_rows(food_arrived_staff(dates), food_money_open_ids())` → tap → `record_food_money_give` →
-  confirm "Recorded for the coming Day/Night report." (Data layer done; this is the Telegram handlers.)
-- **Close hook:** after `save_daily_report` in `gm_bot/bot.py::_store_daily_report_if_any` (~line 1055), call
-  `close_food_period(report_id, business_day, report_kind)` → post the rendered list.
-- **`shift_dates` window** for `food_arrived_staff` (today + yesterday to cover overnight) — confirm on the walk.
-- **Deploy = a LIVE GM-bot restart** (payroll-adjacent) → gate behind an OFF-by-default flag + owner walk in
-  `is_test` first, then quiet window + verify (HEAD==origin, active, code carries it).
+**⛔ REMAINING = GO-LIVE only (the HIGH-RISK step — needs the owner):**
+1. **Deploy** the gated-off code to the live GM bot (one quiet-window restart; verify HEAD==origin, active,
+   code carries it). Safe because the gate is OFF.
+2. **Owner walk in test mode:** `/testmode` on → listener `/menu` → 🍚 Food Allowance → give a few (is_test)
+   → post a test report → confirm the auto-posted "Night staff food" list → `/testreset`.
+3. **Flip live:** `gm_set_state('food_money_live','on')` (a DB write, no restart) → real.
 **PARKED:** checkout-only timing (owner will discuss with staff) — the button approach doesn't need it.
 

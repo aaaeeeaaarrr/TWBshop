@@ -1067,6 +1067,15 @@ async def _store_daily_report_if_any(msg, text: str) -> dict | None:
         full["report_id"], full["business_day"], full["report_kind"],
         full["computed"].get("math_ok"), parsed.get("_source", "free"),
     )
+    # Food-money close hook (GATED — a no-op when the feature is off; never raises into the report flow):
+    # a report being stored is the owner's "the report is done" → attach the open meal-money gives to it
+    # and post the Day/Night staff-food list to the listener.
+    try:
+        from gm_bot import food_money_ui
+        await food_money_ui.post_food_list_on_report(
+            msg.get_bot(), full["report_id"], full["business_day"], full["report_kind"])
+    except Exception:
+        logger.exception("food close hook failed")
     return full
 
 
@@ -5578,7 +5587,11 @@ def _own_kb(rows) -> InlineKeyboardMarkup:
 
 
 async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/menu — OWNER ONLY (salaries live in here, so not even Tyty)."""
+    """/menu — the LISTENER gets the shop menu (Food Allowance); the OWNER gets the owner menu
+    (salaries live in here, so not even Tyty / the listener)."""
+    from gm_bot import food_money_ui
+    if await food_money_ui.cmd_menu_listener(update, context):
+        return
     if update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
     await update.message.reply_text("🗂 Owner menu",
@@ -7370,6 +7383,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("menu",        cmd_menu))
     app.add_handler(CommandHandler("joined",      cmd_joined))
     app.add_handler(CallbackQueryHandler(_owner_menu_callback, pattern=r"^own:"))
+    from gm_bot import food_money_ui                      # Food Allowance menu (listener DM; gated OFF by default)
+    app.add_handler(CallbackQueryHandler(food_money_ui.on_food_callback, pattern=r"^food:"))
     app.add_handler(CommandHandler("commands",    cmd_commands))
     app.add_handler(CommandHandler("help",        cmd_commands))
     app.add_handler(CallbackQueryHandler(staff_button_callback, pattern=r"^ss:"))
