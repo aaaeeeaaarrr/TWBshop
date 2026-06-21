@@ -72,13 +72,72 @@ The core exposes **commands** + emits **results/events**; channels are adapters.
 TWB check-in also runs the new core; assert new == live; zero exposure). Prove it → port lateness → AL →
 sick → OT → payback → points onto the same shape → add web adapter → onboarding wizard → package → sell.
 
-## Open design questions to refine next (step by step)
-1. **Recurrence:** store each `shift` instance up front (generate from a schedule), or compute upcoming
-   instances on the fly + materialize on first touch? (iCal RRULE-style vs eager rows.)
-2. **Balances:** pure event-projection (replay) vs entity + event-trail (maintain a balance row, verify
-   against events)? (Recommend the latter for simplicity + the per-event verifier.)
-3. **`business_day` rule:** date-of-start everywhere, or a per-tenant cutoff (e.g. 03:00) for reporting?
-4. **Identity for staff across channels:** a person may have a Telegram id AND a web login — one `staff_id`,
-   many channel identities.
-5. **Shadow comparator scope:** which outputs do we compare new-vs-live first (the check-in verdict +
-   lateness minutes are the obvious first asserts)?
+## Locked decisions (owner, 2026-06-22 — working basis, refine details)
+1. **Recurrence:** a schedule TEMPLATE materializes `shift` rows a rolling ~30 days ahead (stable IDs to
+   reference), not pure compute-on-the-fly. A daily job extends the horizon + applies template changes to
+   not-yet-started shifts only.
+2. **Balances (debt / OT bank / points):** keep a balance ROW per staff + verify it against the event
+   trail (not full replay). The per-event verifier asserts row == sum(events).
+3. **`business_day`:** date-of-start by default; per-tenant cutoff configurable later. Label only.
+4. **Staff identity:** one `staff_id` + a `channel_identities` table (telegram_id, web_login, … all map to
+   the one person).
+5. **Shadow comparator (first asserts):** the check-in VERDICT + lateness MINUTES, then credit amounts.
+
+## ⚠ TOTAL-MIND interaction & edge-case map (owner: "don't trade old bugs for new ones")
+Switching identity from *date* to *shift_id* ripples everywhere that used the date. Each interaction below:
+how the new model handles it **+ the NEW risk it introduces that we must design against.**
+
+- **Identity ripple (the big one).** Today `attendance_sessions`, `payback_bookings`, `shift_changes`,
+  `sick_cases`, points all key on (staff, DATE). New: they reference `shift_id` (for per-shift things) or
+  stay per-STAFF (balances). **Rule:** *per-shift* facts (check-in, lateness, a payback-slot, OT on a
+  shift) → `shift_id`; *per-staff* balances (debt, OT bank, points) → `staff_id` (a shift event credits
+  them). **New risk:** a wrong shift↔event mapping at migration/shadow time → assert it in the comparator.
+
+- **Far-date move / overlap.** `shift_moved` keeps `shift_id`, changes the interval — far dates are just
+  different instants. **New risk the model now EXPOSES (and must guard):** a move can make two of a
+  person's shifts **overlap** (the old date-model couldn't even represent two shifts/day, so it never
+  checked). **New invariant:** *no two active shifts for one staff overlap* (unless an intentional split
+  with a gap) → reject/flag the move. Also: only a **scheduled/future** shift may be moved — never a
+  worked one (a worked interval is frozen history).
+
+- **Payback ladder + deadline + over-book.** The ladder counts working days → now = **upcoming shift
+  instances** (entities), and a payback slot **is** a shift (`origin=payback-slot`). **New risk = the SAME
+  class as the bug we just fixed:** a stale plan. **Rule:** the ladder, the deadline count, and the
+  `book_room` over-book guard must ALWAYS re-derive from the CURRENT shifts/events, never a cached plan —
+  and if a counted shift is later moved/cancelled, an event re-triggers the re-derive. (The entity model
+  makes "what's my real remaining + my real upcoming slots" a clean query instead of date math.)
+
+- **Leave (AL / sick / special).** `leave_taken` supersedes the shift(s) it **overlaps by interval**
+  (handles half-day / partial = shorten or split the shift). **New risk:** leave overlapping a shift that
+  ALSO has a payback/OT origin, or a leave whose window crosses midnight → resolve by interval-overlap,
+  not by date-equality (one resolver, like today's `resolve_day` but interval-based).
+
+- **Swap (A↔B day-off).** `swap_applied` reassigns/creates shift instances with their real intervals.
+  **New risk:** a swap that creates an overlap (see invariant above) or leaves an orphan (B's cancelled
+  shift still referenced) → both sides emitted as one atomic event-pair; the overlap invariant catches the rest.
+
+- **Balances on cancel/reverse.** A points/credit event for attendance that ALREADY happened **stands**
+  even if a later part changes; cancelling a **future scheduled** shift just cancels (nothing to reverse).
+  **Rule:** events for things that occurred are immutable; reversals are explicit compensating events
+  (`payback_credit_reversed`), never silent edits — so the balance row always == sum(events).
+
+- **The shadow comparator is itself overnight-sensitive (irony to guard).** It maps an old (staff, DATE)
+  row to a new `shift` entity by INTERVAL. **New risk:** mis-aligning an overnight old-row to the wrong
+  new-shift → the comparator must map by the interval the work fell in (reuse the overnight-aware binding),
+  and a mapping failure must surface as a comparator error, not a silent "match."
+
+- **Cutover migration (date-keyed → shift_id).** In-flight shift (someone mid-overnight) → maps to the
+  active shift entity; open debt/OT/points (per-staff) → carry over unchanged; booked future payback slots
+  → become shift entities. **New risk:** an in-flight or booked row that doesn't map cleanly → migration
+  must be a dry-run-first, reconciled, reversible step (same rigor as a balance migration).
+
+### New invariants the model must enforce (so new bugs can't hide)
+1. **No overlapping active shifts** for one staff (the move/swap guard).
+2. **Worked intervals are frozen** — never moved/edited; changes create new shifts or compensating events.
+3. **Always re-derive** ladder / deadline / over-book from current state — never a cached plan.
+4. **Balance row == sum(its events)** — enforced by the per-event verifier (the "check everything" layer).
+5. **Comparator maps by interval + fails loud** on any unmapped old/new row.
+
+## Open (finer detail, refine as we build)
+- exact event payload schemas; the `channel_identities` shape; the per-tenant config schema; how the
+  schedule template expresses patterns (rotations, splits); reversal-event catalogue.
