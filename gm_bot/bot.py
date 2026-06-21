@@ -1569,8 +1569,10 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     slot_size = min(balance, pb.day_ext_cap(normal_len))   # 18h-total-day cap (owner rule)
     work_days = [d for d in pb.working_days_ahead(staff.get("day_off"), leave_isos,
                                                   _today_pp(), 10, 6) if d.isoformat() not in taken]
-    next_off = [d for d in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos, _today_pp(), 14)
-                if d.isoformat() not in taken][:1]   # the NEXT day off only (owner: not a 14-day scan)
+    # the NEXT day off only (owner: not a 14-day scan) — AND only when the debt is ≥2h (owner Jun 21:
+    # don't burn a rest day to repay minutes; small debt attaches to working days only).
+    next_off = ([d for d in pb.dayoff_dates_ahead(staff.get("day_off"), leave_isos, _today_pp(), 14)
+                 if d.isoformat() not in taken][:1] if pb.dayoff_payback_allowed(balance) else [])
     # real per-date away set (AL / special-leave / swap-off) → an honest shortfall, not a blind one
     away = away_staff_by_dates([d.isoformat() for d in work_days + next_off])
     def _leave_names(d):

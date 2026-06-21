@@ -13,6 +13,17 @@ _DOW = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 
 PB_DEADLINE_DAYS = 14   # a debt must be worked off within 14 days (owner spec, session 28)
 
+DAYOFF_MIN_PAYBACK_MIN = 120   # owner rule (Jun 21): never offer a staff's DAY OFF as a payback slot
+                               # for a debt under 2h — small debt attaches to standard working days
+                               # (before/after their shift); save rest-day payback for a real chunk.
+
+
+def dayoff_payback_allowed(balance_min: int) -> bool:
+    """True only when the open debt is large enough (≥2h) to justify offering a rest day for it.
+    Below that, payback attaches to working days only (a 1-min slot on a working day is harmless —
+    it just extends a shift they're already on — but a rest day is never worth a small debt)."""
+    return (balance_min or 0) >= DAYOFF_MIN_PAYBACK_MIN
+
 MAX_DAY_TOTAL_MIN = 18 * 60   # owner rule (Jun 15: raised 15h→18h — some staff work long shifts by
                               # choice): one day's TOTAL work time (shift + extension) never exceeds 18h
 

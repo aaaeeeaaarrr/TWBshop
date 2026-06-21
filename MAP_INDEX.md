@@ -46,7 +46,7 @@
 - `gm_bot/ot.py` — OT pure logic. No DB/Telegram.
     · cap_room, grant_fits, duration_options, ot_earned, split_ot_pb, apply_ot_to_pb, settle_shift, rest_redefine, _fmt_dur, _ext_tag, end_option_tags, start_options
 - `gm_bot/payback.py` — Payback pure logic (session 28). No DB/Telegram.
-    · day_ext_cap, unbooked, working_days_ahead, dayoff_dates_ahead, swap_pairings, dayoff_windows, slot_windows, takeback_windows, redefine_window, apply_payback, ignore_stage
+    · dayoff_payback_allowed, day_ext_cap, unbooked, working_days_ahead, dayoff_dates_ahead, swap_pairings, dayoff_windows, slot_windows, takeback_windows, redefine_window, apply_payback, ignore_stage
 - `gm_bot/payroll.py` — Payroll pure logic (session 28). No DB/Telegram.
     · day_pay, prorate_join_month, compute_slip, slip_line
 - `gm_bot/points.py` — Points pure logic (session 28). No DB/Telegram.
