@@ -650,6 +650,10 @@ prompt says "read what's written"). 4. Prices are a signal; the receipt's printe
 prompt-builder (pure prompt-shape test) + wire the pre-known-vendor callers to pass it. 3. pure ranking
 function + tests. 4. Fix-flow suggestion buttons + callback (rename + learn) + tests. 5. staging walk: the
 same hard receipt across 1–3 corrections → names firm up; verify a confident read is never overridden.
+**✅ BUILT 2026-06-21 (steps 1–4, INERT/accountant):** `vendor_item_history` + `vendor_priors_for` (db) ·
+`extract_receipt(vendor_priors=)` + `_vendor_priors_block` (anti-anchor), wired into candidate-promote ·
+`capture.did_you_mean` + `capture.dym_rows` · the ✏️ Fix `acc:dym:` buttons (rename + learn, re-derived
+server-side). 13 §G tests; full suite 834p/2s. **Step 5 (the staging walk) = owner** — the only piece left.
 
 ### G6. Deferred (NOT MVP — add only if it bites)
 Per-line model self-confidence flag · two-pass re-read for cold hard receipts (decision ii) · inline card

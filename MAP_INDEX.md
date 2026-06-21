@@ -71,9 +71,9 @@
 ## accountant/
 - `accountant/__init__.py` — Accountant TWB — finance / expense / payment lane (separate twbshop-accountant bot).
 - `accountant/bot.py` — accountant/bot.py — the Telegram shell for the accountant (P1 capture).
-    · _allowed, _rows_kb, _kb, _cand_kb, _card_text_kb, _send_card, _download, cmd_start, cmd_vendor, cmd_vendors, on_photo, _on_supplier_photo, _capture_expense_photo, _safe_edit, _rerender  …(+11, grep)
+    · _allowed, _rows_kb, _kb, _cand_kb, _card_text_kb, _send_card, _download, cmd_start, cmd_vendor, cmd_vendors, on_photo, _on_supplier_photo, _capture_expense_photo, _safe_edit, _rerender  …(+12, grep)
 - `accountant/capture.py` — accountant/capture.py — P1 capture pure logic (no Telegram, no DB, fully unit-testable).
-    · fmt_money, math_check, parse_amount_cents, did_you_mean, route, render_card, card_buttons, vendor_picker_buttons, channel_picker_buttons, candidate_card, candidate_buttons, lookalike_prompt, lookalike_buttons, receipt_pick_label
+    · fmt_money, math_check, parse_amount_cents, did_you_mean, dym_rows, route, render_card, card_buttons, vendor_picker_buttons, channel_picker_buttons, candidate_card, candidate_buttons, lookalike_prompt, lookalike_buttons, receipt_pick_label
 - `accountant/db.py` — Accounting ledger — schema + data layer for the Accountant bot.
     · to_usd_cents, init_accounting_db, vendor_link, vendor_by_group, _vnorm, _vendor_aliases, vendor_by_name, find_similar_vendors, add_vendor_alias, get_vendor, propose_vendor, confirm_vendor, list_unconfirmed_vendors, vendor_item_history, vendor_priors_for  …(+33, grep)
 

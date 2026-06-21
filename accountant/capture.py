@@ -95,6 +95,25 @@ def did_you_mean(line_price_cents, history, limit=3, band_cents=None):
     return out
 
 
+def dym_rows(rid, lines, history, limit=3):
+    """Fix-flow did-you-mean button rows (design §G, mechanism B). For each LOW-CONFIDENCE line
+    (`li['confident']` falsy — a fresh translation, not a confirmed alias) that has a price, suggest the
+    vendor's nearest-priced items as `#pos name` buttons → callback 'acc:dym:{rid}_{line_id}_{idx}'.
+    Pure; [] when no low-confidence line has a suggestion. The apply side re-derives by idx (never trusts
+    the label)."""
+    rows = []
+    for pos, li in enumerate(lines, 1):
+        if li.get("confident") or not (li.get("orig_name") or "").strip():
+            continue
+        price = li.get("unit_price_cents")
+        if price is None:
+            price = li.get("line_total_cents")
+        cands = did_you_mean(price, history, limit=limit)
+        if cands:
+            rows.append([(f"#{pos} {c}", f"acc:dym:{rid}_{li['id']}_{i}") for i, c in enumerate(cands)])
+    return rows
+
+
 def route(assess: dict) -> str:
     """Map an assess_receipt_photo result to the capture action.
     'receipt' → ledger row; 'expense_sheet'/'pos_screen' → the report engine; 'other' → ignore."""

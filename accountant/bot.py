@@ -26,7 +26,7 @@ from accountant.db import (add_candidate, add_receipt, attach_vendor_channel, cl
                            recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
                            save_receipt_lines, set_candidate_card, set_payment, set_vendor_kind,
                            to_usd_cents, unclaim_candidate, vendor_by_group, vendor_by_name,
-                           vendor_link, vendor_priors_for)
+                           vendor_item_history, vendor_link, vendor_priors_for)
 from shared.ai_client import extract_receipt
 
 try:
@@ -257,6 +257,23 @@ async def _rerender(q, rid):
     await _safe_edit(q, text, kb)
 
 
+def _dym_keyboard(rid):
+    """The Fix-flow did-you-mean keyboard for receipt #rid (§G B), or None if no low-confidence line has a
+    price-based suggestion. Marks each line 'confident' like the card, then capture.dym_rows builds it."""
+    r = get_receipt(rid)
+    vid = r.get("vendor_id") if r else None
+    if not vid:
+        return None
+    lines = get_receipt_lines(rid)
+    for li in lines:
+        orig = (li.get("orig_name") or "").strip()
+        li["confident"] = (not orig) or (orig == (li.get("raw_name") or "")) or \
+                          (get_item_alias(vid, orig) == li.get("raw_name"))
+    hist = [{"name": h["name"], "price_cents": h["price_cents"]} for h in vendor_item_history(vid)]
+    rows = capture.dym_rows(rid, lines, hist)
+    return _rows_kb(rows) if rows else None
+
+
 async def _show_channel_suggestions(q, vid, head=None):
     """§G9 — offer to link a vendor's paid-signal channel from the listener's known chats (groups + DMs),
     fuzzy-matched by name so the owner taps instead of scrolling hundreds. Always offers skip / once-off,
@@ -340,6 +357,34 @@ async def on_callback(update, context):
         v = get_vendor(vid)
         await _safe_edit(q, f"🔗 Linked {v['name'] if v else vid} → channel {cid}.")
         return
+    if action == "dym":                           # sid = "rid_lineid_idx" → apply a did-you-mean (§G B)
+        try:
+            rid, line_id, idx = (int(x) for x in sid.split("_"))
+        except ValueError:
+            return
+        r = get_receipt(rid)
+        vid = r.get("vendor_id") if r else None
+        line = next((li for li in get_receipt_lines(rid) if li["id"] == line_id), None)
+        if line is None or vid is None:
+            await _safe_edit(q, "✏️ That receipt changed — open the card again.")
+            return
+        price = line.get("unit_price_cents")
+        if price is None:
+            price = line.get("line_total_cents")
+        hist = [{"name": h["name"], "price_cents": h["price_cents"]} for h in vendor_item_history(vid)]
+        cands = capture.did_you_mean(price, hist, limit=3)
+        if idx < 0 or idx >= len(cands):
+            return
+        name = cands[idx]
+        rename_receipt_line(line_id, name)                 # apply
+        learn_item_alias(vid, line.get("orig_name"), name)  # learn (human-confirmed → future auto-resolve)
+        kb = _dym_keyboard(rid)
+        if kb:
+            await _safe_edit(q, f"✅ {name}. Tap another suggestion, or send a correction:", kb)
+        else:
+            await _safe_edit(q, f"✅ {name} — all suggestions applied.")
+            await _send_card(update, rid)                  # one fresh card once nothing's left to suggest
+        return
     # ── vendor-id actions (sid = a vendor id) ──
     if action in ("vok", "lsug", "lskip", "1off"):
         try:
@@ -371,11 +416,13 @@ async def on_callback(update, context):
         set_payment(rid, "aba")
     elif action == "fix":
         context.user_data["acc_fix"] = rid
+        kb = _dym_keyboard(rid)                    # §G B: price-based suggestions for low-confidence lines
+        head = "✏️ Tap a suggestion below, or send a correction:\n" if kb else "✏️ Send a correction:\n"
         await q.message.reply_text(
-            "✏️ Send a correction:\n"
+            head +
             "• a number = the total (e.g. 135.30)\n"
             "• `1 Apple` = rename item 1 (I'll remember it for next time)\n"
-            "• anything else = a note")
+            "• anything else = a note", reply_markup=kb)
         return
     elif action == "setv":
         await _show_vendor_picker(q, rid)

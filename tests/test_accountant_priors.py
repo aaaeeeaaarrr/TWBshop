@@ -32,6 +32,23 @@ def test_vendor_priors_block_is_a_soft_hint_or_empty():
     assert "READ WHAT IS ACTUALLY WRITTEN" in block          # the anti-anchor guard must be present
 
 
+# ─────────────────────────── Fix-flow did-you-mean rows (pure) ───────────────────────────
+def test_dym_rows_only_low_confidence_priced_lines():
+    from accountant.capture import dym_rows
+    lines = [
+        {"id": 11, "raw_name": "Chicken", "orig_name": "សាច់", "unit_price_cents": 115, "confident": False},
+        {"id": 12, "raw_name": "Cheese", "orig_name": "Cheese", "unit_price_cents": 500, "confident": True},
+        {"id": 13, "raw_name": "X", "orig_name": "", "unit_price_cents": 110, "confident": False},
+    ]
+    hist = [{"name": "Potato", "price_cents": 120}, {"name": "Onion", "price_cents": 110}]
+    rows = dym_rows(7, lines, hist)
+    assert len(rows) == 1                                     # only line 11 (low-confidence + has orig + price)
+    labels = [lbl for (lbl, _) in rows[0]]
+    data = [d for (_, d) in rows[0]]
+    assert labels[0].startswith("#1 ")                       # labelled by the card's line position
+    assert all(s.startswith("acc:dym:7_11_") for s in data)  # callback carries rid_lineid_idx (re-derived on apply)
+
+
 # ─────────────────────────── vendor history + priors (staging) ───────────────────────────
 @pytest.fixture
 def priors_vendor():
