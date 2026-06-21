@@ -14,7 +14,7 @@
 - `gm_bot/attendance_ui.py` — Attendance main-menu — owner role-play SHELL + LIVE staff entry (one set of menus, no fork).
     · _today, _now_min, _hm, _shift_date_now, _shift_running, _present_now, _near_days, fmt12, fmt12s, day_label, shift_len_min, late_offsets, grid, staff_day_events, _decision  …(+112, grep)
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
-    · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+9, grep)
+    · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
     · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+204, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.

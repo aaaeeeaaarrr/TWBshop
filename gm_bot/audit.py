@@ -12,12 +12,14 @@ SQL runner. Each problem line is self-contained — the owner can paste it to Cl
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 OT_CAP_MIN = 840          # 14h bank cap
 from gm_bot.payback import MAX_DAY_TOTAL_MIN   # one day's total work-time cap (single source of truth)
 STALE_PENDING_DAYS = 4    # a request nobody decided for this long = stuck ladder
 STALE_OPEN_SESSION_DAYS = 2
+LATE_SICK_OWN_MIN = 30    # mirror gm_bot.attendance_ui: own-sick told < this before shift start = −15
+LATE_SICK_LOOKBACK_DAYS = 14   # only audit recent sicks (don't dredge ancient history)
 
 
 def _nm(staff_by_id: dict, sid) -> str:
@@ -525,6 +527,37 @@ def v_staff_sanity(staff_rows: list[dict]) -> list[str]:
 
 # ───────────────────────────── DB runner ─────────────────────────────
 
+def v_late_sick_penalty(sick: list[dict], pevents: list[dict], staff: dict, today: date) -> list[str]:
+    """Own-sick declared within 30 min of shift start (or after it) MUST carry a −15 'late_sick_inform'
+    points event. Catches the Long-class miss where the penalty silently didn't fire (the pre-shift
+    window bug). Read-only; recent window only so it never dredges ancient history. Family-sick is
+    own-only-excluded (family late = a soft note, no points)."""
+    out = []
+    have = {(e["staff_id"], e.get("ref")) for e in pevents if e.get("cause") == "late_sick_inform"}
+    for c in sick:
+        if (c.get("who") or "").strip().lower() != "me":
+            continue
+        sd, created, sid = c.get("the_date"), c.get("created_at"), c.get("staff_id")
+        ws = ((staff.get(sid) or {}).get("work_start") or "").strip()
+        if not sd or not created or ":" not in ws:
+            continue
+        if sd > today or (today - sd).days > LATE_SICK_LOOKBACK_DAYS:
+            continue
+        try:
+            h, m = (int(x) for x in ws.split(":")[:2])
+        except Exception:
+            continue
+        shift_start_utc = datetime.combine(sd, time(h, m), tzinfo=timezone.utc) - timedelta(hours=7)  # PP→UTC
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        mins_before = (shift_start_utc - created).total_seconds() / 60.0
+        if mins_before < LATE_SICK_OWN_MIN and (sid, sd.isoformat()) not in have:
+            out.append("LATE-SICK: %s own-sick on %s declared %d min before shift start (< %d) "
+                       "but has NO -15 late_sick_inform — the penalty didn't fire"
+                       % (_nm(staff, sid), sd.isoformat(), round(mins_before), LATE_SICK_OWN_MIN))
+    return out
+
+
 def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple[list[str], dict]:
     """Run every invariant. test_rows: None = follow the current mode (test rows in test mode,
     real rows live — the /audit command); True/False = explicit (the daily auto-audit passes
@@ -572,6 +605,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_swap_exclusivity(als, overrides, swaps, staff)
                 + v_a2_paired(scs, overrides, staff)
                 + v_late_points(sess, pevents, staff)
+                + v_late_sick_penalty(sick, pevents, staff, today)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)
                 + v_one_active_redefine(scs, staff)
