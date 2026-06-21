@@ -3969,6 +3969,15 @@ async def _special_leave_supersede(context, staff: dict, start_date: str, days: 
 async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> None:
     """Day-1 own-sick booking (provisional case + paperless payback + rest-well + the FYI with
     the reason). Shared by the typed-reason dispatch and the 30-min auto-resolve."""
+    # LATE-INFORMING must be measured BEFORE the sick case exists. Once sick_create runs,
+    # resolve_day marks the day not-working (start_min=None) and _sick_late_mins returns None —
+    # filing the sick erases the very shift-start the −15 needs (self-cancellation bug: the −15
+    # silently never fired since go-live; owner caught it via Long, Jun 21). Capture first.
+    try:
+        from gm_bot.attendance_ui import _sick_late_mins
+        _late_inform_mins = _sick_late_mins(persona)
+    except Exception:
+        _late_inform_mins = None
     sick_create(persona["id"], "me", date_iso, "provisional")
     await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
     from gm_bot.attendance import to_min
@@ -3987,10 +3996,10 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     # ONCE per day. Recorded SILENTLY (don't pile on while they're sick); taught at the next check-in
     # (deferred flag below). Papers do NOT wipe it. Only for TODAY's shift; None = not working today.
     try:
-        from gm_bot.attendance_ui import _sick_late_mins, LATE_SICK_OWN_MIN
-        mins = _sick_late_mins(persona)
-        # mins is None unless they have a CURRENT/imminent shift (overnight-aware), so that alone gates
-        # this to a real shift — the old `date_iso == today` guard is dropped (date_iso is now the
+        from gm_bot.attendance_ui import LATE_SICK_OWN_MIN
+        mins = _late_inform_mins   # captured BEFORE sick_create (above) — not recomputed, see why there
+        # mins is None unless they had a CURRENT/imminent shift (overnight-aware) at filing time, so that
+        # alone gates this to a real shift — the old `date_iso == today` guard is dropped (date_iso is the
         # overnight-aware shift date, which is YESTERDAY for a 2am report, so == today would wrongly skip).
         if mins is not None and mins < LATE_SICK_OWN_MIN:
             done_key = "late_inform_done:%d:%s" % (persona["id"], date_iso)
