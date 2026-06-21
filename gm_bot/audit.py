@@ -132,8 +132,14 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date,
             still_running = ((r["staff_id"], str(r["when_date"])) in open_sessions
                              and r["when_date"] >= today - timedelta(days=1))
             if not still_running:
-                out.append("OT: %s change #%s APPROVED for %s but never settled — OT may not have "
-                           "banked at checkout" % (nm, r["id"], r["when_date"]))
+                # name what it ACTUALLY is (owner Jun 22: a payback slot is NOT OT — the 'OT' prefix
+                # on a payback redefine was misleading).
+                if (r.get("reason") or "") == "payback slot":
+                    out.append("PAYBACK: %s slot #%s for %s was approved but never settled — the worked "
+                               "time may not have credited the debt" % (nm, r["id"], r["when_date"]))
+                else:
+                    out.append("OT: %s change #%s APPROVED for %s but never settled — OT may not have "
+                               "banked at checkout" % (nm, r["id"], r["when_date"]))
         if st == "proposed" and r.get("when_date") and r["when_date"] < today:
             out.append("OT: %s change #%s still PROPOSED but its date %s passed (staff never "
                        "answered)" % (nm, r["id"], r["when_date"]))
