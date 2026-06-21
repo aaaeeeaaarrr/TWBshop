@@ -16,8 +16,8 @@ ORG = "test_shadow"
 ORG2 = "test_shadow2"
 
 
-def _utc(y, m, d, hh, mm):
-    return datetime(y, m, d, hh, mm, tzinfo=UTC)
+def _utc(y, m, d, hh, mm, ss=0):
+    return datetime(y, m, d, hh, mm, ss, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
@@ -72,6 +72,22 @@ def test_day_shift_on_time_and_late():
     assert on["state"] == "on_time" and on["minutes_late"] == 0
     late = check_in(ORG, 999004, _utc(2026, 6, 20, 23, 12), "06:00", "15:00")  # 06:12 PP
     assert late["state"] == "late" and late["minutes_late"] == 12
+
+
+def test_grace_and_early_threshold_match_live():
+    # within GRACE (≤5 late) / below EARLY bonus (<5 early) → on_time with 0/0, exactly like live
+    assert check_in(ORG, 999010, _utc(2026, 6, 20, 23, 3), "06:00", "15:00")["state"] == "on_time"   # 3 late
+    assert check_in(ORG, 999011, _utc(2026, 6, 20, 22, 57), "06:00", "15:00")["state"] == "on_time"  # 3 early
+    assert check_in(ORG, 999012, _utc(2026, 6, 20, 23, 5), "06:00", "15:00")["state"] == "on_time"   # 5 late (not >5)
+    r6 = check_in(ORG, 999013, _utc(2026, 6, 20, 23, 6), "06:00", "15:00")                            # 6 late
+    assert r6["state"] == "late" and r6["minutes_late"] == 6
+    r5e = check_in(ORG, 999014, _utc(2026, 6, 20, 22, 55), "06:00", "15:00")                          # 5 early
+    assert r5e["state"] == "early" and r5e["minutes_early"] == 5
+
+
+def test_seconds_are_truncated_like_live():
+    # 06:05:50 PP = 5 min 50 s late → live truncates seconds → 5 late → within grace → on_time
+    assert check_in(ORG, 999015, _utc(2026, 6, 20, 23, 5, 50), "06:00", "15:00")["state"] == "on_time"
 
 
 # ── idempotency (one check-in per shift) ────────────────────────────────────

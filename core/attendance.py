@@ -34,17 +34,37 @@ def _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz):
     return shift_for_instant(org_id, staff_id, when_dt)
 
 
+def verdict(when_dt, start_dt, tz: str = "Asia/Phnom_Penh",
+            grace_min: int = 5, early_bonus_min: int = 5) -> tuple:
+    """(state, minutes_late, minutes_early) for a check-in instant vs the shift start. PARITY with live
+    (gm_bot/checkin.verdict): minute-of-day truncation (drop seconds), a GRACE for small lateness, and an
+    EARLY threshold — within grace either side = 'on_time' with 0/0. grace_min/early_bonus_min are
+    per-tenant config (TWB = 5/5); pure (no DB). Circle math handles overnight by construction."""
+    z = ZoneInfo(tz)
+    wl, sl = when_dt.astimezone(z), start_dt.astimezone(z)
+    rel = ((wl.hour * 60 + wl.minute) - (sl.hour * 60 + sl.minute)) % 1440
+    if rel == 0:
+        early = late = 0
+    elif rel > 720:                       # before the start = early
+        early, late = 1440 - rel, 0
+    else:
+        early, late = 0, rel
+    if early >= early_bonus_min:
+        return "early", 0, early
+    if late > grace_min:
+        return "late", late, 0
+    return "on_time", 0, 0
+
+
 def check_in(org_id, staff_id, when_dt, work_start, work_end,
-             tz: str = "Asia/Phnom_Penh", location=None) -> dict:
+             tz: str = "Asia/Phnom_Penh", location=None,
+             grace_min: int = 5, early_bonus_min: int = 5) -> dict:
     """Bind the check-in to its shift + return the verdict (state + minutes), emitting one checked_in
-    event. Verdict is pure: minutes vs the shift's real start_dt. `when_dt` must be tz-aware (UTC)."""
+    event. Verdict matches live (grace/early thresholds, minute-of-day). `when_dt` must be tz-aware."""
     shift = _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz)
     if not shift:
         return {"bound": False, "reason": "no shift near this instant"}
-    diff_min = round((when_dt - shift["start_dt"]).total_seconds() / 60.0)
-    late = max(0, diff_min)
-    early = max(0, -diff_min)
-    state = "late" if late > 0 else ("early" if early > 0 else "on_time")
+    state, late, early = verdict(when_dt, shift["start_dt"], tz, grace_min, early_bonus_min)
     inserted = _emit_event(org_id, shift["shift_id"], staff_id, "checked_in", when_dt,
                            {"minutes_late": late, "minutes_early": early, "state": state,
                             "location": location})
