@@ -16,7 +16,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+210, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+211, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/clarify.py` — Clarification escalation ladder — pure decision logic + text builders.
@@ -212,6 +212,8 @@
     · classify, run
 - `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.
     · main
+- `scripts/replay_checkins.py` — REPLAY accelerator (owner Jun 22 — "days instead of weeks").
+    · _live_state, main
 - `scripts/run_accountant_local.py` — LOCAL TEST launcher for the accountant bot — staging DB + dev poller + the Python-3.14
 - `scripts/seed_vendors.py` — Seed acc_vendors from scripts/vendor_seed.py.
     · main

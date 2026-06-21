@@ -1814,14 +1814,6 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if first:
         _gm_log("checkin", staff["id"], detail={"date": shift_date, "state": state,
                                                 "late": late, "early": early})
-        # SHADOW-RUN (gated off by default; best-effort + fully isolated — see core/shadow_hook.py):
-        # run the new platform core on this SAME real check-in + record new-vs-live. A shadow failure is
-        # logged as [SHADOW] and can NEVER affect this live check-in (it's the LAST thing + swallows all).
-        try:
-            from core.shadow_hook import shadow_checkin
-            shadow_checkin(staff, now_pp, state, late, early)
-        except Exception:
-            pass
         # record raw points events (values derived later — owner-tuned; nothing connected yet)
         try:
             if state == "early":
@@ -1863,6 +1855,15 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
                 await msg.reply_text(ui._V_LATE % (late, late))
         else:
             await msg.reply_text(ui._V_ONTIME)
+    # SHADOW-RUN (gated off by default; best-effort + fully isolated — see core/shadow_hook.py): run the
+    # new core on this SAME check-in + record new-vs-live, AFTER the staff's reply so the shadow is NEVER
+    # on the staff's path (owner Jun 22: zero live-facing latency). A failure logs [SHADOW] + can't touch live.
+    if first:
+        try:
+            from core.shadow_hook import shadow_checkin
+            shadow_checkin(staff, now_pp, state, late, early)
+        except Exception:
+            pass
     # DEFERRED Late-Informing reminder (owner, Jun 16): taught at the NEXT check-in, not while they're
     # sick. Expires after 7 days (the −15 still stands in their points; only the courtesy note expires).
     if first:
@@ -6022,6 +6023,22 @@ async def _session_closer_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info("session-closer: closed %d stale open session(s)", n)
 
 
+async def _shadow_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Nightly SHADOW digest → DM the owner (owner Jun 22): today's tally + the carried-over UNRESOLVED
+    mismatches (a missed night combines into the next, by construction — build_digest reports all open)
+    + a proposed fix per pattern + a cut-over readiness read. Best-effort + read-only; runs only while
+    the shadow is on. Tagged [SHADOW] so it's never mistaken for a live alert."""
+    try:
+        from core.shadow_hook import shadow_enabled
+        if not shadow_enabled():
+            return
+        from core.shadow import build_digest
+        d = build_digest("twb")
+        await context.bot.send_message(config.OWNER_TELEGRAM_ID, "📊 [SHADOW] nightly review\n\n" + d["text"])
+    except Exception:
+        logger.exception("[SHADOW] nightly digest failed (live unaffected)")
+
+
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/audit — owner: cross-check that every button input translated to the right stored result.
     Runs all data invariants (AL deductions, payback math, OT banking/cap, sessions, no-shows,
@@ -7641,6 +7658,11 @@ def build_app() -> Application:
     app.job_queue.run_daily(_session_closer_job,
                             time=__import__("datetime").time(hour=0, minute=0),
                             name="gm_session_closer")
+    # nightly SHADOW digest → DM the owner at 21:45 PP (14:45 UTC), after the evening check-in wave.
+    # Carries over unresolved mismatches (a missed night combines into the next). No-op while shadow off.
+    app.job_queue.run_daily(_shadow_digest_job,
+                            time=__import__("datetime").time(hour=14, minute=45),
+                            name="gm_shadow_digest")
     # bounded reason-nudge ladder (10/20/30): every 5 min, gated
     app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
                                 name="gm_reason_nudge")

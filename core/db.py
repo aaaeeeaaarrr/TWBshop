@@ -66,9 +66,16 @@ def init_core_db() -> None:
                     live       JSONB,
                     new        JSONB,
                     note       TEXT,
+                    source     TEXT NOT NULL DEFAULT 'live',  -- 'live' (real-time hook) | 'replay' (backfill)
+                    reconciled BOOLEAN NOT NULL DEFAULT FALSE,-- a mismatch we've understood/fixed/accepted
                     at         TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
+            # self-migrate (table may predate these columns)
+            cur.execute("ALTER TABLE shadow_comparisons ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'live'")
+            cur.execute("ALTER TABLE shadow_comparisons ADD COLUMN IF NOT EXISTS reconciled BOOLEAN NOT NULL DEFAULT FALSE")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_shadow_open "
+                        "ON shadow_comparisons (org_id, agree, reconciled)")
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:
