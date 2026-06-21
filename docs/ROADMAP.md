@@ -185,9 +185,16 @@ pre/post-report gives must not miscount the money). Needs no staff conversation 
   · server-recomputed give · blocked-when-off · no-salary-leak) + **full suite 829p/2s** (no regression);
   `gm_bot.bot` imports clean. **ARRIVED RULE:** `checked_in_at IS NOT NULL`, never `_present_now` (schedule).
 
+**▶ DECISION (2026-06-21): move the menu to the ACCOUNTANT bot, not the GM bot.** @AccountantTWB_bot is
+ALREADY in the Expenses TWB group (privacy off) — so no GM-in-group add needed (supersedes prereq 0 below).
+The pure calc/render/menu-rows + the gives/arrived DB are reusable as-is; rebuild the thin UI on the
+accountant. **OPEN sub-decision = the CLOSE TRIGGER:** the GM report-store event (`save_daily_report`) is
+NOT visible to the accountant, so the auto "post the list when the daily report is stored" can't carry over.
+→ **recommend a manual one-tap "📋 Post food list" on the accountant** (the listener taps it when they do
+the report — still human-signaled "report done", all on one bot, no cross-bot polling). Rebuild pending that pick.
+
 **⛔ REMAINING = GO-LIVE only (the HIGH-RISK step — needs the owner):**
-0. **PREREQ:** add the **GM bot to the Expenses TWB group** (`-5417163768`) and make sure it can see `/menu`
-   there (bot privacy OFF, or use `/menu@<gmbot>`). The GM bot is NOT in that group per config — owner adds it.
+0. ~~add the GM bot to the group~~ — SUPERSEDED: it's the accountant bot (already in the group), see DECISION above.
 1. **Deploy** the gated-off code to the live GM bot (one quiet-window restart; verify HEAD==origin, active,
    code carries it). Safe because the gate is OFF.
 2. **Owner walk in test mode:** `/testmode` on → in the Expenses TWB group `/menu` → 🍚 Food Allowance →
