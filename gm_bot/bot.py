@@ -2593,14 +2593,21 @@ async def _ot_buyback_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if not staff:
         return await _expired_toast(query, context, update.effective_user.id if update.effective_user else None)
     rest_min = (int(e_min) - int(s_min)) % 1440 or 1440
-    ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), rest_min)
-    # Jun 11 (the buyback twin of the mini-shift bug): booking now DEBITS the bank immediately
-    # (was: nothing debited → the same hours bookable forever) and creates the shift REDEFINE so
-    # attendance is fair on the rest day (no false 'late' for using earned rest).
-    from shared.database import ot_bank_spend, shift_change_autoapprove
+    # ATOMIC CLAIM FIRST (owner 'never again', Jun 22 — the OT-rest twin of the payback over-book):
+    # debit the bank ONLY if it covers the rest, in one conditional statement. A None return = the bank
+    # doesn't cover it OR a double-tap / stale two-device menu already spent it → refuse, and create NO
+    # buyback row + NO rest redefine (which would otherwise mint a phantom rest day). Only book when claimed.
+    from shared.database import ot_bank_claim_spend, shift_change_autoapprove
     from gm_bot.attendance import to_min as _tm0
     from gm_bot import ot as _ot
-    ot_bank_spend(staff["id"], rest_min)
+    if ot_bank_claim_spend(staff["id"], rest_min) is None:
+        await query.edit_message_text(
+            "That rest time isn't available any more — your OT bank doesn't cover it "
+            "(it may already be booked). Open your menu to see your current bank.\n"
+            "ម៉ោងសម្រាកនោះមិនអាចកក់បានទៀតទេ — OT bank មិនគ្រប់គ្រាន់ "
+            "(ប្រហែលជាបានកក់រួចហើយ)។ សូមបើក menu ដើម្បីពិនិត្យ OT bank បច្ចុប្បន្ន។")
+        return
+    ot_buyback_book(staff["id"], slot_date, int(s_min), int(e_min), rest_min)
     _w0, _w1 = _tm0(staff.get("work_start")), _tm0(staff.get("work_end"))
     if _w0 is not None and _w1 is not None:
         win = _ot.rest_redefine(_w0, _w1, int(s_min), int(e_min))
