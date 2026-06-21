@@ -166,6 +166,8 @@
     · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+295, grep)
 - `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
     · make_error_handler
+- `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
+    · RedactTokenFilter, redact, install_log_hygiene
 - `shared/runtime_guard.py` — Runtime guard: refuse to start a live Telegram/Telethon poller off production.
     · assert_polling_allowed
 - `shared/stock_shared.py` — Shared stock tables — the accountant <-> stock-lane seam (design §E7 / §E11).
