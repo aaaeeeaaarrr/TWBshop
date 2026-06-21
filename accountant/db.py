@@ -337,6 +337,43 @@ def list_unconfirmed_vendors() -> list[dict]:
             return list(cur.fetchall())
 
 
+def vendor_item_history(vendor_id) -> list[dict]:
+    """Per-item price/frequency for a vendor, from acc_receipt_lines ⋈ acc_receipts (design §G). Returns
+    [{name, price_cents, n}] — `price_cents` = the most-recent known unit price (fallback the line total),
+    `n` = how many times seen. Read-only. Powers the vendor priors (the read) + the Fix did-you-mean."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT l.raw_name AS name, l.unit_price_cents, l.line_total_cents
+                           FROM acc_receipt_lines l JOIN acc_receipts r ON r.id = l.receipt_id
+                           WHERE r.vendor_id=%s AND l.raw_name IS NOT NULL AND l.raw_name <> ''
+                           ORDER BY l.id DESC""", (vendor_id,))
+            rows = cur.fetchall()
+    agg: dict = {}
+    for x in rows:
+        name = x["name"]
+        price = x["unit_price_cents"] if x["unit_price_cents"] is not None else x["line_total_cents"]
+        if name not in agg:                       # first seen (id DESC) = newest → its price is the latest
+            agg[name] = {"name": name, "price_cents": price, "n": 0}
+        agg[name]["n"] += 1
+    return list(agg.values())
+
+
+def vendor_priors_for(vendor_id, max_items=12) -> dict:
+    """Soft priors for the read (design §G, mechanism A): the vendor's name + learned aliases (orig→english)
+    + the items we usually buy from them (most-frequent first, with a typical price). Read-only; {} when the
+    vendor is unknown. Fed to extract_receipt so it reads TOWARD plausible — a hint, never an anchor."""
+    v = get_vendor(vendor_id)
+    if not v:
+        return {}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT orig_name, english_name FROM acc_item_aliases WHERE vendor_key=%s",
+                        (vendor_id,))
+            aliases = [{"orig": r["orig_name"], "english": r["english_name"]} for r in cur.fetchall()]
+    items = sorted(vendor_item_history(vendor_id), key=lambda h: h["n"], reverse=True)[:max_items]
+    return {"vendor_name": v["name"], "aliases": aliases, "items": items}
+
+
 def set_vendor_kind(vendor_id: int, kind: str) -> None:
     """Tag a vendor (§G9): 'supplier' (AP, default) · 'oneoff' (throwaway market buy — kept OFF the
     payable run / recurring views, still on the books) · 'internal' (Homemade/Delis — not an AP vendor

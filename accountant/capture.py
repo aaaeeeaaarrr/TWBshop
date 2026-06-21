@@ -67,6 +67,34 @@ def parse_amount_cents(text):
     return (None, None, None)
 
 
+def did_you_mean(line_price_cents, history, limit=3, band_cents=None):
+    """Fix-flow 'did you mean?' suggestions (design §G, mechanism B): rank a vendor's historical items by
+    PRICE proximity to a low-confidence line's price. `history` = [{name, price_cents}, ...]. Returns up to
+    `limit` distinct names, closest price first (optionally only within `band_cents`). A suggestion shown to
+    a human — never auto-applied, never overrides a confident read. Pure. [] when the line has no price."""
+    if line_price_cents is None:
+        return []
+    scored = []
+    for h in (history or []):
+        p = h.get("price_cents")
+        name = h.get("name")
+        if p is None or not name:
+            continue
+        d = abs(p - line_price_cents)
+        if band_cents is not None and d > band_cents:
+            continue
+        scored.append((d, name))
+    scored.sort(key=lambda x: x[0])
+    seen, out = set(), []
+    for _, name in scored:
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def route(assess: dict) -> str:
     """Map an assess_receipt_photo result to the capture action.
     'receipt' → ledger row; 'expense_sheet'/'pos_screen' → the report engine; 'other' → ignore."""
