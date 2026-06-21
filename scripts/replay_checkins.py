@@ -18,13 +18,28 @@ from datetime import timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.database import _db
+from shared.database import _db, staff_all
 from core.db import init_core_db, ensure_org
 from core.attendance import check_in
 from core.shadow import compare_checkin
 
 ORG = "twb"
 TZ = "Asia/Phnom_Penh"
+
+
+def _resolved_schedule(staff_dict, shift_date, base):
+    """REDEFINE-AWARE schedule for a day: live's resolve_day knows the moved start (payback/OT slot).
+    Returns (work_start, work_end) as HH:MM — the resolved start if the day was redefined, else the base.
+    This is the shadow glue feeding the resolved schedule; the standalone core stays clean."""
+    try:
+        from gm_bot.attendance_ui import resolve_day
+        dec = resolve_day(staff_dict, str(shift_date))
+        if dec.get("working") and dec.get("start_min") is not None and dec.get("end_min") is not None:
+            sm, em = int(dec["start_min"]) % 1440, int(dec["end_min"]) % 1440
+            return "%02d:%02d" % (sm // 60, sm % 60), "%02d:%02d" % (em // 60, em % 60)
+    except Exception:
+        pass
+    return base
 
 
 def _live_state(minutes_late, minutes_early):
@@ -38,6 +53,7 @@ def _live_state(minutes_late, minutes_early):
 def main(days: int = 30):
     init_core_db()
     ensure_org(ORG, "TWBshop", TZ)
+    staff_by_id = {s["id"]: s for s in staff_all(None)}   # full dicts for resolve_day (redefine-aware)
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id, work_start, work_end FROM staff_registry")
@@ -63,7 +79,10 @@ def main(days: int = 30):
         if not ws_we or not ws_we[0] or not ws_we[1]:
             skipped += 1
             continue
-        res = check_in(ORG, r["staff_id"], r["checked_in_at"], ws_we[0], ws_we[1], TZ)
+        # feed the REDEFINE-AWARE resolved schedule (the redefine port, measured with no core change/deploy)
+        ws, we = _resolved_schedule(staff_by_id.get(r["staff_id"], {"id": r["staff_id"],
+                                    "work_start": ws_we[0], "work_end": ws_we[1]}), r["shift_date"], ws_we)
+        res = check_in(ORG, r["staff_id"], r["checked_in_at"], ws, we, TZ)
         ok = compare_checkin(ORG, r["staff_id"], _live_state(r["minutes_late"], r["minutes_early"]),
                              r["minutes_late"], r["minutes_early"], res, source="replay")
         done += 1

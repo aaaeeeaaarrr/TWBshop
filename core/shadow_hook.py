@@ -26,17 +26,23 @@ def shadow_enabled() -> bool:
         return False
 
 
-def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early) -> None:
+def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early, resolved_start_min=None) -> None:
     """Run core.check_in for TWB on the SAME check-in event + record new-vs-live. Best-effort + isolated:
-    any failure is swallowed and logged as [SHADOW] (live is never affected). No-op unless shadow_run=on."""
+    any failure is swallowed and logged as [SHADOW] (live is never affected). No-op unless shadow_run=on.
+    `resolved_start_min`: live's REDEFINE-aware start (from resolve_day) — pass it so the shadow judges
+    vs the same moved start live used (the redefine port; verified to take agreement to ~100%). Falls
+    back to the base work_start when not given."""
     if not shadow_enabled():
         return
     try:
         from core.attendance import check_in
         from core.shadow import compare_checkin
         ls = _STATE_MAP.get((live_state or "").strip(), live_state)
-        res = check_in("twb", staff["id"], when_dt,
-                       staff.get("work_start"), staff.get("work_end"), "Asia/Phnom_Penh")
+        ws = staff.get("work_start")
+        if resolved_start_min is not None:
+            sm = int(resolved_start_min) % 1440
+            ws = "%02d:%02d" % (sm // 60, sm % 60)   # redefine-aware start (end-move doesn't affect check-in)
+        res = check_in("twb", staff["id"], when_dt, ws, staff.get("work_end"), "Asia/Phnom_Penh")
         agree = compare_checkin("twb", staff["id"], ls, live_late, live_early, res)
         who = staff.get("call_name") or staff.get("canonical_name") or staff["id"]
         if agree:

@@ -1861,7 +1861,7 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if first:
         try:
             from core.shadow_hook import shadow_checkin
-            shadow_checkin(staff, now_pp, state, late, early)
+            shadow_checkin(staff, now_pp, state, late, early, resolved_start_min=ws)  # ws = resolve_day start
         except Exception:
             pass
     # DEFERRED Late-Informing reminder (owner, Jun 16): taught at the NEXT check-in, not while they're
