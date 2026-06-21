@@ -1622,6 +1622,32 @@ def _fmt_min(m: int) -> str:
     return ("%d:%02d%s" % (h12, mm, sfx)) if mm else ("%d%s" % (h12, sfx))
 
 
+def _slot_when_label(staff: dict, slot_date_iso: str, s_min: int, e_min: int) -> str:
+    """Human-clear payback-slot label that disambiguates an OVERNIGHT TAIL (owner, Jun 21: Chenda's
+    '6am' under '20/06' is really SUNDAY morning). A slot whose time is earlier than the staff's shift
+    start has wrapped past midnight → it falls on the NEXT calendar day, so show it as
+    'Sat 20/06 shift → Sun 6:00am-6:59am'. A same-day slot stays the plain 'Sat 20/06 6:00pm-7:00pm'."""
+    from datetime import date as _d, timedelta as _td
+    from gm_bot.attendance import to_min
+    d = _d.fromisoformat(str(slot_date_iso))
+    ws = to_min(staff.get("work_start"))
+    times = "%s-%s" % (_fmt_min(s_min), _fmt_min(e_min))
+    if ws is not None and (s_min % 1440) < ws:          # wrapped past midnight = next morning
+        nxt = d + _td(days=1)
+        return "%s shift → %s %s" % (d.strftime("%a %d/%m"), nxt.strftime("%a"), times)
+    return "%s %s" % (d.strftime("%a %d/%m"), times)
+
+
+def _return_when_label(staff: dict, when: "date | None" = None) -> str:
+    """'Sat 21/06, 9pm' — the day-of-week + date + shift-start for a sick-return FYI (owner, Jun 21:
+    'TOMORROW' alone is ambiguous). Defaults to tomorrow (the 'coming in tomorrow' tap)."""
+    from datetime import timedelta as _td
+    from gm_bot.attendance_ui import fmt12s
+    d = when or (_today_pp() + _td(days=1))
+    ws = fmt12s(staff.get("work_start")) if staff else "?"
+    return "%s %s, %s" % (d.strftime("%a"), d.strftime("%d/%m"), ws)
+
+
 def _create_payback_redefine(staff: dict, slot_date: str, s_min: int, e_min: int) -> None:
     """A booked payback slot IS a shift redefine (owner unification): the existing engine then
     does everything — T−10 at the new start, lateness vs the new start, checkout settle credits
@@ -3461,14 +3487,12 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 reply_markup=kb)
             return
         _create_payback_redefine(staff, slot_date, s_min, e_min)   # the slot IS a redefine
-        from datetime import date as _date
-        d = _date.fromisoformat(slot_date)
+        when = _slot_when_label(staff, slot_date, s_min, e_min)   # overnight-tail aware (owner Jun 21)
         await query.edit_message_text(
-            "Booked ✓ — %s %s-%s.\nបានកក់រួច ✓ — %s %s-%s។\n"
+            "Booked ✓ — %s.\nបានកក់រួច ✓ — %s។\n"
             "Come 5 minutes early and you earn +10 points ⭐\n"
             "មកដល់មុន 5 នាទី ប្អូននឹងទទួលបាន +10 points ⭐"
-            % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
-               d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
+            % (when, when))
         # WF7: this booking message is a harmless TERMINAL (details, no buttons) — release it from the
         # menu singleton so re-opening the menu posts a fresh one below instead of collapsing THIS to
         # "⤵ Menu continues below" (which would erase the booked time the staffer needs to see).
@@ -3476,8 +3500,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         _menu_release(context)
         # plain Supervisors notice
         await _att_send(context, None, "Supervisors group", "",
-            "%s pays back %s %s-%s." % (staff.get("call_name") or staff["canonical_name"],
-                                       d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)),
+            "%s pays back %s." % (staff.get("call_name") or staff["canonical_name"], when),
             group=True)
 
 
@@ -3729,10 +3752,12 @@ async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TY
     staff = next((s for s in staff_all("active") if s["id"] == case["staff_id"]), None)
     nm = (staff.get("call_name") or staff["canonical_name"]) if staff else "Staff"
     if action == "yes":
-        await query.edit_message_text("Great — see you tomorrow 🤍\nឃើញគ្នាស្អែក 🤍")
+        when = _return_when_label(staff)   # 'Sat 21/06, 9pm' — explicit, not bare "tomorrow" (owner Jun 21)
+        await query.edit_message_text("Great — see you %s 🤍\nឃើញគ្នា %s 🤍" % (when, when))
         await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s is well enough to return TOMORROW.\nFYI: %s នឹងវិលត្រឡប់មកធ្វើការវិញនៅថ្ងៃស្អែក។"
-            % (nm, nm), group=True)
+            "FYI: %s is well enough to return TOMORROW — %s.\n"
+            "FYI: %s នឹងវិលត្រឡប់មកធ្វើការវិញនៅថ្ងៃស្អែក — %s។"
+            % (nm, when, nm, when), group=True)
     elif action == "no":
         # owner (Jun 11): no one-tap stay-out — the reason is typed and the Supervisors read it
         _arm_sick_explain(context, update, "sret_exp", case_id, case["staff_id"])
