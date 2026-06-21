@@ -1648,6 +1648,16 @@ def _return_when_label(staff: dict, when: "date | None" = None) -> str:
     return "%s %s, %s" % (d.strftime("%a"), d.strftime("%d/%m"), ws)
 
 
+def _gm_log(kind: str, staff_id=None, uid=None, detail=None) -> None:
+    """Best-effort gm_events forensics entry (owner Jun 21). Never raises into a live flow; mode-tagged
+    so test-mode role-play doesn't pollute the live audit trail."""
+    try:
+        from gm_bot.events import log_event
+        log_event(kind, staff_id=staff_id, uid=uid, detail=detail, is_test=_att_test_mode())
+    except Exception:
+        pass
+
+
 def _create_payback_redefine(staff: dict, slot_date: str, s_min: int, e_min: int) -> None:
     """A booked payback slot IS a shift redefine (owner unification): the existing engine then
     does everything — T−10 at the new start, lateness vs the new start, checkout settle credits
@@ -1748,6 +1758,7 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
         att_check_out(staff["id"], sd, now_pp.isoformat())
         flow_clear(user.id)
         banked, new_bal = _settle_redefined_shift(staff, sd, now_pp)   # OT net of payback, if redefined
+        _gm_log("checkout", staff["id"], uid=user.id, detail={"date": sd, "ot_banked": banked})
         await msg.reply_text(ui._CO_DONE)
         if banked > 0:                               # earned OT → offer to take it back as rest
             await _offer_buyback(context, staff, new_bal, user.id, banked)
@@ -1777,6 +1788,8 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     early = mins if state == "early" else 0
     first = att_check_in(staff["id"], shift_date, now_pp.isoformat(), True, late, early)
     if first:
+        _gm_log("checkin", staff["id"], detail={"date": shift_date, "state": state,
+                                                "late": late, "early": early})
         # record raw points events (values derived later — owner-tuned; nothing connected yet)
         try:
             if state == "early":
@@ -3487,6 +3500,8 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 reply_markup=kb)
             return
         _create_payback_redefine(staff, slot_date, s_min, e_min)   # the slot IS a redefine
+        _gm_log("payback_booked", staff["id"], uid=user.id,
+                detail={"date": slot_date, "start": s_min, "end": e_min, "mins": mins})
         when = _slot_when_label(staff, slot_date, s_min, e_min)   # overnight-tail aware (owner Jun 21)
         await query.edit_message_text(
             "Booked ✓ — %s.\nបានកក់រួច ✓ — %s។\n"
@@ -3553,6 +3568,8 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     "Pick before tomorrow, or I'll pick for you.\n"
                     "សូមជ្រើសមុនថ្ងៃស្អែក។ បើអ្នកមិនទាន់ជ្រើសទេ ខ្ញុំនឹងជ្រើសជូនអ្នក។",
                     kb=_payback_slot_keyboard(staff, remaining))
+                _gm_log("push_sent", debt["staff_id"], uid=uid,
+                        detail={"kind": "payback_warn", "remaining": remaining})
             elif stage == "autobook":
                 from gm_bot import payback as _pb
                 from gm_bot.attendance import to_min
@@ -4032,6 +4049,8 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     await _att_send(context, None, "Supervisors group", "",
         "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។\nReason · មូលហេតុ៖ %s"
         % (_snm, _snm, reason), group=True)
+    _gm_log("sick_filed", persona.get("id"), detail={"date": date_iso, "reason": reason,
+                                                      "late_mins": _late_inform_mins})
     # LATE INFORMING (owner, Jun 16): own-sick reported within 30 min of shift start / after it = −15,
     # ONCE per day. Recorded SILENTLY (don't pile on while they're sick); taught at the next check-in
     # (deferred flag below). Papers do NOT wipe it. Only for TODAY's shift; None = not working today.
@@ -4046,6 +4065,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
             if gm_get_state(done_key) != "true":
                 points_record(persona["id"], "late_sick_inform", 1, date_iso)
                 gm_set_state(done_key, "true")
+                _gm_log("late_sick_inform", persona["id"], detail={"date": date_iso, "mins": mins, "pts": -15})
                 uid = (persona.get("telegram_ids") or [None])[0]
                 if uid:
                     gm_set_state("late_inform_notice:%d" % uid, _today_pp().isoformat())
@@ -7352,6 +7372,22 @@ async def _live_group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ─── Application builder ──────────────────────────────────────────────────────
 
+async def _log_every_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Group -1 forensics: record EVERY button tap to gm_events (owner Jun 21: 'log every click').
+    Best-effort + never answers/edits/stops propagation — the real handler in group 0 still runs."""
+    try:
+        from gm_bot.events import log_event
+        q = update.callback_query
+        if not q:
+            return
+        uid = update.effective_user.id if update.effective_user else None
+        staff = staff_get_by_uid(uid) if uid else None
+        log_event("click", staff_id=(staff or {}).get("id"), uid=uid,
+                  detail={"data": q.data}, is_test=_att_test_mode())
+    except Exception:
+        pass
+
+
 def build_app() -> Application:
     if not config.GM_BOT_TOKEN:
         raise ValueError("GM_BOT_TOKEN not set in config/secrets")
@@ -7359,6 +7395,8 @@ def build_app() -> Application:
     app = Application.builder().token(config.GM_BOT_TOKEN).build()
     from shared.error_handler import make_error_handler
     app.add_error_handler(make_error_handler("GM"))   # nothing dies silently (the gm_save_concern lesson)
+    # Forensics: log every callback tap FIRST (group -1), then let the real handler (group 0) run.
+    app.add_handler(CallbackQueryHandler(_log_every_click), group=-1)
 
     # Restore the test-mode process flag from the DB so a restart can't silently flip
     # att_test_on() to False while attendance_test_mode='true' (which would make TEST mode show

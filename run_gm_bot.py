@@ -44,6 +44,8 @@ init_gm_leave_db()
 init_stock_db()
 init_staff_registry_db()
 init_attendance_db()      # adds the gender column (among others)
+from gm_bot.events import init_events_db
+init_events_db()          # append-only gm_events audit log (forensics: pushes/clicks/sick/points/FYI)
 from shared.database import seed_staff_genders
 seed_staff_genders()      # fill the gender column from the owner roster (idempotent; logs unmatched)
 from shared.database import points_seed_catalogue, set_att_test, gm_get_state
