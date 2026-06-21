@@ -6224,6 +6224,33 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
     if not update.message or not update.effective_user:
         return
     uid = update.effective_user.id
+    # REASON-FIRST sick capture (owner Jun 21): a typed reason armed right after the who-pick, BEFORE
+    # the time/date ladder. Handled first so it works for BOTH the owner (test) and a live staffer
+    # (flow_state is uid-keyed). Stores the reason for the filing step, then shows the next screen.
+    try:
+        from shared.database import flow_load as _fl, flow_clear as _fc, gm_set_state as _gss
+        _sr = _fl(uid)
+    except Exception:
+        _sr = None
+    if _sr and _sr.get("flow") == "sick_reason":
+        pend = _sr.get("data") or {}
+        who = pend.get("who") or "me"
+        reason = (update.message.text or "").strip()
+        if not reason:
+            await update.message.reply_text(_sick_reason_prompt(who))   # empty → ask again
+            return
+        _gss("sick_reason_val:%d" % uid, reason)   # consumed at the filing step
+        _fc(uid)
+        if uid == config.OWNER_TELEGRAM_ID:
+            persona = next((s for s in staff_all("active") if s["id"] == pend.get("persona_id")), None)
+        else:
+            persona = staff_get_by_uid(uid)
+        if persona:
+            from gm_bot import attendance_ui as _aui
+            text, kb = (_aui.sick_me_screen(persona) if who == "me"
+                        else _aui.sick_family_dates(persona, who))
+            await update.message.reply_text(text, reply_markup=kb)
+        return
     if uid == config.OWNER_TELEGRAM_ID:
         if context.user_data.get("att_test_pending"):
             await _att_dispatch(update, context,
@@ -6487,11 +6514,23 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         pass
     if reason is None:   # typed-reason flows read the message; tap-to-confirm flows pass it in
         reason = (((update.message.text or "").strip()) if update.message else "") or "(no reason)"
+    _flow = pend.get("flow")
+    # REASON-FIRST (owner Jun 21): a sick reason captured right after the who-pick is stashed in
+    # gm_state — use it here so the confirm is a normal tap (the reason was already given). Consumed
+    # once. If somehow absent, the mandatory gate below still requires a typed reason (backstop).
+    if _flow in ("sick_me", "sick_fam"):
+        try:
+            _uid = update.effective_user.id
+            _stored = gm_get_state("sick_reason_val:%d" % _uid)
+            if _stored and _stored.strip():
+                reason = _stored.strip()
+                gm_set_state("sick_reason_val:%d" % _uid, "")   # consumed
+        except Exception:
+            pass
     # owner (Jun 15): EVERY schedule change MUST carry a real reason — a senior is moving someone's day.
     # owner (Jun 21): a SICK filing (own + family) must ALSO carry a typed reason — never a blank FYI
     # again (Long's blank). Sick rejects a bare tap-confirm too (it must be TYPED). Reject + re-arm the
     # SAME pend so they just type it (no re-picking); the typed reason then files + is shown.
-    _flow = pend.get("flow")
     if _reason_gate_blank(_flow, reason):
         uid = update.effective_user.id
         if uid == config.OWNER_TELEGRAM_ID:

@@ -12,7 +12,7 @@
 - `gm_bot/attendance.py` — Private-DM attendance system — pure logic, no DB/AI/Telegram.
     · strip_khmer, haversine_m, in_work_zone, days_due, to_min, overlaps, available_staff, lateness_kind, outside_exceeded
 - `gm_bot/attendance_ui.py` — Attendance main-menu — owner role-play SHELL + LIVE staff entry (one set of menus, no fork).
-    · _today, _now_min, _hm, _shift_date_now, _shift_running, _present_now, _near_days, fmt12, fmt12s, day_label, shift_len_min, late_offsets, grid, staff_day_events, _decision  …(+112, grep)
+    · _today, _now_min, _hm, _shift_date_now, _shift_running, _present_now, _near_days, fmt12, fmt12s, day_label, shift_len_min, late_offsets, grid, staff_day_events, _decision  …(+113, grep)
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.

@@ -939,6 +939,22 @@ def _arm_pending(context, update, pend: dict) -> None:
         flow_save(uid, "att_pending", "reason", pend, ttl_min=ttl)
 
 
+def _arm_sick_reason(context, update, p, who) -> None:
+    """Reason-FIRST (owner Jun 21): arm a 'sick_reason' flow so the NEXT typed message is captured as
+    the mandatory sickness reason, THEN the time/date ladder is shown (bot._private_text_router does the
+    capture + re-show). uid-keyed flow_state → works live AND owner-test, restart-safe. Superseded if
+    another flow is armed; cleared on cancel / sick-menu re-entry."""
+    _supersede_prev_pend(context, update)
+    _menu_release(context)
+    uid = update.effective_user.id
+    try:   # each fresh who-pick starts clean — a stale value from an abandoned flow can't carry over
+        from shared.database import gm_set_state
+        gm_set_state("sick_reason_val:%d" % uid, "")
+    except Exception:
+        pass
+    flow_save(uid, "sick_reason", "await", {"who": who, "persona_id": p["id"]}, ttl_min=30)
+
+
 def _arm_prompt(p: dict, context, base: str, back: str, extra_rows=None):
     """Unified prompt for an armed terminal. Neutral copy works for BOTH live (routes to the real
     seniors/Supervisors) and test; test adds an owner coaching suffix. (KH pending for new lines.)
@@ -2785,8 +2801,22 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sub == "":
             return await show(special_menu(p))
         if sub == "sick":
+            try:   # clear any abandoned reason-first arm so it can't mis-capture later text
+                from shared.database import flow_load, flow_clear
+                _f = flow_load(uid)
+                if _f and _f.get("flow") == "sick_reason":
+                    flow_clear(uid)
+            except Exception:
+                pass
             return await show(sick_menu(p))
         if sub == "me":
+            # reason-FIRST (owner Jun 21): when this will really file (live/test), ask the mandatory
+            # reason BEFORE the time/can't-come screen; a walk-preview just shows the screen.
+            if _armed(context):
+                _arm_sick_reason(context, update, p, "me")
+                from gm_bot.bot import _sick_reason_prompt
+                return await show((_sick_reason_prompt("me"),
+                                   InlineKeyboardMarkup([_back_row("att:sp:sick")])))
             return await show(sick_me_screen(p))
         if sub == "meo":
             return await show(sick_me_time(p, int(data[3])))
@@ -2799,6 +2829,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     "att:sp:me"))
             return await show(sick_me_cant(p))
         if sub == "sickf":
+            # reason-FIRST for family too (owner Jun 21): relationship-aware reason before the dates.
+            if _armed(context):
+                _arm_sick_reason(context, update, p, data[3])
+                from gm_bot.bot import _sick_reason_prompt
+                return await show((_sick_reason_prompt(data[3]),
+                                   InlineKeyboardMarkup([_back_row("att:sp:sick")])))
             return await show(sick_family_dates(p, data[3]))
         if sub == "famd":
             return await show(sick_family_fulltime(p, data[3], data[4]))
