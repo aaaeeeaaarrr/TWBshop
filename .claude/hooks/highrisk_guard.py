@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse HIGH-RISK guard (Hook 1) — universal, every project.
 
-Hard-blocks dangerous actions. No override exists — Bedrock delta 1 (2026-06-10) removed
-the self-approval marker that Claude could type. Every block is unconditional; the owner
-runs the blocked command manually in their own terminal.
+Hard-blocks dangerous WRITES. No self-approval marker exists — Bedrock delta 1 (2026-06-10) removed it.
+EXCEPTION (2026-06-21): a READ-ONLY command (no write-SQL verb anywhere) is allowed through the
+payroll/staff rule only — a SELECT can't corrupt payroll, so read-only investigations no longer need a
+manual run. Every WRITE, and every OTHER rule (secrets, rm-rf, prod-restart, destructive-SQL, KHQR…),
+stays an unconditional hard block the owner runs manually.
 
 When this guard fires Claude MUST lead the reply with:
   \U0001f6d1 NEEDS YOU — run in your terminal: ! <exact command>
@@ -45,7 +47,9 @@ CMD_PROTECTED = [
          r"(?:secrets\.py|\.env\b|\.bootstrap_token|\.session\b|\.claude[\\/])"
          r"|>+\s*['\"]?[^\n|;]*?(?:secrets\.py|\.env\b|\.bootstrap_token|\.session\b|\.claude[\\/])"
          r"|\btee\b[^\n|;]*(?:secrets\.py|\.env|\.bootstrap_token|\.session|\.claude[\\/])"
-         r"|\bsed\s+-i\b[^\n|;]*(?:secrets\.py|config\.py|\.session\b)",
+         r"|\bsed\s+-i\b[^\n|;]*(?:secrets\.py|config\.py|\.session\b)"
+         r"|\bcopy-item\b[^\n|;]*\.claude[\\/]"            # block Copy-Item into .claude (close the loophole)
+         r"|\bcp\b[^\n|;]*\.claude[\\/]",
          RX)),
     ("payments / KHQR / Bakong",
      re.compile(r"\b(khqr|bakong)\b", RX)),
@@ -54,6 +58,17 @@ CMD_PROTECTED = [
     ("permissions / ban / offboard",
      re.compile(r"\b(ban_chat_member|kickchatmember|unban|exstaff|offboard|ban_users?)\b", RX)),
 ]
+
+# A command is READ-ONLY when it carries no write-SQL verb. Read-only staff/payroll lookups are allowed
+# (a SELECT can't corrupt payroll); any write keeps the hard block. Word boundaries keep 'updated_at' /
+# 'created_at' / 'deleted' from counting as writes, while UPDATE/INSERT/DELETE/DROP/… anywhere do.
+WRITE_SQL = re.compile(
+    r"\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|merge|upsert|replace|copy)\b"
+    r"|on\s+conflict", RX)
+
+# Only this rule may be bypassed for a read-only command (a SELECT can't corrupt it). Everything else
+# (secrets, rm-rf, prod-restart, destructive-SQL, KHQR, permissions) hard-blocks even on a read.
+READONLY_BYPASS = ("payroll",)
 
 # ── Patterns applied to FILE PATHS (Edit / Write / MultiEdit / NotebookEdit) ─
 PATH_PROTECTED = [
@@ -117,8 +132,13 @@ def main(raw):
     if tool in ("Bash", "PowerShell"):
         cmd = ti.get("command", "") or ""
         scan = _descan_commit(cmd)   # a git-commit MESSAGE is prose, not an action — don't scan it
+        readonly = WRITE_SQL.search(scan) is None   # a pure read — no write-SQL verb anywhere
         for label, rx in CMD_PROTECTED:
             if rx.search(scan):
+                # Read-only staff/payroll LOOKUPS are safe (a SELECT can't corrupt payroll) — allow them
+                # so investigations don't need a manual run; every WRITE + every other rule stays blocked.
+                if readonly and label.startswith(READONLY_BYPASS):
+                    continue
                 hard_block(label, cmd)
 
     elif tool in ("Edit", "Write", "MultiEdit"):
