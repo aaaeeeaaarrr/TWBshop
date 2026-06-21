@@ -69,51 +69,59 @@ def _classify(live: dict, new: dict) -> tuple:
 
 
 def build_digest(org_id) -> dict:
-    """The nightly digest: today's tally + ALL unresolved mismatches (carryover — a missed night combines
-    into the next), grouped by pattern with a proposed fix, plus a cut-over readiness read. Returns
-    {text, stats} — text is the owner-facing report."""
+    """Nightly digest. The LIVE real-time stream is the READINESS signal — its unresolved mismatches are
+    carried over (a missed night combines into the next) with proposed fixes. The REPLAY backfill is a
+    one-time GAP-ANALYSIS, summarised separately so launch-week backfill noise never drags the live read.
+    Plus COVERAGE (which verdict types have been seen+agreed) and a cut-over readiness verdict."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""SELECT COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok
-                           FROM shadow_comparisons WHERE org_id=%s AND at >= NOW() - INTERVAL '24 hours'""",
-                        (org_id,))
-            t = cur.fetchone()
-            today_n, today_ok = t["n"], t["ok"]
-            cur.execute("SELECT COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
-                        "WHERE org_id=%s", (org_id,))
-            a = cur.fetchone()
-            all_n, all_ok = a["n"], a["ok"]
-            cur.execute("""SELECT id, staff_id, live, new, source FROM shadow_comparisons
-                           WHERE org_id=%s AND agree=FALSE AND reconciled=FALSE ORDER BY id""", (org_id,))
+            def _stat(src, day=False):
+                q = ("SELECT COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
+                     "WHERE org_id=%s AND source=%s")
+                if day:
+                    q += " AND at >= NOW() - INTERVAL '24 hours'"
+                cur.execute(q, (org_id, src))
+                return cur.fetchone()
+            lt, la, ra = _stat("live", True), _stat("live"), _stat("replay")
+            cur.execute("""SELECT id, staff_id, live, new FROM shadow_comparisons
+                           WHERE org_id=%s AND source='live' AND agree=FALSE AND reconciled=FALSE
+                           ORDER BY id""", (org_id,))
             open_rows = [dict(r) for r in cur.fetchall()]
-    # group the open mismatches by pattern
+            cur.execute("SELECT DISTINCT new->>'state' s FROM shadow_comparisons "
+                        "WHERE org_id=%s AND source='live' AND agree", (org_id,))
+            covered = sorted(r["s"] for r in cur.fetchall() if r["s"])
     groups = {}
     for r in open_rows:
         live = r["live"] if isinstance(r["live"], dict) else json.loads(r["live"] or "{}")
         new = r["new"] if isinstance(r["new"], dict) else json.loads(r["new"] or "{}")
         key, fix = _classify(live, new)
-        g = groups.setdefault(key, {"count": 0, "fix": fix, "ids": [], "example": (live, new)})
+        g = groups.setdefault(key, {"count": 0, "fix": fix, "example": (live, new)})
         g["count"] += 1
-        g["ids"].append(r["id"])
-    rate = (100.0 * all_ok / all_n) if all_n else 0.0
+    live_rate = (100.0 * la["ok"] / la["n"]) if la["n"] else 0.0
+    replay_rate = (100.0 * ra["ok"] / ra["n"]) if ra["n"] else 0.0
     open_count = len(open_rows)
-    ready = all_n >= 20 and not open_count   # simple v1 gate: enough volume + zero open mismatches
+    full_cover = set(covered) >= {"on_time", "late", "early"}
+    ready = la["n"] >= 20 and open_count == 0 and full_cover
     lines = ["🌓 SHADOW digest — TWBshop (org twb)",
-             "Today: %d check-ins shadowed, %d agreed, %d mismatched." % (today_n, today_ok, today_n - today_ok),
-             "All-time: %d compared · %.0f%% agree · %d UNRESOLVED mismatch group(s) carried over." %
-             (all_n, rate, len(groups))]
+             "LIVE stream (real-time = the readiness signal): %d today / %d all-time · %.0f%% agree · %d open group(s)."
+             % (lt["n"], la["n"], live_rate, len(groups)),
+             "Replay backtest (one-time gap-analysis): %d compared · %.0f%% agree." % (ra["n"], replay_rate),
+             "Coverage (verdict types agreed live): %s%s"
+             % (", ".join(covered) or "none yet", "" if full_cover else "  ⚠ missing some of on_time/late/early")]
     if groups:
-        lines.append("\nOpen mismatch patterns (carried until reconciled):")
+        lines.append("\nOpen LIVE mismatch patterns (carried until reconciled):")
         for key, g in sorted(groups.items(), key=lambda kv: -kv[1]["count"]):
             lines.append("  • [%s] ×%d — e.g. live=%s new=%s\n     ↳ proposed: %s"
                          % (key, g["count"], g["example"][0], g["example"][1], g["fix"]))
     else:
-        lines.append("\nNo unresolved mismatches. 🎉")
-    lines.append("\nCut-over readiness: %s (%.0f%% agree over %d compared; %d open)."
-                 % ("READY ✅" if ready else "not yet", rate, all_n, open_count))
+        lines.append("\nNo open LIVE mismatches. 🎉")
+    lines.append("\nCut-over readiness: %s — live %.0f%% over %d · backtest %.0f%% over %d · %d open · coverage %s."
+                 % ("READY ✅" if ready else "not yet", live_rate, la["n"], replay_rate, ra["n"],
+                    open_count, "full" if full_cover else "partial"))
     return {"text": "\n".join(lines),
-            "stats": {"today": today_n, "today_agree": today_ok, "all": all_n, "agree_rate": rate,
-                      "open_groups": len(groups), "open_count": open_count, "ready": ready}}
+            "stats": {"live_today": lt["n"], "live_all": la["n"], "live_rate": live_rate,
+                      "replay_all": ra["n"], "replay_rate": replay_rate, "open_groups": len(groups),
+                      "open_count": open_count, "coverage": covered, "ready": ready}}
 
 
 def comparison_stats(org_id=None) -> dict:
