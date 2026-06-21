@@ -77,11 +77,17 @@
 
 - **2026-06-21 — LONG (id 1) paperless-sick −15 + payback (owner: "dock −15pts yes, send him a message, push
   payback after").** Jun 19 own-sick declared 20:55 (5 min before his 21:00 shift), paperless → 540-min debt
-  #154, but the −15 `late_sick_inform` DID NOT fire (root cause: `_sick_late_mins`/`_shift_date_now` returns
-  None in the 30-min PRE-shift window → the −15 only catches sicks declared AFTER shift start). **TO DO
-  (HIGH-RISK write → owner runs vetted script, after the shift-window fix lands):** record −15
-  `late_sick_inform` for Long (Jun 19) → send him the late-informing message → then push the 540 payback. Same
-  pre-shift-window bug also disables the FAMILY-sick soft-note (built, but never shows before shift start).
+  #154, the −15 `late_sick_inform` DID NOT fire. **ROOT CAUSE (CONFIRMED, traced read-only vs real Long data —
+  NOT the earlier pre-shift-window theory):** `_sickme_book` computed lateness AFTER `sick_create`; once the
+  case exists `resolve_day` reports the day not-working (start_min=None) → `_sick_late_mins` returns None → −15
+  silently skipped (self-cancellation/ordering). **CODE FIX SHIPPED-INERT `d09e00c`** (capture lateness before
+  sick_create) — needs the batched GM deploy to go live. **⚠ SCOPE — the −15 NEVER fired for ANYONE since
+  go-live (Jun 16), not just Long.** Scope query (own-sick cases since Jun 16 that were late-informed) BLOCKED
+  by a transient prod-network outage from dev — run when back. **OWNER DECISION: retroactive −15 for all missed
+  late-informers, or just Long + going-forward?** **TO DO (HIGH-RISK write → owner runs vetted script, after the
+  fix deploys):** record −15 for Long (Jun 19) → send him the message → push the 540 payback. **FAMILY-sick
+  note: VERIFIED built + NOT affected** (computed at screen-build before the case exists, so resolve_day still
+  sees the shift) — confirm live in the walk.
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
