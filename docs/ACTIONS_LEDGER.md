@@ -18,6 +18,12 @@
   authoritative `book_room` guard at the `payback_book` chokepoint (commit `07807f6`). **Group post still HELD** for
   owner go (Heng's balance is now genuinely 0 → the correction post is factually ready).
 
+- **2026-06-21 — THYDA (id 34) retroactive −15 DONE + HENG group-correction POSTED (owner go).** Owner: fix
+  Thyda too. Applied −15 `late_sick_inform` #131 ref 2026-06-21 (BEFORE: none → AFTER independent re-read: #131);
+  she filed own-sick 13:52 PP, 113 min after her 12:00 shift, before the deploy. Heng correction POSTED to the
+  Supervisors group (chat -4980513319, message_id 5836, "system error — he paid his 89, balance 0, ignore").
+  **FINAL prod audit = 0 problems (CLEAN).**
+
 - **2026-06-21 — LONG (id 1) retroactive −15 DONE (HIGH-RISK payroll write; vetted script + independent proof).**
   Owner decision = just Long + going-forward. Ran `scripts/fix_long_late_sick.py --apply` on prod. **BEFORE:** no
   late_sick_inform events. **AFTER (independent re-read):** event #130 `late_sick_inform` ref 2026-06-19 recorded
@@ -81,12 +87,6 @@
     present; no penalty (no-show reversed); self-resolves on her next check-in under the fixed code.
 
 ## Open (not yet done)
-
-- **2026-06-21 — THYDA (id ?) pre-deploy −15 miss — OWNER DECISION PENDING.** Own-sick filed Jun 21 13:52 PP
-  (113 min after shift start), ~2.3h BEFORE the 16:12 deploy → hit the old buggy code, no −15. Per "just Long"
-  it's left; but it's TODAY + egregious. Owner: apply −15 to Thyda too (one-liner like Long), or leave it?
-  Until resolved it shows in the audit/watchdog for 14 days (bounded). FAMILY-sick late-note: VERIFIED built +
-  NOT affected by the self-cancellation bug (computed at screen-build before the case) — confirm in a live walk.
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
