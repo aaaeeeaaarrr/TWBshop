@@ -1,5 +1,20 @@
 # Bakery Automation System — Project Rules & Status
 
+> ## ▶▶ PROJECT NORTH STAR — the REAL objective (owner, 2026-06-22)
+> This is **not** ultimately "a Telegram bakery bot." The end goal is a **portable, multi-tenant TOTAL
+> business-management PLATFORM sold/leased as a service** — attendance + POS + stock + back-office +
+> supervisory/HR + more — delivered via a **stupid-proof self-serve wizard** ("Telegram? web? app?
+> several?", paste token, listener details…), **channel-agnostic** (the brain holds no Telegram/web/app
+> code; channels are adapters), **config-driven per tenant**, **integration-friendly** (tap a customer's
+> existing POS, or be the POS; stock via AppSheet today, maybe our cloud later), sold as **packages/
+> bundles/layers** for different market segments. **TWBshop is CUSTOMER #1** — currently a live Telegram
+> system; we'll onboard it onto the platform via **shadow-run** (build fresh, run parallel to live, prove
+> it, cut over with instant revert). **Reuse TWB's hard-won domain RULES; rebuild the single-tenant,
+> Telegram-fused PLUMBING clean.** Every architectural decision — even small ones — must keep this open.
+> **Full design + the governing principles → `docs/PLATFORM_VISION.md`; the shift-model worked example →
+> `docs/SHIFT_MODEL_DESIGN.md`.** (Current build is still TWB-the-bot; the platform is built deliberately,
+> MVP-slice first, no fire — TWB stays stable meanwhile.)
+
 > **🗺️ START HERE — open `MAP.md` for ANY task** (Layer 1: entry files · law-doc · `docs/HISTORY.md`
 > section · ⚠ gotcha per area). **Need any other file / "where's function X"? → `MAP_INDEX.md`** (Layer 2:
 > auto-generated complete inventory). **Before claiming anything exists / works / is missing / is a gap,
