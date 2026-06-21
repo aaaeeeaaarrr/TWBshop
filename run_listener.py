@@ -19,6 +19,8 @@ logging.basicConfig(
         logging.StreamHandler(),
     ],
 )
+from shared.log_redact import install_log_hygiene
+install_log_hygiene()   # belt-and-suspenders token redaction (Jun 22 audit)
 
 from ops_intelligence.listener import run
 

@@ -26,6 +26,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     level=logging.INFO,
 )
+from shared.log_redact import install_log_hygiene
+install_log_hygiene()   # keep the bot TOKEN out of logs/journal + drop the getUpdates spam (Jun 22 audit)
 logger = logging.getLogger(__name__)
 
 # Rotating file handler for unmatched orders — max 5 MB, keep 3 old files

@@ -26,8 +26,9 @@ logging.basicConfig(
                             backupCount=3, encoding="utf-8"),
     ],
 )
-# Suppress httpx request logs — they print full Telegram API URLs containing the bot token
-logging.getLogger("httpx").setLevel(logging.WARNING)
+# keep the bot TOKEN out of logs — redaction filter + httpx/httpcore/telegram.request->WARNING (Jun 22)
+from shared.log_redact import install_log_hygiene
+install_log_hygiene()
 logging.getLogger("hpack").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
