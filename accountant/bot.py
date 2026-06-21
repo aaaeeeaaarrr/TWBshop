@@ -26,7 +26,7 @@ from accountant.db import (add_candidate, add_receipt, attach_vendor_channel, cl
                            recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
                            save_receipt_lines, set_candidate_card, set_payment, set_vendor_kind,
                            to_usd_cents, unclaim_candidate, vendor_by_group, vendor_by_name,
-                           vendor_link)
+                           vendor_link, vendor_priors_for)
 from shared.ai_client import extract_receipt
 
 try:
@@ -430,7 +430,7 @@ async def _candidate_new(q, context, c):
     raw = await _download(context, c.get("photo_file_id"))
     if raw is None:
         return
-    rec = await extract_receipt(raw)
+    rec = await extract_receipt(raw, vendor_priors=vendor_priors_for(c.get("vendor_id")))
     context.user_data[f"cand_extract:{cid}"] = rec
     cents = to_usd_cents(rec.get("total_amount"), rec.get("total_currency") or "USD")
     look = find_lookalike_receipt(c.get("vendor_id"), cents, 7)
@@ -456,7 +456,7 @@ async def _candidate_promote(q, context, c, rec=None):
         raw = await _download(context, c.get("photo_file_id"))
         if raw is None:
             return
-        rec = await extract_receipt(raw)
+        rec = await extract_receipt(raw, vendor_priors=vendor_priors_for(c.get("vendor_id")))
     if not rec.get("is_receipt"):                # not a receipt → don't number it
         resolve_candidate(cid, "ignored", uid, note="not a receipt")
         await _edit_cand(q, cid)

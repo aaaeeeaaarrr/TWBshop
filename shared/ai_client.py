@@ -1047,14 +1047,38 @@ async def detect_leave_request(text: str) -> dict:
 _LAST_USAGE = {"in": 0, "out": 0}  # tokens of the most recent extract_receipt call (cost observability)
 
 
-async def extract_receipt(image_bytes: bytes) -> dict:
+def _vendor_priors_block(vendor_priors: dict | None) -> str:
+    """The optional CONTEXT prefix for extract_receipt, from a vendor's priors (design §G, mechanism A):
+    name + learned aliases + usual items/prices, framed as a SOFT hint (read TOWARD these, but read what's
+    actually written). '' when there are no priors. Pure → testable without an API call."""
+    if not vendor_priors:
+        return ""
+    lines = []
+    for a in (vendor_priors.get("aliases") or [])[:20]:
+        if a.get("orig") and a.get("english"):
+            lines.append(f"  {a['orig']} = {a['english']}")
+    for it in (vendor_priors.get("items") or [])[:15]:
+        nm = it.get("name")
+        if not nm:
+            continue
+        pc = it.get("price_cents")
+        lines.append(f"  {nm}" + (f" (~${pc / 100:.2f})" if pc else ""))
+    if not lines:
+        return ""
+    vn = vendor_priors.get("vendor_name") or "a known supplier"
+    return (f"CONTEXT — this receipt is likely from {vn}. Things we've bought from them before (read "
+            "TOWARD these when the handwriting is ambiguous, but READ WHAT IS ACTUALLY WRITTEN — they may "
+            "sell something new):\n" + "\n".join(lines) + "\n\n")
+
+
+async def extract_receipt(image_bytes: bytes, vendor_priors: dict | None = None) -> dict:
     """Focused, robust receipt read for the accountant (P1). ONE Sonnet call that classifies +
     extracts — kept deliberately narrow (not the kitchen-sink assess_receipt_photo) so the model
     isn't juggling five jobs on a hard handwritten read. Sonnet (not Haiku) for robustness across
     the endless variety of supplier formats. Returns:
         {is_receipt, is_clear, vendor, items_text, total_amount, total_currency, is_handwritten, issues}
     """
-    prompt = (
+    prompt = _vendor_priors_block(vendor_priors) + (
         "Read this purchase receipt/invoice for bookkeeping.\n"
         "It may be a PRE-PRINTED FORM that lists many product OPTIONS (e.g. a gas shop pre-prints "
         "Gas 12kg / 15kg / 48kg). ONLY the line(s) with a HANDWRITTEN quantity or price were ACTUALLY "

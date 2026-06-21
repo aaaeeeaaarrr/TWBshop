@@ -20,6 +20,18 @@ def test_did_you_mean_dedupes_names():
     assert did_you_mean(120, hist) == ["Potato"]
 
 
+# ─────────────────────────── priors-into-read block (pure) ───────────────────────────
+def test_vendor_priors_block_is_a_soft_hint_or_empty():
+    from shared.ai_client import _vendor_priors_block
+    assert _vendor_priors_block(None) == ""
+    assert _vendor_priors_block({"items": [], "aliases": []}) == ""
+    block = _vendor_priors_block({"vendor_name": "Atlas",
+                                  "aliases": [{"orig": "ដំឡូង", "english": "potato"}],
+                                  "items": [{"name": "Onion", "price_cents": 110}]})
+    assert "Atlas" in block and "potato" in block and "Onion" in block
+    assert "READ WHAT IS ACTUALLY WRITTEN" in block          # the anti-anchor guard must be present
+
+
 # ─────────────────────────── vendor history + priors (staging) ───────────────────────────
 @pytest.fixture
 def priors_vendor():
