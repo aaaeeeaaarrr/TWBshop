@@ -159,6 +159,22 @@ def init_accounting_db() -> None:
                 )
             """)
 
+            # ── acc_vendor_merges — audit trail for vendor merges (§G7 V4). Records the moved ids so a
+            # merge is traceable AND reversible (undo_vendor_merge repoints them back). ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS acc_vendor_merges (
+                    id            SERIAL PRIMARY KEY,
+                    dup_id        INTEGER NOT NULL,
+                    canonical_id  INTEGER NOT NULL,
+                    merged_by     BIGINT,
+                    receipt_ids   TEXT DEFAULT '[]',   -- JSON: acc_receipts.id moved dup→canonical
+                    payment_ids   TEXT DEFAULT '[]',
+                    candidate_ids TEXT DEFAULT '[]',
+                    undone        BOOLEAN DEFAULT FALSE,
+                    merged_at     TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
             # ── acc_receipt_candidates — the "Received Yet?" forward flow (design §E3) ──
             # A photo a supplier posts in THEIR group is forwarded to the Expense group as a
             # CANDIDATE (never auto-numbered). The owner forks it: New&received → promote to a
@@ -248,7 +264,7 @@ def vendor_by_name(name: str) -> dict | None:
     n = _vnorm(name)
     if len(n) < 3:
         return None
-    for v in list_vendors(active_only=False):
+    for v in list_vendors(active_only=True):       # never resolve/suggest a deactivated (e.g. merged) vendor
         for c in [_vnorm(v["name"])] + _vendor_aliases(v):
             if c and (c in n or n in c):
                 return v
@@ -264,7 +280,7 @@ def find_similar_vendors(name: str, limit: int = 3, cutoff: float = 0.6) -> list
     if len(n) < 2:
         return []
     scored = []
-    for v in list_vendors(active_only=False):
+    for v in list_vendors(active_only=True):       # never resolve/suggest a deactivated (e.g. merged) vendor
         best = 0.0
         for c in [_vnorm(v["name"])] + _vendor_aliases(v):
             if not c:
@@ -372,6 +388,106 @@ def vendor_priors_for(vendor_id, max_items=12) -> dict:
             aliases = [{"orig": r["orig_name"], "english": r["english_name"]} for r in cur.fetchall()]
     items = sorted(vendor_item_history(vendor_id), key=lambda h: h["n"], reverse=True)[:max_items]
     return {"vendor_name": v["name"], "aliases": aliases, "items": items}
+
+
+def _parse_json_list(j):
+    try:
+        return json.loads(j or "[]")
+    except (ValueError, TypeError):
+        return []
+
+
+def rename_vendor(vendor_id, new_name) -> bool:
+    """Correct a vendor's display name (§G7 V4). The OLD name is kept as an alias so receipts that still
+    print it keep resolving (self-healing). Returns True if renamed."""
+    nm = (new_name or "").strip()
+    v = get_vendor(vendor_id)
+    if not v or not nm or _vnorm(v["name"]) == _vnorm(nm):
+        return False
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE acc_vendors SET name=%s WHERE id=%s", (nm, vendor_id))
+    add_vendor_alias(vendor_id, v["name"])             # old spelling → alias (name is now the new one)
+    return True
+
+
+def merge_vendors(dup_id, canonical_id, by=None) -> dict:
+    """Merge a DUPLICATE vendor into the CANONICAL one (§G7 V4, OWNER action). ONE transaction (all-or-
+    nothing): repoint receipts/payments/candidates + item-aliases dup→canonical, fold the dup's name +
+    spelling-aliases into canonical's, move the dup's group if canonical has none, deactivate the dup, and
+    write an audit row with the moved ids (traceable + reversible by undo_vendor_merge)."""
+    if dup_id == canonical_id:
+        return {"ok": False, "reason": "same vendor"}
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, name, tg_group_id, aliases FROM acc_vendors WHERE id IN (%s,%s)",
+                        (dup_id, canonical_id))
+            rows = {r["id"]: r for r in cur.fetchall()}
+            if dup_id not in rows or canonical_id not in rows:
+                return {"ok": False, "reason": "vendor not found"}
+            dup, canon = rows[dup_id], rows[canonical_id]
+            cur.execute("UPDATE acc_receipts SET vendor_id=%s WHERE vendor_id=%s RETURNING id",
+                        (canonical_id, dup_id))
+            receipt_ids = [r["id"] for r in cur.fetchall()]
+            cur.execute("UPDATE acc_payments SET vendor_id=%s WHERE vendor_id=%s RETURNING id",
+                        (canonical_id, dup_id))
+            payment_ids = [r["id"] for r in cur.fetchall()]
+            cur.execute("UPDATE acc_receipt_candidates SET vendor_id=%s WHERE vendor_id=%s RETURNING id",
+                        (canonical_id, dup_id))
+            candidate_ids = [r["id"] for r in cur.fetchall()]
+            # item-aliases: move where canonical has none for that orig; drop the rest (canonical wins)
+            cur.execute("""UPDATE acc_item_aliases a SET vendor_key=%s WHERE a.vendor_key=%s
+                           AND NOT EXISTS (SELECT 1 FROM acc_item_aliases b
+                                           WHERE b.vendor_key=%s AND lower(b.orig_name)=lower(a.orig_name))""",
+                        (canonical_id, dup_id, canonical_id))
+            cur.execute("DELETE FROM acc_item_aliases WHERE vendor_key=%s", (dup_id,))
+            # vendor-name spelling aliases: dup name + its aliases → canonical (dedup; skip == canonical name)
+            canon_aliases = _parse_json_list(canon["aliases"])
+            have = {_vnorm(x) for x in canon_aliases}
+            for cand in [dup["name"]] + _parse_json_list(dup["aliases"]):
+                if cand and _vnorm(cand) not in have and _vnorm(cand) != _vnorm(canon["name"]):
+                    canon_aliases.append(cand.strip())
+                    have.add(_vnorm(cand))
+            # move the dup's group to canonical if canonical has none (one group = one vendor)
+            if dup.get("tg_group_id") and not canon.get("tg_group_id"):
+                g = dup["tg_group_id"]
+                cur.execute("UPDATE acc_vendors SET tg_group_id=NULL WHERE id=%s", (dup_id,))  # free first (UNIQUE)
+                cur.execute("UPDATE acc_vendors SET tg_group_id=%s, channel_kind=%s WHERE id=%s",
+                            (g, "dm" if g > 0 else "group", canonical_id))
+            cur.execute("UPDATE acc_vendors SET aliases=%s WHERE id=%s",
+                        (json.dumps(canon_aliases), canonical_id))
+            cur.execute("UPDATE acc_vendors SET active=FALSE WHERE id=%s", (dup_id,))    # deactivate the dup
+            cur.execute("""INSERT INTO acc_vendor_merges (dup_id, canonical_id, merged_by, receipt_ids,
+                           payment_ids, candidate_ids) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                        (dup_id, canonical_id, by, json.dumps(receipt_ids), json.dumps(payment_ids),
+                         json.dumps(candidate_ids)))
+            merge_id = cur.fetchone()["id"]
+    return {"ok": True, "merge_id": merge_id, "receipts": len(receipt_ids), "payments": len(payment_ids),
+            "candidates": len(candidate_ids), "dup_name": dup["name"], "canonical_id": canonical_id}
+
+
+def undo_vendor_merge(merge_id) -> dict:
+    """Reverse a merge's FINANCIAL repoint (§G7 V4): move the recorded receipts/payments/candidates back to
+    the dup and reactivate it. (The alias/group folds are minor + not auto-reversed — redo by hand if
+    needed.) Idempotent: an already-undone merge is a no-op."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM acc_vendor_merges WHERE id=%s", (merge_id,))
+            m = cur.fetchone()
+            if not m or m["undone"]:
+                return {"ok": False, "reason": "not found or already undone"}
+            rids, pids, cids = (_parse_json_list(m["receipt_ids"]), _parse_json_list(m["payment_ids"]),
+                                _parse_json_list(m["candidate_ids"]))
+            dup_id = m["dup_id"]
+            if rids:
+                cur.execute("UPDATE acc_receipts SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, rids))
+            if pids:
+                cur.execute("UPDATE acc_payments SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, pids))
+            if cids:
+                cur.execute("UPDATE acc_receipt_candidates SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, cids))
+            cur.execute("UPDATE acc_vendors SET active=TRUE WHERE id=%s", (dup_id,))
+            cur.execute("UPDATE acc_vendor_merges SET undone=TRUE WHERE id=%s", (merge_id,))
+    return {"ok": True, "receipts": len(rids), "payments": len(pids), "candidates": len(cids), "dup_id": dup_id}
 
 
 def set_vendor_kind(vendor_id: int, kind: str) -> None:

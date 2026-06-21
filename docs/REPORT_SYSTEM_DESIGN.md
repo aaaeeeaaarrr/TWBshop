@@ -690,8 +690,10 @@ truth-consolidation work.)
   **V2** `find_similar_vendors` dedup helper ✅ **BUILT** · `add_vendor_alias` (self-healing) ✅ **BUILT**
   (6 tests, accountant suite 49/49) · **V3** pick/propose-new capture UX + create-immediately →
   **LEAN INTERIM `needs_review` flag on `acc_vendors`** (owner-chosen 2026-06-21; fold into the full
-  Pending queue when it lands) · **V4** rename/add-alias (staff) + merge (owner). V1+V2 were the
-  unblocked read-side foundation; V3 is next.
+  Pending queue when it lands) · **V4** rename + merge + undo ✅ **BUILT 2026-06-21** (`rename_vendor`
+  self-healing · `merge_vendors` atomic repoint of receipts/payments/candidates/aliases + `acc_vendor_merges`
+  audit · `undo_vendor_merge` · `/vrename`,`/vmerge`,`/vmergeundo` · match/suggest now active-only so a
+  merged dup can't shadow the canonical; 4 before/after tests). **V1–V4 + §G read-priors all SHIPPED (INERT).**
 
 ### G8. Prices are a PRIMARY goal — keep the door open (owner emphasis, 2026-06-21)
 Prices aren't just a did-you-mean signal; they're a headline feature in their own right (ties to §E5/E6,

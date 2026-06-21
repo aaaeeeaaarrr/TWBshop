@@ -25,6 +25,7 @@ from accountant.db import (add_candidate, add_receipt, attach_vendor_channel, cl
                            listener_channels_matching, list_vendors, propose_vendor,
                            recent_receipts_for_vendor, rename_receipt_line, resolve_candidate,
                            save_receipt_lines, set_candidate_card, set_payment, set_vendor_kind,
+                           merge_vendors, rename_vendor, undo_vendor_merge,
                            to_usd_cents, unclaim_candidate, vendor_by_group, vendor_by_name,
                            vendor_item_history, vendor_link, vendor_priors_for)
 from shared.ai_client import extract_receipt
@@ -140,6 +141,51 @@ async def cmd_vendors(update, context):
             f"🆕 {v['name']} (vendor #{v['id']})",
             reply_markup=_rows_kb([[("✅ Confirm", f"acc:vok:{v['id']}"),
                                     ("🔗 Link channel", f"acc:lsug:{v['id']}")]]))
+
+
+async def cmd_vrename(update, context):
+    """/vrename <vendor_id> <new name> — fix a vendor's name (§G7 V4); the old name is kept as an alias."""
+    if not _allowed(update):
+        return
+    args = context.args or []
+    if len(args) < 2 or not args[0].isdigit():
+        await update.message.reply_text("Usage: /vrename <vendor_id> <new name>")
+        return
+    ok = rename_vendor(int(args[0]), " ".join(args[1:]))
+    await update.message.reply_text("✅ Renamed (old name kept as an alias)." if ok
+                                    else "⚠️ Couldn't rename — check the id, or the name is unchanged.")
+
+
+async def cmd_vmerge(update, context):
+    """/vmerge <dup_id> <canonical_id> — OWNER only: merge a duplicate vendor into the canonical one (§G7
+    V4). Moves all receipts/payments/candidates + aliases to the canonical, deactivates the dup. Reversible."""
+    if update.effective_user.id != OWNER_TELEGRAM_ID:
+        return
+    args = context.args or []
+    if len(args) != 2 or not (args[0].isdigit() and args[1].isdigit()):
+        await update.message.reply_text("Usage: /vmerge <dup_id> <canonical_id>  (merges dup INTO canonical)")
+        return
+    res = merge_vendors(int(args[0]), int(args[1]), by=update.effective_user.id)
+    if not res.get("ok"):
+        await update.message.reply_text(f"⚠️ Merge not done: {res.get('reason')}")
+        return
+    await update.message.reply_text(
+        f"✅ Merged #{args[0]} → #{args[1]} (\"{res['dup_name']}\"). Moved {res['receipts']} receipts, "
+        f"{res['payments']} payments, {res['candidates']} candidates.\nUndo: /vmergeundo {res['merge_id']}")
+
+
+async def cmd_vmergeundo(update, context):
+    """/vmergeundo <merge_id> — OWNER only: reverse a vendor merge's financial repoint (§G7 V4)."""
+    if update.effective_user.id != OWNER_TELEGRAM_ID:
+        return
+    args = context.args or []
+    if len(args) != 1 or not args[0].isdigit():
+        await update.message.reply_text("Usage: /vmergeundo <merge_id>")
+        return
+    res = undo_vendor_merge(int(args[0]))
+    await update.message.reply_text(
+        f"↩️ Undone: moved {res['receipts']} receipts back, reactivated vendor #{res['dup_id']}."
+        if res.get("ok") else f"⚠️ {res.get('reason')}")
 
 
 async def on_photo(update, context):
@@ -625,6 +671,9 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("vendor", cmd_vendor))
     app.add_handler(CommandHandler("vendors", cmd_vendors))
+    app.add_handler(CommandHandler("vrename", cmd_vrename))
+    app.add_handler(CommandHandler("vmerge", cmd_vmerge))
+    app.add_handler(CommandHandler("vmergeundo", cmd_vmergeundo))
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(CallbackQueryHandler(on_candidate_callback, pattern=r"^accand:"))
     app.add_handler(CallbackQueryHandler(on_callback, pattern=r"^acc:"))
