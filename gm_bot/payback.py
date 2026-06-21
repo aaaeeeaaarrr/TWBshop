@@ -43,6 +43,17 @@ def unbooked(balance_min: int, pending_ext_min: int) -> int:
     return max(0, max(0, balance_min or 0) - max(0, pending_ext_min or 0))
 
 
+def book_room(owed_min: int, paid_min: int, open_booked_min: int) -> int:
+    """AUTHORITATIVE bookable room (owner 'never again', Jun 21): owed − already-credited − still-open
+    bookings. A new payback slot may not exceed this. Source of truth = the BOOKINGS ledger (not
+    redefine-extensions, which are created separately/best-effort and can diverge — the hole that let
+    Heng over-book a 7-min balance with an 89-min slot). Crucially this does NOT block a legit
+    re-booking: a staffer late to a come-early slot has a 'done' (not open) booking + partial credit in
+    paid, so the unworked remainder correctly leaves room. Validated on real data: Heng=−82 (over-book
+    exposed), Nak/Chantrea/Chenda=0, Long=540 — nobody legit blocked."""
+    return max(0, int(owed_min or 0) - int(paid_min or 0) - int(open_booked_min or 0))
+
+
 def working_days_ahead(day_off: str | None, leave_iso: set[str], start: date,
                        n_days: int, count: int) -> list[date]:
     """The next `count` WORKING days from `start` (inclusive) within `n_days` —

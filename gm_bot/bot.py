@@ -3448,7 +3448,18 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 "ពេលនោះមិនអាចកក់បានទៀតទេ — នៅសល់ %s ត្រូវកក់។ សូមជ្រើសម្តងទៀត៖"
                 % (_hm(remaining), _hm(remaining)), reply_markup=kb)
             return
-        payback_book(debt["id"], staff["id"], slot_date, s_min, e_min, mins)
+        if payback_book(debt["id"], staff["id"], slot_date, s_min, e_min, mins) == 0:
+            # AUTHORITATIVE guard refused (would over-book — a stale button / race the pre-check missed).
+            from gm_bot.attendance_ui import _hm
+            fresh = _pb_remaining(staff, payback_open_debt(staff["id"])["balance"]
+                                  if payback_open_debt(staff["id"]) else 0)
+            kb = _payback_slot_keyboard(staff, fresh) if fresh > 0 else None
+            await query.edit_message_text(
+                (_PB_FULLY_BOOKED if not kb else
+                 "That time isn't available any more — %s left to book. Pick again:\n"
+                 "ពេលនោះមិនអាចកក់បានទៀតទេ — នៅសល់ %s ត្រូវកក់។ សូមជ្រើសម្តងទៀត៖" % (_hm(fresh), _hm(fresh))),
+                reply_markup=kb)
+            return
         _create_payback_redefine(staff, slot_date, s_min, e_min)   # the slot IS a redefine
         from datetime import date as _date
         d = _date.fromisoformat(slot_date)
@@ -3532,14 +3543,18 @@ async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                     normal_len = ((we - ws) % 1440) or 1440
                     amt = min(remaining, _pb.day_ext_cap(normal_len))   # 15h-total-day cap
                     _lbl, s_min, e_min = _pb.slot_windows(ws, we, amt)[0]
-                    payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
-                                 amt, auto_booked=True)
-                    _create_payback_redefine(staff, d0.isoformat(), s_min, e_min)
-                    await _att_send(context, uid, "Staff", nm,
-                        "I booked you %s %s-%s (you didn't choose).\n"
-                        "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"
-                        % (d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
-                           d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
+                    # honor the authoritative over-book guard (0 = refused); never claim "I booked"
+                    # nor create a dangling redefine if the slot didn't actually book.
+                    if payback_book(debt["id"], staff["id"], d0.isoformat(), s_min, e_min,
+                                    amt, auto_booked=True) == 0:
+                        logger.warning("auto-book refused (over-book guard) for staff %s", debt["staff_id"])
+                    else:
+                        _create_payback_redefine(staff, d0.isoformat(), s_min, e_min)
+                        await _att_send(context, uid, "Staff", nm,
+                            "I booked you %s %s-%s (you didn't choose).\n"
+                            "ខ្ញុំបានកក់ពេលឱ្យអ្នក %s %s-%s (ព្រោះអ្នកមិនបានជ្រើស)។"
+                            % (d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
+                               d0.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min)))
         except Exception as e:
             logger.error("payback ladder for %s failed: %s", debt["staff_id"], e)
 

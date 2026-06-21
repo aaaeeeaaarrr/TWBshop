@@ -4331,8 +4331,24 @@ def payback_open_bookings(staff_id: int) -> list[dict]:
 
 def payback_book(debt_id: int, staff_id: int, slot_date: str, start_min: int, end_min: int,
                  minutes: int, auto_booked: bool = False) -> int:
+    """Book a payback slot. Returns the booking id, or 0 if REFUSED by the over-book guard.
+    AUTHORITATIVE GUARD (owner 'never again', Jun 21): the single chokepoint for every booking path
+    (manual tap, stale button, auto-booker, future). Reads owed/paid + the still-open bookings in the
+    SAME transaction as the insert, so no stale/divergent pre-check can mint an over-booking (Heng
+    booked an 89-min slot against a 7-min balance via a path whose remaining read >0). Refuses (0) any
+    slot that would push committed payback past the debt — never caps (a partial window complicates the
+    redefine); the caller re-offers a correctly-sized picker."""
+    from gm_bot.payback import book_room
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT minutes_owed, minutes_paid FROM payback_debts WHERE id=%s", (debt_id,))
+            d = cur.fetchone()
+            if d:
+                cur.execute("SELECT COALESCE(SUM(minutes),0) AS s FROM payback_bookings "
+                            "WHERE debt_id=%s AND status='booked' AND is_test=%s", (debt_id, _ATT_TEST))
+                room = book_room(d["minutes_owed"], d["minutes_paid"], cur.fetchone()["s"])
+                if int(minutes) > room:
+                    return 0   # would over-book — refuse (caller re-offers a correctly-sized picker)
             cur.execute("""INSERT INTO payback_bookings
                 (debt_id, staff_id, slot_date, start_min, end_min, minutes, auto_booked, is_test)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
