@@ -32,7 +32,7 @@
 - `gm_bot/food_money_db.py` — Food-money gives — EVENT-DRIVEN (owner: a give counts toward the report that's done NEXT, not a clock
     · init_food_money_db, food_arrived_staff, record_food_money_give, food_money_open_ids, food_money_open_list, close_food_period, food_money_list_for_report
 - `gm_bot/food_money_ui.py` — Food Allowance — the listener's /menu button (live wiring), GATED so it's safe even when deployed.
-    · _food_gate_on, _may_use, _shift_dates, _coming_report_hint, _kb, _food_list_kb, cmd_menu_listener, on_food_callback, post_food_list_on_report
+    · _food_gate_on, _may_use, _shift_dates, _coming_report_hint, _kb, _food_list_kb, food_menu_entry, on_food_callback, post_food_list_on_report
 - `gm_bot/frequency.py` — Frequency / pattern detection for autonomous call-outs (session 28). No DB/Telegram/AI.
     · _within, detect
 - `gm_bot/late.py` — Late-declaration pure logic (session 28). No DB/Telegram.

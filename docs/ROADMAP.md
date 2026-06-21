@@ -171,22 +171,27 @@ pre/post-report gives must not miscount the money). Needs no staff conversation 
   `food_menu_rows` = ARRIVED-only + exclude-given + standard-shift amount) + `gm_bot/food_money_db.py`
   (open gives · partial-UNIQUE no-double · `close_food_period` · `food_arrived_staff` = CHECKED-IN staff
   from `attendance_sessions` ⋈ `staff_registry` · self-migrating init).
-- Wiring: **`gm_bot/food_money_ui.py`** — `/menu` listener branch (1 button "🍚 Food Allowance") · the
-  give flow (list → tap → `record_food_money_give`, server-recomputed amount, name disappears) · the
-  close hook `post_food_list_on_report`. `gm_bot/bot.py`: 3 minimal touch-points (cmd_menu listener
-  branch · `food:` callback handler · close-hook call after `save_daily_report`).
+- Wiring: **`gm_bot/food_money_ui.py`** — `/menu` in the **Expenses TWB group** (`-5417163768`), owner OR
+  listener (a shared group, owner's 2026-06-21 choice) → 1 button "🍚 Food Allowance" · the give flow
+  (list → tap → `record_food_money_give`, server-recomputed amount, name disappears) · the close hook
+  `post_food_list_on_report` (posts the list to that group). `gm_bot/bot.py`: 3 touch-points (cmd_menu
+  food-entry · `food:` callback handler · close-hook after `save_daily_report`). **Salary-leak guard added:**
+  the owner menu is now PRIVATE-only, and food_menu_entry fully handles `/menu` in the group so the owner
+  menu can never fall through into a group.
 - **GATE — `_food_gate_on()` = `att_test_on()` OR `gm_state 'food_money_live'='on'`. OFF by default** →
-  deployed-but-off is fully inert (listener /menu = "nothing here yet"; callback returns; hook no-ops).
-  Access = listener (`1271537077`) + owner, PRIVATE only. `is_test` follows the attendance test switch.
-- **Proof:** 24 food/UI tests (incl. $11.92 sheet · close-then-reopen · arrived-only · gate off-by-default
-  · server-recomputed give · blocked-when-off) + **full suite 827p/2s** (no regression from the live edits);
+  deployed-but-off is fully inert (menu silent; callback returns; hook no-ops). Access = the Expenses TWB
+  group (`-5417163768`), owner + listener only. `is_test` follows the attendance test switch.
+- **Proof:** 26 food/UI tests (incl. $11.92 sheet · close-then-reopen · arrived-only · gate off-by-default
+  · server-recomputed give · blocked-when-off · no-salary-leak) + **full suite 829p/2s** (no regression);
   `gm_bot.bot` imports clean. **ARRIVED RULE:** `checked_in_at IS NOT NULL`, never `_present_now` (schedule).
 
 **⛔ REMAINING = GO-LIVE only (the HIGH-RISK step — needs the owner):**
+0. **PREREQ:** add the **GM bot to the Expenses TWB group** (`-5417163768`) and make sure it can see `/menu`
+   there (bot privacy OFF, or use `/menu@<gmbot>`). The GM bot is NOT in that group per config — owner adds it.
 1. **Deploy** the gated-off code to the live GM bot (one quiet-window restart; verify HEAD==origin, active,
    code carries it). Safe because the gate is OFF.
-2. **Owner walk in test mode:** `/testmode` on → listener `/menu` → 🍚 Food Allowance → give a few (is_test)
-   → post a test report → confirm the auto-posted "Night staff food" list → `/testreset`.
+2. **Owner walk in test mode:** `/testmode` on → in the Expenses TWB group `/menu` → 🍚 Food Allowance →
+   give a few (is_test) → post a test report → confirm the auto-posted "Night staff food" list → `/testreset`.
 3. **Flip live:** `gm_set_state('food_money_live','on')` (a DB write, no restart) → real.
 **PARKED:** checkout-only timing (owner will discuss with staff) — the button approach doesn't need it.
 

@@ -24,6 +24,9 @@ from shared.database import att_test_on, gm_get_state
 logger = logging.getLogger(__name__)
 _PP = ZoneInfo("Asia/Phnom_Penh")
 LISTENER_ID = config.DISPATCH_REMINDER_TELEGRAM_ID
+# The menu lives in the Expenses TWB group so the owner OR the listener (both in it) can run /menu there.
+# ⚠ The GM bot must be a MEMBER of this group, and able to see /menu (privacy off, or /menu@<gmbot>).
+EXPENSE_GROUP_ID = -5417163768
 
 
 def _food_gate_on() -> bool:
@@ -32,10 +35,11 @@ def _food_gate_on() -> bool:
 
 
 def _may_use(update) -> bool:
+    """The Food Allowance menu = the Expenses TWB group, owner or listener only (not other members)."""
     chat, user = update.effective_chat, update.effective_user
-    if chat is None or user is None or chat.type != "private":
+    if chat is None or user is None:
         return False
-    return user.id in (config.OWNER_TELEGRAM_ID, LISTENER_ID)
+    return chat.id == EXPENSE_GROUP_ID and user.id in (config.OWNER_TELEGRAM_ID, LISTENER_ID)
 
 
 def _shift_dates():
@@ -63,17 +67,15 @@ def _food_list_kb():
     return rows, _kb(btns)
 
 
-async def cmd_menu_listener(update, context) -> bool:
-    """If this /menu is the LISTENER's, show the listener menu (1 button for now). Returns True if handled
-    (so the owner's /menu falls through untouched)."""
-    user = update.effective_user
-    if user is None or user.id != LISTENER_ID or update.effective_chat.type != "private":
-        return False
-    if not _food_gate_on():
-        await update.message.reply_text("🗂 Menu — nothing here yet.")
-        return True
-    await update.message.reply_text("🗂 Menu", reply_markup=_kb([[("🍚 Food Allowance", "food:open")]]))
-    return True
+async def food_menu_entry(update, context) -> bool:
+    """/menu in the EXPENSES TWB group by the owner or listener → show the shop menu (1 button for now).
+    Returns True if WE handled it — crucially, True for the owner here too, so the owner's salary menu can
+    NEVER fall through and render in a group. Silent when the feature is gated off (no group spam)."""
+    if not _may_use(update):
+        return False                       # not the food-menu context → cmd_menu handles (owner private)
+    if _food_gate_on():
+        await update.message.reply_text("🗂 Menu", reply_markup=_kb([[("🍚 Food Allowance", "food:open")]]))
+    return True                            # handled (shown if live; silent if off) — never falls through
 
 
 async def on_food_callback(update, context) -> None:
@@ -128,6 +130,6 @@ async def post_food_list_on_report(bot, report_id, business_day_iso, report_kind
         biz = _dt.date.fromisoformat(business_day_iso) if isinstance(business_day_iso, str) else business_day_iso
         closed = close_food_period(report_id, biz, report_kind, is_test=att_test_on())
         if closed:
-            await bot.send_message(LISTENER_ID, render_food_list(report_kind, biz, closed))
+            await bot.send_message(EXPENSE_GROUP_ID, render_food_list(report_kind, biz, closed))
     except Exception:
         logger.exception("food list post on report failed")

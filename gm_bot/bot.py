@@ -5590,9 +5590,10 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/menu — the LISTENER gets the shop menu (Food Allowance); the OWNER gets the owner menu
     (salaries live in here, so not even Tyty / the listener)."""
     from gm_bot import food_money_ui
-    if await food_money_ui.cmd_menu_listener(update, context):
+    if await food_money_ui.food_menu_entry(update, context):
         return
-    if update.effective_user.id != config.OWNER_TELEGRAM_ID:
+    # owner menu = PRIVATE only (salaries — never render it in a group)
+    if update.effective_chat.type != "private" or update.effective_user.id != config.OWNER_TELEGRAM_ID:
         return
     await update.message.reply_text("🗂 Owner menu",
         reply_markup=_own_kb([[("👥 Staff info", "own:staff")]]))
