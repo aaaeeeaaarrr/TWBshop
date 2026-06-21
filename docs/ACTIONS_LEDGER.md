@@ -65,6 +65,24 @@
 
 ## Open (not yet done)
 
+- **2026-06-21 — HENG (id 37) PB-OVERBOOK data fix (owner: fix it + why + never-again).** Confirmed: debt
+  #148 owed 96 / paid 89 / open 7; a PHANTOM Jun-21 89-min slot (booking #62 + shift_change #268, status
+  approved/booked) created Jun 19 20:08 — BEFORE his Jun-19 89-min slot credited at checkout (~23:00), so
+  the gate saw the full balance (root cause: bookable-remainder ignores today's worked-but-uncredited slot;
+  stale-push hits the same gap). ALSO bug: the Jun-20 7-min slot is 'done' but never credited (paid stuck 89).
+  **TO DO (HIGH-RISK write → owner runs vetted before/after script):** cancel booking #62 + sc #268, credit
+  the worked 7 → debt #148 → 0/cleared. **THEN** post the Supervisors correction (HELD per owner: "wait till
+  we sort it all"): "overbooking alert was a system error — Heng already paid his 89." Never-again = the gate
+  code fix (count approved-but-uncredited slots incl. today's) — build+stage first.
+
+- **2026-06-21 — LONG (id 1) paperless-sick −15 + payback (owner: "dock −15pts yes, send him a message, push
+  payback after").** Jun 19 own-sick declared 20:55 (5 min before his 21:00 shift), paperless → 540-min debt
+  #154, but the −15 `late_sick_inform` DID NOT fire (root cause: `_sick_late_mins`/`_shift_date_now` returns
+  None in the 30-min PRE-shift window → the −15 only catches sicks declared AFTER shift start). **TO DO
+  (HIGH-RISK write → owner runs vetted script, after the shift-window fix lands):** record −15
+  `late_sick_inform` for Long (Jun 19) → send him the late-informing message → then push the 540 payback. Same
+  pre-shift-window bug also disables the FAMILY-sick soft-note (built, but never shows before shift start).
+
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
   below); owner picked "phased both". **Only the per-event exact-delta version remains (phase 2): wire an
