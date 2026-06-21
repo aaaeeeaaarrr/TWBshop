@@ -109,7 +109,9 @@ def v_special(leaves: list[dict], staff: dict) -> list[str]:
     return out
 
 
-def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
+def v_shift_changes(rows: list[dict], staff: dict, today: date,
+                    open_sessions: set | None = None) -> list[str]:
+    open_sessions = open_sessions or set()
     out = []
     for r in rows:
         nm = _nm(staff, r["staff_id"])
@@ -122,8 +124,16 @@ def v_shift_changes(rows: list[dict], staff: dict, today: date) -> list[str]:
                 out.append("OT: %s change #%s is done but ot_banked=%s (must be 0..%d)"
                            % (nm, r["id"], ob, OT_CAP_MIN))
         if st == "approved" and r.get("when_date") and r["when_date"] < today:
-            out.append("OT: %s change #%s APPROVED for %s but never settled — OT may not have "
-                       "banked at checkout" % (nm, r["id"], r["when_date"]))
+            # An OVERNIGHT shift dated D is still being WORKED until ~06:00 D+1 — its session stays OPEN
+            # past midnight and the redefine settles at checkout (or the 07:00 closer). Don't cry "never
+            # settled" while the session is still open + recent (the watchdog was waking the owner at 2am
+            # for every overnight worker with a payback/OT slot). A CLOSED-but-unsettled redefine, or an
+            # old dangling one, still flags.
+            still_running = ((r["staff_id"], str(r["when_date"])) in open_sessions
+                             and r["when_date"] >= today - timedelta(days=1))
+            if not still_running:
+                out.append("OT: %s change #%s APPROVED for %s but never settled — OT may not have "
+                           "banked at checkout" % (nm, r["id"], r["when_date"]))
         if st == "proposed" and r.get("when_date") and r["when_date"] < today:
             out.append("OT: %s change #%s still PROPOSED but its date %s passed (staff never "
                        "answered)" % (nm, r["id"], r["when_date"]))
@@ -590,9 +600,11 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
             cur.execute("SELECT key, value FROM gm_state WHERE key LIKE 'dead_taps:%%'")
             taps = [(r["key"], r["value"]) for r in cur.fetchall()]
 
+    open_sessions = {(s["staff_id"], str(s["shift_date"])) for s in sess
+                     if s.get("checked_in_at") and not s.get("checked_out_at")}
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)
-                + v_shift_changes(scs, staff, today)
+                + v_shift_changes(scs, staff, today, open_sessions)
                 + v_sessions(sess, staff, today)
                 + v_ot_bank(banks, staff)
                 + v_noshow_vs_sessions(nos, sess, staff)
