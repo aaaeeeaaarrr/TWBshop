@@ -80,6 +80,20 @@ Everything else (POS, stock, more channels, packaging) extends the same proven f
 8. **Packaging:** what are the first 2–3 sellable bundles + rough pricing/positioning?
 9. **Go-to-market:** who's the first paying customer after TWB? (validates the whole thing.)
 
+## Onboarding wizard — UX law (owner, 2026-06-22)
+The self-serve wizard: **every step carries a plain-language explanation + conditional (if-this-then)
+branching** so the least technical human can do it. "Do you want Telegram? → if yes, here's exactly how
+to get a token, paste it here → we'll verify it live." Skippable; bare-minimum-usable; later steps appear
+only if earlier answers make them relevant. Stupid-proof is a measured requirement, not a slogan.
+
+## Live-TWB safety during the build (verified 2026-06-22)
+A read-only sweep confirmed the LIVE attendance ACTION/BALANCE/DECISION paths are overnight-correct
+(they use `_shift_date_now` / `resolve_day` / datetime windows / `_shift_end_dt`, not raw calendar
+dates). The only overnight-naivety left is a couple of AUDIT FLAGS (false-alarm noise, not wrong
+numbers/actions). **Conclusion: the old model is safe to keep running during the multi-week shadow-run
+build — building the new entity+event model (the real fix) does NOT drop the essential live fix.** The
+remaining audit-flag noise can be cheaply hardened so the watchdog stays trustworthy meanwhile.
+
 ## Principles to carry into EVERY decision from here (owner's standing instruction)
 - Multi-tenant, config-driven, channel-agnostic, entity+event-based, integration-pluggable — **by default**,
   even in small choices.
