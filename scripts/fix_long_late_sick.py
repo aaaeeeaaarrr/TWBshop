@@ -16,7 +16,10 @@ Usage:
   TWBSHOP_ENV=prod python scripts/fix_long_late_sick.py            # dry-run
   TWBSHOP_ENV=prod python scripts/fix_long_late_sick.py --apply    # write + proof
 """
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root on path
 
 STAFF_ID = 1
 UID = 5961683250

@@ -9,6 +9,23 @@
 
 ## Done (with proof)
 
+- **2026-06-21 — HENG (id 37) PB-OVERBOOK data fix DONE (HIGH-RISK payroll write; deployed code + vetted
+  script, independent before/after proof).** After deploying the over-book guard (tag `session-51-gm-20260621`),
+  ran `scripts/fix_heng_overbook.py --apply` on prod. **BEFORE:** debt #148 owed 96 / paid 89 / open · booking
+  #62 (Jun-21 89min) booked · sc #268 approved. **AFTER (independent re-read):** debt #148 **96/96 CLEARED** ·
+  booking #62 **cancelled** · sc #268 **cancelled**. Audit overbook flag GONE. The phantom Jun-21 89-min slot is
+  void (he already paid his 89 on Jun 19); the worked-but-uncredited 7-min Jun-20 tail is now credited. NEVER-AGAIN:
+  authoritative `book_room` guard at the `payback_book` chokepoint (commit `07807f6`). **Group post still HELD** for
+  owner go (Heng's balance is now genuinely 0 → the correction post is factually ready).
+
+- **2026-06-21 — LONG (id 1) retroactive −15 DONE (HIGH-RISK payroll write; vetted script + independent proof).**
+  Owner decision = just Long + going-forward. Ran `scripts/fix_long_late_sick.py --apply` on prod. **BEFORE:** no
+  late_sick_inform events. **AFTER (independent re-read):** event #130 `late_sick_inform` ref 2026-06-19 recorded
+  + deferred-notice flag set → the bot teaches Long + offers his 540 payback (debt #154) at his next check-in.
+  ROOT-CAUSE FIX (self-cancellation: lateness captured before sick_create) deployed `d09e00c`/tag above; the −15
+  now fires for everyone going forward. ⚠ A pre-deploy miss surfaced (THYDA, own-sick Jun 21 13:52 PP, 113 min
+  late, before the 16:12 deploy) — left per "just Long" pending owner's call.
+
 - **2026-06-19 — FALLBACK END-OF-SHIFT SESSION-CLOSER built + deployed + the 3 stale sessions CLOSED on prod
   (HIGH-RISK: closes live attendance sessions; before/after independent proof + final clean audit).** Daily
   07:00 PP `_session_closer_job` (`gm_bot/bot.py`) closes any still-open session whose shift has fully ended
@@ -65,29 +82,11 @@
 
 ## Open (not yet done)
 
-- **2026-06-21 — HENG (id 37) PB-OVERBOOK data fix (owner: fix it + why + never-again).** Confirmed: debt
-  #148 owed 96 / paid 89 / open 7; a PHANTOM Jun-21 89-min slot (booking #62 + shift_change #268, status
-  approved/booked) created Jun 19 20:08 — BEFORE his Jun-19 89-min slot credited at checkout (~23:00), so
-  the gate saw the full balance (root cause: bookable-remainder ignores today's worked-but-uncredited slot;
-  stale-push hits the same gap). ALSO bug: the Jun-20 7-min slot is 'done' but never credited (paid stuck 89).
-  **TO DO (HIGH-RISK write → owner runs vetted before/after script):** cancel booking #62 + sc #268, credit
-  the worked 7 → debt #148 → 0/cleared. **THEN** post the Supervisors correction (HELD per owner: "wait till
-  we sort it all"): "overbooking alert was a system error — Heng already paid his 89." Never-again = the gate
-  code fix (count approved-but-uncredited slots incl. today's) — build+stage first.
-
-- **2026-06-21 — LONG (id 1) paperless-sick −15 + payback (owner: "dock −15pts yes, send him a message, push
-  payback after").** Jun 19 own-sick declared 20:55 (5 min before his 21:00 shift), paperless → 540-min debt
-  #154, the −15 `late_sick_inform` DID NOT fire. **ROOT CAUSE (CONFIRMED, traced read-only vs real Long data —
-  NOT the earlier pre-shift-window theory):** `_sickme_book` computed lateness AFTER `sick_create`; once the
-  case exists `resolve_day` reports the day not-working (start_min=None) → `_sick_late_mins` returns None → −15
-  silently skipped (self-cancellation/ordering). **CODE FIX SHIPPED-INERT `d09e00c`** (capture lateness before
-  sick_create) — needs the batched GM deploy to go live. **⚠ SCOPE — the −15 NEVER fired for ANYONE since
-  go-live (Jun 16), not just Long.** **OWNER DECISION (Jun 21): JUST LONG + going-forward** — the deployed fix
-  handles everyone from deploy onward; NO retroactive dig for past missed cases. **TO DO (HIGH-RISK write →
-  owner runs vetted script, after the fix deploys):** record −15 for Long (Jun 19) → send him the message →
-  push the 540 payback. **FAMILY-sick
-  note: VERIFIED built + NOT affected** (computed at screen-build before the case exists, so resolve_day still
-  sees the shift) — confirm live in the walk.
+- **2026-06-21 — THYDA (id ?) pre-deploy −15 miss — OWNER DECISION PENDING.** Own-sick filed Jun 21 13:52 PP
+  (113 min after shift start), ~2.3h BEFORE the 16:12 deploy → hit the old buggy code, no −15. Per "just Long"
+  it's left; but it's TODAY + egregious. Owner: apply −15 to Thyda too (one-liner like Long), or leave it?
+  Until resolved it shows in the audit/watchdog for 14 days (bounded). FAMILY-sick late-note: VERIFIED built +
+  NOT affected by the self-cancellation bug (computed at screen-build before the case) — confirm in a live walk.
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done

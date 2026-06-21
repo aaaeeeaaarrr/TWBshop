@@ -13,7 +13,10 @@ Usage:
   TWBSHOP_ENV=prod python scripts/fix_heng_overbook.py            # dry-run (shows plan + BEFORE)
   TWBSHOP_ENV=prod python scripts/fix_heng_overbook.py --apply    # write + AFTER proof
 """
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root on path
 
 DEBT_ID = 148
 BOOKING_ID = 62
