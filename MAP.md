@@ -19,6 +19,11 @@
 
 ---
 
+## 🌱 NEW PLATFORM (`core/`) — the product foundation (channel-agnostic · multi-tenant) · shadow-run, ACTS ON NOTHING
+- **Entry:** `core/db.py` (orgs · `shifts` entity · `attendance_events` log · `shadow_comparisons`) · `core/shifts.py::shift_window`/`shift_for_instant` (interval model — overnight by construction) · `core/attendance.py::check_in`/`check_out` (channel-agnostic commands) · `core/shadow.py::compare_checkin`
+- **Read-first:** `docs/PLATFORM_VISION.md` (north star + principles) · `docs/ATTENDANCE_DOMAIN_MODEL.md` (entity+event model + the 5 invariants) · `docs/SHIFT_MODEL_DESIGN.md`
+- **⚠ Gotchas:** date = LABEL only — reason on `start_dt`/`end_dt` intervals (NEVER `< today`) · tenant-scoped (`org_id` everywhere) · atomic-claim-at-the-write (UNIQUE-as-claim) · runs PARALLEL to live and acts on NOTHING (shadow) — cut over only after proven. First slice = check-in/out (built session 51d).
+
 ## Attendance — check-in / check-out / no-show  ·  ⚠ LIVE (real staff, payroll-adjacent)
 - **Entry:** `gm_bot/bot.py` (scheduler + location handler + jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout`
 - **Read-first:** `docs/ATTENDANCE_SYSTEM_DETAILED.md` · `docs/STATEFUL_MENU_PATTERNS.md` · grep `docs/HISTORY.md` sessions 31–42
