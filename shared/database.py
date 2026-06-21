@@ -2310,6 +2310,9 @@ def init_attendance_db() -> None:
                 -- Jun 16: gender ('M'|'F') for records (the bot's Khmer is gender-neutral); seeded from
                 -- the owner's roster by seed_staff_genders().
                 ALTER TABLE staff_registry ADD COLUMN IF NOT EXISTS gender TEXT;
+                -- Jun 21: the sickness reason, captured up-front + mandatory (owner) — shown in the
+                -- Supervisors FYI + kept on the case (no more blank-reason auto-resolve FYIs).
+                ALTER TABLE sick_cases ADD COLUMN IF NOT EXISTS reason TEXT;
                 -- session 28: flow-state persistence (H1) — one active ladder per uid, survives restart
                 CREATE TABLE IF NOT EXISTS gm_flow_state (
                     uid        BIGINT PRIMARY KEY,
@@ -3060,12 +3063,13 @@ def special_leave_get(leave_id: int) -> dict | None:
             return dict(r) if r else None
 
 
-def sick_create(staff_id: int, who: str, the_date: str, status: str = "open") -> int:
+def sick_create(staff_id: int, who: str, the_date: str, status: str = "open",
+                reason: str | None = None) -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("""INSERT INTO sick_cases (staff_id, who, the_date, status, is_test)
-                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                        (staff_id, who, the_date, status, _ATT_TEST))
+            cur.execute("""INSERT INTO sick_cases (staff_id, who, the_date, status, reason, is_test)
+                           VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                        (staff_id, who, the_date, status, (reason or None), _ATT_TEST))
             return cur.fetchone()["id"]
 
 

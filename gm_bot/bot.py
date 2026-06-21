@@ -1658,6 +1658,30 @@ def _gm_log(kind: str, staff_id=None, uid=None, detail=None) -> None:
         pass
 
 
+def _reason_gate_blank(flow: str | None, reason) -> bool:
+    """True when a reason-mandatory flow has no real reason yet (owner Jun 15 schedule changes + Jun 21
+    sick). 'shift' rejects only blank/'(no reason)'; SICK also rejects a bare '(confirmed)' tap — a sick
+    filing must be TYPED, never a blank FYI (Long's bug)."""
+    if flow not in ("shift", "sick_me", "sick_fam"):
+        return False
+    blank = {"", "(no reason)"}
+    if flow in ("sick_me", "sick_fam"):
+        blank.add("(confirmed)")
+    return (not reason) or (str(reason).strip() in blank)
+
+
+def _sick_reason_prompt(who: str | None = None) -> str:
+    """Relationship-aware mandatory 'what's wrong?' prompt (owner Jun 21) — a sick filing must carry a
+    typed reason (never a blank FYI again). `who` None/'me' = own-sick; else the family relationship."""
+    if not who or who == "me":
+        return ("🤒 What's wrong? Please type a few words — it goes to the Supervisors.\n"
+                "🤒 ឈឺអ្វី? សូមវាយពីរបីម៉ាត់ — វានឹងផ្ញើទៅបងៗ។")
+    en = {"child": "your child", "spouse": "your husband/wife", "parent": "your parent",
+          "family": "your family member"}.get(who, "your " + str(who))
+    return ("🤒 What's wrong with %s? Please type a few words — it goes to the Supervisors.\n"
+            "🤒 %s ឈឺអ្វី? សូមវាយពីរបីម៉ាត់ — វានឹងផ្ញើទៅបងៗ។" % (en, _who_kh(who)))
+
+
 def _create_payback_redefine(staff: dict, slot_date: str, s_min: int, e_min: int) -> None:
     """A booked payback slot IS a shift redefine (owner unification): the existing engine then
     does everything — T−10 at the new start, lateness vs the new start, checkout settle credits
@@ -4035,7 +4059,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         _late_inform_mins = _sick_late_mins(persona)
     except Exception:
         _late_inform_mins = None
-    sick_create(persona["id"], "me", date_iso, "provisional")
+    sick_create(persona["id"], "me", date_iso, "provisional", reason=reason)
     await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
     from gm_bot.attendance import to_min
     ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
@@ -6463,17 +6487,20 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
         pass
     if reason is None:   # typed-reason flows read the message; tap-to-confirm flows pass it in
         reason = (((update.message.text or "").strip()) if update.message else "") or "(no reason)"
-    # owner (Jun 15): EVERY schedule change (A1 time / A2 day-off move / extension) MUST carry a real
-    # reason — a senior is moving someone's day, the staffer deserves the why. Reject a blank reason and
-    # re-arm the SAME pend so they just type it again (no re-picking). Other flows keep their own copy.
-    if pend.get("flow") == "shift" and (not reason or str(reason).strip() in ("", "(no reason)")):
+    # owner (Jun 15): EVERY schedule change MUST carry a real reason — a senior is moving someone's day.
+    # owner (Jun 21): a SICK filing (own + family) must ALSO carry a typed reason — never a blank FYI
+    # again (Long's blank). Sick rejects a bare tap-confirm too (it must be TYPED). Reject + re-arm the
+    # SAME pend so they just type it (no re-picking); the typed reason then files + is shown.
+    _flow = pend.get("flow")
+    if _reason_gate_blank(_flow, reason):
         uid = update.effective_user.id
         if uid == config.OWNER_TELEGRAM_ID:
             context.user_data["att_test_pending"] = pend          # test: re-stash for the next message
         else:
             from shared.database import flow_save
             flow_save(uid, "att_pending", "reason", pend, ttl_min=30)   # live: re-arm (restart-safe)
-        nag = ("📝 A reason is required for a schedule change — please type the reason.\n"
+        nag = (_sick_reason_prompt(pend.get("who")) if _flow in ("sick_me", "sick_fam") else
+               "📝 A reason is required for a schedule change — please type the reason.\n"
                "📝 ត្រូវមានមូលហេតុសម្រាប់ការប្តូរកាលវិភាគ — សូមវាយមូលហេតុ។")
         if update.message is not None:
             await update.message.reply_text(nag)
@@ -6700,16 +6727,18 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
     elif flow == "sick_fam":
         # WF3: book TERMINAL ('cleared'), not 'open' — there is no night nudge to answer, and
         # resolve_day still treats it as away (status <> 'cancelled') + the 7-day pool counts it.
-        sick_create(persona["id"], pend["who"], pend["date"], "cleared")
+        sick_create(persona["id"], pend["who"], pend["date"], "cleared", reason=reason)
         await _sick_supersede(context, persona, pend["date"])   # away → stand down redefine/AL that day
         nm = persona.get("call_name") or persona["canonical_name"]
         win = pend.get("window")                                # WF2: a TIMES booking carries a window
         when = ("today (%s)" % win) if win else "today"
         when_kh = ("ថ្ងៃនេះ (%s)" % win) if win else "ថ្ងៃនេះ"
         await _att_send(context, None, "Supervisors group", "",
-            "FYI: %s takes sick leave for their %s %s.\n"
+            "FYI: %s takes sick leave for their %s %s.\nReason · មូលហេតុ៖ %s\n"
             "FYI: %s សុំច្បាប់ឈឺសម្រាប់%s%s។"
-            % (nm, pend["who"], when, nm, _who_kh(pend["who"]), when_kh), group=True)
+            % (nm, pend["who"], when, reason, nm, _who_kh(pend["who"]), when_kh), group=True)
+        _gm_log("sick_filed", persona["id"], detail={"who": pend["who"], "date": pend["date"],
+                                                     "reason": reason})
         await confirm(
             "🤍 Noted — take care of your %s. The Supervisors are informed.\n"
             "🤍 បានកត់ត្រា — សូមថែទាំ%sរបស់អ្នក។ បានជូនដំណឹងដល់បងៗ។" % (pend["who"], _who_kh(pend["who"])),
