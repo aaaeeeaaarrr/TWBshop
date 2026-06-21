@@ -82,10 +82,10 @@
   case exists `resolve_day` reports the day not-working (start_min=None) → `_sick_late_mins` returns None → −15
   silently skipped (self-cancellation/ordering). **CODE FIX SHIPPED-INERT `d09e00c`** (capture lateness before
   sick_create) — needs the batched GM deploy to go live. **⚠ SCOPE — the −15 NEVER fired for ANYONE since
-  go-live (Jun 16), not just Long.** Scope query (own-sick cases since Jun 16 that were late-informed) BLOCKED
-  by a transient prod-network outage from dev — run when back. **OWNER DECISION: retroactive −15 for all missed
-  late-informers, or just Long + going-forward?** **TO DO (HIGH-RISK write → owner runs vetted script, after the
-  fix deploys):** record −15 for Long (Jun 19) → send him the message → push the 540 payback. **FAMILY-sick
+  go-live (Jun 16), not just Long.** **OWNER DECISION (Jun 21): JUST LONG + going-forward** — the deployed fix
+  handles everyone from deploy onward; NO retroactive dig for past missed cases. **TO DO (HIGH-RISK write →
+  owner runs vetted script, after the fix deploys):** record −15 for Long (Jun 19) → send him the message →
+  push the 540 payback. **FAMILY-sick
   note: VERIFIED built + NOT affected** (computed at screen-build before the case exists, so resolve_day still
   sees the shift) — confirm live in the walk.
 
