@@ -42,9 +42,13 @@ def main(days: int = 30):
         with conn.cursor() as cur:
             cur.execute("SELECT id, work_start, work_end FROM staff_registry")
             sched = {r["id"]: (r["work_start"], r["work_end"]) for r in cur.fetchall()}
+            # which (staff, date) had a REDEFINE (payback/OT slot moved the start) — to split the result
+            cur.execute("SELECT DISTINCT staff_id, when_date FROM shift_changes "
+                        "WHERE status IN ('approved','done')")
+            redefine_days = {(r["staff_id"], str(r["when_date"])) for r in cur.fetchall()}
             # fresh replay: drop prior replay comparisons (keep the live-hook ones)
             cur.execute("DELETE FROM shadow_comparisons WHERE org_id=%s AND source='replay'", (ORG,))
-            cur.execute("""SELECT staff_id, checked_in_at, minutes_late, minutes_early
+            cur.execute("""SELECT staff_id, shift_date, checked_in_at, minutes_late, minutes_early
                            FROM attendance_sessions
                            WHERE checked_in_at IS NOT NULL AND is_test=FALSE
                              AND shift_date >= CURRENT_DATE - %s
@@ -52,6 +56,8 @@ def main(days: int = 30):
             rows = [dict(r) for r in cur.fetchall()]
 
     done = skipped = agree = 0
+    norm_n = norm_ok = redef_n = redef_ok = 0   # split: normal-day vs redefine-day
+    _norm_miss = []   # normal-day mismatch examples to characterize the remaining gap
     for r in rows:
         ws_we = sched.get(r["staff_id"])
         if not ws_we or not ws_we[0] or not ws_we[1]:
@@ -62,8 +68,24 @@ def main(days: int = 30):
                              r["minutes_late"], r["minutes_early"], res, source="replay")
         done += 1
         agree += 1 if ok else 0
+        if (r["staff_id"], str(r["shift_date"])) in redefine_days:
+            redef_n += 1; redef_ok += 1 if ok else 0
+        else:
+            norm_n += 1; norm_ok += 1 if ok else 0
+            if not ok:
+                _norm_miss.append((str(r["shift_date"]), r["staff_id"],
+                                   _live_state(r["minutes_late"], r["minutes_early"]),
+                                   r["minutes_late"], r["minutes_early"], res.get("state"),
+                                   res.get("minutes_late"), res.get("minutes_early")))
     print("replayed %d check-ins (last %d days) · %d agreed · %d mismatched · %d skipped (no schedule)"
           % (done, days, agree, done - agree, skipped))
+    print("  SPLIT — normal days: %d/%d agree (%.0f%%) · redefine days: %d/%d agree (%.0f%%)"
+          % (norm_ok, norm_n, (100.0 * norm_ok / norm_n if norm_n else 0),
+             redef_ok, redef_n, (100.0 * redef_ok / redef_n if redef_n else 0)))
+    if _norm_miss:
+        print("  NORMAL-DAY mismatches (date · staff · live[state,L,E] -> new[state,L,E]):")
+        for m in _norm_miss[:12]:
+            print("    %s s%s live[%s,%s,%s] -> new[%s,%s,%s]" % m)
     from core.shadow import build_digest
     print("\n" + build_digest(ORG)["text"])
 
