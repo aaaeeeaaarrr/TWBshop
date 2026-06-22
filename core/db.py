@@ -104,6 +104,21 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_debts_open "
                         "ON core_payback_debts (org_id, staff_id, status)")
+            # the core's OWN representation of a day's modifiers (leave / redefine / swap) — what makes the
+            # resolver SELF-DERIVE (post-cut-over there's no live to feed it). Populated natively, or synced
+            # from live during the shadow phase. One row per (org, staff, day, kind); resolve() folds them.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_day_overrides (
+                    org_id    TEXT NOT NULL,
+                    staff_id  INTEGER NOT NULL,
+                    day       DATE NOT NULL,
+                    kind      TEXT NOT NULL,          -- al | sick | special | redefine | swap_off | swap_work
+                    start_min INTEGER,                -- for redefine / swap_work
+                    end_min   INTEGER,
+                    source    TEXT NOT NULL DEFAULT 'native',  -- native | live_sync
+                    PRIMARY KEY (org_id, staff_id, day, kind)
+                )
+            """)
             # AL balance + requests — deduct-at-approval ↔ refund-on-cancel (S1). The per-day deduction is
             # FROZEN on the request at creation, so refund reads the row and never recomputes.
             cur.execute("""

@@ -21,7 +21,8 @@
 | Payback split (OT clears debt first) | 🟡 PARITY | `core.settle`; sparse live credits |
 | AL deduction (charged days · frozen S1 map · count) | 🟡 PARITY | `core.leave` vs `gm_bot.al` + S1 invariants |
 | Short-notice points · fractional AL | 🟡 PARITY | `core.leave` parity |
-| Schedule resolver (base/redefine/AL/sick/swap precedence) | 🟡 PARITY | `core.schedule.resolve_day` brain ported, parity vs live's precedence (full space incl. leave>redefine>day-off). Still *fed* the day's modifiers — deriving them from core events is the remaining wiring (#7) |
+| Schedule resolver (precedence) | 🟡 PARITY | `core.schedule.resolve_day` brain, parity vs live's precedence (full space) |
+| Resolver SELF-DERIVE (core decides from its own state) | 🟢 BUILT | `core/derive.py` — resolves a day from `core_day_overrides` (no live feed → cut-over-ready); staging-proven incl. precedence. Remaining wiring: the live→core SYNC to populate the overrides during the shadow phase |
 | OT/payback settle ORCHESTRATION (atomic claim · cap · refund · over-book guard) | 🟢 BUILT | `core/ledger.py` — settle-once claim + structural CHECK constraints (over-credit/over-bank impossible) + reversible (S1); proven on staging (no double-bank · cap · buyback refusal · clean reverse). Remaining: wire into the shadow at checkout + which-debt/redefine-window selection |
 | AL deduct/refund ORCHESTRATION (atomic deduct-at-approval + symmetric refund) | 🟢 BUILT | `core/leave_ledger.py` — frozen-map deduct ↔ refund (S1), atomic claim each way; proven on staging (deduct-once · refund-once · exact reversal · refund reads the frozen total even after a schedule change) |
 | Sick / no-show PENALTY computation | 🟡 PARITY | `core/points.py` — full catalogue (incl. `no_show` −2/min, `late_sick_inform` −15) drift-guarded == live + `points_for` derivation (Σ value×qty) + no_show/late_sick event constructors |
