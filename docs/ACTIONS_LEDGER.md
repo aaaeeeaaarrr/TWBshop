@@ -9,6 +9,15 @@
 
 ## Done (with proof)
 
+- **2026-06-22 — LONG (id 1) Jun-21 erroneous −15 REMOVED (HIGH-RISK points write; deployed code + vetted script
+  + independent before/after + clean audit).** He CHECKED IN (21:14) then fell ill mid-shift = leave-early sick →
+  the −15 (for late-informing an ABSENCE) doesn't apply. Deployed the gate + audit exemption + display nudge +
+  `core/sick.py` (tag `session-52f-leaveearly-sick-20260622` = `76de47d`; gm active, NR=0, no startup errors).
+  Ran `scripts/fix_long_leaveearly_15.py --apply`: **BEFORE** late_sick_inform (2 events) → **AFTER (independent
+  re-read)** (1 event) — removed `points_events` id 138 (ref 2026-06-21); his Jun-19 −15 (id 130, genuine
+  absence) KEPT. **Long net −28 → −13.** Post-fix PROD audit = **0 problems, 0 LATE-SICK flags** (the exemption
+  holds — no false-flag on case #51). Going forward, a checked-in staffer reporting sick gets NO −15.
+
 - **2026-06-21 — HENG (id 37) PB-OVERBOOK data fix DONE (HIGH-RISK payroll write; deployed code + vetted
   script, independent before/after proof).** After deploying the over-book guard (tag `session-51-gm-20260621`),
   ran `scripts/fix_heng_overbook.py --apply` on prod. **BEFORE:** debt #148 owed 96 / paid 89 / open · booking
@@ -88,14 +97,11 @@
 
 ## Open (not yet done)
 
-- **2026-06-22 — LONG (id 1) Jun-21 −15 REMOVAL (HIGH-RISK points write) — NOT DONE YET (staged, awaiting deploy + quiet window).**
-  Owner: leave-early sick (he CHECKED IN then fell ill mid-shift) must NOT carry the −15. Code fix committed
-  `2b5e4ee` (the −15 gate + audit exemption + display + `core/sick.py`). Data fix VETTED + dry-run confirmed:
-  `scripts/fix_long_leaveearly_15.py --apply` removes `points_events` id 138 (late_sick_inform, ref 2026-06-21)
-  → Long −28 → −13. His Jun-19 −15 (id 130, genuine absence) is KEPT. **Sequence:** deploy gm at the 21:30+ PP
-  quiet window (it's the 20:30–21:30 evening shift-edge now) → run the script `--apply` → re-run prod audit
-  (#51 must stay clean via the exemption). **Also flagged, NOT in this fix:** the leave-early PAYBACK should be
-  remaining-only (entangled with the session checkout) — separate, careful follow-up + owner go.
+- **2026-06-22 — LEAVE-EARLY PAYBACK (remaining-only) — OPEN (flagged; needs design + owner go).** A checked-in
+  staffer who leaves early sick should owe payback only for the REMAINING unworked time ("pay-back from now"),
+  not the full shift. Entangled with the session checkout (right now Long shows full attendance AND a full sick
+  payback). The −15 half is DONE (below); this payback half + Long's Jun-21 payback correction await a focused
+  design pass + owner go.
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
