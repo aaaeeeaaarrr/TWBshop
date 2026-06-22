@@ -4086,10 +4086,18 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         _checked_in_for_shift = False
     sick_create(persona["id"], "me", date_iso, "provisional", reason=reason)
     await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
-    from gm_bot.attendance import to_min
+    from gm_bot.attendance import to_min, remaining_shift_min
     ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
     shift_min = ((we - ws) % 1440 or 1440) if ws is not None and we is not None else 540
-    payback_add_debt(persona["id"], shift_min, "paperless sick", date_iso)
+    if _checked_in_for_shift and ws is not None:
+        # LEAVE-EARLY sick (came to work, fell ill): pay back only the REMAINING unworked time
+        # ("pay-back from now"), NOT the whole shift — they worked up to now, any lateness was already
+        # booked at check-in, and they're still paid the shift + repay the missed tail. Papers cancel it.
+        _remaining = remaining_shift_min(ws, shift_min, date_iso, _now_pp())
+        if _remaining > 0:
+            payback_add_debt(persona["id"], _remaining, "leave-early sick", date_iso)
+    else:
+        payback_add_debt(persona["id"], shift_min, "paperless sick", date_iso)   # absent sick = full shift
     await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
         persona.get("call_name") or persona["canonical_name"],
         "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"

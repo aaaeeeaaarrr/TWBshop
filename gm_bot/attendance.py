@@ -103,6 +103,17 @@ def to_min(hhmm) -> int | None:
     return (h % 24) * 60 + (m % 60)
 
 
+def remaining_shift_min(ws_min: int, shift_min: int, business_day: str, now_dt, tz: str = "Asia/Phnom_Penh") -> int:
+    """Minutes from `now_dt` to the shift END — the unworked tail a leave-early staffer will miss ("pay-back
+    from now"). Overnight-aware via the duration (end = start + shift_min). Clamped to [0, shift_min].
+    Pure (no DB)."""
+    from datetime import datetime as _dt, date as _date, timedelta as _td
+    from zoneinfo import ZoneInfo
+    base = _dt.combine(_date.fromisoformat(str(business_day)), _dt.min.time(), tzinfo=ZoneInfo(tz))
+    end = base + _td(minutes=int(ws_min) + int(shift_min))
+    return max(0, min(int(shift_min), round((end - now_dt).total_seconds() / 60.0)))
+
+
 def overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
     """Do two minute-ranges overlap? (handles overnight shifts where end < start)."""
     def expand(s, e):

@@ -10,7 +10,7 @@
 - `gm_bot/analyzer.py` — Scans ops_messages for operational concerns and saves them to gm_concerns.
     · _matches_rules, _extract_low_stock_items, _analyze_photo, _detect_attendance_concerns, _keyword_text_concerns, _worth_checking, _semantic_concern_dict, _semantic_text_concerns, _semantic_enabled, detect_text_concerns, analyze_live_message, _detect_low_stock_concerns, run_analysis
 - `gm_bot/attendance.py` — Private-DM attendance system — pure logic, no DB/AI/Telegram.
-    · strip_khmer, haversine_m, in_work_zone, days_due, to_min, overlaps, available_staff, lateness_kind, outside_exceeded
+    · strip_khmer, haversine_m, in_work_zone, days_due, to_min, remaining_shift_min, overlaps, available_staff, lateness_kind, outside_exceeded
 - `gm_bot/attendance_ui.py` — Attendance main-menu — owner role-play SHELL + LIVE staff entry (one set of menus, no fork).
     · _today, _now_min, _hm, _shift_date_now, _shift_running, _present_now, _near_days, fmt12, fmt12s, day_label, shift_len_min, late_offsets, grid, staff_day_events, _decision  …(+114, grep)
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
@@ -198,6 +198,8 @@
     · _events, main
 - `scripts/fix_long_leaveearly_15.py` — Vetted data-fix (owner Jun 22): remove Long's ERRONEOUS Jun-21 −15 late_sick_inform (points_events
     · _points, main
+- `scripts/fix_long_payback.py` — Vetted data-fix (owner Jun 22): correct Long's #154 payback over-charge from the leave-early-sick bug.
+    · _read, main
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
     · _info, _entry, render, main
 - `scripts/integration_audit.py` — integration_audit.py - the INTEGRATOR's cross-lane sweep (what no single lane can see).
