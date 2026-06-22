@@ -20,8 +20,8 @@ Every measurement is local replay = **no deploy to measure**; the shadow is isol
 | 3 | **Checkout + worked** | worked-min capped at edges | `attendance_sessions` | MED | ✅ MATH DONE — `core.settle.worked_minutes` (edge-clamped). Remaining: the closer/auto-checkout orchestration. |
 | 4 | **OT settle / bank** | ot_earned · banked · cap | `shift_changes.ot_banked` · `ot_bank` | **HIGH** | ✅ MATH DONE — `core/settle.py`, drift-guarded vs `gm_bot.ot` + honest bank-cap. Remaining (live build): the **atomic claim-or-reject** on the bank. |
 | 5 | **Payback settle / debt** | pb_cleared (OT clears debt first) | `payback_debts` · `payback_bookings` | **HIGH** | ✅ MATH DONE — `core.settle.settle_shift` (one currency). Remaining (live build): WHICH debt + redefine window + the **over-book guard** (book_room). |
-| 6 | **AL / sick / special leave** | days deducted (frozen map) · refund · short-notice points | `al_requests` · `sick_cases` · `special_leaves` | **HIGH** | Money/balance. The deduct-at-approval + refund-on-cancel laws (S1). Fresh focused session. |
-| 7 | **Schedule changes** | swap · redefine · day-off move | `shift_changes` · `dayoff_*` | MED | Model as `shift_moved`/events on the shift entity (the clean platform way; replaces the shadow's resolve_day feed). |
+| 6 | **AL / sick / special leave** | days deducted (frozen map) · short-notice points · fractional | `al_requests` · `sick_cases` · `special_leaves` | **HIGH** | ✅ MATH DONE — `core/leave.py`, drift-guarded vs `gm_bot.al` (incl. the S1 frozen-map invariants). Remaining (live build): the **atomic deduct-at-approval + symmetric refund-on-cancel** (S1) + the ≥2-senior quorum. |
+| 7 | **Schedule changes** | swap · redefine · day-off move | `shift_changes` · `dayoff_*` | MED | NOT a parity-math port — ARCHITECTURAL: model redefines/swaps as `shift_moved` events on the shift entity (the clean platform way; replaces the shadow's resolve_day feed). |
 
 ## After the verticals (the platform shell)
 - **Channel adapters** — Telegram is proven as the shadow hook; add a **web adapter** (same commands, a page) → "Telegram? web? both?" becomes config.
