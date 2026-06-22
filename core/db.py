@@ -102,6 +102,29 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_debts_open "
                         "ON core_payback_debts (org_id, staff_id, status)")
+            # AL balance + requests — deduct-at-approval ↔ refund-on-cancel (S1). The per-day deduction is
+            # FROZEN on the request at creation, so refund reads the row and never recomputes.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_al_balance (
+                    org_id         TEXT NOT NULL,
+                    staff_id       INTEGER NOT NULL,
+                    days_remaining NUMERIC(6,2) NOT NULL DEFAULT 0,
+                    updated_at     TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, staff_id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_al_requests (
+                    req_id     BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    staff_id   INTEGER NOT NULL,
+                    days       JSONB NOT NULL,
+                    deduction  JSONB NOT NULL,                     -- the FROZEN per-day map (S1)
+                    total      NUMERIC(6,2) NOT NULL,
+                    status     TEXT NOT NULL DEFAULT 'pending',    -- pending | approved | cancelled
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:
