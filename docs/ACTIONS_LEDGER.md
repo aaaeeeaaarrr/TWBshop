@@ -107,6 +107,15 @@
 
 ## Open (not yet done)
 
+- **2026-06-23 — POLICY/REVIEW (owner to weigh in): sick "come-at-X" fairness (sibling of the leave-early fix).**
+  The leave-early fix exempted came-to-work sick from the −15 + over-payback. The SIBLING case — a sick staffer
+  who comes LATER ("come at X") — per `sick_me_time` treats the missed time as "pay-back, same as informed late."
+  Same fairness class: should sickness ease the lateness penalty for a sick-DELAYED arrival too? **No code change
+  made** (a policy call). ⚠ Also: the `att:sp:meo` come-at-X handler wasn't found in `bot.py` and `sick_me_time`
+  reads as a TEST-PREVIEW screen — the LIVE wiring needs a proper trace before any change. **Blast-radius of the
+  leave-early bug VERIFIED CONTAINED: only Long's Jun-21 (#51) was affected — both −15 + payback fixed; every
+  other own-sick since go-live was a genuine absence (no check-in), correctly charged.**
+
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
   below); owner picked "phased both". **Only the per-event exact-delta version remains (phase 2): wire an
