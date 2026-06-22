@@ -76,6 +76,32 @@ def init_core_db() -> None:
             cur.execute("ALTER TABLE shadow_comparisons ADD COLUMN IF NOT EXISTS reconciled BOOLEAN NOT NULL DEFAULT FALSE")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_shadow_open "
                         "ON shadow_comparisons (org_id, agree, reconciled)")
+            # ── the money ledger (org-scoped) — atomic-claim-at-the-write, the cure for the over-book /
+            # double-bank bug-class. The CHECK constraints enforce the invariants STRUCTURALLY: the DB
+            # itself refuses an over-credit (paid>owed) or an over-debit (balance<0) — not the caller. ──
+            cur.execute("ALTER TABLE shifts ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ")  # settle-once claim
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_ot_bank (
+                    org_id      TEXT NOT NULL,
+                    staff_id    INTEGER NOT NULL,
+                    balance_min INTEGER NOT NULL DEFAULT 0 CHECK (balance_min >= 0),
+                    updated_at  TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, staff_id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_payback_debts (
+                    debt_id    BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    staff_id   INTEGER NOT NULL,
+                    owed_min   INTEGER NOT NULL CHECK (owed_min >= 0),
+                    paid_min   INTEGER NOT NULL DEFAULT 0 CHECK (paid_min >= 0 AND paid_min <= owed_min),
+                    status     TEXT NOT NULL DEFAULT 'open',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_core_debts_open "
+                        "ON core_payback_debts (org_id, staff_id, status)")
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:

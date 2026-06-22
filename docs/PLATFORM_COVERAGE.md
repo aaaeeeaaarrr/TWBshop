@@ -22,7 +22,8 @@
 | AL deduction (charged days · frozen S1 map · count) | 🟡 PARITY | `core.leave` vs `gm_bot.al` + S1 invariants |
 | Short-notice points · fractional AL | 🟡 PARITY | `core.leave` parity |
 | Schedule resolver (base/redefine/AL/sick/swap precedence) | 🟡 PARITY | `core.schedule.resolve_day` brain ported, parity vs live's precedence (full space incl. leave>redefine>day-off). Still *fed* the day's modifiers — deriving them from core events is the remaining wiring (#7) |
-| Settle/leave ORCHESTRATION (which-debt · atomic claim-or-reject · symmetric refund · over-book guard) | 🔴 GAP | math done; the live state-moving mechanism not built in core |
+| OT/payback settle ORCHESTRATION (atomic claim · cap · refund · over-book guard) | 🟢 BUILT | `core/ledger.py` — settle-once claim + structural CHECK constraints (over-credit/over-bank impossible) + reversible (S1); proven on staging (no double-bank · cap · buyback refusal · clean reverse). Remaining: wire into the shadow at checkout + which-debt/redefine-window selection |
+| AL deduct/refund ORCHESTRATION (atomic deduct-at-approval + symmetric refund) | 🔴 GAP | the leave MATH is done (frozen map); the atomic deduct/refund mechanism not built yet |
 | Sick flow (reason · −15 late-sick · family) | 🔴 GAP | live-only |
 | No-show detection / penalty | 🔴 GAP | live-only |
 | Special leave | 🔴 GAP | live-only |
