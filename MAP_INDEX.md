@@ -213,7 +213,7 @@
 - `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.
     · main
 - `scripts/replay_checkins.py` — REPLAY accelerator (owner Jun 22 — "days instead of weeks").
-    · _live_state, main
+    · _resolved_schedule, _live_state, main
 - `scripts/run_accountant_local.py` — LOCAL TEST launcher for the accountant bot — staging DB + dev poller + the Python-3.14
 - `scripts/seed_vendors.py` — Seed acc_vendors from scripts/vendor_seed.py.
     · main

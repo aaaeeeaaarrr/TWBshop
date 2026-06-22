@@ -16,10 +16,10 @@ Every measurement is local replay = **no deploy to measure**; the shadow is isol
 | # | Vertical | Compare new-vs-live on | Live source | Risk | Notes / approach |
 |---|---|---|---|---|---|
 | 1 | **Check-in** | state · late · early | `attendance_sessions` | MED | ✅ DONE — 98–100% (redefine-aware). Residual: 2 launch-week early-5 edges. |
-| 2 | **Points (check-in)** | early_arrival +10 · late split (−1/−2) | `points_events` | LOW | Derived from the verdict (done) + the late-declaration split (`late_declared_at`). Quick win, builds confidence. |
-| 3 | **Checkout + worked** | worked-min · session close | `attendance_sessions` | MED | Bind checkout (done) + worked capped at end; the closer/auto-checkout edge. |
-| 4 | **OT settle / bank** | ot_banked (cap, atomic claim) | `shift_changes.ot_banked` · `ot_bank` | **HIGH** | Money. The settle (worked−normal → OT, capped) + the atomic-claim law. Fresh focused session. |
-| 5 | **Payback settle / debt** | payback credited · debt cleared | `payback_debts` · `payback_bookings` | **HIGH** | Money. Credit = ext worked vs the redefine window; the over-book guard. Fresh focused session. |
+| 2 | **Points (check-in)** | early_arrival +10 · late split (−1/−2) | `points_events` | LOW | ✅ DONE — `core/points.py`, PARITY-proven vs `gm_bot.points` (split cross-checked full space + catalogue). |
+| 3 | **Checkout + worked** | worked-min capped at edges | `attendance_sessions` | MED | ✅ MATH DONE — `core.settle.worked_minutes` (edge-clamped). Remaining: the closer/auto-checkout orchestration. |
+| 4 | **OT settle / bank** | ot_earned · banked · cap | `shift_changes.ot_banked` · `ot_bank` | **HIGH** | ✅ MATH DONE — `core/settle.py`, drift-guarded vs `gm_bot.ot` + honest bank-cap. Remaining (live build): the **atomic claim-or-reject** on the bank. |
+| 5 | **Payback settle / debt** | pb_cleared (OT clears debt first) | `payback_debts` · `payback_bookings` | **HIGH** | ✅ MATH DONE — `core.settle.settle_shift` (one currency). Remaining (live build): WHICH debt + redefine window + the **over-book guard** (book_room). |
 | 6 | **AL / sick / special leave** | days deducted (frozen map) · refund · short-notice points | `al_requests` · `sick_cases` · `special_leaves` | **HIGH** | Money/balance. The deduct-at-approval + refund-on-cancel laws (S1). Fresh focused session. |
 | 7 | **Schedule changes** | swap · redefine · day-off move | `shift_changes` · `dayoff_*` | MED | Model as `shift_moved`/events on the shift entity (the clean platform way; replaces the shadow's resolve_day feed). |
 
