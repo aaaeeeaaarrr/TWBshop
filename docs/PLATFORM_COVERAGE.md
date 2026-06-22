@@ -24,8 +24,8 @@
 | Schedule resolver (base/redefine/AL/sick/swap precedence) | 🟡 PARITY | `core.schedule.resolve_day` brain ported, parity vs live's precedence (full space incl. leave>redefine>day-off). Still *fed* the day's modifiers — deriving them from core events is the remaining wiring (#7) |
 | OT/payback settle ORCHESTRATION (atomic claim · cap · refund · over-book guard) | 🟢 BUILT | `core/ledger.py` — settle-once claim + structural CHECK constraints (over-credit/over-bank impossible) + reversible (S1); proven on staging (no double-bank · cap · buyback refusal · clean reverse). Remaining: wire into the shadow at checkout + which-debt/redefine-window selection |
 | AL deduct/refund ORCHESTRATION (atomic deduct-at-approval + symmetric refund) | 🟢 BUILT | `core/leave_ledger.py` — frozen-map deduct ↔ refund (S1), atomic claim each way; proven on staging (deduct-once · refund-once · exact reversal · refund reads the frozen total even after a schedule change) |
-| Sick flow (reason · −15 late-sick · family) | 🔴 GAP | live-only |
-| No-show detection / penalty | 🔴 GAP | live-only |
+| Sick / no-show PENALTY computation | 🟡 PARITY | `core/points.py` — full catalogue (incl. `no_show` −2/min, `late_sick_inform` −15) drift-guarded == live + `points_for` derivation (Σ value×qty) + no_show/late_sick event constructors |
+| Sick / no-show / special FLOW (reason · family · sweep · papers) | 🔴 GAP | per-CHANNEL adapter work (Telegram menus/jobs), not core math — belongs in the adapter layer, not the brain |
 | Special leave | 🔴 GAP | live-only |
 | Schedule changes (swap · redefine create · day-off move) | 🔴 GAP | architectural (`shift_moved` events) — #7 |
 | Channel-agnostic spine | 🟢 BUILT | `core/channel.py` — neutral (command, params) dispatch; test proves two channel shapes → one brain + GUARDS that no core/* imports a channel SDK (principle #1 enforced) |

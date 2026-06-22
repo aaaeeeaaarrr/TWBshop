@@ -1,10 +1,17 @@
 """core.points — check-in points (channel-agnostic, per-tenant config). Parity with gm_bot.points.
 
-A check-in generates point EVENTS derived from the verdict: early → early_arrival(+10, qty 1); late →
-split into late_uninformed (−2/min, the minutes elapsed BEFORE they declared) + late_informed (−1/min,
-the minutes after they declared); on_time → none. The split is the only non-trivial bit. Values are
-per-tenant config (TWB: +10 / −1 / −2); quantity is the unit count live records.
+Design (live's, kept): RECORD raw events (cause + quantity); DERIVE points later = Σ value×quantity over
+a catalogue, so changing a value re-scores history fairly. A check-in emits early_arrival(+10) OR the
+late split (−1/−2); an absence emits no_show(−2/shift-min); late-sick emits late_sick_inform(−15).
+The catalogue is per-tenant config (these = TWB's); drift-guarded == gm_bot.points.CATALOGUE.
 """
+
+# cause → points value (TWB). Drift-guarded against gm_bot.points.CATALOGUE by tests/test_core_points.py.
+CATALOGUE = {
+    "early_arrival": 10, "late_informed": -1, "late_uninformed": -2, "no_show": -2,
+    "return_after_doctor": 15, "ot_no_show": -30, "short_notice_al": -0.1,
+    "late_sick_inform": -15, "owner_adjustment": 1,
+}
 
 
 def split_late(late_min, declare_offset_min):
@@ -32,3 +39,19 @@ def checkin_points(state, late_min, early_min, declare_offset_min=None):
             out.append(("late_informed", inf))
         return out
     return []
+
+
+def no_show_points(shift_minutes) -> list:
+    """Never arrived on a working day → no_show, quantity = the shift's minutes (−2/min)."""
+    return [("no_show", int(shift_minutes))]
+
+
+def late_sick_points() -> list:
+    """Told us sick within 30 min of start / after it (own-sick) → the −15 Late-Informing event."""
+    return [("late_sick_inform", 1)]
+
+
+def points_for(events) -> float:
+    """DERIVE points from raw events [(cause, quantity)] via the catalogue: Σ value × quantity. Unknown
+    causes score 0 (forward-compatible). This is the platform's points total (per-tenant catalogue)."""
+    return round(sum(CATALOGUE.get(c, 0) * q for c, q in events), 2)

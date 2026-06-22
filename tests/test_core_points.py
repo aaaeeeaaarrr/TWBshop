@@ -27,3 +27,19 @@ def test_catalogue_values_match_live():
     assert live.CATALOGUE["early_arrival"][0] == 10
     assert live.CATALOGUE["late_informed"][0] == -1
     assert live.CATALOGUE["late_uninformed"][0] == -2
+
+
+def test_full_catalogue_parity_with_live():
+    # DRIFT-GUARD: every cause + value matches live's catalogue exactly
+    assert set(cp.CATALOGUE) == set(live.CATALOGUE)
+    for cause, val in cp.CATALOGUE.items():
+        assert val == live.CATALOGUE[cause][0], cause
+
+
+def test_points_derivation_and_absence_events():
+    assert cp.points_for([("early_arrival", 1)]) == 10
+    assert cp.points_for([("late_uninformed", 4), ("late_informed", 6)]) == -14   # 4·−2 + 6·−1
+    assert cp.no_show_points(540) == [("no_show", 540)]
+    assert cp.points_for(cp.no_show_points(540)) == -1080                          # 540 · −2
+    assert cp.points_for(cp.late_sick_points()) == -15
+    assert cp.points_for([("mystery_cause", 99)]) == 0                             # unknown → 0 (forward-compat)
