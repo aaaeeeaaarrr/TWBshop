@@ -1179,6 +1179,17 @@ def _sick_late_mins(p: dict) -> int | None:
     return int(dec["start_min"]) - now_abs
 
 
+def _sick_checked_in(p: dict) -> bool:
+    """Did p CHECK IN for the shift 'now' belongs to? Came-to-work then sick = leave-early sick — no
+    'you told us late' nudge and no −15 (they showed up and reported the moment they fell ill)."""
+    try:
+        from shared.database import att_get_session
+        sd = _shift_date_now(p)
+        return bool((att_get_session(p["id"], sd.isoformat()) or {}).get("checked_in_at"))
+    except Exception:
+        return False
+
+
 def _late_sick_callout(mins: int | None) -> str:
     """Own-sick 'why so late?' nudge (no points talk), or '' if not late (≥ 30 min before shift)."""
     if mins is None or mins >= LATE_SICK_OWN_MIN:
@@ -1213,7 +1224,8 @@ def sick_me_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows = [_back_row("att:sp:sick")] + grid(btns, 3)
     rows.append([InlineKeyboardButton("📝 Really can't — explain · មិនអាចមក — ពន្យល់",
                                       callback_data="att:sp:mecant")])   # typed reason → Supervisors
-    return _hdr(p, _late_sick_callout(_sick_late_mins(p)) +
+    callout = "" if _sick_checked_in(p) else _late_sick_callout(_sick_late_mins(p))  # leave-early → no "told us late" nudge
+    return _hdr(p, callout +
                    "Sorry to hear 😟 Take some medicine and come try — see how you feel at work.\n"
                    "សោកស្តាយណាស់ 😟 សូមលេបថ្នាំ ហើយមកសាកធ្វើការមើល — មើលថាអ្នកមានអារម្មណ៍យ៉ាងម៉េច"
                    "នៅកន្លែងធ្វើការ។\n\n"

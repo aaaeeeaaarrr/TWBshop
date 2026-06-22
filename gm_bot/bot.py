@@ -4075,6 +4075,15 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         _late_inform_mins = _sick_late_mins(persona)
     except Exception:
         _late_inform_mins = None
+    # CAME-TO-WORK then sick = "leave-early sick": if they checked in for this shift, the −15
+    # late-INFORMING penalty does NOT apply — that penalty is for telling us about an ABSENCE late;
+    # someone who showed up and reported the moment they fell ill is the opposite (owner, Jun 22).
+    # Capture before sick_create (which flips the day to not-working).
+    try:
+        from shared.database import att_get_session
+        _checked_in_for_shift = bool((att_get_session(persona["id"], date_iso) or {}).get("checked_in_at"))
+    except Exception:
+        _checked_in_for_shift = False
     sick_create(persona["id"], "me", date_iso, "provisional", reason=reason)
     await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
     from gm_bot.attendance import to_min
@@ -4100,7 +4109,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         # mins is None unless they had a CURRENT/imminent shift (overnight-aware) at filing time, so that
         # alone gates this to a real shift — the old `date_iso == today` guard is dropped (date_iso is the
         # overnight-aware shift date, which is YESTERDAY for a 2am report, so == today would wrongly skip).
-        if mins is not None and mins < LATE_SICK_OWN_MIN:
+        if mins is not None and mins < LATE_SICK_OWN_MIN and not _checked_in_for_shift:
             done_key = "late_inform_done:%d:%s" % (persona["id"], date_iso)
             if gm_get_state(done_key) != "true":
                 points_record(persona["id"], "late_sick_inform", 1, date_iso)

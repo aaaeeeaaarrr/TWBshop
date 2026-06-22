@@ -543,12 +543,14 @@ def v_staff_sanity(staff_rows: list[dict]) -> list[str]:
 
 # ───────────────────────────── DB runner ─────────────────────────────
 
-def v_late_sick_penalty(sick: list[dict], pevents: list[dict], staff: dict, today: date) -> list[str]:
+def v_late_sick_penalty(sick: list[dict], pevents: list[dict], staff: dict, today: date,
+                        checked_in: set | None = None) -> list[str]:
     """Own-sick declared within 30 min of shift start (or after it) MUST carry a −15 'late_sick_inform'
-    points event. Catches the Long-class miss where the penalty silently didn't fire (the pre-shift
-    window bug). Read-only; recent window only so it never dredges ancient history. Family-sick is
-    own-only-excluded (family late = a soft note, no points)."""
+    points event — UNLESS they CHECKED IN for that shift (leave-early sick = fell ill on the job, not a
+    late-informed absence; owner Jun 22, exempt). Catches the Long-class miss where the penalty silently
+    didn't fire. Read-only; recent window only. Family-sick is own-only-excluded (no points)."""
     out = []
+    ci = checked_in or set()
     have = {(e["staff_id"], e.get("ref")) for e in pevents if e.get("cause") == "late_sick_inform"}
     for c in sick:
         if (c.get("who") or "").strip().lower() != "me":
@@ -567,7 +569,8 @@ def v_late_sick_penalty(sick: list[dict], pevents: list[dict], staff: dict, toda
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         mins_before = (shift_start_utc - created).total_seconds() / 60.0
-        if mins_before < LATE_SICK_OWN_MIN and (sid, sd.isoformat()) not in have:
+        if (mins_before < LATE_SICK_OWN_MIN and (sid, sd.isoformat()) not in have
+                and (sid, sd.isoformat()) not in ci):   # exempt: checked in = leave-early, no −15 due
             out.append("LATE-SICK: %s own-sick on %s declared %d min before shift start (< %d) "
                        "but has NO -15 late_sick_inform — the penalty didn't fire"
                        % (_nm(staff, sid), sd.isoformat(), round(mins_before), LATE_SICK_OWN_MIN))
@@ -608,6 +611,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
 
     open_sessions = {(s["staff_id"], str(s["shift_date"])) for s in sess
                      if s.get("checked_in_at") and not s.get("checked_out_at")}
+    checked_in = {(s["staff_id"], str(s["shift_date"])) for s in sess if s.get("checked_in_at")}
     problems = (v_payback(debts, staff)
                 + v_al(als, staff, today)
                 + v_shift_changes(scs, staff, today, open_sessions)
@@ -623,7 +627,7 @@ def run_audit(today: date | None = None, test_rows: bool | None = None) -> tuple
                 + v_swap_exclusivity(als, overrides, swaps, staff)
                 + v_a2_paired(scs, overrides, staff)
                 + v_late_points(sess, pevents, staff)
-                + v_late_sick_penalty(sick, pevents, staff, today)
+                + v_late_sick_penalty(sick, pevents, staff, today, checked_in)
                 + v_al_same_day_gate(als, sess, staff)
                 + v_exclusivity(als, scs, staff, today)
                 + v_one_active_redefine(scs, staff)

@@ -21,6 +21,13 @@ def test_flags_late_own_sick_with_no_penalty():
     assert len(out) == 1 and "LONG" in out[0] and "2026-06-19" in out[0]
 
 
+def test_no_flag_when_checked_in_leave_early():
+    # SAME late own-sick that test_flags... flags — but they CHECKED IN for that shift → leave-early
+    # sick (fell ill on the job), exempt, no −15 due (the Long Jun-21 case). owner Jun 22.
+    sick = [{"staff_id": 1, "who": "me", "the_date": date(2026, 6, 19), "created_at": _utc(2026, 6, 19, 13, 55)}]
+    assert v_late_sick_penalty(sick, [], STAFF, TODAY, checked_in={(1, "2026-06-19")}) == []
+
+
 def test_no_flag_when_penalty_present():
     sick = [{"staff_id": 1, "who": "me", "the_date": date(2026, 6, 18), "created_at": _utc(2026, 6, 18, 13, 55)}]
     pevents = [{"staff_id": 1, "cause": "late_sick_inform", "ref": "2026-06-18"}]
