@@ -28,8 +28,9 @@
 | No-show detection / penalty | 🔴 GAP | live-only |
 | Special leave | 🔴 GAP | live-only |
 | Schedule changes (swap · redefine create · day-off move) | 🔴 GAP | architectural (`shift_moved` events) — #7 |
+| Channel-agnostic spine | 🟢 BUILT | `core/channel.py` — neutral (command, params) dispatch; test proves two channel shapes → one brain + GUARDS that no core/* imports a channel SDK (principle #1 enforced) |
 | Channels: Telegram | ✅ PROVEN | the shadow hook runs on the live Telegram flow |
-| Channels: web / app adapter | 🔴 GAP | not built |
+| Channels: web / app adapter | 🟡 SPINE READY | the spine + a web-shaped adapter are demonstrated in test; a runnable web server is the remaining productization |
 
 ## Honest percentage
 - **Dominant daily flow (check-in): ~proven.** Check-in is the single most frequent attendance event, and
