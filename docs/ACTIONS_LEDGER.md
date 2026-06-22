@@ -9,6 +9,16 @@
 
 ## Done (with proof)
 
+- **2026-06-23 — LONG (id 1) Jun-21 PAYBACK over-charge CORRECTED (HIGH-RISK payback write; deployed code + vetted
+  script + independent before/after + clean audit).** The leave-early-sick bug booked the FULL shift (540) as
+  paperless payback; correct = the REMAINING unworked tail (302, "pay-back from now"). Deployed `remaining_shift_min`
+  + the `_sickme_book` branch (tag `session-52g-leaveearly-payback-20260623` = `50e7efd`; gm active, NR=0, no
+  errors). Ran `scripts/fix_long_payback.py --apply`: #154 `minutes_owed` **1094 → 856** (independent re-read) =
+  540 (Jun-19 absent sick) + 14 (Jun-21 late check-in) + 302 (Jun-21 sick remaining); booking #69 (540) ≤ 856 →
+  no over-book. **Post-fix prod audit = 0 problems, 0 payback/over-book flags.** Pay model honoured: he's still
+  paid the shift and repays only the missed tail (no checkout, which would have underpaid). Going forward,
+  leave-early sick pays back only the unworked tail.
+
 - **2026-06-22 — LONG (id 1) Jun-21 erroneous −15 REMOVED (HIGH-RISK points write; deployed code + vetted script
   + independent before/after + clean audit).** He CHECKED IN (21:14) then fell ill mid-shift = leave-early sick →
   the −15 (for late-informing an ABSENCE) doesn't apply. Deployed the gate + audit exemption + display nudge +
@@ -96,12 +106,6 @@
     present; no penalty (no-show reversed); self-resolves on her next check-in under the fixed code.
 
 ## Open (not yet done)
-
-- **2026-06-22 — LEAVE-EARLY PAYBACK (remaining-only) — OPEN (flagged; needs design + owner go).** A checked-in
-  staffer who leaves early sick should owe payback only for the REMAINING unworked time ("pay-back from now"),
-  not the full shift. Entangled with the session checkout (right now Long shows full attendance AND a full sick
-  payback). The −15 half is DONE (below); this payback half + Long's Jun-21 payback correction await a focused
-  design pass + owner go.
 
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
