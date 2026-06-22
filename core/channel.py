@@ -9,25 +9,31 @@ plug into — "Telegram? web? both?" becomes config, not code. Per-tenant settin
 from core.attendance import check_in, check_out, verdict
 
 
-def handle(org_id: str, command: str, params: dict) -> dict:
-    """Execute a channel-neutral command. `params` is a plain dict — never a Telegram/HTTP object. Returns
-    a neutral result dict {ok: bool, ...} the calling adapter renders. Unknown command / missing param =
-    a clean error, never an exception across the channel boundary."""
+def _load_config(org_id):
+    from core.tenant_config import get_config   # lazy — keeps the brain free of any import-time coupling
+    return get_config(org_id)
+
+
+def handle(org_id: str, command: str, params: dict, config: dict = None) -> dict:
+    """Execute a channel-neutral command. `params` is a plain dict — never a Telegram/HTTP object. The
+    tenant's CONFIG (grace/thresholds) is applied automatically (loaded for `org_id`, or pass `config`
+    to skip the DB); `params` may override per-call. Returns {ok: bool, ...} the adapter renders. Unknown
+    command / missing param = a clean error, never an exception across the channel boundary."""
+    cfg = config if config is not None else _load_config(org_id)
+    grace = params.get("grace_min", cfg.get("grace_min", 5))
+    early = params.get("early_bonus_min", cfg.get("early_bonus_min", 5))
+    tz = params.get("tz", "Asia/Phnom_Penh")
     try:
-        if command == "verdict":                       # pure query — no DB
-            st, late, early = verdict(params["when"], params["start_dt"],
-                                      params.get("tz", "Asia/Phnom_Penh"),
-                                      params.get("grace_min", 5), params.get("early_bonus_min", 5))
-            return {"ok": True, "state": st, "minutes_late": late, "minutes_early": early}
+        if command == "verdict":
+            st, late, early_m = verdict(params["when"], params["start_dt"], tz, grace, early)
+            return {"ok": True, "state": st, "minutes_late": late, "minutes_early": early_m}
         if command == "check_in":
             r = check_in(org_id, params["staff_id"], params["when"], params["work_start"],
-                         params["work_end"], params.get("tz", "Asia/Phnom_Penh"),
-                         grace_min=params.get("grace_min", 5),
-                         early_bonus_min=params.get("early_bonus_min", 5))
+                         params["work_end"], tz, grace_min=grace, early_bonus_min=early)
             return {"ok": True, **r}
         if command == "check_out":
             r = check_out(org_id, params["staff_id"], params["when"], params["work_start"],
-                          params["work_end"], params.get("tz", "Asia/Phnom_Penh"))
+                          params["work_end"], tz)
             return {"ok": True, **r}
         return {"ok": False, "error": "unknown command: %s" % command}
     except KeyError as e:

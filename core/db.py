@@ -16,9 +16,11 @@ def init_core_db() -> None:
                     org_id      TEXT PRIMARY KEY,
                     name        TEXT,
                     timezone    TEXT NOT NULL DEFAULT 'Asia/Phnom_Penh',
+                    config      JSONB NOT NULL DEFAULT '{}',  -- per-tenant knobs (grace/thresholds/channels/package)
                     created_at  TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
+            cur.execute("ALTER TABLE orgs ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'")
             # A shift = one work interval for one person. The IDENTITY is shift_id; start_dt/end_dt are the
             # real (UTC) interval and the ONLY basis for time logic; business_day is a derived label.
             # UNIQUE(org_id, staff_id, start_dt) is the atomic-claim anchor — no duplicate instance.

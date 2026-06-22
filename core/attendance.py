@@ -49,7 +49,7 @@ def verdict(when_dt, start_dt, tz: str = "Asia/Phnom_Penh",
         early, late = 1440 - rel, 0
     else:
         early, late = 0, rel
-    if early >= early_bonus_min:
+    if early > 0 and early >= early_bonus_min:   # early>0 guard: 0 min is never "early" (matters if a tenant sets early_bonus_min=0)
         return "early", 0, early
     if late > grace_min:
         return "late", late, 0

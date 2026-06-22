@@ -29,6 +29,7 @@
 | Special leave | 🔴 GAP | live-only |
 | Schedule changes (swap · redefine create · day-off move) | 🔴 GAP | architectural (`shift_moved` events) — #7 |
 | Channel-agnostic spine | 🟢 BUILT | `core/channel.py` — neutral (command, params) dispatch; test proves two channel shapes → one brain + GUARDS that no core/* imports a channel SDK (principle #1 enforced) |
+| Multi-tenant config (per-tenant knobs) | 🟢 BUILT | `core/tenant_config.py` — grace/thresholds/cap/channels/package on `orgs.config`, defaults = TWB; wired into the spine so the same code serves every tenant. (The onboarding wizard writes this.) |
 | Channels: Telegram | ✅ PROVEN | the shadow hook runs on the live Telegram flow |
 | Channels: web / app adapter | 🟡 SPINE READY | the spine + a web-shaped adapter are demonstrated in test; a runnable web server is the remaining productization |
 
@@ -43,6 +44,15 @@
 
 **So: not 90%.** Call it ~**proven on the main flow, ~half the breadth.** The covered half is the
 high-frequency path; the uncovered half is the money-moving mechanism + the rarer flows + other channels.
+
+**UPDATE (after this build run):** the BUILT/PARITY breadth is now much higher — the whole brain
+(verdict·points·settle·leave·resolver), BOTH money mechanisms (OT/payback + AL, atomic, staging-proven),
+the channel spine, and multi-tenant config are all in. By behavior breadth that's ~**70%+ built**. But
+the binding metric for cut-over is EMPIRICAL real-data agreement, and that is still **only PROVEN for
+check-in** — the money paths are PARITY + atomic-proven on staging, not yet confirmed on live data
+(which is sparse for OT/payback, so it accrues slowly — the "days of study"). The remaining GAPs are now
+mostly: real-data confirmation (time) · the self-derive event-sync · sick/no-show/special FLOW · a
+runnable web server + the onboarding wizard.
 
 ## What raises it next (in build order)
 1. **#7 self-derive the resolver** (`shift_moved` events) → moves the resolver 🟠→ and unlocks schedule-changes.
