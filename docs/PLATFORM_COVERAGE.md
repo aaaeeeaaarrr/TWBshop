@@ -34,6 +34,7 @@
 | Channels: Telegram | ✅ PROVEN | the shadow hook runs on the live Telegram flow |
 | Channels: web | 🟢 BUILT | `adapters/web.py` — HTTP request → neutral command → JSON, proven (same brain as Telegram/replay) + a thin stdlib `serve()`. A deployable second channel. |
 | Channels: app / others | 🔵 TRIVIAL | any new channel = one small adapter to the spine (the hard part — the brain — is done) |
+| Onboarding wizard (self-serve setup) | 🟢 ENGINE BUILT | `core/onboarding.py` — channel-agnostic step engine (steps=data, skip→default) + `apply()` → creates org + writes tenant config; starter steps included (owner refines the questions + package names/prices — a product decision) |
 
 ## Honest percentage
 - **Dominant daily flow (check-in): ~proven.** Check-in is the single most frequent attendance event, and
