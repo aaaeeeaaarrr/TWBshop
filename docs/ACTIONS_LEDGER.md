@@ -88,6 +88,15 @@
 
 ## Open (not yet done)
 
+- **2026-06-22 — LONG (id 1) Jun-21 −15 REMOVAL (HIGH-RISK points write) — NOT DONE YET (staged, awaiting deploy + quiet window).**
+  Owner: leave-early sick (he CHECKED IN then fell ill mid-shift) must NOT carry the −15. Code fix committed
+  `2b5e4ee` (the −15 gate + audit exemption + display + `core/sick.py`). Data fix VETTED + dry-run confirmed:
+  `scripts/fix_long_leaveearly_15.py --apply` removes `points_events` id 138 (late_sick_inform, ref 2026-06-21)
+  → Long −28 → −13. His Jun-19 −15 (id 130, genuine absence) is KEPT. **Sequence:** deploy gm at the 21:30+ PP
+  quiet window (it's the 20:30–21:30 evening shift-edge now) → run the script `--apply` → re-run prod audit
+  (#51 must stay clean via the exemption). **Also flagged, NOT in this fix:** the leave-early PAYBACK should be
+  remaining-only (entangled with the session checkout) — separate, careful follow-up + owner go.
+
 - **🛠 POST-WALK / GO-LIVE HARDENING (owner wants this for live, Jun 14): build the PER-EVENT
   COMMIT-VERIFIER.** **▶ PHASE 1 SHIPPED 2026-06-19** — the broad-net **LIVE audit-watchdog** (see Done
   below); owner picked "phased both". **Only the per-event exact-delta version remains (phase 2): wire an
