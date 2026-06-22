@@ -32,7 +32,8 @@
 | Channel-agnostic spine | 🟢 BUILT | `core/channel.py` — neutral (command, params) dispatch; test proves two channel shapes → one brain + GUARDS that no core/* imports a channel SDK (principle #1 enforced) |
 | Multi-tenant config (per-tenant knobs) | 🟢 BUILT | `core/tenant_config.py` — grace/thresholds/cap/channels/package on `orgs.config`, defaults = TWB; wired into the spine so the same code serves every tenant. (The onboarding wizard writes this.) |
 | Channels: Telegram | ✅ PROVEN | the shadow hook runs on the live Telegram flow |
-| Channels: web / app adapter | 🟡 SPINE READY | the spine + a web-shaped adapter are demonstrated in test; a runnable web server is the remaining productization |
+| Channels: web | 🟢 BUILT | `adapters/web.py` — HTTP request → neutral command → JSON, proven (same brain as Telegram/replay) + a thin stdlib `serve()`. A deployable second channel. |
+| Channels: app / others | 🔵 TRIVIAL | any new channel = one small adapter to the spine (the hard part — the brain — is done) |
 
 ## Honest percentage
 - **Dominant daily flow (check-in): ~proven.** Check-in is the single most frequent attendance event, and
