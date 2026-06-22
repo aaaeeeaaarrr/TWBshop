@@ -196,6 +196,8 @@
     · _snap, _show, main
 - `scripts/fix_long_late_sick.py` — VETTED DATA-FIX — Long (staff 1) retroactive -15 late-sick-informing (owner Jun 21).
     · _events, main
+- `scripts/fix_long_leaveearly_15.py` — Vetted data-fix (owner Jun 22): remove Long's ERRONEOUS Jun-21 −15 late_sick_inform (points_events
+    · _points, main
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
     · _info, _entry, render, main
 - `scripts/integration_audit.py` — integration_audit.py - the INTEGRATOR's cross-lane sweep (what no single lane can see).
