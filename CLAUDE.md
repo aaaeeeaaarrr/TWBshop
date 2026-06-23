@@ -52,8 +52,8 @@ logic, or a network surface.
 6. **PROTECT THE REPO.** Private repos (existing) + server-only deploy + minimize what any client can infer.
    Don't leak the ruleset through verbose client payloads or error messages.
 
-*(Full detail as the product grows → `docs/PRODUCT_SECURITY.md` when first needed. A concise version can be
-mirrored to the global rules on request — `python bootstrap.py --push-global`.)*
+*(Full detail will live in a dedicated product-security doc when first needed. A concise version can be
+mirrored to the global rules on request via `python bootstrap.py --push-global`.)*
 
 ---
 
