@@ -120,6 +120,21 @@
 
 ## Open (not yet done)
 
+- **★ SESSION-53 OPEN-LOOP ANCHOR (pre-compact 2026-06-23) — the single list so nothing is lost. Detail in the named docs.**
+  - **CURRENT BUILD = the config-driven WIZARD platform** ("the system IS its config"; every edit from now is a
+    config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** (`core/tenant_config.py`) ·
+    **2 ✅ AL re-ping ladder** (deployed) · **3 → NEXT: wire the FULL attendance menu into the shadow,
+    config-driven** · 4 wizard UI · 5 migrate other live domains (accountant/b2b/retail/hire/pos) as the shadow
+    beats live. Full design → `docs/WIZARD_DESIGN.md`; lineup detail → `docs/PLATFORM_ROADMAP.md`; status → CLAUDE.md.
+  - **PARKED — TO DO WITH OWNER (needs their input):** (a) the wizard-shape DEEP brainstorm (categories/subs/
+    if-conditions/defaults/Simple-Advanced) · (b) the **COMPANY NAME** (catchy, easy abbreviation).
+  - **OPERATIONAL OPEN:** AL-ladder **owner test-mode walk** (re-ping replaces card; escalation DM after #4 — see Done) ·
+    sick **come-at-X informed-vs-uninformed** Q (below, minor) · the **−15/payback leave-early** going-forward
+    test-walk (fix deployed; see Done).
+  - **SHADOW residual:** the **2 Jun-17 boundary edges** root-cause (owner chose this, then parked) → `docs/PLATFORM_COVERAGE.md`.
+  - **EARLIER PARKED:** bedrock landmines (B2B F2/F3/F4 — DISABLED till fixed; accountant F5/F6/F7) → `docs/BEDROCK_AUDIT_2026-06-22.md`;
+    broader platform port (other verticals). · **RULE (owner): every future edit must fit the wizard (config-driven).**
+
 - **2026-06-23 — REVIEWED (no action needed): sick "come-at-X" is NOT an over-penalty.** Traced the sibling case:
   picking "come at X" (`att:sp:meo` → `attendance_ui.py:2833`) just SHOWS a "see you ~X" message — it books
   nothing (no payback, no points, no sick case). The eventual late check-in flows through the normal late path.
