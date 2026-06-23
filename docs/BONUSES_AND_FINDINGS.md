@@ -71,6 +71,8 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Dashboard onboarding progress** `[ship]` — the admin "at a glance" now shows **setup N/5** (linked) +
   warnings, via a shared `_setup_state` so `/setup` and the dashboard can't drift (truth-consolidation by
   construction). The owner sees how close a tenant is to go-live without opening /setup.
+- **Request-body size cap** `[ship]` — `MAX_CONTENT_LENGTH = 2MB` (a >2MB POST → 413); a memory-DoS guard for
+  the import/forms. W3-prep, zero behaviour change.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

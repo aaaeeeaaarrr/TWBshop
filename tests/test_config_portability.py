@@ -48,6 +48,13 @@ def test_import_applies_safe_only(monkeypatch):
         _reset()
 
 
+def test_oversized_post_rejected(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    big = "x" * (3 * 1024 * 1024)                                   # 3MB > the 2MB cap
+    r = create_app(ORG).test_client().post("/import", data={"blob": big})
+    assert r.status_code == 413                                     # Request Entity Too Large (memory-DoS guard)
+
+
 def test_import_bad_json(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _reset()

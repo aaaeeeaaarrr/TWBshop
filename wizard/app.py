@@ -909,6 +909,7 @@ def render_health(org_id: str) -> str:
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
+    app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # cap request bodies at 2MB (memory-DoS guard)
 
     @app.before_request
     def _guard():
