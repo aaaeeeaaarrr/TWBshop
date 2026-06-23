@@ -49,6 +49,10 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Platform e2e smoke test** `[ship]` — one test walks org→staff→config(audited)→web check-in→history→
   what-if→export; proves the pieces CONNECT (integration regressions the units miss) + a PARTIAL answer to the
   "unvalidated" gap — the platform's own flow is now proven; only the live-bot Telegram leg stays unproven.
+- **Config health-check** `[ship/sell]` — read-only validation surfacing likely setup mistakes (expertise on
+  with no skills · OT banking with a 0 cap · no staff group · Telegram with no token · AL=0 · …); a `/health`
+  page + an at-a-glance count on the dashboard. Lets a customer self-correct before it bites — a support-cost
+  reducer + trust signal. Add a check = one line in `core/health.py`.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

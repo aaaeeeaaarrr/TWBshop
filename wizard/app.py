@@ -24,6 +24,7 @@ from core.tenant_config import get_config, set_config, raw_overrides
 from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
+from core.health import config_health
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -145,9 +146,12 @@ def _admin_dashboard(org_id: str) -> str:
     audit = recent_config_audit(org_id, 1)
     last = ("last change %s <code>%s</code> by %s" % (str(audit[0]["at"])[:16], escape(audit[0]["path"]),
             escape(audit[0]["who"] or "?"))) if audit else "no config changes yet"
-    return ("<div class='box'><b>📊 At a glance</b> &nbsp; %d staff · %d groups · channels: %s · %s</div>"
+    n_issues = len(config_health(org_id))
+    health = "⚠️ %d config issue(s)" % n_issues if n_issues else "✅ config healthy"
+    return ("<div class='box'><b>📊 At a glance</b> &nbsp; %d staff · %d groups · channels: %s · "
+            "<a href='/health'>%s</a> · %s</div>"
             % (len(list_staff(org_id)), len(list_groups(org_id)),
-               escape(", ".join(cfg.get("channels", [])) or "—"), last))
+               escape(", ".join(cfg.get("channels", [])) or "—"), health, last))
 
 
 def render_page(org_id: str = "twb") -> str:
@@ -157,7 +161,7 @@ def render_page(org_id: str = "twb") -> str:
     body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
             "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
-            "<a href='/audit'>audit</a> · <a href='/export'>export</a></div>"
+            "<a href='/audit'>audit</a> · <a href='/health'>health</a> · <a href='/export'>export</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -848,6 +852,19 @@ def render_import(org_id: str, msg: str = "") -> str:
     return _page("Import", body)
 
 
+def render_health(org_id: str) -> str:
+    issues = config_health(org_id)
+    if not issues:
+        rows = "<li>✅ No config issues found — you're good to go.</li>"
+    else:
+        icon = {"warn": "⚠️", "info": "ℹ️"}
+        rows = "".join("<li>%s %s</li>" % (icon.get(lvl, "•"), escape(msg)) for lvl, msg in issues)
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+            "<h1>🩺 Config health-check</h1><div class='box'><p class='note'>Likely setup mistakes or "
+            "inconsistencies (read-only — nothing changed).</p><ul>%s</ul></div>" % rows)
+    return _page("Health", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
@@ -1035,6 +1052,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/audit")
     def audit():
         return render_audit(org_id)
+
+    @app.get("/health")
+    def health():
+        return render_health(org_id)
 
     @app.get("/export")
     def export():
