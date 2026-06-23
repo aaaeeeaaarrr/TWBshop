@@ -909,6 +909,15 @@ def create_app(org_id: str = "twb") -> Flask:
             return
         return redirect("/login")
 
+    @app.after_request
+    def _security_headers(resp):
+        # defense-in-depth (W3-prep, zero behaviour change). CSP is deferred — the inline check-in JS/styles
+        # need a nonce/refactor first; these three break nothing.
+        resp.headers["X-Frame-Options"] = "DENY"               # no embedding → anti-clickjacking
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        return resp
+
     @app.get("/")
     def index():
         return render_page(org_id)

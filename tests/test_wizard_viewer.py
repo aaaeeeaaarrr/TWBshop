@@ -48,6 +48,12 @@ def test_healthz():
     assert create_app().test_client().get("/healthz").status_code == 200
 
 
+def test_security_headers_present():
+    r = create_app("twb").test_client().get("/healthz")
+    assert r.headers.get("X-Frame-Options") == "DENY"                 # anti-clickjacking
+    assert r.headers.get("X-Content-Type-Options") == "nosniff"
+
+
 # ── schema explains everything new ───────────────────────────────────────────
 def test_schema_explains_new_mechanisms():
     for _g, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS):

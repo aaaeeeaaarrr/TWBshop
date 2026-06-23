@@ -65,6 +65,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   `← admin` link and the what-if/audit/health pages carry admin-style navs. Harmless while owner-only on
   localhost, but for a REAL multi-tenant customer the customer surface must expose NO admin links / internal
   pages. Tie to auth-roles (W3): serve customer-appropriate navs when authed as a customer. PARKED (W3).
+- **Security response headers** `[ship]` — `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` ·
+  `Referrer-Policy: no-referrer` on every wizard response (anti-clickjacking / MIME-sniffing; W3-prep, zero
+  behaviour change). CSP deferred — the inline check-in JS/styles need a nonce or refactor first (parked W3).
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
