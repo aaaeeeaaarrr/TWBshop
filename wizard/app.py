@@ -25,7 +25,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
 from core.health import config_health
-from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches
+from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -884,16 +884,20 @@ def render_shadow(org_id: str) -> str:
         "<tr><td>%s</td><td>%d</td><td>%d</td><td>%d%%</td></tr>"
         % (escape(k), v["total"], v["agree"], (100 * v["agree"] // v["total"]) if v["total"] else 0)
         for k, v in by_kind.items()) or "<tr><td colspan='4' class='note'>No shadow comparisons yet.</td></tr>"
+    span = comparison_span(org_id)
+    span_html = ("<p class='note'>Data span: <b>%d days</b> (%s → %s)</p>"
+                 % (span["days"], str(span["first"])[:16], str(span["last"])[:16])) if span["first"] else ""
     body = ("<div class='nav'><a href='/'>← admin</a></div>"
             "<h1>👥 Shadow agreement — cut-over readiness</h1>"
             "<div class='box'><p class='note'>How often the new platform's computation matched live, on real "
             "data. Cut a vertical over only after enough agreement over enough days (read-only — informs the "
             "decision, changes nothing).</p>"
             "<p><b>Overall: %d%% agree</b> &nbsp; <span class='note'>(%d of %d compared · %d mismatch)</span></p>"
+            "%s"
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Vertical</th><th>Compared</th>"
             "<th>Agreed</th><th>Agreement</th></tr>%s</table></div>%s"
-            % (pct, overall["agree"], overall["total"], overall["mismatch"], rows,
+            % (pct, overall["agree"], overall["total"], overall["mismatch"], span_html, rows,
                _render_mismatches(org_id)))
     return _page("Shadow", body)
 

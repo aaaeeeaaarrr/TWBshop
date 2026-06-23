@@ -38,5 +38,6 @@ def test_shadow_agreement_page(monkeypatch):
         body = create_app(ORG).test_client().get("/shadow").get_data(as_text=True)
         assert "Shadow agreement" in body and "checkin" in body and "66%" in body   # agreement
         assert "Recent mismatches" in body and "on_time" in body                     # the diff detail
+        assert "Data span" in body                                                   # how long it's gathered
     finally:
         _clean()

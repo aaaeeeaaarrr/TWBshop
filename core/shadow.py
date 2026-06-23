@@ -183,6 +183,18 @@ def comparison_stats_by_kind(org_id) -> dict:
             return {r["kind"]: {"total": r["n"], "agree": r["ok"]} for r in cur.fetchall()}
 
 
+def comparison_span(org_id) -> dict:
+    """How long the shadow has been gathering data ({first, last, days}) — the 'enough days of agreement'
+    side of the cut-over criterion (read-only)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT MIN(at) lo, MAX(at) hi, "
+                        "EXTRACT(DAY FROM MAX(at) - MIN(at))::int d FROM shadow_comparisons WHERE org_id=%s",
+                        (org_id,))
+            r = cur.fetchone()
+            return {"first": r["lo"], "last": r["hi"], "days": r["d"] or 0}
+
+
 def recent_mismatches(org_id, limit: int = 10) -> list:
     """Recent disagreements (read-only) — what the new platform computed differently from live, so the owner
     can see WHAT differs before cutting over."""
