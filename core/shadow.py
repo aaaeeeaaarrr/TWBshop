@@ -181,3 +181,13 @@ def comparison_stats_by_kind(org_id) -> dict:
             cur.execute("SELECT kind, COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
                         "WHERE org_id=%s GROUP BY kind ORDER BY kind", (org_id,))
             return {r["kind"]: {"total": r["n"], "agree": r["ok"]} for r in cur.fetchall()}
+
+
+def recent_mismatches(org_id, limit: int = 10) -> list:
+    """Recent disagreements (read-only) — what the new platform computed differently from live, so the owner
+    can see WHAT differs before cutting over."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT kind, staff_id, live, new, at FROM shadow_comparisons "
+                        "WHERE org_id=%s AND NOT agree ORDER BY at DESC LIMIT %s", (org_id, int(limit)))
+            return [dict(r) for r in cur.fetchall()]

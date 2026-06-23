@@ -25,7 +25,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
 from core.health import config_health
-from core.shadow import comparison_stats, comparison_stats_by_kind
+from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -892,9 +892,23 @@ def render_shadow(org_id: str) -> str:
             "<p><b>Overall: %d%% agree</b> &nbsp; <span class='note'>(%d of %d compared · %d mismatch)</span></p>"
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Vertical</th><th>Compared</th>"
-            "<th>Agreed</th><th>Agreement</th></tr>%s</table></div>"
-            % (pct, overall["agree"], overall["total"], overall["mismatch"], rows))
+            "<th>Agreed</th><th>Agreement</th></tr>%s</table></div>%s"
+            % (pct, overall["agree"], overall["total"], overall["mismatch"], rows,
+               _render_mismatches(org_id)))
     return _page("Shadow", body)
+
+
+def _render_mismatches(org_id: str) -> str:
+    ms = recent_mismatches(org_id, 10)
+    if not ms:
+        return ""
+    items = "".join(
+        "<li class='note'><b>%s</b> %s &nbsp; live: <code>%s</code> → new: <code>%s</code></li>"
+        % (escape(m["kind"] or "?"), escape(str(m["at"])[:16]),
+           escape(str(m["live"])[:80]), escape(str(m["new"])[:80]))
+        for m in ms)
+    return ("<div class='box'><h3>Recent mismatches</h3><p class='note'>What the new system computed "
+            "differently — investigate these before cutting that vertical over.</p><ul>%s</ul></div>" % items)
 
 
 def render_export(org_id: str) -> str:
