@@ -57,6 +57,10 @@ def test_schema_explains_new_mechanisms():
     assert schema.describe("connections.telegram.bot_token")["type"] == "secret"
     assert schema.describe("onboarding.staff_entry")["type"] == "enum"          # discover-confirm/manual/bulk
     assert schema.describe("categories.attendance.schedule.split_shift_allowed")["type"] == "bool"
+    # bot-as-approver: 'by' offers the bot, and bot_rule explains each if-condition
+    by = schema.APPROVAL_FIELDS["by"]
+    assert any(o[0] == "bot" for o in by["options"])
+    assert "IF" in schema.APPROVAL_FIELDS["bot_rule"]["options"][0][2].upper()   # the rules spell out the condition
 
 
 # ── customer view: complete + friendly + no leak ─────────────────────────────
@@ -66,6 +70,8 @@ def test_customer_view_complete_no_internal_leak():
     assert "Sick leave" in body and "Staff rules" in body and "Connections" in body  # all mechanisms shown
     assert "Setup &amp; staff" in body and "Discover &amp; confirm" in body          # onboarding section
     assert "Overnight shifts" in body and "Allow split shifts" in body               # split/midnight options
+    assert "Track minimum skill coverage" in body                                    # expertise/coverage
+    assert "The bot (automatic)" in body and "Keep coverage" in body                 # bot-as-approver + a rule
     assert "What earned overtime becomes" in body                                    # the new OT options
     assert "paste to set" in body and "not set" in body                              # token field, masked
     assert "SHADOW" not in body and "PLANNED" not in body and "LIVE_FIXED" not in body  # no internals leak

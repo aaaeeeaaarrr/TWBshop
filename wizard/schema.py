@@ -159,6 +159,13 @@ DESCRIPTORS = {
     f"{_ATT}.staff_rules.auto_clockout_grace_min": {
         "label": "Auto-close a forgotten checkout after (minutes)", "type": "int", "min": 0, "max": 240, "unit": "min",
         "help": "If a staffer forgets to check out, close it automatically this long after their shift end."},
+    # ── Expertise / skill coverage ──
+    f"{_ATT}.expertise.enabled": {"label": "Track minimum skill coverage", "type": "bool",
+        "help": "Make sure enough skilled people are always working — e.g. ALWAYS at least 1 baker on shift. "
+                "You give each staffer their skills, set each skill's minimum (and special higher/lower numbers "
+                "for certain days/hours) in the staff screen, and the bot can use it to approve leave only when "
+                "coverage still holds.",
+        "true": "ON — skill-coverage minimums are tracked/enforced.", "false": "OFF — no skill-coverage rules."},
     # ── Connections / onboarding (the wizard's plumbing) ──
     "connections.telegram.bot_token": {"label": "Telegram bot token", "type": "secret",
         "help": "The token from @BotFather for THIS tenant's bot. Stored encrypted; never shown."},
@@ -216,9 +223,21 @@ APPROVAL_FIELDS = {
                   "help": "How many people must approve. (If the requester is themselves a senior, the "
                           "system needs one fewer.)"},
     "by": {"label": "Approved by", "type": "enum",
-           "help": "Who is allowed to approve this request.",
+           "help": "WHO decides this request.",
            "options": [("senior", "Senior staff", "Any senior can approve."),
-                       ("management", "Management", "Only management can approve.")]},
+                       ("management", "Management", "Only management can approve."),
+                       ("bot", "The bot (automatic)", "The system decides automatically using the rule below — "
+                        "no human needed for the clear cases.")]},
+    "bot_rule": {"label": "Bot decision rule (only used when “Approved by” = the bot)", "type": "enum",
+                 "help": "HOW the bot decides when you let it approve. Ignored unless 'Approved by' is the bot.",
+                 "options": [
+                     ("coverage_maintained", "Keep coverage", "IF the minimum skill coverage is STILL met "
+                      "without this person → the bot auto-approves; otherwise it asks a senior. (Needs Expertise on.)"),
+                     ("within_quota", "Within their quota", "IF the staffer is still within their leave quota "
+                      "AND coverage holds → auto-approve; else a senior decides."),
+                     ("always", "Always approve", "The bot approves every request of this type automatically (no human)."),
+                     ("senior_if_unsure", "Easy ones only", "The bot approves the clear-cut cases and sends "
+                      "anything borderline to a senior.")]},
     "reason_required": {"label": "Reason required", "type": "bool",
                         "help": "Whether the requester must type a reason.",
                         "true": "ON — they must give a reason.", "false": "OFF — a reason is optional."},
@@ -265,6 +284,7 @@ ATTENDANCE_GROUPS = [
                   f"{_ATT}.schedule.min_rest_between_shifts_min"]),
     ("Staff rules", [f"{_ATT}.staff_rules.max_consecutive_days", f"{_ATT}.staff_rules.max_weekly_hours",
                      f"{_ATT}.staff_rules.probation_days", f"{_ATT}.staff_rules.auto_clockout_grace_min"]),
+    ("Expertise &amp; coverage", [f"{_ATT}.expertise.enabled"]),
     ("Points", [f"{_ATT}.points.enabled"]),
 ]
 

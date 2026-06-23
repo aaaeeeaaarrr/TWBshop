@@ -17,7 +17,8 @@ from core.points import CATALOGUE as _CATALOGUE   # TWB's points catalogue = the
 _APPROVAL_DEFAULT = {
     "required": True,
     "approvers": 2,                       # seniors needed (code reduces to 1 when the requester is senior)
-    "by": "senior",                       # senior | management | [named uids]
+    "by": "senior",                       # senior | management | bot | [named uids]  — WHO approves
+    "bot_rule": "coverage_maintained",    # when by="bot": how the bot decides (see wizard.schema for each)
     "reason_required": False,
     "approver_on_shift": False,           # must an approver be on shift to count?
     "reping_hours": 6,                    # re-ping non-responders every N hours …
@@ -106,6 +107,11 @@ DEFAULTS = {
                 "max_weekly_hours": 0,          # 0 = unlimited
                 "probation_days": 0,
                 "auto_clockout_grace_min": 0,   # auto-close a forgotten checkout this long after shift end
+            },
+            "expertise": {                  # minimum SKILL coverage at all times (e.g. always ≥1 baker working)
+                "enabled": False,           # TWB doesn't use coverage-by-skill yet → off
+                "roles": {},                # {skill_name: {"min_required": N}} — set in the staff/expertise screen
+                "coverage_overrides": [],   # [{role, days:[…], hours:"HH:MM-HH:MM", min}] — raise/lower for special times
             },
             "points": {"enabled": True, "catalogue": dict(_CATALOGUE)},
             "approvals": {                  # the wizard's Approvals table (one row per request type)

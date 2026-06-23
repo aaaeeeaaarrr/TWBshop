@@ -59,6 +59,22 @@ telegram id · google id · consent. **Shift windows** are a LIST of `{start, en
 Entry methods: **discover-confirm** (default, from the group) · **manual** (type one) · **bulk import**
 (paste a list / upload a sheet / import from Deputy/Loyverse/POS).
 
+### B1. Expertise / skills + minimum coverage (owner, 2026-06-23)
+A staffer can hold **one or more expertises** (baker, cashier, barista, supervisor…). The tenant defines, per
+skill, a **minimum needed at all times** (e.g. always ≥1 baker working), and **day/hour overrides** to raise
+or lower it (≥2 bakers on weekends, 0 overnight). The system can then refuse/flag a schedule or a leave
+request that would drop a skill below its minimum. **Config:** `categories.attendance.expertise`
+(`enabled` · `roles{skill:{min_required}}` · `coverage_overrides[{role,days,hours,min}]`); each staff carries
+`expertises:[…]`. **Build now:** the config + the `enabled` toggle + full explanations. **Build next (with the
+staff CRUD):** the per-skill minimum + override editor (a small repeatable-row UI) and the staff skill picker.
+
+### B2. The bot as an APPROVER (owner, 2026-06-23)
+In the Approvals table, **"Approved by"** now offers **the bot** (alongside senior / management). When the bot
+approves, a **decision rule** says HOW (each spelled out for the customer): **Keep coverage** (auto-approve only
+IF minimum skill coverage still holds without this person, else a senior) · **Within their quota** · **Always
+approve** · **Easy ones only** (bot does the clear cases, escalates the borderline). This is the "Computer/AI
+Power" applied to approvals — the bot handles routine decisions, humans handle the judgement calls.
+
 ## C. Beyond Telegram
 - **Web / app onboarding:** the same config + staff data; access via a browser login or app instead of a
   bot. The brain is identical (channel-agnostic) — only the adapter differs.
