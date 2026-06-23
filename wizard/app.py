@@ -219,10 +219,13 @@ def _render_approvals(cfg: dict) -> str:
             "the same way to: %s.</p>%s" % (escape(others), "".join(rows)))
 
 
+_CONFIGURABLE_DOMAINS = {"accountant", "stock", "pos", "hr_payroll"}   # have their own editable sections above
+
+
 def _render_locked_modules(cfg: dict) -> str:
     rows = []
     for name, c in catalog.CATEGORIES.items():
-        if c["live"]:
+        if c["live"] or name in _CONFIGURABLE_DOMAINS:   # don't also list a configurable domain as upsell
             continue
         pkgs = [p for p, cs in catalog.PACKAGES.items() if name in cs]
         rows.append("<li>🔒 <b>%s</b> — %s <br><small class='note'>available in: %s · integrations: %s</small></li>"
@@ -673,7 +676,7 @@ def render_checkin(token: str, result: dict = None) -> str:
         else:
             msg = "Couldn't do that: %s" % result.get("error", "please try again")
         return _page("Check in", "<h1>Hi %s</h1><div class='box'><h2>%s</h2></div>" % (who, escape(msg)))
-    body = ("<h1>Hi %s 👋</h1><div class='box'><p>What would you like to do?</p>"
+    body = ("<h1>Hi %s 👋</h1><div class='box'><p>Your shift: <b>%s</b></p><p>What would you like to do?</p>"
             "<button onclick=\"go('fi')\" style='font-size:18px;padding:12px 24px'>📍 Check IN</button> &nbsp; "
             "<button onclick=\"go('fo')\" style='font-size:18px;padding:12px 24px;background:#6b7280'>📍 Check OUT</button>"
             "<form id='fi' method='post' action='/checkin/%s'><input type='hidden' name='lat'><input type='hidden' name='lon'></form>"
@@ -682,7 +685,7 @@ def render_checkin(token: str, result: dict = None) -> str:
             "<script>function go(id){var f=document.getElementById(id);if(!navigator.geolocation){f.submit();return;}"
             "navigator.geolocation.getCurrentPosition(function(p){f.lat.value=p.coords.latitude;"
             "f.lon.value=p.coords.longitude;f.submit();},function(){f.submit();});}</script>"
-            % (who, escape(token), escape(token)))
+            % (who, escape(_windows_str(s.get("shift_windows"))), escape(token), escape(token)))
     return _page("Check in", body)
 
 

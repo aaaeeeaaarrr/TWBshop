@@ -42,7 +42,7 @@ def test_checkin_page_and_records(monkeypatch):
         c = create_app(ORG).test_client()
         assert "isn't valid" in c.get("/checkin/nope").get_data(as_text=True)        # bad token
         page = c.get("/checkin/%s" % tok).get_data(as_text=True)
-        assert "Check IN" in page and "geolocation" in page                           # the page + JS
+        assert "Check IN" in page and "geolocation" in page and "Your shift" in page   # page + JS + shift shown
         body = c.post("/checkin/%s" % tok, data={"lat": "11.5", "lon": "104.9"}).get_data(as_text=True)
         assert "Checked in" in body or "already checked in" in body
         with _db() as cc:

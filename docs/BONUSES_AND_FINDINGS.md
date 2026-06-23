@@ -59,6 +59,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   delivery/rostering/CRM are quick to model when wanted.
 - **Stock supplier price-compare = a PRIMARY goal** `[decision]` — modelled as a config knob
   (`supplier_price_compare`); keep per-item price + a canonical item path open (no vendor-only shortcut).
+- **Config-section vs upsell duplicate** `[gotcha]` — a domain promoted to its own editable section was ALSO
+  still listed in the "add more" upsell (catalog `live=False`). Fixed via `_CONFIGURABLE_DOMAINS` exclusion.
+  Watch this whenever a catalog category becomes a config section.
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
