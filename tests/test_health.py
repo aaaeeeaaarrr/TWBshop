@@ -37,6 +37,26 @@ def test_health_flags_ot_bank_zero_cap():
         _reset()
 
 
+def test_health_flags_zero_approvers():
+    _reset()
+    try:
+        set_config(ORG, {"categories": {"attendance": {"approvals": {"al": {"approvers": 0}}}}})
+        assert any(lvl == "warn" and "0 approvers" in m for lvl, m in config_health(ORG))
+    finally:
+        _reset()
+
+
+def test_health_flags_duplicate_staff_names():
+    from core.onboarding_flow import add_staff_manual
+    _reset()
+    try:
+        add_staff_manual(ORG, "Sok")
+        add_staff_manual(ORG, "Sok")
+        assert any(lvl == "warn" and "share a name" in m for lvl, m in config_health(ORG))
+    finally:
+        _reset()
+
+
 def test_health_default_config_has_no_warns():
     _reset()
     try:

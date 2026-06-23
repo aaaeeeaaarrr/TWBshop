@@ -39,4 +39,24 @@ def config_health(org_id) -> list:
         out.append(("info", "Telegram is a channel but no bot token is set."))
     if not leave.get("al_annual_days"):
         out.append(("info", "Annual-leave entitlement is 0 — staff get no AL days."))
+
+    # ── staff sanity ──
+    if any(not (s.get("shift_windows") or []) for s in staff):
+        out.append(("info", "Some staff have no shift hours set — they can't be scheduled until they do."))
+    names = [s.get("name") for s in staff if s.get("name")]
+    dupes = sorted({n for n in names if names.count(n) > 1})
+    if dupes:
+        out.append(("warn", "Two staff share a name (%s) — ambiguous for assignments/approvals." % ", ".join(dupes)))
+
+    # ── approvals: someone must be able to approve ──
+    for kind, rule in (att.get("approvals", {}) or {}).items():
+        if rule.get("required") and rule.get("by") != "bot" and not rule.get("approvers"):
+            out.append(("warn", "%s requests require approval but 0 approvers are set — they'd never clear." % kind))
+            break
+
+    # ── expertise overrides must reference a real skill ──
+    role_names = {r.get("name") for r in (exp.get("roles") or []) if isinstance(r, dict)}
+    if any(isinstance(ov, dict) and ov.get("role") and ov["role"] not in role_names
+           for ov in (exp.get("coverage_overrides") or [])):
+        out.append(("warn", "A coverage override references a skill that isn't in your skills list."))
     return out
