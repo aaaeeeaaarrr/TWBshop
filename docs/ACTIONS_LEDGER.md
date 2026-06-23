@@ -124,9 +124,10 @@
   - **CURRENT BUILD = the config-driven WIZARD platform** ("the system IS its config"; every edit from now is a
     config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** · **2 ✅ AL re-ping ladder**
     (deployed) · **3 ⏳ wire full attendance menu into the shadow** (3a ✅ settle/money path deployed; 3b = points +
-    AL-verdict + sick + schedule hooks = NEXT shadow work) · **4 ⏳ wizard UI** (W1 ✅ read-only viewer LIVE on
-    server — `twbshop-wizard`, localhost:8090 via `ssh -L 8090:localhost:8090 twbshop`; W2 = edit SHADOW knobs +
-    shadow-diff preview; W3 = per-customer logins + HTTPS + cut-over controls) · 5 migrate other live domains. Full
+    AL-verdict + sick + schedule hooks = NEXT shadow work) · **4 ⏳ wizard UI** (W1 ✅ viewer + W2 ✅ customer editor LIVE
+    on server — `twbshop-wizard`, localhost:8090 via `ssh -L 8090:localhost:8090 twbshop`; `/`=admin, `/customer`=
+    product with explanations + Apply/Cancel draft, SHADOW-only edits; W2.5 = shadow-diff preview; W3 = per-customer
+    logins + HTTPS + cut-over controls) · 5 migrate other live domains. Full
     design → `docs/WIZARD_DESIGN.md`; lineup → `docs/PLATFORM_ROADMAP.md`; status → CLAUDE.md.
   - **SECURITY now a LAW** (owner Jun 23): CLAUDE.md "▶▶ PRODUCT SECURITY & IP PROTECTION" + memory — brain
     server-side / thin clients / auth + tenant-isolation / localhost+tunnel until authed. Apply pervasively.
