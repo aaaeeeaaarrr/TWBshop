@@ -4,5 +4,6 @@ psycopg2-binary>=2.9
 telethon>=1.36
 pymupdf>=1.24
 pytest>=9.0
+flask>=3.0
 
 jsonschema

@@ -269,5 +269,6 @@
     · ok, fail, info, head, _db, get_intake, get_flags, reset, fake_arrival_db, make_context, make_update, make_arrival_update, s1_cook_have, s2_happy_path, s3_voice_strikes  …(+7, grep)
 - `run_test_scoring_engine.py` — Tests the scoring engine with three synthetic quiz attempts:
     · get_vid, load_correct_answers, make_candidate, make_attempt, insert_answer, cleanup
+- `run_wizard.py` — Entry point: the Wizard config viewer (Stage 1, READ-ONLY).
 - `bootstrap.py` — bootstrap.py — run on any new machine, or to sync latest secrets after a pull.
     · get_token, fetch_file, set_permissions, _write_ssh_config, _ensure_global_guards, _secret_keys, sync, full_setup, _gh_put

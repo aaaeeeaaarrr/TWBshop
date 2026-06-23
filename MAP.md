@@ -24,6 +24,11 @@
 - **Read-first:** `docs/PLATFORM_VISION.md` (north star + principles) · `docs/ATTENDANCE_DOMAIN_MODEL.md` (entity+event model + the 5 invariants) · `docs/SHIFT_MODEL_DESIGN.md`
 - **⚠ Gotchas:** date = LABEL only — reason on `start_dt`/`end_dt` intervals (NEVER `< today`) · tenant-scoped (`org_id` everywhere) · atomic-claim-at-the-write (UNIQUE-as-claim) · runs PARALLEL to live and acts on NOTHING (shadow) — cut over only after proven. First slice = check-in/out (built session 51d).
 
+## 🧩 WIZARD (`wizard/`) — config viewer/editor web adapter (a thin CLIENT; the brain stays server-side)
+- **Entry:** `wizard/app.py::render_page` (read-only viewer — badged config + catalog) · `wizard/status.py::status_for` (the LIVE/SHADOW/PLANNED cut-over map) · `wizard/catalog.py` (menu of categories/integrations/packages) · `run_wizard.py` (localhost:8090)
+- **Read-first:** `docs/WIZARD_DESIGN.md` · CLAUDE.md ▶▶ PRODUCT SECURITY & IP · the config model `core/tenant_config.py`
+- **⚠ Gotchas:** SECURITY — server-side only, binds 127.0.0.1 (reach via `ssh -L 8090:localhost:8090 twbshop`), read-only in Stage 1, NO secrets in any page · the badge truth = `wizard/status.py` (flip a prefix SHADOW→LIVE = the cut-over) · single-threaded (shared DB pool isn't thread-safe).
+
 ## Attendance — check-in / check-out / no-show  ·  ⚠ LIVE (real staff, payroll-adjacent)
 - **Entry:** `gm_bot/bot.py` (scheduler + location handler + jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout`
 - **Read-first:** `docs/ATTENDANCE_SYSTEM_DETAILED.md` · `docs/STATEFUL_MENU_PATTERNS.md` · grep `docs/HISTORY.md` sessions 31–42
