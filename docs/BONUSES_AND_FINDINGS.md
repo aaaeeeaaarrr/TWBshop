@@ -73,6 +73,12 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   construction). The owner sees how close a tenant is to go-live without opening /setup.
 - **Request-body size cap** `[ship]` — `MAX_CONTENT_LENGTH = 2MB` (a >2MB POST → 413); a memory-DoS guard for
   the import/forms. W3-prep, zero behaviour change.
+- **What-if current breakdown** `[ship]` — the what-if now shows "Currently: X on-time, Y late, …" for context
+  beside the change count.
+- **Onboarding chain e2e (REAL core)** `[ship/needs-validate]` — a test drives the Telegram adapter → REAL
+  core → DB: a staff-group poster is staged → `/onboard` lists → confirm button → a real `core_staff` record.
+  The integration the mock-only adapter tests don't cover. Strongest de-risking of the unvalidated onboarding
+  short of a real bot (the Telegram TRANSPORT is still mocked — a live BotFather run remains the final proof).
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
