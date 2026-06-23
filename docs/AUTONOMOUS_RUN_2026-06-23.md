@@ -76,6 +76,23 @@ you're away), genuinely HIGH-RISK, or needs your input. All recorded so nothing 
 - **Per-event commit-verifier phase 2** — owner-gated HIGH-RISK live-write surgery (ledger).
 - **Wizard W2.5 shadow-diff preview / W3 logins+HTTPS** — product polish; W3 needs your auth/exposure call.
 
+### 8 ✅ Wizard EXPANSION (your feedback: "not all mechanisms shown · OT/swap look PLANNED but are live · bring options from all over · a place for tokens")
+All **config + UI + secret-store only — ZERO live behavior change** (DEFAULTS still = TWB's real rules):
+- **Fixed the "PLANNED" confusion** → new **LIVE-FIXED** badge (4 states now: LIVE · SHADOW · LIVE-FIXED ·
+  PLANNED). OT/swap/sick approvals + the live mechanisms now read **LIVE-FIXED** ("live today, fixed rules —
+  config drives them at cut-over"), not "planned". New options read PLANNED.
+- **Every mechanism now in the view** — added sick details, schedule/swap/day-off, **Staff rules**, plus the
+  full approvals ladder fields for every request type. Customer view covers Attendance + Connections.
+- **Options from all over (not just TWB)** — OT disposition (bank / convert-to-AL / **pay out** / expire) +
+  rate multiplier · AL accrual models (yearly / monthly / per-hours) · carry-over · rest-between-shifts ·
+  max consecutive days / weekly hours / probation. TWB's defaults unchanged.
+- **A place for tokens (secure)** — a Connections screen: Telegram **bot token** + **listener session** +
+  owner chat + web/app + integration keys. Tokens are SECRETS → a new encrypted-pending store
+  (`core_org_secrets`), **never** in the readable config, **never** shown (only "set ✓ / not set" + a
+  write-only input). Editing limited to safe SHADOW/PLANNED knobs; LIVE/LIVE-FIXED locked.
+- 9 wizard tests (4-state grounding, secret-to-store-not-config, locks, no-leak, clamps). Deploys to the
+  wizard service only (bots untouched). ⚠ encrypt `core_org_secrets` at rest before any public exposure (W3).
+
 ## Net result of this run
 Shipped SAFE, reviewable value with ZERO live-bot disruption (only the isolated wizard service restarted):
 check-in shadow → READY · the cut-over dashboard · the customer editor + dashboard live · accountant

@@ -45,6 +45,21 @@ CATEGORIES = {
         "blurb": "Delivery capture + photo quality control (the WOC archive), driver/customer flow.",
         "integrations": ["In-house", "FoodPanda / Grab", "Nham24"],
     },
+    "rostering": {
+        "live": False,
+        "blurb": "Build & publish shift rosters, demand forecasting, open-shift bidding.",
+        "integrations": ["In-house", "Deputy", "When I Work", "Homebase"],
+    },
+    "crm_loyalty": {
+        "live": False,
+        "blurb": "Customer profiles, loyalty points/tiers, campaigns, feedback.",
+        "integrations": ["In-house", "Telegram", "Mailchimp", "Meta (FB/IG)"],
+    },
+    "payments_payroll": {
+        "live": False,
+        "blurb": "Collect payments + run staff payroll/slips, taxes/contributions.",
+        "integrations": ["Bakong / KHQR", "ABA", "Wing", "Bank payroll file", "NSSF export"],
+    },
 }
 
 # Sold bundles (gating). Each unlocks a set of categories; sub-features can lock behind a higher tier.
