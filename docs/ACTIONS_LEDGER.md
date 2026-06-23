@@ -122,10 +122,14 @@
 
 - **★ SESSION-53 OPEN-LOOP ANCHOR (pre-compact 2026-06-23) — the single list so nothing is lost. Detail in the named docs.**
   - **CURRENT BUILD = the config-driven WIZARD platform** ("the system IS its config"; every edit from now is a
-    config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** (`core/tenant_config.py`) ·
-    **2 ✅ AL re-ping ladder** (deployed) · **3 → NEXT: wire the FULL attendance menu into the shadow,
-    config-driven** · 4 wizard UI · 5 migrate other live domains (accountant/b2b/retail/hire/pos) as the shadow
-    beats live. Full design → `docs/WIZARD_DESIGN.md`; lineup detail → `docs/PLATFORM_ROADMAP.md`; status → CLAUDE.md.
+    config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** · **2 ✅ AL re-ping ladder**
+    (deployed) · **3 ⏳ wire full attendance menu into the shadow** (3a ✅ settle/money path deployed; 3b = points +
+    AL-verdict + sick + schedule hooks = NEXT shadow work) · **4 ⏳ wizard UI** (W1 ✅ read-only viewer LIVE on
+    server — `twbshop-wizard`, localhost:8090 via `ssh -L 8090:localhost:8090 twbshop`; W2 = edit SHADOW knobs +
+    shadow-diff preview; W3 = per-customer logins + HTTPS + cut-over controls) · 5 migrate other live domains. Full
+    design → `docs/WIZARD_DESIGN.md`; lineup → `docs/PLATFORM_ROADMAP.md`; status → CLAUDE.md.
+  - **SECURITY now a LAW** (owner Jun 23): CLAUDE.md "▶▶ PRODUCT SECURITY & IP PROTECTION" + memory — brain
+    server-side / thin clients / auth + tenant-isolation / localhost+tunnel until authed. Apply pervasively.
   - **PARKED — TO DO WITH OWNER (needs their input):** (a) the wizard-shape DEEP brainstorm (categories/subs/
     if-conditions/defaults/Simple-Advanced) · (b) the **COMPANY NAME** (catchy, easy abbreviation).
   - **OPERATIONAL OPEN:** AL-ladder **owner test-mode walk** (re-ping replaces card; escalation DM after #4 — see Done) ·
