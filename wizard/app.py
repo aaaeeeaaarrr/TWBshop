@@ -720,16 +720,21 @@ def render_checkin(token: str, result: dict = None) -> str:
         else:
             msg = "Couldn't do that: %s" % result.get("error", "please try again")
         return _page("Check in", "<h1>Hi %s</h1><div class='box'><h2>%s</h2></div>" % (who, escape(msg)))
+    from core.attendance import recent_checkins
+    recent = recent_checkins(s["org_id"], s["staff_id"], 5)
+    rec_html = ("<div class='box'><h3>Your recent check-ins</h3><ul>%s</ul></div>"
+                % "".join("<li class='note'>%s &nbsp; %s</li>" % (escape(str(r["day"])), escape(r["state"] or "—"))
+                          for r in recent)) if recent else ""
     body = ("<h1>Hi %s 👋</h1><div class='box'><p>Your shift: <b>%s</b></p><p>What would you like to do?</p>"
             "<button onclick=\"go('fi')\" style='font-size:18px;padding:12px 24px'>📍 Check IN</button> &nbsp; "
             "<button onclick=\"go('fo')\" style='font-size:18px;padding:12px 24px;background:#6b7280'>📍 Check OUT</button>"
             "<form id='fi' method='post' action='/checkin/%s'><input type='hidden' name='lat'><input type='hidden' name='lon'></form>"
             "<form id='fo' method='post' action='/checkout/%s'><input type='hidden' name='lat'><input type='hidden' name='lon'></form>"
-            "<p class='note'>We use your location to confirm you're at work.</p></div>"
+            "<p class='note'>We use your location to confirm you're at work.</p></div>%s"
             "<script>function go(id){var f=document.getElementById(id);if(!navigator.geolocation){f.submit();return;}"
             "navigator.geolocation.getCurrentPosition(function(p){f.lat.value=p.coords.latitude;"
             "f.lon.value=p.coords.longitude;f.submit();},function(){f.submit();});}</script>"
-            % (who, escape(_windows_str(s.get("shift_windows"))), escape(token), escape(token)))
+            % (who, escape(_windows_str(s.get("shift_windows"))), escape(token), escape(token), rec_html))
     return _page("Check in", body)
 
 

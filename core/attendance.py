@@ -91,3 +91,16 @@ def check_out(org_id, staff_id, when_dt, work_start, work_end, tz: str = "Asia/P
                            {"worked_min": worked})
     return {"bound": True, "shift_id": shift["shift_id"], "worked_min": worked,
             "duplicate": not inserted}
+
+
+def recent_checkins(org_id, staff_id, limit: int = 5) -> list:
+    """The staffer's recent check-ins (read-only) — [{at, state, day}], newest first. For a staff 'my
+    history' view; no writes."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT e.at, e.detail, s.business_day
+                           FROM attendance_events e JOIN shifts s ON s.shift_id = e.shift_id
+                           WHERE e.org_id=%s AND e.staff_id=%s AND e.type='checked_in'
+                           ORDER BY e.at DESC LIMIT %s""", (org_id, staff_id, int(limit)))
+            return [{"at": r["at"], "state": (r["detail"] or {}).get("state"), "day": r["business_day"]}
+                    for r in cur.fetchall()]

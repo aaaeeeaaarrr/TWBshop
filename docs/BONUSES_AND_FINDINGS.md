@@ -38,6 +38,8 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Config change log (auditability)** `[ship/sell]` — every config edit logs who-changed-which-knob-when
   (`core_config_audit`); PRODUCT SECURITY law #5. Trust + forensics + the multi-tenant story. Secrets log the
   ACT, never the value. A `/audit` page (+ a link from the customer view).
+- **Staff "my recent check-ins"** `[ship]` — the web check-in page shows the staffer their last few check-ins
+  (date + verdict); a small transparency/trust touch that completes the staff web view.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

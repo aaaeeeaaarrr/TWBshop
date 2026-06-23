@@ -73,6 +73,21 @@ def test_web_checkout_records(monkeypatch):
         _clean()
 
 
+def test_web_recent_checkins_shown(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Sok", shift_windows=[{"start": "00:00", "end": "23:59"}])
+        tok = ensure_checkin_token(ORG, sid)
+        c = create_app(ORG).test_client()
+        c.post("/checkin/%s" % tok, data={})                                    # one check-in
+        page = c.get("/checkin/%s" % tok).get_data(as_text=True)
+        assert "recent check-ins" in page.lower()                               # history shown
+    finally:
+        _clean()
+
+
 def test_staff_link_page(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     cdb.ensure_org(ORG, "T")
