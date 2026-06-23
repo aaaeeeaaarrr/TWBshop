@@ -808,9 +808,12 @@ def render_whatif(org_id: str) -> str:
             "Early bonus (min) <input type='number' name='early' value='%d' min='0' max='60'> &nbsp; "
             "<button type='submit'>Preview</button></form></div>"
             "<div class='box'><h2>%d of %d recent check-ins would change</h2>"
+            "<p class='note'>Currently: %s</p>"
             "<p>Transitions:</p><ul>%s</ul>%s</div>"
-            % (cur_g, cur_e, grace, early, res["changed"], res["total"], trans,
-               ("<p>Examples:</p><ul>%s</ul>" % ex) if ex else ""))
+            % (cur_g, cur_e, grace, early, res["changed"], res["total"],
+               ", ".join("%d %s" % (n, escape(k.replace("_", " ")))
+                         for k, n in sorted(res["current"].items(), key=lambda x: -x[1])) or "—",
+               trans, ("<p>Examples:</p><ul>%s</ul>" % ex) if ex else ""))
     return _page("What-if", body)
 
 

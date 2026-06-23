@@ -20,12 +20,13 @@ def verdict_whatif(org_id, new_grace, new_early, tz="Asia/Phnom_Penh", limit=300
                            WHERE e.org_id=%s AND e.type='checked_in' AND s.start_dt IS NOT NULL
                            ORDER BY e.at DESC LIMIT %s""", (org_id, int(limit)))
             rows = cur.fetchall()
-    total, changed, by_transition, examples = 0, 0, {}, []
+    total, changed, by_transition, examples, current = 0, 0, {}, [], {}
     for r in rows:
         old_state = (r["detail"] or {}).get("state")
         if not old_state:
             continue
         total += 1
+        current[old_state] = current.get(old_state, 0) + 1            # the breakdown as it stands today
         new_state, _late, _early = verdict(r["at"], r["start_dt"], tz, int(new_grace), int(new_early))
         if new_state != old_state:
             changed += 1
@@ -33,4 +34,5 @@ def verdict_whatif(org_id, new_grace, new_early, tz="Asia/Phnom_Penh", limit=300
             by_transition[key] = by_transition.get(key, 0) + 1
             if len(examples) < 8:
                 examples.append({"at": str(r["at"]), "from": old_state, "to": new_state})
-    return {"total": total, "changed": changed, "by_transition": by_transition, "examples": examples}
+    return {"total": total, "changed": changed, "by_transition": by_transition, "examples": examples,
+            "current": current}

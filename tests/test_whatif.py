@@ -35,6 +35,7 @@ def test_whatif_reclassifies():
         res = verdict_whatif(ORG, 2, 5)                       # tighten grace to 2 → it becomes late
         assert res["total"] >= 1 and res["changed"] >= 1
         assert res["by_transition"].get("on_time→late", 0) >= 1
+        assert res["current"].get("on_time", 0) >= 1          # current breakdown reported
         assert verdict_whatif(ORG, 5, 5)["changed"] == 0     # same config → nothing reclassifies
     finally:
         _clean()
@@ -47,6 +48,6 @@ def test_whatif_page_renders(monkeypatch):
     try:
         check_in(ORG, 1, _at(8, 3), "08:00", "17:00", TZ, grace_min=5, early_bonus_min=5)
         body = create_app(ORG).test_client().get("/whatif?grace=2&early=5").get_data(as_text=True)
-        assert "What-if" in body and "would change" in body
+        assert "What-if" in body and "would change" in body and "Currently" in body
     finally:
         _clean()
