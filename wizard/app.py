@@ -373,6 +373,23 @@ def _windows_str(windows) -> str:
     return " + ".join("%s–%s" % (w.get("start", "?"), w.get("end", "?")) for w in (windows or [])) or "—"
 
 
+def _parse_staff_line(line: str) -> dict | None:
+    """One bulk-import line → a staff dict. Format: 'Name, role, HH:MM-HH:MM, skill1;skill2' (only name
+    required; the rest optional). Lenient."""
+    parts = [p.strip() for p in line.split(",")]
+    name = (parts[0] if parts else "")[:60]
+    if not name:
+        return None
+    role = (parts[1][:40] or None) if len(parts) > 1 and parts[1] else None
+    windows = []
+    if len(parts) > 2 and "-" in parts[2]:
+        a, b = (x.strip() for x in parts[2].split("-", 1))
+        if _hhmm(a) and _hhmm(b):
+            windows = [{"start": a, "end": b}]
+    skills = [s.strip()[:30] for s in parts[3].split(";") if s.strip()] if len(parts) > 3 and parts[3] else []
+    return {"name": name, "role": role, "shift_windows": windows, "expertises": skills}
+
+
 def render_staff(org_id: str) -> str:
     staff = list_staff(org_id)
     rows = "".join(
@@ -402,6 +419,12 @@ def render_staff(org_id: str) -> str:
         "Shift <input type='time' name='work_start'> to <input type='time' name='work_end'> "
         "&nbsp; split (optional) <input type='time' name='split_start'> to <input type='time' name='split_end'>"
         "<br><br><button type='submit'>+ add staffer</button></form></div>"
+        "<div class='box'><h3>Bulk import</h3>"
+        "<p class='note'>One staffer per line: <code>Name, role, 21:00-06:00, baker;cashier</code> "
+        "(role / hours / skills optional). Overnight + skills supported.</p>"
+        "<form method='post' action='/staff/import'>"
+        "<textarea name='bulk' rows='5' style='width:100%%'></textarea><br>"
+        "<button type='submit'>Import</button></form></div>"
         % rows)
     return _page("Staff", body)
 
@@ -626,6 +649,15 @@ def create_app(org_id: str = "twb") -> Flask:
         sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
         if sid > 0:
             remove_staff(org_id, sid)
+        return redirect("/staff")
+
+    @app.post("/staff/import")
+    def staff_import():
+        for line in (request.form.get("bulk") or "").splitlines():
+            d = _parse_staff_line(line.strip())
+            if d:
+                add_staff_manual(org_id, d["name"], role=d["role"], expertises=d["expertises"],
+                                 shift_windows=d["shift_windows"])
         return redirect("/staff")
 
     @app.get("/staff/edit/<int:sid>")

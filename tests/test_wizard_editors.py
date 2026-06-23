@@ -128,6 +128,20 @@ def test_staff_edit_updates_fields():
         _clean()
 
 
+def test_staff_bulk_import():
+    c = _client()
+    _clean()
+    try:
+        c.post("/staff/import", data={"bulk": "Sok, baker, 21:00-06:00, baker;cashier\nDara, cashier\n\nLin"})
+        staff = list_staff(ORG)
+        assert len(staff) == 3                                          # blank line skipped, 3 imported
+        sok = next(s for s in staff if s["name"] == "Sok")
+        assert sok["role"] == "baker" and sok["expertises"] == ["baker", "cashier"]
+        assert sok["shift_windows"] == [{"start": "21:00", "end": "06:00"}]
+    finally:
+        _clean()
+
+
 def test_staff_split_shift_two_windows():
     c = _client()
     _clean()
