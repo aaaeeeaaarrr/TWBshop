@@ -155,6 +155,42 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, key)
                 )
             """)
+            # Platform STAFF (org-scoped) — the discover-confirm onboarding produces these (docs/ONBOARDING_DESIGN.md).
+            # shift_windows is a LIST of {day,start,end} → split shifts + overnight (end<start) by the interval model.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_staff (
+                    staff_id      BIGSERIAL PRIMARY KEY,
+                    org_id        TEXT NOT NULL,
+                    name          TEXT NOT NULL,
+                    call_name     TEXT,
+                    role          TEXT,
+                    is_senior     BOOLEAN DEFAULT FALSE,
+                    expertises    JSONB DEFAULT '[]',
+                    shift_windows JSONB DEFAULT '[]',
+                    telegram_id   BIGINT,
+                    google_id     TEXT,
+                    day_off       TEXT,
+                    consent       BOOLEAN DEFAULT FALSE,
+                    status        TEXT DEFAULT 'active',
+                    created_at    TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_core_staff_org ON core_staff (org_id, status)")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_staff_tg ON core_staff (org_id, telegram_id) "
+                        "WHERE telegram_id IS NOT NULL")
+            # Onboarding CANDIDATES — people the bot saw in a staff group, awaiting the owner's one-by-one confirm.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_onboarding_candidates (
+                    org_id      TEXT NOT NULL,
+                    tg_user_id  BIGINT NOT NULL,
+                    chat_id     BIGINT,
+                    tg_name     TEXT,
+                    tg_username TEXT,
+                    status      TEXT NOT NULL DEFAULT 'pending',   -- pending | confirmed | skipped
+                    seen_at     TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, tg_user_id)
+                )
+            """)
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:
