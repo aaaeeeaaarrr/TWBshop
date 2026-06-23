@@ -110,7 +110,7 @@ DEFAULTS = {
             },
             "expertise": {                  # minimum SKILL coverage at all times (e.g. always ≥1 baker working)
                 "enabled": False,           # TWB doesn't use coverage-by-skill yet → off
-                "roles": {},                # {skill_name: {"min_required": N}} — set in the staff/expertise screen
+                "roles": [],                # [{"name": skill, "min_required": N}] — set in the Expertise editor
                 "coverage_overrides": [],   # [{role, days:[…], hours:"HH:MM-HH:MM", min}] — raise/lower for special times
             },
             "points": {"enabled": True, "catalogue": dict(_CATALOGUE)},

@@ -89,3 +89,11 @@ def list_staff(org_id: str, status: str = "active") -> list[dict]:
             cur.execute("SELECT * FROM core_staff WHERE org_id=%s AND status=%s ORDER BY staff_id",
                         (org_id, status))
             return [dict(r) for r in cur.fetchall()]
+
+
+def remove_staff(org_id: str, staff_id: int) -> None:
+    """Soft-remove (status='removed') — reversible, keeps history. Scoped to the org."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE core_staff SET status='removed' WHERE org_id=%s AND staff_id=%s",
+                        (org_id, staff_id))

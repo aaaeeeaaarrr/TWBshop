@@ -12,12 +12,14 @@ SECRETS (bot tokens etc.) live in the encrypted org-secret store, are NEVER rend
 and are never written to the readable config. Apply validates server-side + writes ONLY whitelisted knobs.
 Auth + CSRF + encryption-at-rest land in W3 (with public access).
 """
+import re
 from html import escape
 
 from flask import Flask, request, redirect
 
 from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret
+from core.onboarding_flow import list_staff, add_staff_manual, remove_staff
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
 
@@ -134,7 +136,8 @@ def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
-    body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>see the customer view →</a></div>"
+    body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>customer view</a> · <a href='/staff'>staff</a> · "
+            "<a href='/expertise'>expertise</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -225,7 +228,8 @@ def _render_locked_modules(cfg: dict) -> str:
 def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
-    body = ("<div class='nav'><a href='/'>← admin</a></div>"
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/staff'>staff</a> · "
+            "<a href='/expertise'>expertise</a></div>"
             "<h1>⚙️ Configure your system</h1>"
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
@@ -287,6 +291,116 @@ def apply_changes(org_id: str, form) -> dict:
     return over
 
 
+# ── EXPERTISE editor (skills + minimum coverage + day/hour overrides) ─────────
+_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _exp_cfg(org_id: str) -> dict:
+    return get_config(org_id).get("categories", {}).get("attendance", {}).get("expertise", {})
+
+
+def _save_exp(org_id: str, key: str, value) -> None:
+    set_config(org_id, {"categories": {"attendance": {"expertise": {key: value}}}})
+
+
+def _int(v, lo, hi, default=0) -> int:
+    try:
+        return max(lo, min(hi, int(v)))
+    except (TypeError, ValueError):
+        return default
+
+
+def render_expertise(org_id: str) -> str:
+    exp = _exp_cfg(org_id)
+    roles = exp.get("roles") or []
+    overrides = exp.get("coverage_overrides") or []
+    role_rows = "".join(
+        "<li><b>%s</b> — min <b>%d</b> at all times "
+        "<form method='post' action='/expertise/role/del' style='display:inline'>"
+        "<input type='hidden' name='name' value='%s'><button class='btn'>remove</button></form></li>"
+        % (escape(r.get("name", "")), int(r.get("min_required", 0)), escape(r.get("name", "")))
+        for r in roles) or "<li class='note'>No skills yet.</li>"
+    ov_rows = "".join(
+        "<li>%s: min <b>%d</b> on <b>%s</b>%s "
+        "<form method='post' action='/expertise/override/del' style='display:inline'>"
+        "<input type='hidden' name='idx' value='%d'><button class='btn'>remove</button></form></li>"
+        % (escape(o.get("role", "")), int(o.get("min", 0)), escape(", ".join(o.get("days") or []) or "any day"),
+           (" " + escape(o["hours"]) if o.get("hours") else ""), i)
+        for i, o in enumerate(overrides)) or "<li class='note'>No overrides — the minimums above apply all the time.</li>"
+    role_opts = "".join("<option value='%s'>%s</option>" % (escape(r["name"]), escape(r["name"])) for r in roles)
+    day_boxes = " ".join("<label style='font-weight:normal'><input type='checkbox' name='days' value='%s'> %s</label>"
+                         % (d, d) for d in _DAYS)
+    body = (
+        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/staff'>staff</a></div>"
+        "<h1>🧠 Expertise &amp; coverage</h1>"
+        "<p class='note'>Define each skill and how many you need WORKING at all times; add overrides to need "
+        "more (or fewer) on certain days/hours. The bot can use this to approve leave only when coverage holds.</p>"
+        "<div class='box'><h3>Skills &amp; minimums</h3><ul>%s</ul>"
+        "<form method='post' action='/expertise/role/add'>Skill <input type='text' name='name' placeholder='e.g. baker'> "
+        "&nbsp; min at all times <input type='number' name='min' value='1' min='0' max='99' style='width:70px'> "
+        "<button type='submit'>+ add skill</button></form></div>"
+        "<div class='box'><h3>Coverage overrides (need more/fewer at special times)</h3><ul>%s</ul>"
+        "<form method='post' action='/expertise/override/add'>Skill <select name='role'>%s</select> "
+        "&nbsp; min <input type='number' name='min' value='1' min='0' max='99' style='width:70px'> "
+        "&nbsp; days: %s &nbsp; hours <input type='text' name='hours' placeholder='06:00-12:00 (optional)'> "
+        "<button type='submit'>+ add override</button></form></div>"
+        % (role_rows, ov_rows, role_opts or "<option value=''>(add a skill first)</option>", day_boxes))
+    return _page("Expertise & coverage", body)
+
+
+# ── STAFF editor (the platform roster — discover-confirm feeds it; this is the manual/edit view) ──
+def _hhmm(v):
+    v = (v or "").strip()
+    return v if re.fullmatch(r"[0-2]?\d:[0-5]\d", v) else None
+
+
+def _windows_from_form(form) -> list:
+    w = []
+    s, e = _hhmm(form.get("work_start")), _hhmm(form.get("work_end"))
+    if s and e:
+        w.append({"start": s, "end": e})
+    ss, se = _hhmm(form.get("split_start")), _hhmm(form.get("split_end"))
+    if ss and se:
+        w.append({"start": ss, "end": se})
+    return w
+
+
+def _windows_str(windows) -> str:
+    return " + ".join("%s–%s" % (w.get("start", "?"), w.get("end", "?")) for w in (windows or [])) or "—"
+
+
+def render_staff(org_id: str) -> str:
+    staff = list_staff(org_id)
+    rows = "".join(
+        "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+        "<td><form method='post' action='/staff/del' style='display:inline'>"
+        "<input type='hidden' name='staff_id' value='%d'><button class='btn'>remove</button></form></td></tr>"
+        % (escape(s.get("name", "")), escape(s.get("role") or ""), "senior" if s.get("is_senior") else "",
+           escape(", ".join(s.get("expertises") or [])), escape(_windows_str(s.get("shift_windows"))),
+           s["staff_id"])
+        for s in staff) or "<tr><td colspan='6' class='note'>No staff yet.</td></tr>"
+    body = (
+        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
+        "<h1>👥 Staff</h1>"
+        "<p class='note'>Your platform roster. The bot's <b>discover-confirm</b> fills this from your group; you "
+        "can also add/edit by hand here. (TWB's existing live staff migrate here at cut-over.) Overnight is fine "
+        "— a window like 21:00→06:00 is one shift; add a second window for a split shift.</p>"
+        "<div class='box'><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+        "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Name</th><th>Role</th><th></th>"
+        "<th>Skills</th><th>Hours</th><th></th></tr>%s</table></div>"
+        "<div class='box'><h3>Add a staffer</h3><form method='post' action='/staff/add'>"
+        "Name <input type='text' name='name' placeholder='full name'> "
+        "Call-name <input type='text' name='call_name' style='width:120px'> "
+        "Role <input type='text' name='role' style='width:120px'> "
+        "<label style='font-weight:normal'><input type='checkbox' name='is_senior'> senior</label><br><br>"
+        "Skills (comma-separated) <input type='text' name='expertises' placeholder='baker, cashier'><br><br>"
+        "Shift <input type='time' name='work_start'> to <input type='time' name='work_end'> "
+        "&nbsp; split (optional) <input type='time' name='split_start'> to <input type='time' name='split_end'>"
+        "<br><br><button type='submit'>+ add staffer</button></form></div>"
+        % rows)
+    return _page("Staff", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
 
@@ -302,6 +416,68 @@ def create_app(org_id: str = "twb") -> Flask:
     def customer_apply():
         apply_changes(org_id, request.form)
         return redirect("/customer?saved=1")
+
+    @app.get("/expertise")
+    def expertise():
+        return render_expertise(org_id)
+
+    @app.post("/expertise/role/add")
+    def exp_role_add():
+        name = (request.form.get("name") or "").strip()[:40]
+        if name:
+            roles = [r for r in (_exp_cfg(org_id).get("roles") or []) if r.get("name") != name]
+            roles.append({"name": name, "min_required": _int(request.form.get("min"), 0, 99, 1)})
+            _save_exp(org_id, "roles", roles)
+        return redirect("/expertise")
+
+    @app.post("/expertise/role/del")
+    def exp_role_del():
+        name = request.form.get("name")
+        _save_exp(org_id, "roles", [r for r in (_exp_cfg(org_id).get("roles") or []) if r.get("name") != name])
+        return redirect("/expertise")
+
+    @app.post("/expertise/override/add")
+    def exp_ov_add():
+        role = (request.form.get("role") or "").strip()[:40]
+        if role:
+            ov = list(_exp_cfg(org_id).get("coverage_overrides") or [])
+            ov.append({"role": role, "min": _int(request.form.get("min"), 0, 99, 1),
+                       "days": [d for d in request.form.getlist("days") if d in _DAYS],
+                       "hours": (request.form.get("hours") or "").strip()[:20]})
+            _save_exp(org_id, "coverage_overrides", ov)
+        return redirect("/expertise")
+
+    @app.post("/expertise/override/del")
+    def exp_ov_del():
+        ov = list(_exp_cfg(org_id).get("coverage_overrides") or [])
+        idx = _int(request.form.get("idx"), 0, len(ov) - 1, -1)
+        if 0 <= idx < len(ov):
+            ov.pop(idx)
+            _save_exp(org_id, "coverage_overrides", ov)
+        return redirect("/expertise")
+
+    @app.get("/staff")
+    def staff():
+        return render_staff(org_id)
+
+    @app.post("/staff/add")
+    def staff_add():
+        name = (request.form.get("name") or "").strip()[:60]
+        if name:
+            exps = [e.strip()[:30] for e in (request.form.get("expertises") or "").split(",") if e.strip()]
+            add_staff_manual(org_id, name,
+                             call_name=((request.form.get("call_name") or "").strip()[:40] or None),
+                             role=((request.form.get("role") or "").strip()[:40] or None),
+                             is_senior=("is_senior" in request.form), expertises=exps,
+                             shift_windows=_windows_from_form(request.form))
+        return redirect("/staff")
+
+    @app.post("/staff/del")
+    def staff_del():
+        sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
+        if sid > 0:
+            remove_staff(org_id, sid)
+        return redirect("/staff")
 
     @app.get("/healthz")
     def healthz():
