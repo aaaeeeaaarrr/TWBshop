@@ -12,14 +12,15 @@ SECRETS (bot tokens etc.) live in the encrypted org-secret store, are NEVER rend
 and are never written to the readable config. Apply validates server-side + writes ONLY whitelisted knobs.
 Auth + CSRF + encryption-at-rest land in W3 (with public access).
 """
+import os
 import re
 from html import escape
 from urllib.parse import quote
 
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, session
 
 from core.tenant_config import get_config, set_config
-from core.db import set_org_secret, has_org_secret
+from core.db import set_org_secret, has_org_secret, verify_user, user_count
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role)
@@ -577,8 +578,35 @@ def render_bot_setup(org_id: str) -> str:
     return _page("Create your bot", body)
 
 
+# ── AUTH (W3 foundation — OFF by default; localhost+tunnel = owner-only) ───────
+def auth_enabled() -> bool:
+    """Logins are OFF unless WIZARD_AUTH=1 (then it's required for public/multi-tenant). Seed a user with
+    core.db.create_user(org, username, password). ⚠ before PUBLIC exposure also add CSRF + login rate-limit
+    + HTTPS (W3). Until then the wizard stays localhost-only behind the SSH tunnel."""
+    return os.environ.get("WIZARD_AUTH") == "1"
+
+
+def render_login() -> str:
+    err = ("<div class='saved' style='background:#fee2e2;border-color:#fca5a5'>Wrong username or password.</div>"
+           if request.args.get("err") else "")
+    body = ("<h1>🔒 Wizard login</h1>%s<div class='box'><form method='post' action='/login'>"
+            "Username <input type='text' name='username'><br><br>"
+            "Password <input type='password' name='password'><br><br>"
+            "<button type='submit'>Log in</button></form></div>" % err)
+    return _page("Login", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
+    app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
+
+    @app.before_request
+    def _guard():
+        if not auth_enabled() or request.endpoint in ("login", "login_post", "logout", "healthz", "static"):
+            return
+        if user_count(org_id) == 0 or session.get("user"):   # no users yet → don't lock out (seed first)
+            return
+        return redirect("/login")
 
     @app.get("/")
     def index():
@@ -725,6 +753,23 @@ def create_app(org_id: str = "twb") -> Flask:
             set_config(org_id, {"connections": {"telegram": {"bot_username": res["username"]}}})
             return redirect("/bot?ok=" + quote(res["username"]))
         return redirect("/bot?err=" + quote(res.get("error", "could not connect")[:120]))
+
+    @app.get("/login")
+    def login():
+        return render_login()
+
+    @app.post("/login")
+    def login_post():
+        u = (request.form.get("username") or "").strip()
+        if verify_user(org_id, u, request.form.get("password") or ""):
+            session["user"] = u
+            return redirect("/")
+        return redirect("/login?err=1")
+
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        return redirect("/login")
 
     @app.get("/healthz")
     def healthz():

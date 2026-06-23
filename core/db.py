@@ -3,6 +3,9 @@
 Reuses shared.database._db (same env-guarded Postgres pool) during the build/shadow phase; the tables
 are NEW and additive, so they coexist with the live system and touch nothing it owns. Self-migrating.
 """
+import base64
+import hashlib
+import hmac
 import logging
 import os
 
@@ -229,6 +232,17 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, chat_id)
                 )
             """)
+            # WIZARD USERS — per-org logins (the W3 auth foundation). Passwords are HASHED, never plaintext.
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_org_users (
+                    org_id        TEXT NOT NULL,
+                    username      TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role          TEXT DEFAULT 'owner',
+                    created_at    TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, username)
+                )
+            """)
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:
@@ -293,3 +307,54 @@ def clear_org_secret(org_id: str, key: str) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM core_org_secrets WHERE org_id=%s AND key=%s", (org_id, key))
+
+
+# ── WIZARD USERS (per-org logins) — passwords HASHED (pbkdf2-sha256), never plaintext ──────────────────
+# NOTE: we hash with hashlib (NOT werkzeug) on purpose — the repo's secrets.py shadows the stdlib `secrets`
+# module that werkzeug's hashing imports, which would crash it. os.urandom + pbkdf2 + hmac avoid that.
+def _hash_pw(password: str, salt: bytes = None) -> str:
+    salt = salt or os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
+    return "pbkdf2_sha256$200000$%s$%s" % (base64.b64encode(salt).decode(), base64.b64encode(dk).decode())
+
+
+def _check_pw(stored: str, password: str) -> bool:
+    try:
+        _algo, iters, salt_b64, dk_b64 = stored.split("$")
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode(), base64.b64decode(salt_b64), int(iters))
+        return hmac.compare_digest(base64.b64decode(dk_b64), dk)   # constant-time
+    except Exception:
+        return False
+
+
+def create_user(org_id: str, username: str, password: str, role: str = "owner") -> bool:
+    """Create/replace a wizard login. Returns False on empty input."""
+    if not username or not password:
+        return False
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO core_org_users (org_id, username, password_hash, role)
+                           VALUES (%s,%s,%s,%s)
+                           ON CONFLICT (org_id, username) DO UPDATE
+                             SET password_hash=EXCLUDED.password_hash, role=EXCLUDED.role""",
+                        (org_id, username, _hash_pw(password), role))
+    return True
+
+
+def verify_user(org_id: str, username: str, password: str) -> str | None:
+    """Return the user's role if username+password match, else None."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash, role FROM core_org_users WHERE org_id=%s AND username=%s",
+                        (org_id, username))
+            r = cur.fetchone()
+    if not r:
+        return None
+    return r["role"] if _check_pw(r["password_hash"], password or "") else None
+
+
+def user_count(org_id: str) -> int:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) n FROM core_org_users WHERE org_id=%s", (org_id,))
+            return cur.fetchone()["n"]
