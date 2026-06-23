@@ -136,6 +136,19 @@ def test_stock_domain_shown_and_editable():
         _reset(org)
 
 
+def test_customer_view_shows_health_warning():
+    from core.tenant_config import set_config
+    org = "twbtest_hb"
+    _reset(org)
+    try:
+        set_config(org, {"categories": {"attendance": {"expertise": {"enabled": True, "roles": []}}}})
+        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        assert "worth checking" in body and "Expertise" in body          # customer sees their own warning
+        assert "SHADOW" not in body and "PLANNED" not in body            # still no internal badge leak
+    finally:
+        _reset(org)
+
+
 def test_pos_and_hr_domains_shown_and_editable():
     org = "twbtest_dom"
     _reset(org)

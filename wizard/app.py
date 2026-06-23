@@ -268,6 +268,16 @@ def _render_locked_modules(cfg: dict) -> str:
     return "<ul>%s</ul>" % "".join(rows)
 
 
+def _health_banner(org_id: str) -> str:
+    """Show the CUSTOMER their own config warnings (warn-level only) at the top of their view."""
+    warns = [m for lvl, m in config_health(org_id) if lvl == "warn"]
+    if not warns:
+        return ""
+    items = "".join("<li>%s</li>" % escape(m) for m in warns)
+    return ("<div class='saved' style='background:#fef3c7;border-color:#fcd34d'>"
+            "<b>⚠️ A few things worth checking:</b><ul>%s</ul></div>" % items)
+
+
 def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
@@ -276,7 +286,7 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<h1>⚙️ Configure your system</h1>"
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
-            "those when we switch them over). Tokens are write-only — paste to set, never shown back.</p>%s"
+            "those when we switch them over). Tokens are write-only — paste to set, never shown back.</p>%s%s"
             "<form method='post' action='/customer/apply'>%s"
             "<h2>Setup &amp; staff</h2><div class='box'>"
             "<p class='note'>How your system gets set up. The easy path: we guide you to create a bot, you "
@@ -295,7 +305,8 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<a href='/audit' class='btn'>📝 Change history</a></div></form>"
             "<h2>Approvals</h2><div class='box'>%s</div>"
             "<h2>Add more to your system</h2><div class='box'>%s</div>"
-            % (saved_banner, _SCOPE_FIELD, _render_groups(cfg, schema.ONBOARDING_GROUPS, org_id),
+            % (saved_banner, _health_banner(org_id), _SCOPE_FIELD,
+               _render_groups(cfg, schema.ONBOARDING_GROUPS, org_id),
                _render_groups(cfg, schema.ATTENDANCE_GROUPS, org_id),
                _render_groups(cfg, schema.ACCOUNTANT_GROUPS, org_id),
                _render_groups(cfg, schema.STOCK_GROUPS, org_id),
@@ -476,7 +487,8 @@ def render_staff(org_id: str) -> str:
         % (escape(s.get("name", "")), escape(s.get("role") or ""), "senior" if s.get("is_senior") else "",
            escape(", ".join(s.get("expertises") or [])), escape(_windows_str(s.get("shift_windows"))),
            s["staff_id"], s["staff_id"], s["staff_id"])
-        for s in staff) or "<tr><td colspan='6' class='note'>No staff yet.</td></tr>"
+        for s in staff) or ("<tr><td colspan='6' class='note'>No staff yet — the bot can <b>discover</b> them "
+                            "from your staff group (it stages whoever posts), or add one below / paste a list.</td></tr>")
     body = (
         "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
         "<h1>👥 Staff</h1>"

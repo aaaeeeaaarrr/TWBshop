@@ -58,6 +58,13 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   done" signal for onboarding (not just "4 of 4 checkboxes" — it also means the config is sane).
 - **Readable config diff on export** `[ship]` — the export page shows "default → your value" per customized
   knob in plain English (not just JSON), so a customer sees exactly what they've changed at a glance.
+- **Customer sees their OWN config health** `[ship]` — warn-level issues now show as a banner at the top of
+  the customer view (not just the admin `/health` page), so a tenant self-corrects. Health-check is now
+  customer-facing — more valuable wired into the place they actually edit.
+- **Customer view links to ADMIN + shares tool navs** `[gotcha/parked]` — the `/customer` view has a
+  `← admin` link and the what-if/audit/health pages carry admin-style navs. Harmless while owner-only on
+  localhost, but for a REAL multi-tenant customer the customer surface must expose NO admin links / internal
+  pages. Tie to auth-roles (W3): serve customer-appropriate navs when authed as a customer. PARKED (W3).
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
