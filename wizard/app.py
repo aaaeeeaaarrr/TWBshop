@@ -23,7 +23,8 @@ from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret, verify_user, user_count
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
-                                  list_candidates, group_id_for_role)
+                                  list_candidates, group_id_for_role,
+                                  ensure_checkin_token, staff_by_checkin_token)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
 
@@ -399,12 +400,12 @@ def render_staff(org_id: str) -> str:
     staff = list_staff(org_id)
     rows = "".join(
         "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-        "<td><a href='/staff/edit/%d' class='btn'>edit</a> "
+        "<td><a href='/staff/edit/%d' class='btn'>edit</a> <a href='/staff/link/%d' class='btn'>link</a> "
         "<form method='post' action='/staff/del' style='display:inline'>"
         "<input type='hidden' name='staff_id' value='%d'><button class='btn'>remove</button></form></td></tr>"
         % (escape(s.get("name", "")), escape(s.get("role") or ""), "senior" if s.get("is_senior") else "",
            escape(", ".join(s.get("expertises") or [])), escape(_windows_str(s.get("shift_windows"))),
-           s["staff_id"], s["staff_id"])
+           s["staff_id"], s["staff_id"], s["staff_id"])
         for s in staff) or "<tr><td colspan='6' class='note'>No staff yet.</td></tr>"
     body = (
         "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
@@ -596,14 +597,77 @@ def render_login() -> str:
     return _page("Login", body)
 
 
+# ── WEB CHECK-IN channel (browser check-in via a per-staff link → core; platform, not TWB live) ──
+def render_staff_link(org_id: str, staff_id: int) -> str:
+    s = get_staff(org_id, staff_id)
+    if not s:
+        return _page("Link", "<div class='nav'><a href='/staff'>← staff</a></div><p>Not found.</p>")
+    url = "%s/checkin/%s" % (request.host_url.rstrip("/"), ensure_checkin_token(org_id, staff_id))
+    body = ("<div class='nav'><a href='/staff'>← staff</a></div><h1>🔗 Check-in link — %s</h1>"
+            "<div class='box'><p>Share this private link with <b>%s</b>; opening it on their phone checks "
+            "them in (browser channel — no app, no Telegram needed):</p><p><code>%s</code></p>"
+            "<p class='note'>The link is their identity — keep it private. Records to the platform, never "
+            "TWB's live attendance.</p></div>"
+            % (escape(s.get("name", "")), escape(s.get("name", "")), escape(url)))
+    return _page("Check-in link", body)
+
+
+def _do_web_checkin(staff: dict, lat, lon) -> dict:
+    from datetime import datetime, timezone
+    from core.attendance import check_in as core_check_in
+    org = staff["org_id"]
+    w = (staff.get("shift_windows") or [{}])[0]
+    if not w.get("start") or not w.get("end"):
+        return {"ok": False, "error": "no shift set for you yet — your manager sets your hours"}
+    v = get_config(org).get("categories", {}).get("attendance", {}).get("verdict", {})
+    try:
+        res = core_check_in(org, staff["staff_id"], datetime.now(timezone.utc), w["start"], w["end"],
+                            "Asia/Phnom_Penh", location=({"lat": lat, "lon": lon} if lat else None),
+                            grace_min=int(v.get("grace_min", 5)), early_bonus_min=int(v.get("early_bonus_min", 5)))
+        res["ok"] = res.get("bound", False)
+        return res
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+
+
+def render_checkin(token: str, result: dict = None) -> str:
+    s = staff_by_checkin_token(token)
+    if not s:
+        return _page("Check in", "<h1>Check in</h1><div class='box'>This link isn't valid — ask your manager "
+                     "for your check-in link.</div>")
+    who = escape(s.get("call_name") or s.get("name", ""))
+    if result is not None:
+        if result.get("ok"):
+            st = result.get("state", "")
+            msg = {"on_time": "✅ Checked in — on time!",
+                   "late": "⚠️ Checked in — %d min late." % result.get("minutes_late", 0),
+                   "early": "✅ Checked in — %d min early." % result.get("minutes_early", 0)}.get(st, "✅ Checked in.")
+            if result.get("duplicate"):
+                msg = "You're already checked in for this shift."
+        else:
+            msg = "Couldn't check you in: %s" % result.get("error", "please try again")
+        return _page("Check in", "<h1>Hi %s</h1><div class='box'><h2>%s</h2></div>" % (who, escape(msg)))
+    body = ("<h1>Hi %s 👋</h1><div class='box'><p>Ready to check in?</p>"
+            "<button onclick='ci()' style='font-size:18px;padding:12px 24px'>📍 Check in now</button>"
+            "<form id='f' method='post' action='/checkin/%s'><input type='hidden' name='lat'>"
+            "<input type='hidden' name='lon'></form>"
+            "<p class='note'>We use your location to confirm you're at work.</p></div>"
+            "<script>function ci(){var f=document.getElementById('f');if(!navigator.geolocation){f.submit();return;}"
+            "navigator.geolocation.getCurrentPosition(function(p){f.lat.value=p.coords.latitude;"
+            "f.lon.value=p.coords.longitude;f.submit();},function(){f.submit();});}</script>"
+            % (who, escape(token)))
+    return _page("Check in", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
 
     @app.before_request
     def _guard():
-        if not auth_enabled() or request.endpoint in ("login", "login_post", "logout", "healthz", "static"):
-            return
+        if not auth_enabled() or request.endpoint in ("login", "login_post", "logout", "healthz", "static",
+                                                       "checkin", "checkin_post"):
+            return       # staff check in via their token link, not a wizard login
         if user_count(org_id) == 0 or session.get("user"):   # no users yet → don't lock out (seed first)
             return
         return redirect("/login")
@@ -696,6 +760,10 @@ def create_app(org_id: str = "twb") -> Flask:
     def staff_edit(sid):
         return render_staff_edit(org_id, sid)
 
+    @app.get("/staff/link/<int:sid>")
+    def staff_link(sid):
+        return render_staff_link(org_id, sid)
+
     @app.post("/staff/update")
     def staff_update():
         sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
@@ -770,6 +838,17 @@ def create_app(org_id: str = "twb") -> Flask:
     def logout():
         session.clear()
         return redirect("/login")
+
+    @app.get("/checkin/<token>")
+    def checkin(token):
+        return render_checkin(token)
+
+    @app.post("/checkin/<token>")
+    def checkin_post(token):
+        s = staff_by_checkin_token(token)
+        if not s:
+            return render_checkin(token)
+        return render_checkin(token, result=_do_web_checkin(s, request.form.get("lat"), request.form.get("lon")))
 
     @app.get("/healthz")
     def healthz():

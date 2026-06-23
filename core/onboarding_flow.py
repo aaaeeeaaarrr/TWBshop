@@ -7,6 +7,7 @@ acts on NOTHING live — it builds a NEW tenant's roster (TWB keeps its own staf
 the Telegram UI + guided BotFather are the adapter, wired next.
 """
 import json
+import uuid
 
 from shared.database import _db
 
@@ -110,6 +111,35 @@ def remove_staff(org_id: str, staff_id: int) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE core_staff SET status='removed' WHERE org_id=%s AND staff_id=%s",
                         (org_id, staff_id))
+
+
+# ── WEB check-in link (token = the staffer's identity for the browser channel) ────────────────────────
+def ensure_checkin_token(org_id: str, staff_id: int) -> str | None:
+    """Get (or mint) a staffer's web check-in token — the secret link they open to check in. Idempotent."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT checkin_token FROM core_staff WHERE org_id=%s AND staff_id=%s",
+                        (org_id, staff_id))
+            r = cur.fetchone()
+            if not r:
+                return None
+            if r["checkin_token"]:
+                return r["checkin_token"]
+            tok = uuid.uuid4().hex
+            cur.execute("UPDATE core_staff SET checkin_token=%s WHERE org_id=%s AND staff_id=%s",
+                        (tok, org_id, staff_id))
+            return tok
+
+
+def staff_by_checkin_token(token: str) -> dict | None:
+    """The active staffer behind a web check-in link (the token alone identifies them + their org)."""
+    if not token:
+        return None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM core_staff WHERE checkin_token=%s AND status='active'", (token,))
+            r = cur.fetchone()
+            return dict(r) if r else None
 
 
 def get_staff(org_id: str, staff_id: int) -> dict | None:

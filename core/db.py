@@ -207,6 +207,9 @@ def init_core_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_staff_org ON core_staff (org_id, status)")
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_staff_tg ON core_staff (org_id, telegram_id) "
                         "WHERE telegram_id IS NOT NULL")
+            cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS checkin_token TEXT")   # web check-in link
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_staff_token ON core_staff (checkin_token) "
+                        "WHERE checkin_token IS NOT NULL")
             # Onboarding CANDIDATES — people the bot saw in a staff group, awaiting the owner's one-by-one confirm.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_onboarding_candidates (
