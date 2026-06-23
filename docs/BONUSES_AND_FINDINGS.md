@@ -28,8 +28,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   web check-in token. Minimise typing, maximise tap.
 - **The web channel proves channel-agnostic OPERATION** `[ship]` — staff check in/out via a browser link, same
   brain as Telegram + the replay. Not just onboarding — daily use, any channel.
-- **Two domains in one wizard** `[ship]` — attendance (live-mirrored) + accountant (modelled); proves the
-  "total business platform," not "an attendance app."
+- **THREE domains in one wizard** `[ship]` — attendance (live-mirrored) + accountant + **stock** (modelled);
+  the "total business platform" taking shape, not "an attendance app." Adding a domain = a config block +
+  a schema group + a customer section (cheap to extend → POS/HR/etc. next).
 - **Per-customer shadow + test-mode as a de-risked go-live** `[idea/sell]` — each tenant validates before cutover.
 
 ### 🔍 Findings
@@ -53,6 +54,11 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   activates when `ORG_SECRET_KEY` is set. Before public: also CSRF + HTTPS + login rate-limit (W3).
 - **Accountant landmines F5/F6 FIXED** (atomic claim-by-construction); **B2B F2/F3/F4 = a ready plan**
   (HIGH-RISK money, with owner at re-enable) `[ship/decision]`.
+- **Adding a domain to the wizard is now a known, cheap recipe** `[ship]` — config block + schema descriptors
+  + a group + a customer section + 1 test (~20 min). Stock followed accountant 1:1. So POS/HR/marketing/
+  delivery/rostering/CRM are quick to model when wanted.
+- **Stock supplier price-compare = a PRIMARY goal** `[decision]` — modelled as a config knob
+  (`supplier_price_compare`); keep per-item price + a canonical item path open (no vendor-only shortcut).
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·

@@ -123,6 +123,18 @@ def test_accountant_domain_shown_and_editable():
         _reset(org)
 
 
+def test_stock_domain_shown_and_editable():
+    org = "twbtest_stk"
+    _reset(org)
+    try:
+        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        assert "Stock" in body and "Compare supplier prices" in body and "How stock is counted" in body
+        apply_changes(org, {"categories.stock.count_method": "barcode"})   # PLANNED → editable
+        assert _get_path(get_config(org), "categories.stock.count_method") == "barcode"
+    finally:
+        _reset(org)
+
+
 def test_apply_rejects_bad_enum_and_clamps_int():
     org = "twbtest_wiz3"
     _reset(org)

@@ -228,6 +228,23 @@ DESCRIPTORS = {
     "categories.accountant.food_money.rate_per_shift_hour_riel": {"label": "Food rate (៛ per shift hour)",
         "type": "int", "min": 0, "max": 10000, "unit": "riel",
         "help": "Riel per SCHEDULED shift hour (TWB: 500), ÷4000 → USD, rounded half-up."},
+    # ── Stock (built features modelled — not live yet) ──
+    "categories.stock.enabled": {"label": "Stock module", "type": "bool",
+        "help": "Inventory counts, par/reorder levels, reorder suggestions, supplier price compare.",
+        "true": "ON.", "false": "OFF."},
+    "categories.stock.count_method": {"label": "How stock is counted", "type": "enum",
+        "help": "How staff record stock levels.",
+        "options": [("appsheet", "AppSheet form", "A mobile form (what TWB uses today)."),
+                    ("manual", "Manual entry", "Type the counts in."),
+                    ("barcode", "Barcode scan", "Scan items."),
+                    ("photo", "Photo of the sheet", "Snap the stock sheet; the AI reads it.")]},
+    "categories.stock.par_levels": {"label": "Par / reorder levels", "type": "bool",
+        "help": "Track a target level per item so you know when to reorder.", "true": "ON.", "false": "OFF."},
+    "categories.stock.reorder_suggestions": {"label": "Reorder suggestions", "type": "bool",
+        "help": "Suggest what to reorder when an item drops below its par level.", "true": "ON.", "false": "OFF."},
+    "categories.stock.supplier_price_compare": {"label": "Compare supplier prices", "type": "bool",
+        "help": "Track each item's price across suppliers so you buy from the cheapest.",
+        "true": "ON (a primary goal).", "false": "OFF."},
 }
 
 # Approval-row fields — described ONCE, shown per request type (al/sick/ot/swap/special_leave/dayoff_move).
@@ -327,6 +344,11 @@ ACCOUNTANT_GROUPS = [
                     "categories.accountant.payables.terms_days_default",
                     "categories.accountant.food_money.enabled",
                     "categories.accountant.food_money.rate_per_shift_hour_riel"]),
+]
+
+STOCK_GROUPS = [
+    ("Stock", ["categories.stock.enabled", "categories.stock.count_method", "categories.stock.par_levels",
+               "categories.stock.reorder_suggestions", "categories.stock.supplier_price_compare"]),
 ]
 
 

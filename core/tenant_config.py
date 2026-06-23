@@ -146,7 +146,14 @@ DEFAULTS = {
                 "rounding": "half_up",
             },
         },
-        "stock": {"enabled": False},
+        "stock": {                            # stock/inventory — modelled as config (INERT; ported later)
+            "enabled": False,
+            "count_method": "appsheet",       # appsheet | manual | barcode | photo
+            "par_levels": True,               # track par/reorder levels per item
+            "reorder_suggestions": True,      # suggest a reorder when an item drops below par
+            "supplier_price_compare": True,   # compare the same item's price across suppliers (a PRIMARY goal)
+            "low_stock_alert": True,          # alert when stock is low
+        },
         "pos": {"enabled": False},
         "hr_payroll": {"enabled": False},
     },
