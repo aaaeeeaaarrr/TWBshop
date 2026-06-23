@@ -63,6 +63,11 @@ def init_accounting_db() -> None:
             for _col, _typ in (("needs_review", "BOOLEAN DEFAULT FALSE"), ("created_by", "BIGINT"),
                                ("kind", "TEXT DEFAULT 'supplier'"), ("channel_kind", "TEXT")):
                 cur.execute(f"ALTER TABLE acc_vendors ADD COLUMN IF NOT EXISTS {_col} {_typ}")
+            # F6 (bedrock audit): make duplicate-vendor-name a STRUCTURAL impossibility — a partial UNIQUE on
+            # the ACTIVE vendors' lower(name). propose_vendor then resolves a race to the existing row instead
+            # of minting a duplicate. (Inactive/merged names may repeat, so the index is partial on `active`.)
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_acc_vendors_name_active "
+                        "ON acc_vendors (lower(name)) WHERE active")
 
             # ── acc_receipts — the spine: numbered AP rows (design §D2) ──
             cur.execute("""
@@ -333,9 +338,17 @@ def propose_vendor(name: str, created_by: int | None = None) -> int:
         return 0
     with _db() as conn:
         with conn.cursor() as cur:
+            # F6: atomic claim-by-UNIQUE — a concurrent duplicate loses the race and resolves to the existing
+            # active vendor (no duplicate minted), instead of the old check-then-insert.
             cur.execute("INSERT INTO acc_vendors (name, created_by, needs_review) VALUES (%s,%s,TRUE) "
-                        "RETURNING id", (nm, created_by))
-            return cur.fetchone()["id"]
+                        "ON CONFLICT (lower(name)) WHERE active DO NOTHING RETURNING id", (nm, created_by))
+            r = cur.fetchone()
+            if r:
+                return r["id"]
+            cur.execute("SELECT id FROM acc_vendors WHERE lower(name)=lower(%s) AND active "
+                        "ORDER BY id LIMIT 1", (nm,))
+            row = cur.fetchone()
+            return row["id"] if row else 0
 
 
 def confirm_vendor(vendor_id: int) -> None:
@@ -420,12 +433,14 @@ def merge_vendors(dup_id, canonical_id, by=None) -> dict:
         return {"ok": False, "reason": "same vendor"}
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, name, tg_group_id, aliases FROM acc_vendors WHERE id IN (%s,%s)",
+            cur.execute("SELECT id, name, tg_group_id, aliases, active FROM acc_vendors WHERE id IN (%s,%s)",
                         (dup_id, canonical_id))
             rows = {r["id"]: r for r in cur.fetchall()}
             if dup_id not in rows or canonical_id not in rows:
                 return {"ok": False, "reason": "vendor not found"}
             dup, canon = rows[dup_id], rows[canonical_id]
+            if not dup["active"] or not canon["active"]:   # F5: never re-merge an already-merged/inactive vendor
+                return {"ok": False, "reason": "dup or canonical is inactive (already merged)"}
             cur.execute("UPDATE acc_receipts SET vendor_id=%s WHERE vendor_id=%s RETURNING id",
                         (canonical_id, dup_id))
             receipt_ids = [r["id"] for r in cur.fetchall()]
@@ -478,16 +493,27 @@ def undo_vendor_merge(merge_id) -> dict:
                 return {"ok": False, "reason": "not found or already undone"}
             rids, pids, cids = (_parse_json_list(m["receipt_ids"]), _parse_json_list(m["payment_ids"]),
                                 _parse_json_list(m["candidate_ids"]))
-            dup_id = m["dup_id"]
+            dup_id, canon = m["dup_id"], m["canonical_id"]
+            # F5: only move back rows that are STILL on the canonical — ones a LATER merge moved onward stay
+            # with their newest owner (never strand them on the reactivated dup).
             if rids:
-                cur.execute("UPDATE acc_receipts SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, rids))
+                cur.execute("UPDATE acc_receipts SET vendor_id=%s WHERE id = ANY(%s) AND vendor_id=%s",
+                            (dup_id, rids, canon))
             if pids:
-                cur.execute("UPDATE acc_payments SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, pids))
+                cur.execute("UPDATE acc_payments SET vendor_id=%s WHERE id = ANY(%s) AND vendor_id=%s",
+                            (dup_id, pids, canon))
             if cids:
-                cur.execute("UPDATE acc_receipt_candidates SET vendor_id=%s WHERE id = ANY(%s)", (dup_id, cids))
-            cur.execute("UPDATE acc_vendors SET active=TRUE WHERE id=%s", (dup_id,))
+                cur.execute("UPDATE acc_receipt_candidates SET vendor_id=%s WHERE id = ANY(%s) AND vendor_id=%s",
+                            (dup_id, cids, canon))
+            # reactivate the dup ONLY if it won't collide with an active same-name vendor (the F6 invariant)
+            cur.execute("UPDATE acc_vendors SET active=TRUE WHERE id=%s AND NOT EXISTS "
+                        "(SELECT 1 FROM acc_vendors v WHERE v.active AND v.id<>%s "
+                        " AND lower(v.name)=(SELECT lower(name) FROM acc_vendors WHERE id=%s))",
+                        (dup_id, dup_id, dup_id))
+            reactivated = cur.rowcount == 1
             cur.execute("UPDATE acc_vendor_merges SET undone=TRUE WHERE id=%s", (merge_id,))
-    return {"ok": True, "receipts": len(rids), "payments": len(pids), "candidates": len(cids), "dup_id": dup_id}
+    return {"ok": True, "receipts": len(rids), "payments": len(pids), "candidates": len(cids),
+            "dup_id": dup_id, "reactivated": reactivated}
 
 
 def set_vendor_kind(vendor_id: int, kind: str) -> None:

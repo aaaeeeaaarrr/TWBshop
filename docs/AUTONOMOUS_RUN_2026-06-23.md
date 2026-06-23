@@ -35,4 +35,16 @@ real events the shadow has compared, the agree-rate, and READY/gathering — plu
 wired LIVE vs still SHADOW. Read-only (reads `shadow_comparisons` via `build_digest`). So you open `/` and
 see exactly how close each vertical is to safe cut-over. (Customer view unaffected — no internals leak.)
 
+### 3 ✅ Accountant landmines F5/F6 closed (inert; bedrock audit) — atomic-claim-by-construction
+**F6** (duplicate vendor race): `acc_vendors` now has a partial UNIQUE on `lower(name) WHERE active`, and
+`propose_vendor` does `INSERT … ON CONFLICT DO NOTHING` then resolves to the existing active vendor — a
+concurrent duplicate can't be minted. **F5** (re-merge / strand): `merge_vendors` refuses an already-
+merged/inactive dup or canonical; `undo_vendor_merge` only moves back rows STILL on the canonical (rows a
+LATER merge moved onward stay put — never stranded on the reactivated dup) and skips reactivation if it
+would collide with an active same name. 3 tests; existing vendor/merge suites still green. **No deploy**
+(accountant is inert — not a running service). F7 (P2 matcher stub) stays a build-time note: build it
+claim-first, don't repeat F2/F3.
+(Item 2 — the cut-over dashboard — deployed: tag `session-53d-wizard-dashboard-20260623`, wizard restarted,
+bots untouched.)
+
 _(more appended as each item completes)_
