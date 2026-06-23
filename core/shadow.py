@@ -39,6 +39,25 @@ def compare_checkin(org_id, staff_id, live_state, live_minutes_late, live_minute
     return agree
 
 
+def compare_settle(org_id, staff_id, live: dict, new: dict, note="", source="live") -> bool:
+    """Compare core's checkout-SETTLE outcome to live's on the SAME real redefine checkout. agree =
+    (ot_banked AND pb_cleared) match — that's the money split. `worked` is recorded for visibility but
+    not part of agree (a ±1 worked-rounding nuance is not a settle-logic mismatch). `live`/`new` are
+    {worked, ot_banked, pb_cleared[, reason]}. Records either way; returns True on agree."""
+    agree = (int(live.get("ot_banked", -1)) == int(new.get("ot_banked", -2))
+             and int(live.get("pb_cleared", -1)) == int(new.get("pb_cleared", -2)))
+    _record(org_id, staff_id, "settle", agree, live, new,
+            note=note or ("" if agree else "settle MISMATCH new=%s live=%s" % (new, live)), source=source)
+    return agree
+
+
+def record_settle_info(org_id, staff_id, live: dict, note: str, source="live") -> None:
+    """Record a settle observation that core does NOT yet model (e.g. a payback-slot's ext-worked) —
+    logged as AGREE so it never raises a false cut-over alarm, but kept for visibility/coverage."""
+    _record(org_id, staff_id, "settle", True, live, {"modeled": False, "note": note},
+            note=note, source=source)
+
+
 def mark_reconciled(ids) -> int:
     """Mark mismatches as understood/fixed/accepted so they drop out of the carryover."""
     ids = list(ids)
@@ -51,63 +70,82 @@ def mark_reconciled(ids) -> int:
 
 
 # ── digest analysis ─────────────────────────────────────────────────────────
-def _classify(live: dict, new: dict) -> tuple:
-    """Group key + a proposed fix for a mismatch pattern (so the report is actionable, not just alarms)."""
+def _classify_checkin(live: dict, new: dict) -> tuple:
+    """Group key + a proposed fix for a CHECK-IN mismatch (actionable, not just an alarm)."""
     if not new or new.get("bound") is False:
-        return ("no-bind", "new core didn't bind a shift — a no-show / schedule gap, or a missing "
-                            "materialized shift. Fix: confirm the shift exists for that instant.")
+        return ("checkin/no-bind", "new core didn't bind a shift — a no-show / schedule gap, or a missing "
+                "materialized shift. Fix: confirm the shift exists for that instant.")
     ls, ns = live.get("state"), new.get("state")
     if ls == ns:
-        return ("minutes:%s" % ls,
-                "same verdict (%s) but different minutes — live likely applies a GRACE or a REDEFINE "
-                "(payback/OT slot) the core slice doesn't model yet. Fix: port grace + redefine-aware "
-                "start into core.check_in (EXPECTED until ported)." % ls)
-    return ("state:%s->%s" % (ls, ns),
-            "verdict differs (live=%s new=%s) — usually a redefine/sick-grace day the core slice doesn't "
-            "model yet. Fix: port the redefine/grace rules; if neither applies, a real logic bug to chase."
-            % (ls, ns))
+        return ("checkin/minutes:%s" % ls,
+                "same verdict (%s) but different minutes — live likely applies a GRACE or a REDEFINE the "
+                "core slice doesn't model yet. Fix: port grace + redefine-aware start (EXPECTED until ported)." % ls)
+    return ("checkin/state:%s->%s" % (ls, ns),
+            "verdict differs (live=%s new=%s) — usually a redefine/sick-grace day. Fix: port the "
+            "redefine/grace rules; if neither applies, a real logic bug to chase." % (ls, ns))
+
+
+def _classify_settle(live: dict, new: dict) -> tuple:
+    """Group key + a proposed fix for a SETTLE mismatch (the money split: OT banked / payback cleared)."""
+    return ("settle/%s" % (live.get("reason") or "redefine"),
+            "core settle (ot_banked/pb_cleared) differs from live on a real redefine checkout — check the "
+            "worked / normal_len / payback inputs and the OT→payback-first→bank split (core.settle vs gm_bot.ot).")
+
+
+def _classify_for(kind: str, live: dict, new: dict) -> tuple:
+    return _classify_settle(live, new) if kind == "settle" else _classify_checkin(live, new)
 
 
 def build_digest(org_id) -> dict:
-    """Nightly digest. The LIVE real-time stream is the READINESS signal — its unresolved mismatches are
-    carried over (a missed night combines into the next) with proposed fixes. The REPLAY backfill is a
-    one-time GAP-ANALYSIS, summarised separately so launch-week backfill noise never drags the live read.
-    Plus COVERAGE (which verdict types have been seen+agreed) and a cut-over readiness verdict."""
+    """Nightly digest. The LIVE real-time stream is the READINESS signal — unresolved mismatches are
+    carried over (a missed night combines into the next) with proposed fixes, now grouped PER ACTION
+    TYPE (check-in, settle, …). The REPLAY backfill is a one-time GAP-ANALYSIS summarised separately.
+    Plus check-in COVERAGE (verdict types seen+agreed) and a cut-over readiness verdict (gated on the
+    proven high-volume vertical = check-in; other verticals report their own agree-rate as they fill)."""
     with _db() as conn:
         with conn.cursor() as cur:
-            def _stat(src, day=False):
-                q = ("SELECT COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
-                     "WHERE org_id=%s AND source=%s")
-                if day:
-                    q += " AND at >= NOW() - INTERVAL '24 hours'"
-                cur.execute(q, (org_id, src))
-                return cur.fetchone()
-            lt, la, ra = _stat("live", True), _stat("live"), _stat("replay")
-            cur.execute("""SELECT id, staff_id, live, new FROM shadow_comparisons
+            cur.execute("""SELECT kind, COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok,
+                                  COUNT(*) FILTER (WHERE at >= NOW() - INTERVAL '24 hours') n_today
+                           FROM shadow_comparisons WHERE org_id=%s AND source='live'
+                           GROUP BY kind ORDER BY kind""", (org_id,))
+            kinds = [dict(r) for r in cur.fetchall()]
+            cur.execute("SELECT COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
+                        "WHERE org_id=%s AND source='replay'", (org_id,))
+            ra = cur.fetchone()
+            cur.execute("""SELECT id, kind, staff_id, live, new FROM shadow_comparisons
                            WHERE org_id=%s AND source='live' AND agree=FALSE AND reconciled=FALSE
                            ORDER BY id""", (org_id,))
             open_rows = [dict(r) for r in cur.fetchall()]
             cur.execute("SELECT DISTINCT new->>'state' s FROM shadow_comparisons "
-                        "WHERE org_id=%s AND source='live' AND agree", (org_id,))
+                        "WHERE org_id=%s AND source='live' AND agree AND kind='checkin'", (org_id,))
             covered = sorted(r["s"] for r in cur.fetchall() if r["s"])
     groups = {}
     for r in open_rows:
         live = r["live"] if isinstance(r["live"], dict) else json.loads(r["live"] or "{}")
         new = r["new"] if isinstance(r["new"], dict) else json.loads(r["new"] or "{}")
-        key, fix = _classify(live, new)
+        key, fix = _classify_for(r["kind"], live, new)
         g = groups.setdefault(key, {"count": 0, "fix": fix, "example": (live, new)})
         g["count"] += 1
-    live_rate = (100.0 * la["ok"] / la["n"]) if la["n"] else 0.0
+    by_kind = {k["kind"]: k for k in kinds}
+    ci = by_kind.get("checkin", {"n": 0, "ok": 0, "n_today": 0})
+    ci_rate = (100.0 * ci["ok"] / ci["n"]) if ci["n"] else 0.0
     replay_rate = (100.0 * ra["ok"] / ra["n"]) if ra["n"] else 0.0
     open_count = len(open_rows)
     full_cover = set(covered) >= {"on_time", "late", "early"}
-    ready = la["n"] >= 20 and open_count == 0 and full_cover
+    # cut-over readiness stays gated on the proven high-volume vertical (check-in): no open CHECK-IN
+    # mismatch, enough volume, full verdict coverage. Other verticals report agree-rate, don't gate yet.
+    ready = ci["n"] >= 20 and not any(k.startswith("checkin") for k in groups) and full_cover
     lines = ["🌓 SHADOW digest — TWBshop (org twb)",
-             "LIVE stream (real-time = the readiness signal): %d today / %d all-time · %.0f%% agree · %d open group(s)."
-             % (lt["n"], la["n"], live_rate, len(groups)),
-             "Replay backtest (one-time gap-analysis): %d compared · %.0f%% agree." % (ra["n"], replay_rate),
-             "Coverage (verdict types agreed live): %s%s"
-             % (", ".join(covered) or "none yet", "" if full_cover else "  ⚠ missing some of on_time/late/early")]
+             "LIVE check-in (readiness signal): %d today / %d all-time · %.0f%% agree." % (ci["n_today"], ci["n"], ci_rate),
+             "By action type (live, all-time):"]
+    for k in kinds:
+        rate = (100.0 * k["ok"] / k["n"]) if k["n"] else 0.0
+        lines.append("  • %-9s %d compared · %.0f%% agree · %d today" % (k["kind"] + ":", k["n"], rate, k["n_today"]))
+    if not kinds:
+        lines.append("  • (no live comparisons yet — shadow_run off, or no events)")
+    lines.append("Replay backtest (one-time gap-analysis): %d compared · %.0f%% agree." % (ra["n"], replay_rate))
+    lines.append("Check-in coverage (verdict types agreed live): %s%s"
+                 % (", ".join(covered) or "none yet", "" if full_cover else "  ⚠ missing some of on_time/late/early"))
     if groups:
         lines.append("\nOpen LIVE mismatch patterns (carried until reconciled):")
         for key, g in sorted(groups.items(), key=lambda kv: -kv[1]["count"]):
@@ -115,11 +153,11 @@ def build_digest(org_id) -> dict:
                          % (key, g["count"], g["example"][0], g["example"][1], g["fix"]))
     else:
         lines.append("\nNo open LIVE mismatches. 🎉")
-    lines.append("\nCut-over readiness: %s — live %.0f%% over %d · backtest %.0f%% over %d · %d open · coverage %s."
-                 % ("READY ✅" if ready else "not yet", live_rate, la["n"], replay_rate, ra["n"],
-                    open_count, "full" if full_cover else "partial"))
+    lines.append("\nCut-over readiness (check-in vertical): %s — %.0f%% over %d · %d open total · coverage %s."
+                 % ("READY ✅" if ready else "not yet", ci_rate, ci["n"], open_count, "full" if full_cover else "partial"))
     return {"text": "\n".join(lines),
-            "stats": {"live_today": lt["n"], "live_all": la["n"], "live_rate": live_rate,
+            "stats": {"live_today": ci["n_today"], "live_all": ci["n"], "live_rate": ci_rate,
+                      "by_kind": {k["kind"]: {"n": k["n"], "ok": k["ok"]} for k in kinds},
                       "replay_all": ra["n"], "replay_rate": replay_rate, "open_groups": len(groups),
                       "open_count": open_count, "coverage": covered, "ready": ready}}
 

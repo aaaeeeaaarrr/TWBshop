@@ -2543,6 +2543,12 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
             ot_buyback_mark_taken(staff["id"], shift_date)       # rest booking → taken (bookkeeping)
         except Exception:
             pass
+        try:   # SHADOW-RUN (gated off by default; fully isolated — core/shadow_hook.py): record core's
+            from core.shadow_hook import shadow_settle      # settle math vs live's on this REAL checkout
+            shadow_settle(staff, shift_date, sc.get("normal_len"), pb, (sc.get("reason") or ""),
+                          worked, ot_banked, pb_cleared)
+        except Exception:
+            pass
         return banked, new_bal
     except Exception as e:
         logger.error("OT settle at checkout failed: %s", e)

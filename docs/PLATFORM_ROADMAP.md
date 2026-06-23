@@ -23,6 +23,17 @@ Every measurement is local replay = **no deploy to measure**; the shadow is isol
 | 6 | **AL / sick / special leave** | days deducted (frozen map) · short-notice points · fractional | `al_requests` · `sick_cases` · `special_leaves` | **HIGH** | ✅ MATH DONE — `core/leave.py`, drift-guarded vs `gm_bot.al` (incl. the S1 frozen-map invariants). Remaining (live build): the **atomic deduct-at-approval + symmetric refund-on-cancel** (S1) + the ≥2-senior quorum. |
 | 7 | **Schedule resolver + changes** | precedence (leave>redefine>day-off) | `resolve_day` | MED | ✅ BRAIN DONE — `core/schedule.py`, parity vs live's precedence (full space). Remaining: derive the day's modifiers from core EVENTS (`shift_moved`/`leave_granted`…) so the core self-derives instead of being fed (the event-sync wiring). |
 
+> **▶ session 53 — SETTLE shadow WIRED LIVE (verticals 3–5 now proving on REAL checkouts).**
+> `core/shadow_hook.shadow_settle` runs at every real redefine checkout (`gm_bot/bot.py::_settle_redefined_shift`,
+> isolated + gated by `shadow_run`=ON) and records core-vs-live **worked · ot_banked · pb_cleared** to
+> `shadow_comparisons (kind='settle')`. Normal redefines are fully compared (core.settle uncapped = live
+> `gm_bot.ot.settle_shift`, drift-guarded by `tests/test_core_shadow_settle.py`); a **payback-slot**'s
+> ext-worked window isn't modeled in core yet → recorded *informational* (never a false alarm) = the next
+> port (#5). The nightly digest is now **per-action-type** (check-in · settle · …) with check-in still the
+> readiness gate. So 3/4/5's math is now validated on live data, not only parity tests. The remaining
+> "live build" notes below (atomic claim / over-book guard / ≥2-senior quorum) are the CUT-OVER
+> orchestration — still ahead, after the shadow agrees.
+
 ## After the verticals (the platform shell)
 - **Channel adapters** — Telegram is proven as the shadow hook; add a **web adapter** (same commands, a page) → "Telegram? web? both?" becomes config.
 - **Onboarding wizard** — explained + conditional + skippable steps (the UX law); writes the tenant config.

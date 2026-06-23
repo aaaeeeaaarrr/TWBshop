@@ -53,3 +53,35 @@ def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early, reso
     except Exception:
         # the entire reason this is here: a shadow problem must be visible AS shadow, and harmless to live
         logger.exception("[SHADOW] check-in hook failed — LIVE UNAFFECTED")
+
+
+def shadow_settle(staff: dict, shift_date, normal_len, pb_before, reason,
+                  live_worked, live_ot_banked, live_pb_cleared) -> None:
+    """Run core's checkout-SETTLE math on the SAME real redefine checkout + record core-vs-live (the
+    money split: OT banked / payback cleared). Best-effort + fully isolated; no-op unless shadow_run=on.
+    `live_worked` is the worked-minutes live computed (used as the shared input so a ±1 worked-rounding
+    nuance can't masquerade as a settle-logic mismatch). A PAYBACK-SLOT repays via an ext-worked window
+    core doesn't model yet (roadmap #5) → recorded informational (never a false cut-over alarm)."""
+    if not shadow_enabled():
+        return
+    try:
+        from core.shadow import compare_settle, record_settle_info
+        who = staff.get("call_name") or staff.get("canonical_name") or staff["id"]
+        live = {"worked": int(live_worked), "ot_banked": int(live_ot_banked),
+                "pb_cleared": int(live_pb_cleared), "reason": reason or "redefine"}
+        if (reason or "") == "payback slot":
+            record_settle_info("twb", staff["id"], live,
+                               "payback-slot ext-worked settle not modeled in core yet (roadmap #5)")
+            logger.info("[SHADOW] settle (payback-slot, informational) — %s", who)
+            return
+        from core.settle import settle_shift
+        out = settle_shift(int(live_worked), int(normal_len or 0), int(pb_before or 0),
+                           bank_min=0, bank_cap_min=10**9)   # uncapped → parity with live's gm_bot.ot.settle_shift
+        new = {"worked": int(live_worked), "ot_banked": out["ot_banked"], "pb_cleared": out["pb_cleared"]}
+        agree = compare_settle("twb", staff["id"], live, new, source="live")
+        if agree:
+            logger.info("[SHADOW] settle AGREE — %s", who)
+        else:
+            logger.warning("[SHADOW] settle MISMATCH — %s | live=%s new=%s", who, live, new)
+    except Exception:
+        logger.exception("[SHADOW] settle hook failed — LIVE UNAFFECTED")
