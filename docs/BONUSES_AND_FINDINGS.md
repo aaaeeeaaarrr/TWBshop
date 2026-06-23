@@ -46,6 +46,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Config export / import** `[ship/sell]` — a tenant's setup is portable: export their customizations (JSON,
   no secrets) to back up or CLONE onto another tenant; import reuses Apply's whitelist (only safe knobs,
   audited) so it's as safe as the editor. A multi-tenant lever — template a setup, onboard a similar shop fast.
+- **Platform e2e smoke test** `[ship]` — one test walks org→staff→config(audited)→web check-in→history→
+  what-if→export; proves the pieces CONNECT (integration regressions the units miss) + a PARTIAL answer to the
+  "unvalidated" gap — the platform's own flow is now proven; only the live-bot Telegram leg stays unproven.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
