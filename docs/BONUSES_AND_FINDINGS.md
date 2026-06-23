@@ -43,6 +43,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Admin command-center dashboard** `[ship]` — the admin home now has a full tool nav (all ~12 routes
   reachable; the new what-if/audit/templates were orphaned) + an "at a glance" status (staff/groups/channels/
   last change). Ties the sprawling wizard together. (Also fixed a stray `<\code>` typo in the admin header.)
+- **Config export / import** `[ship/sell]` — a tenant's setup is portable: export their customizations (JSON,
+  no secrets) to back up or CLONE onto another tenant; import reuses Apply's whitelist (only safe knobs,
+  audited) so it's as safe as the editor. A multi-tenant lever — template a setup, onboard a similar shop fast.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

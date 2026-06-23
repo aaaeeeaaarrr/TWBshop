@@ -12,6 +12,7 @@ SECRETS (bot tokens etc.) live in the encrypted org-secret store, are NEVER rend
 and are never written to the readable config. Apply validates server-side + writes ONLY whitelisted knobs.
 Auth + CSRF + encryption-at-rest land in W3 (with public access).
 """
+import json
 import os
 import re
 from html import escape
@@ -19,7 +20,7 @@ from urllib.parse import quote
 
 from flask import Flask, request, redirect, session
 
-from core.tenant_config import get_config, set_config
+from core.tenant_config import get_config, set_config, raw_overrides
 from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
@@ -156,7 +157,7 @@ def render_page(org_id: str = "twb") -> str:
     body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
             "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
-            "<a href='/audit'>audit</a></div>"
+            "<a href='/audit'>audit</a> · <a href='/export'>export</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -798,6 +799,55 @@ def render_audit(org_id: str) -> str:
     return _page("Audit", body)
 
 
+# ── CONFIG export / import (clone or back up a tenant's setup) ─────────────────
+def _flatten_cfg(d: dict, prefix: str = "") -> dict:
+    out = {}
+    for k, v in (d or {}).items():
+        p = "%s.%s" % (prefix, k) if prefix else k
+        if isinstance(v, dict) and not _is_secret(v):
+            out.update(_flatten_cfg(v, p))
+        else:
+            out[p] = v
+    return out
+
+
+def _form_from_config(flat: dict) -> dict:
+    """A flat {path: value} → a form dict apply_changes understands, so an import goes through the SAME
+    whitelist/validation/audit as the customer editor (only safe knobs; live ones ignored)."""
+    form, bool_paths = {}, []
+    for path, val in flat.items():
+        desc = schema.describe(path)
+        if not desc:
+            continue
+        if desc["type"] == "bool":
+            bool_paths.append(path)
+            if val:
+                form[path] = "on"
+        elif desc["type"] != "secret":
+            form[path] = str(val)
+    form["_scope"] = ",".join(bool_paths)
+    return form
+
+
+def render_export(org_id: str) -> str:
+    blob = json.dumps(raw_overrides(org_id), indent=2, default=str)
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/import'>import</a></div>"
+            "<h1>⬇️ Export config</h1><div class='box'><p class='note'>Your customizations (no secrets). "
+            "Copy this to back up or clone onto another tenant.</p>"
+            "<textarea rows='18' style='width:100%%' readonly>%s</textarea></div>" % escape(blob))
+    return _page("Export", body)
+
+
+def render_import(org_id: str, msg: str = "") -> str:
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/export'>export</a></div>"
+            "<h1>⬆️ Import config</h1>%s<div class='box'>"
+            "<p class='note'>Paste an exported config. Only safe (non-live) settings are applied — exactly "
+            "like the editor: live knobs are ignored, every change is logged.</p>"
+            "<form method='post' action='/import'><textarea name='blob' rows='14' style='width:100%%'></textarea>"
+            "<br><button type='submit'>Apply import</button></form></div>" % (msg or ""))
+    return _page("Import", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
@@ -985,6 +1035,27 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/audit")
     def audit():
         return render_audit(org_id)
+
+    @app.get("/export")
+    def export():
+        return render_export(org_id)
+
+    @app.get("/import")
+    def import_get():
+        return render_import(org_id)
+
+    @app.post("/import")
+    def import_post():
+        try:
+            data = json.loads(request.form.get("blob") or "{}")
+            if not isinstance(data, dict):
+                raise ValueError
+        except (ValueError, TypeError):
+            return render_import(org_id, "<div class='saved' style='background:#fee2e2;border-color:#fca5a5'>"
+                                         "Invalid JSON.</div>")
+        applied = apply_changes(org_id, _form_from_config(_flatten_cfg(data)))
+        return render_import(org_id, "<div class='saved'>Imported %d setting(s).</div>"
+                             % len(_flatten_cfg(applied)))
 
     @app.get("/checkin/<token>")
     def checkin(token):

@@ -200,6 +200,12 @@ def get_config(org_id) -> dict:
     return _deep_merge(DEFAULTS, _raw(org_id))
 
 
+def raw_overrides(org_id) -> dict:
+    """The tenant's STORED overrides only (deltas from DEFAULTS) — the portable 'their customizations' blob
+    for export/clone. No secrets (those are references, stored separately)."""
+    return _raw(org_id)
+
+
 def set_config(org_id, partial: dict = None, **kw) -> dict:
     """Deep-merge `partial` (and/or top-level kwargs) into the tenant's stored overrides (what the wizard
     does). Returns the new effective config."""
