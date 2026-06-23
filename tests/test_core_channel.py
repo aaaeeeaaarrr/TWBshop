@@ -49,9 +49,9 @@ def test_tenant_config_flows_into_the_brain():
     with _db() as c:                                       # reset to a clean slate (orgs persist)
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
-    assert tc.get_config(org)["grace_min"] == 5            # default out of the box
-    tc.set_config(org, grace_min=0, early_bonus_min=0)
-    assert tc.get_config(org)["grace_min"] == 0
+    assert tc.verdict_cfg(org)["grace_min"] == 5           # default out of the box
+    tc.set_config(org, {"categories": {"attendance": {"verdict": {"grace_min": 0, "early_bonus_min": 0}}}})
+    assert tc.verdict_cfg(org)["grace_min"] == 0           # nested override took
     when = datetime(2026, 6, 20, 23, 3, tzinfo=UTC)        # 3 min late
     start = datetime(2026, 6, 20, 23, 0, tzinfo=UTC)
     r = ch.handle(org, "verdict", {"when": when, "start_dt": start})   # config=None → loads tenant cfg

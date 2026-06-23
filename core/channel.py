@@ -9,19 +9,20 @@ plug into — "Telegram? web? both?" becomes config, not code. Per-tenant settin
 from core.attendance import check_in, check_out, verdict
 
 
-def _load_config(org_id):
-    from core.tenant_config import get_config   # lazy — keeps the brain free of any import-time coupling
-    return get_config(org_id)
+def _verdict_settings(org_id):
+    from core.tenant_config import verdict_cfg   # lazy — keeps the brain free of import-time coupling
+    return verdict_cfg(org_id)
 
 
 def handle(org_id: str, command: str, params: dict, config: dict = None) -> dict:
     """Execute a channel-neutral command. `params` is a plain dict — never a Telegram/HTTP object. The
-    tenant's CONFIG (grace/thresholds) is applied automatically (loaded for `org_id`, or pass `config`
-    to skip the DB); `params` may override per-call. Returns {ok: bool, ...} the adapter renders. Unknown
-    command / missing param = a clean error, never an exception across the channel boundary."""
-    cfg = config if config is not None else _load_config(org_id)
-    grace = params.get("grace_min", cfg.get("grace_min", 5))
-    early = params.get("early_bonus_min", cfg.get("early_bonus_min", 5))
+    tenant's verdict CONFIG (grace/early threshold) is applied automatically (loaded for `org_id`, or pass
+    `config`={grace_min, early_bonus_min} to skip the DB); `params` may override per-call. Returns
+    {ok: bool, ...} the adapter renders. Unknown command / missing param = a clean error, never an
+    exception across the channel boundary."""
+    v = config if config is not None else _verdict_settings(org_id)   # the verdict settings
+    grace = params.get("grace_min", v.get("grace_min", 5))
+    early = params.get("early_bonus_min", v.get("early_bonus_min", 5))
     tz = params.get("tz", "Asia/Phnom_Penh")
     try:
         if command == "verdict":

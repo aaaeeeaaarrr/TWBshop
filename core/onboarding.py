@@ -56,6 +56,10 @@ def apply(org_id: str, answers: dict) -> dict:
     from core.tenant_config import set_config
     ensure_org(org_id, c.get("name"), c.get("timezone", "Asia/Phnom_Penh"))
     chans = ["telegram", "web"] if c.get("channels") == "both" else [c.get("channels", "telegram")]
-    cfg = set_config(org_id, channels=chans, package=c.get("package", "attendance"),
-                     grace_min=c.get("grace_min", 5), early_bonus_min=c.get("early_bonus_min", 5))
+    cfg = set_config(org_id, {
+        "channels": chans,
+        "package": c.get("package", "attendance"),
+        "categories": {"attendance": {"verdict": {
+            "grace_min": c.get("grace_min", 5), "early_bonus_min": c.get("early_bonus_min", 5)}}},
+    })
     return {"ok": True, "config": cfg}

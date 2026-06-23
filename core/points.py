@@ -51,7 +51,9 @@ def late_sick_points() -> list:
     return [("late_sick_inform", 1)]
 
 
-def points_for(events) -> float:
-    """DERIVE points from raw events [(cause, quantity)] via the catalogue: Σ value × quantity. Unknown
-    causes score 0 (forward-compatible). This is the platform's points total (per-tenant catalogue)."""
-    return round(sum(CATALOGUE.get(c, 0) * q for c, q in events), 2)
+def points_for(events, catalogue: dict = None) -> float:
+    """DERIVE points from raw events [(cause, quantity)] via the catalogue: Σ value × quantity. Pass the
+    tenant's `catalogue` (from tenant_config.points_catalogue) for config-driven scoring; defaults to the
+    built-in TWB CATALOGUE. Unknown causes score 0 (forward-compatible)."""
+    cat = catalogue if catalogue is not None else CATALOGUE
+    return round(sum(cat.get(c, 0) * q for c, q in events), 2)

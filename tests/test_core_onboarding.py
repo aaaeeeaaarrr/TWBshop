@@ -31,7 +31,8 @@ def test_apply_writes_tenant_config():
         assert r["ok"]
         cfg = get_config(ORG)
         assert cfg["channels"] == ["telegram", "web"]     # 'both' → both adapters
-        assert cfg["package"] == "total" and cfg["grace_min"] == 0
+        assert cfg["package"] == "total"
+        assert cfg["categories"]["attendance"]["verdict"]["grace_min"] == 0   # nested, config-driven
         # a bad apply changes nothing + reports errors
         bad = ob.apply(ORG, {"name": "", "grace_min": "x"})
         assert bad["ok"] is False and "name" in bad["errors"]
