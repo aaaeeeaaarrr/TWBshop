@@ -3,7 +3,33 @@
 Reuses shared.database._db (same env-guarded Postgres pool) during the build/shadow phase; the tables
 are NEW and additive, so they coexist with the live system and touch nothing it owns. Self-migrating.
 """
+import logging
+import os
+
 from shared.database import _db
+
+_ENC_PREFIX = "enc:"   # marks an encrypted org-secret value (vs a legacy plaintext one)
+
+
+def _org_secret_cipher():
+    """A Fernet from ORG_SECRET_KEY (secrets.py or env) — or None (then secrets stay plaintext + a warning).
+    SECURITY (PRODUCT SECURITY law): set ORG_SECRET_KEY before any public/multi-tenant exposure (W3 gate).
+    Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'."""
+    key = None
+    try:
+        import config
+        key = getattr(config, "ORG_SECRET_KEY", None)
+    except Exception:
+        pass
+    key = key or os.environ.get("ORG_SECRET_KEY")
+    if not key:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception:
+        logging.getLogger("core.secrets").exception("bad ORG_SECRET_KEY")
+        return None
 
 
 def init_core_db() -> None:
@@ -216,14 +242,23 @@ def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh")
 # SECURITY (CLAUDE.md ▶▶ PRODUCT SECURITY & IP): these live OUTSIDE orgs.config and NEVER reach a page.
 # The wizard may SET a secret and ASK whether one is set; only the server-side connector reads the value.
 def set_org_secret(org_id: str, key: str, value: str) -> None:
-    """Store/replace a secret (write-only from the wizard's perspective). Empty value is ignored."""
+    """Store/replace a secret (write-only from the wizard's perspective). Encrypted at rest when
+    ORG_SECRET_KEY is set; otherwise stored plaintext with a one-time warning. Empty value is ignored."""
     if not value:
         return
+    c = _org_secret_cipher()
+    if c:
+        stored = _ENC_PREFIX + c.encrypt(value.encode()).decode()
+    else:
+        stored = value
+        logging.getLogger("core.secrets").warning(
+            "ORG_SECRET_KEY not set — storing secret %s/%s UNENCRYPTED. Set the key before public exposure.",
+            org_id, key)
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO core_org_secrets (org_id, key, value) VALUES (%s,%s,%s) "
                         "ON CONFLICT (org_id, key) DO UPDATE SET value=EXCLUDED.value, set_at=NOW()",
-                        (org_id, key, value))
+                        (org_id, key, stored))
 
 
 def has_org_secret(org_id: str, key: str) -> bool:
@@ -240,7 +275,18 @@ def get_org_secret(org_id: str, key: str) -> str | None:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM core_org_secrets WHERE org_id=%s AND key=%s", (org_id, key))
             r = cur.fetchone()
-            return r["value"] if r else None
+    if not r:
+        return None
+    v = r["value"]
+    if v and v.startswith(_ENC_PREFIX):
+        c = _org_secret_cipher()
+        if not c:
+            return None                              # encrypted but the key is gone → can't decrypt (fail safe)
+        try:
+            return c.decrypt(v[len(_ENC_PREFIX):].encode()).decode()
+        except Exception:
+            return None
+    return v                                          # legacy plaintext
 
 
 def clear_org_secret(org_id: str, key: str) -> None:
