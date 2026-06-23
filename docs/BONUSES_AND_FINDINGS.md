@@ -76,9 +76,12 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **What-if current breakdown** `[ship]` — the what-if now shows "Currently: X on-time, Y late, …" for context
   beside the change count.
 - **Onboarding chain e2e (REAL core)** `[ship/needs-validate]` — a test drives the Telegram adapter → REAL
-  core → DB: a staff-group poster is staged → `/onboard` lists → confirm button → a real `core_staff` record.
-  The integration the mock-only adapter tests don't cover. Strongest de-risking of the unvalidated onboarding
+  core → DB across 3 paths (confirm · consent "approve-a-link" carries to the staff record · skip). The
+  integration the mock-only adapter tests don't cover. Strongest de-risking of the unvalidated onboarding
   short of a real bot (the Telegram TRANSPORT is still mocked — a live BotFather run remains the final proof).
+- **Config↔schema consistency guard** `[ship]` — a test asserts every customer-facing descriptor maps to a
+  real config knob in DEFAULTS (the UI can't show an unsettable knob; apply can't silently drop one).
+  Truth-consolidation by construction — catches drift in the suite.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

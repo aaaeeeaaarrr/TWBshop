@@ -48,6 +48,23 @@ def test_healthz():
     assert create_app().test_client().get("/healthz").status_code == 200
 
 
+def test_every_descriptor_maps_to_a_real_config_knob():
+    # structural guard (truth-consolidation): a customer-facing descriptor must point to a knob that EXISTS
+    # in DEFAULTS — else the UI shows a setting that can't be set, or apply silently drops it.
+    from core.tenant_config import DEFAULTS
+
+    def _exists(path):
+        cur = DEFAULTS
+        for k in path.split("."):
+            if not isinstance(cur, dict) or k not in cur:
+                return False
+            cur = cur[k]
+        return True
+
+    missing = [p for p in schema.DESCRIPTORS if not _exists(p)]
+    assert missing == [], "schema descriptors with no config knob: %s" % missing
+
+
 def test_security_headers_present():
     r = create_app("twb").test_client().get("/healthz")
     assert r.headers.get("X-Frame-Options") == "DENY"                 # anti-clickjacking
