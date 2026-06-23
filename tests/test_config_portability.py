@@ -26,6 +26,7 @@ def test_export_shows_overrides(monkeypatch):
         apply_changes(ORG, {"categories.attendance.verdict.grace_min": "9"})
         body = create_app(ORG).test_client().get("/export").get_data(as_text=True)
         assert "grace_min" in body and "Export config" in body
+        assert "Your customizations" in body and "5 → <b>9</b>" in body   # readable default→value diff
     finally:
         _reset()
 

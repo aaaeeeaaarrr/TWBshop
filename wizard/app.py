@@ -20,7 +20,7 @@ from urllib.parse import quote
 
 from flask import Flask, request, redirect, session
 
-from core.tenant_config import get_config, set_config, raw_overrides
+from core.tenant_config import get_config, set_config, raw_overrides, DEFAULTS
 from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
@@ -837,12 +837,27 @@ def _form_from_config(flat: dict) -> dict:
     return form
 
 
+def _readable_changes(org_id: str) -> str:
+    """Plain-English 'default → your value' per customized knob (cumulative diff vs DEFAULTS)."""
+    rows = []
+    for path, val in sorted(_flatten_cfg(raw_overrides(org_id)).items()):
+        desc = schema.describe(path)
+        label = desc["label"] if desc else path
+        rows.append("<li><b>%s</b> <span class='note'>(%s)</span>: %s → <b>%s</b></li>"
+                    % (escape(label), escape(path), escape(str(_get_path(DEFAULTS, path))), escape(str(val))))
+    return "".join(rows) or "<li class='note'>No customizations yet — using all defaults.</li>"
+
+
 def render_export(org_id: str) -> str:
     blob = json.dumps(raw_overrides(org_id), indent=2, default=str)
     body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/import'>import</a></div>"
-            "<h1>⬇️ Export config</h1><div class='box'><p class='note'>Your customizations (no secrets). "
-            "Copy this to back up or clone onto another tenant.</p>"
-            "<textarea rows='18' style='width:100%%' readonly>%s</textarea></div>" % escape(blob))
+            "<h1>⬇️ Export config</h1>"
+            "<div class='box'><h3>Your customizations</h3><p class='note'>What you've changed from the "
+            "defaults.</p><ul>%s</ul></div>"
+            "<div class='box'><h3>Backup / clone</h3><p class='note'>Copy this (no secrets) to back up or "
+            "clone onto another tenant.</p>"
+            "<textarea rows='14' style='width:100%%' readonly>%s</textarea></div>"
+            % (_readable_changes(org_id), escape(blob)))
     return _page("Export", body)
 
 

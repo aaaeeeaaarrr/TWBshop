@@ -56,6 +56,8 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Go-live readiness gate** `[ship]` — `/setup` folds the health-check in as a 5th step ("clear config
   warnings") and shows a "🎉 Ready to go live!" banner ONLY when all 5 are green. A clear, honest "you're
   done" signal for onboarding (not just "4 of 4 checkboxes" — it also means the config is sane).
+- **Readable config diff on export** `[ship]` — the export page shows "default → your value" per customized
+  knob in plain English (not just JSON), so a customer sees exactly what they've changed at a glance.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
