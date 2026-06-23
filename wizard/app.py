@@ -93,6 +93,30 @@ def _render_catalog() -> str:
             "<h3>Computer / AI Power</h3><ul>%s</ul>" % (rows, pkgs, ai))
 
 
+def render_cutover(org_id: str) -> str:
+    """ADMIN-only cut-over dashboard: the shadow proving the new engine vs live, per vertical — so you see
+    at a glance how close each is to being safe to flip live. Read-only (reads shadow_comparisons)."""
+    try:
+        from core.shadow import build_digest
+        st = build_digest(org_id)["stats"]
+    except Exception:
+        return "<div class='box'>Cut-over status unavailable (shadow not initialised).</div>"
+    bk = st.get("by_kind", {})
+    rows = []
+    for kind, v in sorted(bk.items()):
+        rate = (100.0 * v["ok"] / v["n"]) if v["n"] else 0.0
+        verdict = ("READY ✅" if (kind == "checkin" and st.get("ready")) else "gathering data")
+        rows.append("<li><b>%s</b>: %d compared · %.0f%% agree · %s</li>"
+                    % (escape(kind), v["n"], rate, verdict))
+    s = summary()
+    return ("<div class='box'><b>🚦 Cut-over status</b> — the shadow running the NEW engine beside live and "
+            "comparing, per vertical:<ul>%s</ul>"
+            "<small class='note'>Config knobs wired to LIVE: <b>%d</b> · still SHADOW (proving): <b>%d</b>. "
+            "A vertical 'cuts over' only when its shadow has agreed for days AND its live code is flipped to "
+            "read the config — a deliberate, gated step, never automatic.</small></div>"
+            % ("".join(rows) or "<li>no comparisons yet</li>", s["LIVE"], s["SHADOW"]))
+
+
 def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
@@ -100,11 +124,13 @@ def render_page(org_id: str = "twb") -> str:
     s = summary()
     body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>see the customer view →</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
+            "%s"
             "<div class='box'><b>Legend:</b> %s<br><small style='color:#777'>cut-over map: %d LIVE · %d SHADOW · "
             "%d PLANNED prefixes</small></div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
             "<h2>The menu</h2><div class='box'>%s</div>"
-            % (escape(org_id), legend, s["LIVE"], s["SHADOW"], s["PLANNED"], _render_node(cfg, ""), _render_catalog()))
+            % (escape(org_id), render_cutover(org_id), legend, s["LIVE"], s["SHADOW"], s["PLANNED"],
+               _render_node(cfg, ""), _render_catalog()))
     return _page("Wizard — admin", body)
 
 

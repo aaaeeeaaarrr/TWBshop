@@ -28,9 +28,10 @@ def test_status_badges_are_grounded():
     assert status_for("categories.accountant") == "PLANNED"
 
 
-def test_admin_view_renders_with_badges():
+def test_admin_view_renders_with_badges_and_cutover():
     body = create_app("twb").test_client().get("/").get_data(as_text=True)
     assert "grace_min" in body and "LIVE" in body and "SHADOW" in body and "Packages" in body
+    assert "Cut-over status" in body and "agree" in body   # the readiness dashboard
 
 
 def test_healthz():
