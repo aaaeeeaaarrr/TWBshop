@@ -82,6 +82,10 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Config↔schema consistency guard** `[ship]` — a test asserts every customer-facing descriptor maps to a
   real config knob in DEFAULTS (the UI can't show an unsettable knob; apply can't silently drop one).
   Truth-consolidation by construction — catches drift in the suite.
+- **Shadow agreement / cut-over readiness page** `[ship/sell]` — `/shadow` shows the empirical agreement the
+  shadow gathered on real data (overall + per-vertical: check-in/settle/…), via `comparison_stats_by_kind`.
+  Gives the owner the data to DECIDE a per-vertical cut-over (the key gate) — and a sellable "watch the new
+  system match your current one before you switch" story.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

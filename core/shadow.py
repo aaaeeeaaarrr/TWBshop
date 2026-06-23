@@ -171,3 +171,13 @@ def comparison_stats(org_id=None) -> dict:
                         "COUNT(*) FILTER (WHERE NOT agree) bad FROM shadow_comparisons " + where, args)
             r = cur.fetchone()
             return {"total": r["n"], "agree": r["ok"], "mismatch": r["bad"]}
+
+
+def comparison_stats_by_kind(org_id) -> dict:
+    """Per-vertical shadow agreement ({kind: {total, agree}}) — the empirical basis for a per-vertical
+    cut-over decision (read-only)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT kind, COUNT(*) n, COUNT(*) FILTER (WHERE agree) ok FROM shadow_comparisons "
+                        "WHERE org_id=%s GROUP BY kind ORDER BY kind", (org_id,))
+            return {r["kind"]: {"total": r["n"], "agree": r["ok"]} for r in cur.fetchall()}

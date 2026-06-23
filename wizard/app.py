@@ -25,6 +25,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
                      log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
 from core.health import config_health
+from core.shadow import comparison_stats, comparison_stats_by_kind
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -161,7 +162,8 @@ def render_page(org_id: str = "twb") -> str:
     body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
             "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
-            "<a href='/audit'>audit</a> · <a href='/health'>health</a> · <a href='/export'>export</a></div>"
+            "<a href='/audit'>audit</a> · <a href='/health'>health</a> · <a href='/shadow'>shadow</a> · "
+            "<a href='/export'>export</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -873,6 +875,28 @@ def _readable_changes(org_id: str) -> str:
     return "".join(rows) or "<li class='note'>No customizations yet — using all defaults.</li>"
 
 
+def render_shadow(org_id: str) -> str:
+    """Empirical shadow agreement per vertical — the read-only basis for the owner's cut-over decision."""
+    overall = comparison_stats(org_id)
+    by_kind = comparison_stats_by_kind(org_id)
+    pct = (100 * overall["agree"] // overall["total"]) if overall["total"] else 0
+    rows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td><td>%d%%</td></tr>"
+        % (escape(k), v["total"], v["agree"], (100 * v["agree"] // v["total"]) if v["total"] else 0)
+        for k, v in by_kind.items()) or "<tr><td colspan='4' class='note'>No shadow comparisons yet.</td></tr>"
+    body = ("<div class='nav'><a href='/'>← admin</a></div>"
+            "<h1>👥 Shadow agreement — cut-over readiness</h1>"
+            "<div class='box'><p class='note'>How often the new platform's computation matched live, on real "
+            "data. Cut a vertical over only after enough agreement over enough days (read-only — informs the "
+            "decision, changes nothing).</p>"
+            "<p><b>Overall: %d%% agree</b> &nbsp; <span class='note'>(%d of %d compared · %d mismatch)</span></p>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Vertical</th><th>Compared</th>"
+            "<th>Agreed</th><th>Agreement</th></tr>%s</table></div>"
+            % (pct, overall["agree"], overall["total"], overall["mismatch"], rows))
+    return _page("Shadow", body)
+
+
 def render_export(org_id: str) -> str:
     blob = json.dumps(raw_overrides(org_id), indent=2, default=str)
     body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/import'>import</a></div>"
@@ -1106,6 +1130,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/audit")
     def audit():
         return render_audit(org_id)
+
+    @app.get("/shadow")
+    def shadow():
+        return render_shadow(org_id)
 
     @app.get("/health")
     def health():
