@@ -3102,6 +3102,12 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
                               body, kb=kb, parse_mode="HTML")
         if msg is not None:
             cards.append((msg.chat_id, msg.message_id))
+            if uid:                                  # persist the initial card so the re-ping ladder can delete it
+                try:
+                    from shared.database import al_ping_set
+                    al_ping_set(req_id, uid, msg.chat_id, msg.message_id, 0)   # ping_no 0 = initial
+                except Exception:
+                    pass
     return req_id
 
 
@@ -6056,6 +6062,86 @@ async def _shadow_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.exception("[SHADOW] nightly digest failed (live unaffected)")
 
 
+async def _safe_delete(context, chat_id, message_id) -> None:
+    """Best-effort Telegram delete (a >48h or already-gone message just no-ops)."""
+    try:
+        await context.bot.delete_message(chat_id, message_id)
+    except Exception:
+        pass
+
+
+async def _al_reping_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """APPROVAL LADDER (owner Jun 23, config-driven): for each PENDING AL, per the tenant's approval rule
+    (tenant_config.approval_rule) — re-ping the NON-responding seniors (delete their previous ping, send a
+    fresh one), up to reping_max every reping_hours; escalate to the owner after the max; auto-expire once
+    the AL window has passed. Never touches a senior who already approved/disapproved. Auto-logged
+    (gm_events + [AL-LADDER]). The rule lives in core.approvals (shadow-parity-tested); this executes it."""
+    try:
+        from core.approvals import reping_decision
+        from core.tenant_config import approval_rule
+        from shared.database import (al_pending_requests, al_get_approvals, al_ping_count, al_pings_for,
+                                     al_ping_set, al_pings_clear, al_set_status, al_mark_escalated,
+                                     al_pings_orphaned)
+    except Exception:
+        logger.exception("[AL-LADDER] import failed")
+        return
+    now = _now_pp()
+    today_iso = now.date().isoformat()
+    # 1) clean dangling cards of already-decided/expired requests (post-restart edge)
+    orphan_reqs = {p["request_id"] for p in al_pings_orphaned()}
+    for rid in orphan_reqs:
+        for p in al_pings_clear(rid):
+            await _safe_delete(context, p["chat_id"], p["message_id"])
+    # 2) the ladder, per pending AL
+    for req in al_pending_requests():
+        try:
+            cfg = approval_rule("twb", "al")
+            if not cfg.get("required"):
+                continue
+            days = req.get("days") or []
+            window_passed = bool(days) and max(days) < today_iso
+            pings_done = al_ping_count(req["id"])
+            escalated = bool(req.get("escalated_at"))
+            action = reping_decision(req["created_at"], now, pings_done, escalated, cfg, window_passed)
+            if action == "expire":
+                for p in al_pings_clear(req["id"]):
+                    await _safe_delete(context, p["chat_id"], p["message_id"])
+                al_set_status(req["id"], "expired")
+                _gm_log("al_expired", req["staff_id"], detail={"req": req["id"], "days": days})
+                logger.warning("[AL-LADDER] req #%s EXPIRED (window passed)", req["id"])
+            elif action == "reping":
+                responded = {a["senior_uid"] for a in al_get_approvals(req["id"])}
+                existing = {p["senior_uid"]: p for p in al_pings_for(req["id"])}
+                ping_no, sent = pings_done + 1, 0
+                requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
+                for sen in _seniors(exclude_staff_id=req["staff_id"]):
+                    uid = (sen.get("telegram_ids") or [None])[0]
+                    if not uid or uid in responded:          # skip no-uid + anyone who already decided
+                        continue
+                    old = existing.get(uid)
+                    if old:
+                        await _safe_delete(context, old["chat_id"], old["message_id"])   # delete the previous ping
+                    body, kb = _al_card(req, requester, audience="senior", sen_id=sen["id"], show_cov=False)
+                    msg = await _att_send(context, uid, "Senior", sen.get("call_name") or sen["canonical_name"],
+                                          "⏰ Reminder — still awaiting your decision:\n" + body, kb=kb,
+                                          parse_mode="HTML")
+                    if msg is not None:
+                        al_ping_set(req["id"], uid, msg.chat_id, msg.message_id, ping_no)
+                        sent += 1
+                _gm_log("al_reping", req["staff_id"], detail={"req": req["id"], "ping_no": ping_no, "sent": sent})
+                logger.info("[AL-LADDER] req #%s re-ping #%d → %d senior(s)", req["id"], ping_no, sent)
+            elif action == "escalate":
+                await context.bot.send_message(
+                    config.OWNER_TELEGRAM_ID,
+                    "🔺 AL request #%s still unapproved after %d re-pings — it needs your decision."
+                    % (req["id"], cfg.get("reping_max", 4)))
+                al_mark_escalated(req["id"])
+                _gm_log("al_escalated", req["staff_id"], detail={"req": req["id"]})
+                logger.warning("[AL-LADDER] req #%s ESCALATED to owner", req["id"])
+        except Exception:
+            logger.exception("[AL-LADDER] req #%s failed", req.get("id"))
+
+
 async def cmd_audit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/audit — owner: cross-check that every button input translated to the right stored result.
     Runs all data invariants (AL deductions, payback math, OT banking/cap, sessions, no-shows,
@@ -7683,6 +7769,10 @@ def build_app() -> Application:
     # bounded reason-nudge ladder (10/20/30): every 5 min, gated
     app.job_queue.run_repeating(_reason_nudge_job, interval=300, first=90,
                                 name="gm_reason_nudge")
+    # APPROVAL LADDER (owner Jun 23): every 30 min, re-ping non-responding seniors on pending AL per the
+    # tenant approval config (6h×4, delete-prior, skip responders), escalate to owner, auto-expire past-window.
+    app.job_queue.run_repeating(_al_reping_job, interval=1800, first=150,
+                                name="gm_al_reping")
     app.add_handler(teach_conv)
     # Paperless /stock entry (owner-only test mode) — conversation, registered before
     # the loose private-text handler so count entry isn't intercepted.

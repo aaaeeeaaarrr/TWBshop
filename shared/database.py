@@ -2347,6 +2347,20 @@ def init_attendance_db() -> None:
                     decided_at   TIMESTAMPTZ DEFAULT NOW(),
                     UNIQUE (request_id, senior_uid)
                 );
+                -- the CURRENT approval-ping message per senior per request, persisted so the re-ping
+                -- ladder can delete-the-previous reliably across restarts (bot_data is volatile). ping_no
+                -- 0 = the initial card; 1..N = re-pings. (owner Jun 23 — approval ladder)
+                CREATE TABLE IF NOT EXISTS al_pings (
+                    request_id  INTEGER REFERENCES al_requests(id),
+                    senior_uid  BIGINT,
+                    chat_id     BIGINT,
+                    message_id  BIGINT,
+                    ping_no     INTEGER DEFAULT 0,
+                    sent_at     TIMESTAMPTZ DEFAULT NOW(),
+                    is_test     BOOLEAN DEFAULT FALSE,
+                    PRIMARY KEY (request_id, senior_uid)
+                );
+                ALTER TABLE al_requests ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
                 CREATE TABLE IF NOT EXISTS lateness_records (
                     id           SERIAL PRIMARY KEY,
                     staff_id     INTEGER REFERENCES staff_registry(id),
@@ -3821,6 +3835,58 @@ def al_set_status(req_id: int, status: str) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE al_requests SET status=%s, decided_at=NOW() WHERE id=%s",
                         (status, req_id))
+
+
+def al_ping_set(req_id: int, senior_uid: int, chat_id: int, message_id: int, ping_no: int) -> None:
+    """Persist a senior's CURRENT approval-ping message (upsert) so the next re-ping can delete it."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO al_pings (request_id, senior_uid, chat_id, message_id, ping_no, sent_at, is_test)
+                VALUES (%s,%s,%s,%s,%s,NOW(),%s)
+                ON CONFLICT (request_id, senior_uid) DO UPDATE SET chat_id=EXCLUDED.chat_id,
+                    message_id=EXCLUDED.message_id, ping_no=EXCLUDED.ping_no, sent_at=NOW()""",
+                        (req_id, senior_uid, chat_id, message_id, ping_no, _ATT_TEST))
+
+
+def al_pings_for(req_id: int) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT senior_uid, chat_id, message_id, ping_no FROM al_pings WHERE request_id=%s",
+                        (req_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def al_ping_count(req_id: int) -> int:
+    """How many re-ping ROUNDS have gone out (max ping_no; 0 = only the initial cards)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(MAX(ping_no),0) n FROM al_pings WHERE request_id=%s", (req_id,))
+            return int(cur.fetchone()["n"])
+
+
+def al_pings_clear(req_id: int) -> list[dict]:
+    """Delete the request's ping rows; RETURN them so the caller can delete the dangling Telegram messages."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM al_pings WHERE request_id=%s RETURNING senior_uid, chat_id, message_id",
+                        (req_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def al_mark_escalated(req_id: int) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE al_requests SET escalated_at=NOW() WHERE id=%s", (req_id,))
+
+
+def al_pings_orphaned() -> list[dict]:
+    """Ping rows whose request is no longer pending (decided/expired since the last run) — to clean up the
+    dangling Approve/Reject cards of seniors who never responded."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT p.request_id, p.senior_uid, p.chat_id, p.message_id FROM al_pings p
+                           JOIN al_requests r ON r.id=p.request_id WHERE r.status <> 'pending'""")
+            return [dict(r) for r in cur.fetchall()]
 
 
 def al_pending_requests() -> list[dict]:
