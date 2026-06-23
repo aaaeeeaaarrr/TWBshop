@@ -86,8 +86,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   shadow gathered on real data (overall + per-vertical: check-in/settle/…), via `comparison_stats_by_kind`.
   Gives the owner the data to DECIDE a per-vertical cut-over (the key gate) — and a sellable "watch the new
   system match your current one before you switch" story. + **recent mismatches** (live→new diff) so the
-  owner sees WHAT differs + **data span** (how many days/comparisons gathered) — the full cut-over criterion
-  (enough agreement over enough days) on one read-only page.
+  owner sees WHAT differs + **data span** (how many days/comparisons gathered) + a per-vertical **cut-over
+  suggestion** (✓ ready / ⏳ watching, heuristic ≥98% · ≥30 · ≥5d — owner's call) — the full cut-over
+  criterion, actionable, on one read-only page.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

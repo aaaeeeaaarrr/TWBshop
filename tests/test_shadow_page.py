@@ -39,5 +39,6 @@ def test_shadow_agreement_page(monkeypatch):
         assert "Shadow agreement" in body and "checkin" in body and "66%" in body   # agreement
         assert "Recent mismatches" in body and "on_time" in body                     # the diff detail
         assert "Data span" in body                                                   # how long it's gathered
+        assert "Cut-over?" in body and "keep watching" in body                       # verdict (3<30 → watch)
     finally:
         _clean()

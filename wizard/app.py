@@ -879,12 +879,18 @@ def render_shadow(org_id: str) -> str:
     """Empirical shadow agreement per vertical — the read-only basis for the owner's cut-over decision."""
     overall = comparison_stats(org_id)
     by_kind = comparison_stats_by_kind(org_id)
-    pct = (100 * overall["agree"] // overall["total"]) if overall["total"] else 0
-    rows = "".join(
-        "<tr><td>%s</td><td>%d</td><td>%d</td><td>%d%%</td></tr>"
-        % (escape(k), v["total"], v["agree"], (100 * v["agree"] // v["total"]) if v["total"] else 0)
-        for k, v in by_kind.items()) or "<tr><td colspan='4' class='note'>No shadow comparisons yet.</td></tr>"
     span = comparison_span(org_id)
+    pct = (100 * overall["agree"] // overall["total"]) if overall["total"] else 0
+
+    def _verdict(v):
+        p = (100 * v["agree"] // v["total"]) if v["total"] else 0
+        return ("✓ looks ready" if (v["total"] >= 30 and p >= 98 and span["days"] >= 5)
+                else "⏳ keep watching")
+
+    rows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td><td>%d%%</td><td>%s</td></tr>"
+        % (escape(k), v["total"], v["agree"], (100 * v["agree"] // v["total"]) if v["total"] else 0, _verdict(v))
+        for k, v in by_kind.items()) or "<tr><td colspan='5' class='note'>No shadow comparisons yet.</td></tr>"
     span_html = ("<p class='note'>Data span: <b>%d days</b> (%s → %s)</p>"
                  % (span["days"], str(span["first"])[:16], str(span["last"])[:16])) if span["first"] else ""
     body = ("<div class='nav'><a href='/'>← admin</a></div>"
@@ -896,7 +902,9 @@ def render_shadow(org_id: str) -> str:
             "%s"
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Vertical</th><th>Compared</th>"
-            "<th>Agreed</th><th>Agreement</th></tr>%s</table></div>%s"
+            "<th>Agreed</th><th>Agreement</th><th>Cut-over?</th></tr>%s</table>"
+            "<p class='note'>“Cut-over?” is a suggestion only (≥98%% agreement · ≥30 comparisons · ≥5 days) — "
+            "your decision.</p></div>%s"
             % (pct, overall["agree"], overall["total"], overall["mismatch"], span_html, rows,
                _render_mismatches(org_id)))
     return _page("Shadow", body)
