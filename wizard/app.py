@@ -176,9 +176,14 @@ def _field_input(path: str, desc: dict, value, status: str, org_id: str) -> str:
         hint = ""
     else:
         ctrl, hint = escape(str(value)), ""
-    lock = "" if editable else ' <span class="lock">🔒 live today — set at cut-over</span>'
+    if status == "LIVE":
+        note = ' <span class="lock">🔒 drives the live shop — changed at cut-over</span>'
+    elif status == "LIVE_FIXED":
+        note = ' <span class="lock">live today (fixed) — your change applies at cut-over</span>'
+    else:
+        note = ""
     return ('<div class="fld"><label><b>%s</b>%s</label><div>%s</div><div class="help">%s</div>%s</div>'
-            % (escape(desc["label"]), lock, ctrl, escape(desc["help"]), hint))
+            % (escape(desc["label"]), note, ctrl, escape(desc["help"]), hint))
 
 
 def _render_groups(cfg: dict, groups, org_id: str) -> str:

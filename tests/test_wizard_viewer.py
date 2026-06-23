@@ -68,19 +68,21 @@ def test_customer_view_complete_no_internal_leak():
 
 
 # ── Apply: safe, validated, status-aware ─────────────────────────────────────
-def test_apply_commits_shadow_and_planned_locks_live_fixed():
+def test_apply_commits_safe_knobs_only():
     org = "twbtest_wiz1"
     _reset(org)
     try:
         apply_changes(org, {
-            "categories.attendance.verdict.grace_min": "9",              # SHADOW → commits
-            "categories.attendance.ot.disposition": "pay_money",          # PLANNED → commits
-            "categories.attendance.leave.sick.late_inform_penalty_points": "99",  # LIVE_FIXED → ignored
+            "categories.attendance.verdict.grace_min": "9",                       # SHADOW → commits
+            "categories.attendance.ot.disposition": "pay_money",                  # PLANNED → commits
+            "categories.attendance.leave.sick.late_inform_penalty_points": "20",  # LIVE_FIXED → commits (preference)
+            "categories.attendance.approvals.al.reping_hours": "99",             # LIVE + not an editable group → ignored
         })
         cfg = get_config(org)
         assert _get_path(cfg, "categories.attendance.verdict.grace_min") == 9
         assert _get_path(cfg, "categories.attendance.ot.disposition") == "pay_money"
-        assert _get_path(cfg, "categories.attendance.leave.sick.late_inform_penalty_points") == 15  # unchanged
+        assert _get_path(cfg, "categories.attendance.leave.sick.late_inform_penalty_points") == 20  # preference saved
+        assert _get_path(cfg, "categories.attendance.approvals.al.reping_hours") == 6  # LIVE never writable here
     finally:
         _reset(org)
 

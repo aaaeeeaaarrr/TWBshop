@@ -55,9 +55,11 @@ LEGEND = {
     "PLANNED": "an option, not built yet",
 }
 
-# Which states a customer may EDIT (safe): SHADOW tunes the shadow; PLANNED is a harmless future-preference.
-# LIVE / LIVE_FIXED are read-only here (they're live — changed only via the gated cut-over).
-EDITABLE = {"SHADOW", "PLANNED"}
+# Which states a customer may EDIT here (all SAFE — none change live behavior): SHADOW tunes the shadow;
+# PLANNED is a future-preference; LIVE_FIXED is saved as your desired setting that applies AT CUT-OVER (live
+# still runs its fixed rules until then). Only LIVE is locked — it drives the real shop right now, so it's
+# changed only via the gated cut-over (so a customer can't alter live behavior from here).
+EDITABLE = {"SHADOW", "PLANNED", "LIVE_FIXED"}
 
 
 def status_for(path: str) -> str:
