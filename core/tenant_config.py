@@ -154,8 +154,21 @@ DEFAULTS = {
             "supplier_price_compare": True,   # compare the same item's price across suppliers (a PRIMARY goal)
             "low_stock_alert": True,          # alert when stock is low
         },
-        "pos": {"enabled": False},
-        "hr_payroll": {"enabled": False},
+        "pos": {                              # point of sale — be the POS or tap theirs (INERT; modelled)
+            "enabled": False,
+            "mode": "be_the_pos",             # be_the_pos | tap_existing
+            "track_inventory": True,          # decrement stock on each sale
+            "khqr_payments": True,            # accept KHQR / Bakong
+            "receipt": "print_or_send",       # print_or_send | none
+            "tips_enabled": False,
+        },
+        "hr_payroll": {                       # staff records · salary/slips · payroll run (INERT; modelled)
+            "enabled": False,
+            "pay_cycle": "monthly",           # monthly | biweekly | weekly
+            "payslips": True,                 # generate payslips
+            "nssf_export": False,             # Cambodia social-security export
+            "salary_owner_only": True,        # senior+ salaries are owner-only (privacy rule)
+        },
     },
 }
 

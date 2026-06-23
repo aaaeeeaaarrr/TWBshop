@@ -245,6 +245,30 @@ DESCRIPTORS = {
     "categories.stock.supplier_price_compare": {"label": "Compare supplier prices", "type": "bool",
         "help": "Track each item's price across suppliers so you buy from the cheapest.",
         "true": "ON (a primary goal).", "false": "OFF."},
+    # ── POS ──
+    "categories.pos.enabled": {"label": "POS module", "type": "bool",
+        "help": "Point of sale — be the POS, or tap your existing one.", "true": "ON.", "false": "OFF."},
+    "categories.pos.mode": {"label": "POS mode", "type": "enum",
+        "help": "Run our point of sale, or connect the one you already use.",
+        "options": [("be_the_pos", "Be the POS", "Use our point of sale."),
+                    ("tap_existing", "Tap my existing POS", "Connect Loyverse/Square/etc.; we read the sales.")]},
+    "categories.pos.track_inventory": {"label": "Decrement stock on sale", "type": "bool",
+        "help": "Reduce stock automatically when something sells.", "true": "ON.", "false": "OFF."},
+    "categories.pos.khqr_payments": {"label": "Accept KHQR / Bakong", "type": "bool",
+        "help": "Take QR payments at checkout.", "true": "ON.", "false": "OFF."},
+    "categories.pos.tips_enabled": {"label": "Tips", "type": "bool",
+        "help": "Collect tips at checkout.", "true": "ON.", "false": "OFF."},
+    # ── HR / payroll ──
+    "categories.hr_payroll.enabled": {"label": "HR / payroll module", "type": "bool",
+        "help": "Staff records, salary, payslips, payroll run.", "true": "ON.", "false": "OFF."},
+    "categories.hr_payroll.pay_cycle": {"label": "Pay cycle", "type": "enum",
+        "help": "How often staff are paid.",
+        "options": [("monthly", "Monthly", ""), ("biweekly", "Every 2 weeks", ""), ("weekly", "Weekly", "")]},
+    "categories.hr_payroll.payslips": {"label": "Generate payslips", "type": "bool",
+        "help": "Produce a payslip each pay run.", "true": "ON.", "false": "OFF."},
+    "categories.hr_payroll.salary_owner_only": {"label": "Senior salaries owner-only", "type": "bool",
+        "help": "Hide senior/above salaries from everyone but the owner (the salary-privacy rule).",
+        "true": "ON (recommended).", "false": "OFF."},
 }
 
 # Approval-row fields — described ONCE, shown per request type (al/sick/ot/swap/special_leave/dayoff_move).
@@ -350,6 +374,19 @@ STOCK_GROUPS = [
     ("Stock", ["categories.stock.enabled", "categories.stock.count_method", "categories.stock.par_levels",
                "categories.stock.reorder_suggestions", "categories.stock.supplier_price_compare"]),
 ]
+
+POS_GROUPS = [
+    ("POS", ["categories.pos.enabled", "categories.pos.mode", "categories.pos.track_inventory",
+             "categories.pos.khqr_payments", "categories.pos.tips_enabled"]),
+]
+
+HR_GROUPS = [
+    ("HR &amp; payroll", ["categories.hr_payroll.enabled", "categories.hr_payroll.pay_cycle",
+                          "categories.hr_payroll.payslips", "categories.hr_payroll.salary_owner_only"]),
+]
+
+# All the modelled-but-not-live domains, in one place (the customer view + apply iterate these).
+EXTRA_DOMAIN_GROUPS = ACCOUNTANT_GROUPS + STOCK_GROUPS + POS_GROUPS + HR_GROUPS
 
 
 def describe(path: str) -> dict | None:

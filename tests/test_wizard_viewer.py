@@ -135,6 +135,20 @@ def test_stock_domain_shown_and_editable():
         _reset(org)
 
 
+def test_pos_and_hr_domains_shown_and_editable():
+    org = "twbtest_dom"
+    _reset(org)
+    try:
+        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        assert "POS" in body and "HR &amp; payroll" in body and "Pay cycle" in body and "Be the POS" in body
+        apply_changes(org, {"categories.pos.mode": "tap_existing", "categories.hr_payroll.pay_cycle": "weekly"})
+        cfg = get_config(org)
+        assert _get_path(cfg, "categories.pos.mode") == "tap_existing"
+        assert _get_path(cfg, "categories.hr_payroll.pay_cycle") == "weekly"
+    finally:
+        _reset(org)
+
+
 def test_apply_rejects_bad_enum_and_clamps_int():
     org = "twbtest_wiz3"
     _reset(org)

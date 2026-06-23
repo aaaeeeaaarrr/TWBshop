@@ -28,9 +28,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   web check-in token. Minimise typing, maximise tap.
 - **The web channel proves channel-agnostic OPERATION** `[ship]` — staff check in/out via a browser link, same
   brain as Telegram + the replay. Not just onboarding — daily use, any channel.
-- **THREE domains in one wizard** `[ship]` — attendance (live-mirrored) + accountant + **stock** (modelled);
-  the "total business platform" taking shape, not "an attendance app." Adding a domain = a config block +
-  a schema group + a customer section (cheap to extend → POS/HR/etc. next).
+- **FIVE core domains in one wizard** `[ship/sell]` — attendance (live-mirrored) + accountant + stock + POS +
+  HR/payroll (modelled). The "total business platform" pitch is now concrete: one wizard configures the whole
+  shop. Adding a domain = a config block + schema group + a customer section + 1 test (~15 min each).
 - **Per-customer shadow + test-mode as a de-risked go-live** `[idea/sell]` — each tenant validates before cutover.
 
 ### 🔍 Findings

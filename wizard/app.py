@@ -249,6 +249,8 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<h2>Accountant</h2><div class='box'><p class='note'>Built; not live yet — set your preferences "
             "now, they apply when it's switched on.</p>%s</div>"
             "<h2>Stock</h2><div class='box'><p class='note'>Built features modelled; not live yet.</p>%s</div>"
+            "<h2>POS</h2><div class='box'><p class='note'>Modelled; not live yet.</p>%s</div>"
+            "<h2>HR &amp; payroll</h2><div class='box'><p class='note'>Modelled; not live yet.</p>%s</div>"
             "<h2>Connections (channels &amp; tokens)</h2><div class='box'>%s</div>"
             "<div class='actions'><button type='submit'>✓ Apply changes</button>"
             "<a href='/customer' class='btn'>✗ Cancel changes</a></div></form>"
@@ -258,6 +260,8 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
                _render_groups(cfg, schema.ATTENDANCE_GROUPS, org_id),
                _render_groups(cfg, schema.ACCOUNTANT_GROUPS, org_id),
                _render_groups(cfg, schema.STOCK_GROUPS, org_id),
+               _render_groups(cfg, schema.POS_GROUPS, org_id),
+               _render_groups(cfg, schema.HR_GROUPS, org_id),
                _render_groups(cfg, schema.CONNECTIONS_GROUPS, org_id), _render_approvals(cfg),
                _render_locked_modules(cfg)))
     return _page("Configure — your system", body)
@@ -270,7 +274,7 @@ def apply_changes(org_id: str, form) -> dict:
     cfg = get_config(org_id)
     over: dict = {}
     for _glabel, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS
-                           + schema.ACCOUNTANT_GROUPS + schema.STOCK_GROUPS):
+                           + schema.EXTRA_DOMAIN_GROUPS):
         for path in paths:
             desc = schema.describe(path)
             if not desc:
