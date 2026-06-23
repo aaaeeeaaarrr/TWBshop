@@ -42,13 +42,33 @@ def test_checkin_page_and_records(monkeypatch):
         c = create_app(ORG).test_client()
         assert "isn't valid" in c.get("/checkin/nope").get_data(as_text=True)        # bad token
         page = c.get("/checkin/%s" % tok).get_data(as_text=True)
-        assert "Check in now" in page and "geolocation" in page                       # the page + JS
+        assert "Check IN" in page and "geolocation" in page                           # the page + JS
         body = c.post("/checkin/%s" % tok, data={"lat": "11.5", "lon": "104.9"}).get_data(as_text=True)
         assert "Checked in" in body or "already checked in" in body
         with _db() as cc:
             with cc.cursor() as cur:
                 cur.execute("SELECT count(*) n FROM attendance_events WHERE org_id=%s AND type='checked_in'", (ORG,))
                 assert cur.fetchone()["n"] >= 1                                        # recorded to the platform
+    finally:
+        _clean()
+
+
+def test_web_checkout_records(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Sok", shift_windows=[{"start": "00:00", "end": "23:59"}])
+        tok = ensure_checkin_token(ORG, sid)
+        c = create_app(ORG).test_client()
+        assert "Check OUT" in c.get("/checkin/%s" % tok).get_data(as_text=True)        # the page offers both
+        c.post("/checkin/%s" % tok, data={})                                           # check in first
+        body = c.post("/checkout/%s" % tok, data={}).get_data(as_text=True)
+        assert "Checked out" in body or "already checked out" in body
+        with _db() as cc:
+            with cc.cursor() as cur:
+                cur.execute("SELECT count(*) n FROM attendance_events WHERE org_id=%s AND type='checked_out'", (ORG,))
+                assert cur.fetchone()["n"] >= 1
     finally:
         _clean()
 

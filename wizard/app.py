@@ -630,6 +630,21 @@ def _do_web_checkin(staff: dict, lat, lon) -> dict:
         return {"ok": False, "error": str(e)[:120]}
 
 
+def _do_web_checkout(staff: dict, lat, lon) -> dict:
+    from datetime import datetime, timezone
+    from core.attendance import check_out as core_check_out
+    w = (staff.get("shift_windows") or [{}])[0]
+    if not w.get("start") or not w.get("end"):
+        return {"ok": False, "error": "no shift set for you yet"}
+    try:
+        res = core_check_out(staff["org_id"], staff["staff_id"], datetime.now(timezone.utc),
+                             w["start"], w["end"], "Asia/Phnom_Penh")
+        res["ok"] = res.get("bound", False)
+        return res
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+
+
 def render_checkin(token: str, result: dict = None) -> str:
     s = staff_by_checkin_token(token)
     if not s:
@@ -638,24 +653,30 @@ def render_checkin(token: str, result: dict = None) -> str:
     who = escape(s.get("call_name") or s.get("name", ""))
     if result is not None:
         if result.get("ok"):
-            st = result.get("state", "")
-            msg = {"on_time": "✅ Checked in — on time!",
-                   "late": "⚠️ Checked in — %d min late." % result.get("minutes_late", 0),
-                   "early": "✅ Checked in — %d min early." % result.get("minutes_early", 0)}.get(st, "✅ Checked in.")
-            if result.get("duplicate"):
-                msg = "You're already checked in for this shift."
+            if "worked_min" in result:                      # check-OUT
+                msg = "✅ Checked out — worked %d min today." % result.get("worked_min", 0)
+                if result.get("duplicate"):
+                    msg = "You're already checked out for this shift."
+            else:                                           # check-IN
+                st = result.get("state", "")
+                msg = {"on_time": "✅ Checked in — on time!",
+                       "late": "⚠️ Checked in — %d min late." % result.get("minutes_late", 0),
+                       "early": "✅ Checked in — %d min early." % result.get("minutes_early", 0)}.get(st, "✅ Checked in.")
+                if result.get("duplicate"):
+                    msg = "You're already checked in for this shift."
         else:
-            msg = "Couldn't check you in: %s" % result.get("error", "please try again")
+            msg = "Couldn't do that: %s" % result.get("error", "please try again")
         return _page("Check in", "<h1>Hi %s</h1><div class='box'><h2>%s</h2></div>" % (who, escape(msg)))
-    body = ("<h1>Hi %s 👋</h1><div class='box'><p>Ready to check in?</p>"
-            "<button onclick='ci()' style='font-size:18px;padding:12px 24px'>📍 Check in now</button>"
-            "<form id='f' method='post' action='/checkin/%s'><input type='hidden' name='lat'>"
-            "<input type='hidden' name='lon'></form>"
+    body = ("<h1>Hi %s 👋</h1><div class='box'><p>What would you like to do?</p>"
+            "<button onclick=\"go('fi')\" style='font-size:18px;padding:12px 24px'>📍 Check IN</button> &nbsp; "
+            "<button onclick=\"go('fo')\" style='font-size:18px;padding:12px 24px;background:#6b7280'>📍 Check OUT</button>"
+            "<form id='fi' method='post' action='/checkin/%s'><input type='hidden' name='lat'><input type='hidden' name='lon'></form>"
+            "<form id='fo' method='post' action='/checkout/%s'><input type='hidden' name='lat'><input type='hidden' name='lon'></form>"
             "<p class='note'>We use your location to confirm you're at work.</p></div>"
-            "<script>function ci(){var f=document.getElementById('f');if(!navigator.geolocation){f.submit();return;}"
+            "<script>function go(id){var f=document.getElementById(id);if(!navigator.geolocation){f.submit();return;}"
             "navigator.geolocation.getCurrentPosition(function(p){f.lat.value=p.coords.latitude;"
             "f.lon.value=p.coords.longitude;f.submit();},function(){f.submit();});}</script>"
-            % (who, escape(token)))
+            % (who, escape(token), escape(token)))
     return _page("Check in", body)
 
 
@@ -666,8 +687,8 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.before_request
     def _guard():
         if not auth_enabled() or request.endpoint in ("login", "login_post", "logout", "healthz", "static",
-                                                       "checkin", "checkin_post"):
-            return       # staff check in via their token link, not a wizard login
+                                                       "checkin", "checkin_post", "checkout_post"):
+            return       # staff check in/out via their token link, not a wizard login
         if user_count(org_id) == 0 or session.get("user"):   # no users yet → don't lock out (seed first)
             return
         return redirect("/login")
@@ -849,6 +870,13 @@ def create_app(org_id: str = "twb") -> Flask:
         if not s:
             return render_checkin(token)
         return render_checkin(token, result=_do_web_checkin(s, request.form.get("lat"), request.form.get("lon")))
+
+    @app.post("/checkout/<token>")
+    def checkout_post(token):
+        s = staff_by_checkin_token(token)
+        if not s:
+            return render_checkin(token)
+        return render_checkin(token, result=_do_web_checkout(s, request.form.get("lat"), request.form.get("lon")))
 
     @app.get("/healthz")
     def healthz():
