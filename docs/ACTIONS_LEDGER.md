@@ -131,14 +131,22 @@
     design → `docs/WIZARD_DESIGN.md`; lineup → `docs/PLATFORM_ROADMAP.md`; status → CLAUDE.md.
   - **SECURITY now a LAW** (owner Jun 23): CLAUDE.md "▶▶ PRODUCT SECURITY & IP PROTECTION" + memory — brain
     server-side / thin clients / auth + tenant-isolation / localhost+tunnel until authed. Apply pervasively.
-  - **PARKED — TO DO WITH OWNER (needs their input):** (a) the wizard-shape DEEP brainstorm (categories/subs/
-    if-conditions/defaults/Simple-Advanced) · (b) the **COMPANY NAME** (catchy, easy abbreviation).
-  - **OPERATIONAL OPEN:** AL-ladder **owner test-mode walk** (re-ping replaces card; escalation DM after #4 — see Done) ·
-    sick **come-at-X informed-vs-uninformed** Q (below, minor) · the **−15/payback leave-early** going-forward
-    test-walk (fix deployed; see Done).
-  - **SHADOW residual:** the **2 Jun-17 boundary edges** root-cause (owner chose this, then parked) → `docs/PLATFORM_COVERAGE.md`.
-  - **EARLIER PARKED:** bedrock landmines (B2B F2/F3/F4 — DISABLED till fixed; accountant F5/F6/F7) → `docs/BEDROCK_AUDIT_2026-06-22.md`;
-    broader platform port (other verticals). · **RULE (owner): every future edit must fit the wizard (config-driven).**
+  - **PARKED — TO DO WITH OWNER:** (a) the wizard-shape DEEP brainstorm · (b) the **COMPANY NAME** → now a
+    shortlist for you to pick from: `docs/COMPANY_NAME_IDEAS.md` (autonomous run 2026-06-23).
+  - **OPERATIONAL OPEN → DE-RISKED (autonomous run):** the AL-ladder + −15/payback **owner test-walks** are now
+    belt-and-suspenders only — automated coverage VERIFIED (`test_core_approvals`/`test_al_pings`;
+    `test_late_sick_penalty` incl. the leave-early exemption) + the live cases (#434 auto-expired, Long
+    corrected) proven. · sick **come-at-X informed-vs-uninformed** Q (below, minor) still open.
+  - **SHADOW residual → RESOLVED (autonomous run):** the open check-in mismatches were pre-verdict-port
+    stragglers (within the 5-min grace) → reconciled; check-in vertical now reads **READY** (0 open, full
+    coverage). FOR YOU: check-in is cut-over-ready — the flip is your call (not done).
+  - **EARLIER PARKED → updated (autonomous run):** **accountant F5/F6 FIXED** (inert; commit on main) ·
+    **B2B F2/F3/F4 = ready plan** `docs/B2B_LANDMINE_FIX_PLAN.md` (HIGH-RISK money on real ledger → execute
+    WITH owner at re-enable; B2B stays DISABLED) · F7 = build-time note. broader platform port (other
+    verticals). · **RULE: every future edit must fit the wizard (config-driven).**
+  - **DEFERRED THIS RUN (documented, not dropped):** 3b sparse shadow hooks + settle payback-slot port (need a
+    gm restart for sparse gain — focused session) · live cut-over (your go) · per-event verifier phase 2 ·
+    wizard W2.5/W3. Full run log → `docs/AUTONOMOUS_RUN_2026-06-23.md`.
 
 - **2026-06-23 — REVIEWED (no action needed): sick "come-at-X" is NOT an over-penalty.** Traced the sibling case:
   picking "come at X" (`att:sp:meo` → `attendance_ui.py:2833`) just SHOWS a "see you ~X" message — it books

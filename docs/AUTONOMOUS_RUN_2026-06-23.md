@@ -47,4 +47,37 @@ claim-first, don't repeat F2/F3.
 (Item 2 — the cut-over dashboard — deployed: tag `session-53d-wizard-dashboard-20260623`, wizard restarted,
 bots untouched.)
 
-_(more appended as each item completes)_
+### 4 ✅ Company-name shortlist (for your review — NOT decided)
+`docs/COMPANY_NAME_IDEAS.md` — a curated shortlist (Opero/Tenra/Corevo/Hivory/Kaden/Opsi + descriptive +
+a Khmer-rooted option), with rationale, abbreviations, taglines, and my top-3 steer. Pick one when back →
+I'll check trademark/.com + reserve handles. (Nothing is hardcoded to a name; code uses `org_id`/`twb`.)
+
+### 5 ✅ Deferred owner-walks — automated coverage VERIFIED (so the walks are optional)
+I can't tap Telegram, so instead I confirmed the flows are covered by tests (the gate runs them green):
+- AL re-ping ladder → `test_core_approvals.py` (wait/reping/escalate/expire rule) + `test_al_pings.py`
+  (persistence). Plus the live job already auto-expired Heng #434 (proven).
+- Leave-early sick −15 → `test_late_sick_penalty.py` (explicitly tests the leave-early EXEMPTION, family
+  exclusion, timing) + `test_sick_late_inform_fix.py` + `test_core_sick.py`. Plus Long's data was corrected
+  + audit-clean. → The Telegram walks are now belt-and-suspenders, not required.
+
+### 6 ⏸ B2B money landmine (F2/F3/F4) — PLAN READY, deliberately NOT executed
+HIGH-RISK money on the REAL `b2b_payments` ledger + re-enable is your call → I did NOT do risky autonomous
+surgery. Instead wrote `docs/B2B_LANDMINE_FIX_PLAN.md`: exact, ordered, executable steps (dedup data →
+F3 unique constraints → F4 atomic claim-first → F2 one-txn+idempotent → staging proof + second-opinion),
+ready to do together at re-enable. B2B stays DISABLED. Loop is now a ready plan, not a forgotten risk.
+
+### 7 ⏸ Deferred (documented, not dropped): the gm-deploy / sparse / collaborative items
+Not done autonomously, ON PURPOSE — each is either a LIVE-bot restart for SPARSE gain (not worth it while
+you're away), genuinely HIGH-RISK, or needs your input. All recorded so nothing is lost:
+- **3b sparse shadow hooks** (sick · AL-verdict · schedule) + **the settle payback-slot ext-worked port** —
+  shadow-only + safe, but each needs a gm restart to take effect, for low marginal signal (sparse events;
+  the math is already parity-tested). Best as a focused session → `docs/PLATFORM_ROADMAP.md`.
+- **Live cut-over of check-in** (it's now shadow-READY) — THE high-risk flip; your go + a few more days.
+- **Per-event commit-verifier phase 2** — owner-gated HIGH-RISK live-write surgery (ledger).
+- **Wizard W2.5 shadow-diff preview / W3 logins+HTTPS** — product polish; W3 needs your auth/exposure call.
+
+## Net result of this run
+Shipped SAFE, reviewable value with ZERO live-bot disruption (only the isolated wizard service restarted):
+check-in shadow → READY · the cut-over dashboard · the customer editor + dashboard live · accountant
+landmines closed · B2B landmine de-risked into a ready plan · name proposals · walk-coverage verified.
+Every bright line (live money, live cut-over, B2B re-enable, the company name) left for your review.
