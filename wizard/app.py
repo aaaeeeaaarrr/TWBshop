@@ -20,7 +20,8 @@ from urllib.parse import quote
 from flask import Flask, request, redirect, session
 
 from core.tenant_config import get_config, set_config
-from core.db import set_org_secret, has_org_secret, verify_user, user_count
+from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
+                     log_config_change, recent_config_audit)
 from core.whatif import verdict_whatif
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
@@ -223,6 +224,21 @@ def _render_approvals(cfg: dict) -> str:
 _CONFIGURABLE_DOMAINS = {"accountant", "stock", "pos", "hr_payroll"}   # have their own editable sections above
 
 
+def _editable_bool_paths() -> list:
+    out = []
+    for _g, ps in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS
+                   + schema.EXTRA_DOMAIN_GROUPS):
+        for p in ps:
+            d = schema.describe(p)
+            if d and d.get("type") == "bool" and status_for(p) in EDITABLE:
+                out.append(p)
+    return out
+
+
+# Hidden field naming the editable bools on the customer form, so Apply can tell "unchecked" from "absent".
+_SCOPE_FIELD = "<input type='hidden' name='_scope' value='%s'>" % ",".join(_editable_bool_paths())
+
+
 def _render_locked_modules(cfg: dict) -> str:
     rows = []
     for name, c in catalog.CATEGORIES.items():
@@ -244,7 +260,7 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
             "those when we switch them over). Tokens are write-only — paste to set, never shown back.</p>%s"
-            "<form method='post' action='/customer/apply'>"
+            "<form method='post' action='/customer/apply'>%s"
             "<h2>Setup &amp; staff</h2><div class='box'>"
             "<p class='note'>How your system gets set up. The easy path: we guide you to create a bot, you "
             "add it to your groups, and it <b>finds your staff for you to confirm one-by-one</b> — no typing "
@@ -258,10 +274,11 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<h2>HR &amp; payroll</h2><div class='box'><p class='note'>Modelled; not live yet.</p>%s</div>"
             "<h2>Connections (channels &amp; tokens)</h2><div class='box'>%s</div>"
             "<div class='actions'><button type='submit'>✓ Apply changes</button>"
-            "<a href='/customer' class='btn'>✗ Cancel changes</a></div></form>"
+            "<a href='/customer' class='btn'>✗ Cancel changes</a> "
+            "<a href='/audit' class='btn'>📝 Change history</a></div></form>"
             "<h2>Approvals</h2><div class='box'>%s</div>"
             "<h2>Add more to your system</h2><div class='box'>%s</div>"
-            % (saved_banner, _render_groups(cfg, schema.ONBOARDING_GROUPS, org_id),
+            % (saved_banner, _SCOPE_FIELD, _render_groups(cfg, schema.ONBOARDING_GROUPS, org_id),
                _render_groups(cfg, schema.ATTENDANCE_GROUPS, org_id),
                _render_groups(cfg, schema.ACCOUNTANT_GROUPS, org_id),
                _render_groups(cfg, schema.STOCK_GROUPS, org_id),
@@ -278,6 +295,18 @@ def apply_changes(org_id: str, form) -> dict:
     knob or write an arbitrary key from here."""
     cfg = get_config(org_id)
     over: dict = {}
+    changes: list = []                                         # (path, old, new) for the audit trail
+    # A checkbox sends nothing when unchecked, so "absent" is ambiguous. The form posts a hidden `_scope`
+    # listing the bool paths it actually rendered → we only flip those (absent-in-scope = off; out-of-scope
+    # = leave alone). Without `_scope` (a partial/programmatic call) we touch NO bools — never mass-reset.
+    raw_scope = form.get("_scope")
+    scope = None if raw_scope is None else set(filter(None, raw_scope.split(",")))
+
+    def _put(path, newval):
+        if _get_path(cfg, path) != newval:
+            changes.append((path, _get_path(cfg, path), newval))
+        _set_path(over, path, newval)
+
     for _glabel, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS
                            + schema.EXTRA_DOMAIN_GROUPS):
         for path in paths:
@@ -290,26 +319,39 @@ def apply_changes(org_id: str, form) -> dict:
                 val = form.get(path)
                 if _is_secret(ref) and val:
                     set_org_secret(org_id, ref["__secret__"], val.strip())
+                    changes.append((path, "(secret)", "(secret set)"))   # log the act, never the value
                 continue
             if status_for(path) not in EDITABLE:               # only safe shadow/planned config knobs
                 continue
             if t == "bool":
-                _set_path(over, path, path in form)
+                if scope is not None and path in scope:        # only flip bools this form actually carried
+                    _put(path, path in form)
             elif t == "int":
                 try:
                     v = int(form.get(path, ""))
                 except (TypeError, ValueError):
                     continue
-                _set_path(over, path, max(desc.get("min", v), min(desc.get("max", v), v)))
+                _put(path, max(desc.get("min", v), min(desc.get("max", v), v)))
             elif t == "enum":
                 v = form.get(path)
                 if v in [opt[0] for opt in desc["options"]]:
-                    _set_path(over, path, v)
+                    _put(path, v)
             elif t == "text":
-                _set_path(over, path, (form.get(path) or "").strip())
+                _put(path, (form.get(path) or "").strip())
     if over:
         set_config(org_id, over)
+    if changes:
+        who = _current_user()
+        for path, old, new in changes:
+            log_config_change(org_id, who, path, old, new)
     return over
+
+
+def _current_user() -> str:
+    try:
+        return session.get("user") or "owner"
+    except Exception:
+        return "owner"
 
 
 # ── EXPERTISE editor (skills + minimum coverage + day/hour overrides) ─────────
@@ -724,6 +766,21 @@ def render_whatif(org_id: str) -> str:
     return _page("What-if", body)
 
 
+def render_audit(org_id: str) -> str:
+    """📝 The config change log — who changed which knob, when (PRODUCT SECURITY law #5: auditability)."""
+    rows = recent_config_audit(org_id, 100)
+    items = "".join(
+        "<li><b>%s</b> &nbsp; <code>%s</code> &nbsp; %s → %s <span class='note'>(by %s)</span></li>"
+        % (escape(str(r["at"])[:16]), escape(r["path"]),
+           escape("—" if r["old_val"] is None else r["old_val"]),
+           escape("—" if r["new_val"] is None else r["new_val"]), escape(r["who"] or "?"))
+        for r in rows) or "<li class='note'>No config changes recorded yet.</li>"
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+            "<h1>📝 Config change log</h1><div class='box'><p class='note'>Who changed which setting, when. "
+            "Newest first. (Secrets log the act, never the value.)</p><ul>%s</ul></div>" % items)
+    return _page("Audit", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
@@ -907,6 +964,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/whatif")
     def whatif():
         return render_whatif(org_id)
+
+    @app.get("/audit")
+    def audit():
+        return render_audit(org_id)
 
     @app.get("/checkin/<token>")
     def checkin(token):

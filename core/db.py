@@ -246,6 +246,37 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, username)
                 )
             """)
+            # CONFIG AUDIT — who changed what config knob, when (PRODUCT SECURITY law #5: auditability).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_config_audit (
+                    id      BIGSERIAL PRIMARY KEY,
+                    org_id  TEXT NOT NULL,
+                    who     TEXT,
+                    path    TEXT NOT NULL,
+                    old_val TEXT,
+                    new_val TEXT,
+                    at      TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_cfg_audit_org ON core_config_audit (org_id, at DESC)")
+
+
+def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
+    """Append a who-changed-what-when row for a config edit (auditability)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO core_config_audit (org_id, who, path, old_val, new_val) "
+                        "VALUES (%s,%s,%s,%s,%s)",
+                        (org_id, who or "?", path, None if old_val is None else str(old_val)[:200],
+                         None if new_val is None else str(new_val)[:200]))
+
+
+def recent_config_audit(org_id: str, limit: int = 100) -> list:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT who, path, old_val, new_val, at FROM core_config_audit "
+                        "WHERE org_id=%s ORDER BY at DESC LIMIT %s", (org_id, int(limit)))
+            return [dict(r) for r in cur.fetchall()]
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:

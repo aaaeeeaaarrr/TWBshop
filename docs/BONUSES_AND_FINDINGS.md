@@ -35,6 +35,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **"What-if" config preview** `[ship/sell]` — "if you set grace to 9 min, N of your last M check-ins
   reclassify (late→on_time)." A customer SEES a change's effect on their REAL data before applying — removes
   the fear of changing a rule. A genuine confidence/sales feature; more what-ifs (OT cap, AL ladder) slot in.
+- **Config change log (auditability)** `[ship/sell]` — every config edit logs who-changed-which-knob-when
+  (`core_config_audit`); PRODUCT SECURITY law #5. Trust + forensics + the multi-tenant story. Secrets log the
+  ACT, never the value. A `/audit` page (+ a link from the customer view).
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
@@ -71,6 +74,10 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **The 5 unbuilt catalog domains belong as UPSELL, not config** `[decision]` — marketing/delivery/rostering/
   crm/payments are honestly "available, not built"; inventing config for them would be padding + a wrong model.
   Keep them as the upsell hook; promote to a config section only when actually built.
+- ⭐ **Unchecked checkbox = absent (partial-form bool reset)** `[gotcha]` — an HTML checkbox sends nothing when
+  off, so a partial Apply read "absent" as "off" and would mass-reset every bool to False. **The audit log
+  SURFACED it** (it logged the spurious resets). Fixed with a hidden `_scope` field naming the bools the form
+  carried → Apply flips only those. Applies to ANY checkbox form (retail/b2b/hire menus too — worth a look).
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
