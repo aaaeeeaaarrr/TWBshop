@@ -14,6 +14,7 @@ Auth + CSRF + encryption-at-rest land in W3 (with public access).
 """
 import re
 from html import escape
+from urllib.parse import quote
 
 from flask import Flask, request, redirect
 
@@ -137,7 +138,7 @@ def render_page(org_id: str = "twb") -> str:
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
     body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>customer view</a> · <a href='/staff'>staff</a> · "
-            "<a href='/expertise'>expertise</a></div>"
+            "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -229,7 +230,7 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
     body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/staff'>staff</a> · "
-            "<a href='/expertise'>expertise</a></div>"
+            "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>⚙️ Configure your system</h1>"
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
@@ -401,6 +402,42 @@ def render_staff(org_id: str) -> str:
     return _page("Staff", body)
 
 
+# ── Guided BotFather setup (create in BotFather → verify + auto-configure via the Bot API) ──
+def render_bot_setup(org_id: str) -> str:
+    tel = get_config(org_id).get("connections", {}).get("telegram", {})
+    username = tel.get("bot_username")
+    has_token = has_org_secret(org_id, "telegram_bot_token")
+    if username:
+        status = "✅ Connected: <b>@%s</b> — commands configured." % escape(username)
+    elif has_token:
+        status = "Token saved — press “Verify &amp; configure”."
+    else:
+        status = "Not connected yet."
+    ok, err = request.args.get("ok"), request.args.get("err")
+    flash = ("<div class='saved'>✅ Connected to @%s and configured.</div>" % escape(ok) if ok
+             else ("<div class='saved' style='background:#fee2e2;border-color:#fca5a5'>⚠ %s</div>" % escape(err)
+                   if err else ""))
+    steps = ("<ol><li>Open <a href='https://t.me/BotFather' target='_blank'>@BotFather</a> in Telegram.</li>"
+             "<li>Send <code>/newbot</code>; give it a name + a username ending in <code>bot</code>.</li>"
+             "<li>Copy the <b>token</b> it gives you and paste it below.</li>"
+             "<li>Back in BotFather: <code>/setprivacy</code> → <b>Disable</b> — so the bot can read your "
+             "staff group for discover-confirm.</li></ol>")
+    body = (
+        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · "
+        "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
+        "<h1>🤖 Create &amp; connect your bot</h1>%s"
+        "<div class='box'><b>Status:</b> %s</div>"
+        "<div class='box'><h3>1) Make the bot (in Telegram)</h3>%s</div>"
+        "<div class='box'><h3>2) Connect &amp; auto-configure</h3>"
+        "<form method='post' action='/bot/provision'>Bot token "
+        "<input type='password' name='token' placeholder='paste the BotFather token' style='width:320px'> "
+        "<button type='submit'>Verify &amp; configure</button></form>"
+        "<p class='note'>We verify the token and set the bot's command menu for you. The token is stored "
+        "encrypted and never shown again. (Real Bot-API call — only runs when you submit a token.)</p></div>"
+        % (flash, status, steps))
+    return _page("Create your bot", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
 
@@ -478,6 +515,23 @@ def create_app(org_id: str = "twb") -> Flask:
         if sid > 0:
             remove_staff(org_id, sid)
         return redirect("/staff")
+
+    @app.get("/bot")
+    def bot_setup():
+        return render_bot_setup(org_id)
+
+    @app.post("/bot/provision")
+    def bot_provision():
+        token = (request.form.get("token") or "").strip()
+        if not token:
+            return redirect("/bot?err=" + quote("Paste a token first."))
+        from adapters.telegram_provision import provision
+        res = provision(token)
+        if res.get("ok"):
+            set_org_secret(org_id, "telegram_bot_token", token)         # store the VERIFIED token (encrypted-pending)
+            set_config(org_id, {"connections": {"telegram": {"bot_username": res["username"]}}})
+            return redirect("/bot?ok=" + quote(res["username"]))
+        return redirect("/bot?err=" + quote(res.get("error", "could not connect")[:120]))
 
     @app.get("/healthz")
     def healthz():
