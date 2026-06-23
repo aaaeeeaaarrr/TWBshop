@@ -30,12 +30,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 from telegram.ext import Application
 from core.db import init_core_db, ensure_org
+from core.onboarding_flow import record_group, set_group_role
 from adapters.telegram_onboarding import register
 
 init_core_db()
 ensure_org(org, org)
+record_group(org, int(chat), "Staff group (demo)")
+set_group_role(org, int(chat), "staff")           # the demo maps your group as the staff group
 app = Application.builder().token(token).build()
-register(app, org, int(chat))
+register(app, org)
 logging.getLogger("onboard").info("discover-confirm demo: org=%s staff_chat=%s — add the bot to the group, "
                                   "have people post, then /onboard. Ctrl-C to stop.", org, chat)
 app.run_polling()

@@ -20,6 +20,21 @@ def _clean():
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_staff WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_org_groups WHERE org_id=%s", (ORG,))
+
+
+def test_groups_screen_lists_and_assigns_role():
+    from core.onboarding_flow import record_group, group_id_for_role
+    c = _client()
+    _clean()
+    try:
+        record_group(ORG, -100, "Staff Chat")
+        body = c.get("/groups").get_data(as_text=True)
+        assert "Staff Chat" in body and "staff" in body
+        c.post("/groups/role", data={"chat_id": "-100", "role": "staff"})
+        assert group_id_for_role(ORG, "staff") == -100
+    finally:
+        _clean()
 
 
 def _exp(org):

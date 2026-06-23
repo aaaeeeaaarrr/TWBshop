@@ -20,7 +20,8 @@ from flask import Flask, request, redirect
 
 from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret
-from core.onboarding_flow import list_staff, add_staff_manual, remove_staff
+from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff,
+                                  list_groups, set_group_role, GROUP_ROLES)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
 
@@ -138,7 +139,7 @@ def render_page(org_id: str = "twb") -> str:
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
     body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>customer view</a> · <a href='/staff'>staff</a> · "
-            "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
+            "<a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -402,6 +403,34 @@ def render_staff(org_id: str) -> str:
     return _page("Staff", body)
 
 
+# ── GROUPS — the bot's discovered groups + their roles ───────────────────────
+def render_groups(org_id: str) -> str:
+    groups = list_groups(org_id)
+    rows = []
+    for g in groups:
+        opts = "".join("<option value='%s' %s>%s</option>"
+                       % (r, "selected" if (g.get("role") or "") == r else "", r or "— unassigned —")
+                       for r in [""] + GROUP_ROLES)
+        rows.append("<tr><td>%s</td><td><code>%s</code></td>"
+                    "<td><form method='post' action='/groups/role' style='display:inline'>"
+                    "<input type='hidden' name='chat_id' value='%s'>"
+                    "<select name='role' onchange='this.form.submit()'>%s</select></form></td></tr>"
+                    % (escape(g.get("title") or "(untitled group)"), g["chat_id"], g["chat_id"], opts))
+    table = "".join(rows) or ("<tr><td colspan='3' class='note'>No groups yet — add your bot to your "
+                              "Telegram groups; once someone posts there, the group shows up here.</td></tr>")
+    body = (
+        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/staff'>staff</a> · "
+        "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
+        "<h1>💬 Groups</h1>"
+        "<p class='note'>Add your bot to your Telegram groups; they appear here automatically. Tag your "
+        "<b>staff</b> group so the bot knows where to discover staff for confirm. (Each role is held by one "
+        "group.)</p>"
+        "<div class='box'><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+        "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Group</th><th>Chat id</th>"
+        "<th>Role</th></tr>%s</table></div>" % table)
+    return _page("Groups", body)
+
+
 # ── Guided BotFather setup (create in BotFather → verify + auto-configure via the Bot API) ──
 def render_bot_setup(org_id: str) -> str:
     tel = get_config(org_id).get("connections", {}).get("telegram", {})
@@ -515,6 +544,20 @@ def create_app(org_id: str = "twb") -> Flask:
         if sid > 0:
             remove_staff(org_id, sid)
         return redirect("/staff")
+
+    @app.get("/groups")
+    def groups():
+        return render_groups(org_id)
+
+    @app.post("/groups/role")
+    def groups_role():
+        try:
+            cid = int(request.form.get("chat_id"))
+        except (TypeError, ValueError):
+            cid = None
+        if cid is not None:
+            set_group_role(org_id, cid, request.form.get("role") or "")
+        return redirect("/groups")
 
     @app.get("/bot")
     def bot_setup():

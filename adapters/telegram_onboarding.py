@@ -11,7 +11,8 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-from core.onboarding_flow import record_seen_member, list_candidates, confirm_candidate, skip_candidate
+from core.onboarding_flow import (record_seen_member, list_candidates, confirm_candidate, skip_candidate,
+                                  record_group, group_id_for_role)
 
 logger = logging.getLogger("onboard")
 
@@ -27,12 +28,20 @@ def _candidate_card(c: dict):
     return "👤 Found: <b>%s</b>%s\nAdd them as staff?" % (who, uname), kb
 
 
-def make_handlers(org_id: str, staff_chat_id: int):
-    """Build the three bound handlers (group-message stager · /onboard · confirm callback)."""
+def make_handlers(org_id: str):
+    """Build the three bound handlers (group recorder + staff-group stager · /onboard · confirm callback).
+    The STAFF group is whichever the owner tagged in the wizard (group_id_for_role) — so the bot discovers
+    every group it's in, and only stages people from the one you marked as staff."""
 
     async def on_group_message(update, context):
         chat, u = update.effective_chat, update.effective_user
-        if chat and u and not u.is_bot and chat.id == staff_chat_id:
+        if not chat or getattr(chat, "type", None) not in ("group", "supergroup"):
+            return
+        try:
+            record_group(org_id, chat.id, getattr(chat, "title", None))           # discover the group
+        except Exception:
+            logger.exception("[ONBOARD] record_group failed (harmless)")
+        if u and not u.is_bot and chat.id == group_id_for_role(org_id, "staff"):    # stage only from the staff group
             try:
                 record_seen_member(org_id, u.id, u.full_name, u.username, chat_id=chat.id)
             except Exception:
@@ -75,9 +84,10 @@ def make_handlers(org_id: str, staff_chat_id: int):
     return on_group_message, cmd_onboard, on_callback
 
 
-def register(app, org_id: str, staff_chat_id: int) -> None:
-    """Attach the discover-confirm handlers to a tenant's bot Application."""
-    on_msg, cmd, cb = make_handlers(org_id, staff_chat_id)
-    app.add_handler(MessageHandler(filters.ChatType.GROUPS & ~filters.COMMAND, on_msg), group=5)
+def register(app, org_id: str) -> None:
+    """Attach the discover-confirm handlers to a tenant's bot Application (the staff group comes from the
+    wizard's group mapping, not a fixed id)."""
+    on_msg, cmd, cb = make_handlers(org_id)
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, on_msg), group=5)
     app.add_handler(CommandHandler("onboard", cmd))
     app.add_handler(CallbackQueryHandler(cb, pattern=r"^onb:"))

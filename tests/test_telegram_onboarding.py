@@ -14,27 +14,32 @@ def test_candidate_card_buttons():
     assert "onb:ok:7" in datas and "onb:skip:7" in datas
 
 
-def test_group_message_stages_only_in_staff_group(monkeypatch):
-    staged = []
+def test_group_message_records_group_and_stages_in_staff_group(monkeypatch):
+    recorded, staged = [], []
+    monkeypatch.setattr(ob, "record_group", lambda org, cid, title=None: recorded.append((org, cid)))
+    monkeypatch.setattr(ob, "group_id_for_role", lambda org, role: -100)   # the staff group is -100
     monkeypatch.setattr(ob, "record_seen_member", lambda *a, **k: staged.append(a))
-    on_msg, _, _ = ob.make_handlers("org1", staff_chat_id=-100)
+    on_msg, _, _ = ob.make_handlers("org1")
     upd = MagicMock()
     upd.effective_chat.id = -100
+    upd.effective_chat.type = "group"
+    upd.effective_chat.title = "Staff"
     upd.effective_user.is_bot = False
     upd.effective_user.id = 7
     upd.effective_user.full_name = "Sok"
     upd.effective_user.username = "sok_t"
     asyncio.run(on_msg(upd, None))
-    assert staged and staged[0][0] == "org1" and staged[0][1] == 7
+    assert recorded == [("org1", -100)] and staged and staged[0][1] == 7
+    recorded.clear()
     staged.clear()
-    upd.effective_chat.id = -999                      # a different group → ignored
+    upd.effective_chat.id = -999                       # a different group → recorded but NOT staged
     asyncio.run(on_msg(upd, None))
-    assert staged == []
+    assert recorded == [("org1", -999)] and staged == []
 
 
 def test_onboard_says_none_when_empty(monkeypatch):
     monkeypatch.setattr(ob, "list_candidates", lambda org, status="pending": [])
-    _, cmd, _ = ob.make_handlers("org1", -100)
+    _, cmd, _ = ob.make_handlers("org1")
     upd = MagicMock()
     upd.effective_message.reply_text = AsyncMock()
     asyncio.run(cmd(upd, None))
@@ -50,7 +55,7 @@ def test_confirm_callback_confirms_then_advances(monkeypatch):
 
     monkeypatch.setattr(ob, "list_candidates", _list)
     monkeypatch.setattr(ob, "confirm_candidate", lambda org, uid, name, **k: confirmed.append((uid, name)))
-    _, _, cb = ob.make_handlers("org1", -100)
+    _, _, cb = ob.make_handlers("org1")
     upd = MagicMock()
     upd.callback_query.data = "onb:ok:7"
     upd.callback_query.answer = AsyncMock()
@@ -65,7 +70,7 @@ def test_skip_callback(monkeypatch):
     skipped = []
     monkeypatch.setattr(ob, "list_candidates", lambda org, status="pending": [])
     monkeypatch.setattr(ob, "skip_candidate", lambda org, uid: skipped.append(uid))
-    _, _, cb = ob.make_handlers("org1", -100)
+    _, _, cb = ob.make_handlers("org1")
     upd = MagicMock()
     upd.callback_query.data = "onb:skip:9"
     upd.callback_query.answer = AsyncMock()

@@ -97,3 +97,45 @@ def remove_staff(org_id: str, staff_id: int) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE core_staff SET status='removed' WHERE org_id=%s AND staff_id=%s",
                         (org_id, staff_id))
+
+
+# ── GROUPS the bot is in (auto-discovered) + their roles ──────────────────────
+GROUP_ROLES = ["staff", "suppliers", "management", "expenses", "reports"]
+
+
+def record_group(org_id: str, chat_id: int, title: str = None) -> None:
+    """The bot saw/was-added-to a group → remember it (refresh the title; keep any assigned role)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO core_org_groups (org_id, chat_id, title) VALUES (%s,%s,%s)
+                           ON CONFLICT (org_id, chat_id) DO UPDATE
+                             SET title=COALESCE(EXCLUDED.title, core_org_groups.title)""",
+                        (org_id, chat_id, title))
+
+
+def list_groups(org_id: str) -> list[dict]:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM core_org_groups WHERE org_id=%s ORDER BY seen_at", (org_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def set_group_role(org_id: str, chat_id: int, role: str) -> None:
+    """Tag a group with a role. A role is single-occupancy (one staff group) — assigning it clears any prior
+    holder of that role. role='' / not in GROUP_ROLES → unassign."""
+    role = role if role in GROUP_ROLES else None
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if role:
+                cur.execute("UPDATE core_org_groups SET role=NULL WHERE org_id=%s AND role=%s", (org_id, role))
+            cur.execute("UPDATE core_org_groups SET role=%s WHERE org_id=%s AND chat_id=%s",
+                        (role, org_id, chat_id))
+
+
+def group_id_for_role(org_id: str, role: str) -> int | None:
+    """The chat_id the owner tagged with this role (e.g. the STAFF group that discover-confirm watches)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT chat_id FROM core_org_groups WHERE org_id=%s AND role=%s LIMIT 1", (org_id, role))
+            r = cur.fetchone()
+            return r["chat_id"] if r else None

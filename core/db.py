@@ -191,6 +191,17 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, tg_user_id)
                 )
             """)
+            # GROUPS the bot is in — auto-discovered; the owner tags each with a role (staff drives discover-confirm).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_org_groups (
+                    org_id   TEXT NOT NULL,
+                    chat_id  BIGINT NOT NULL,
+                    title    TEXT,
+                    role     TEXT,            -- staff | suppliers | management | expenses | reports | NULL
+                    seen_at  TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, chat_id)
+                )
+            """)
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:

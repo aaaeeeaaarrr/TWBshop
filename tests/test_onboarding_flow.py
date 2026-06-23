@@ -14,6 +14,24 @@ def _clean():
         with c.cursor() as cur:
             cur.execute("DELETE FROM core_staff WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_onboarding_candidates WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_org_groups WHERE org_id=%s", (ORG,))
+
+
+def test_group_discovery_and_single_role_mapping():
+    from core.onboarding_flow import record_group, list_groups, set_group_role, group_id_for_role
+    _clean()
+    try:
+        record_group(ORG, -100, "Staff Chat")
+        record_group(ORG, -200, "Suppliers")
+        record_group(ORG, -100, "Staff Chat v2")          # re-seen → refresh title, stays one row
+        assert len(list_groups(ORG)) == 2
+        set_group_role(ORG, -100, "staff")
+        assert group_id_for_role(ORG, "staff") == -100
+        set_group_role(ORG, -200, "staff")                # single-occupancy → moves the staff role
+        assert group_id_for_role(ORG, "staff") == -200
+        assert next(g for g in list_groups(ORG) if g["chat_id"] == -100)["role"] is None
+    finally:
+        _clean()
 
 
 def test_discover_then_confirm_builds_roster():
