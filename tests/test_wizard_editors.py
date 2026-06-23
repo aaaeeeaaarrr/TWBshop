@@ -46,6 +46,12 @@ def test_editors_render():
     assert c.get("/staff").status_code == 200 and c.get("/expertise").status_code == 200
 
 
+def test_setup_checklist_renders():
+    body = _client().get("/setup").get_data(as_text=True)
+    for s in ("Setup", "Connect your bot", "Tag your staff group", "Add your staff", "Set your rules"):
+        assert s in body
+
+
 def test_expertise_add_remove_role():
     c = _client()
     _clean()

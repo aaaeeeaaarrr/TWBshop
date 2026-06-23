@@ -21,7 +21,8 @@ from flask import Flask, request, redirect
 from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff,
-                                  list_groups, set_group_role, GROUP_ROLES)
+                                  list_groups, set_group_role, GROUP_ROLES,
+                                  list_candidates, group_id_for_role)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
 
@@ -138,8 +139,9 @@ def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
-    body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>customer view</a> · <a href='/staff'>staff</a> · "
-            "<a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · <a href='/bot'>bot setup</a></div>"
+    body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
+            "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
+            "<a href='/bot'>bot setup</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
             "%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
@@ -230,8 +232,8 @@ def _render_locked_modules(cfg: dict) -> str:
 def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/staff'>staff</a> · "
-            "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/setup'>setup</a> · <a href='/staff'>staff</a> · "
+            "<a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>⚙️ Configure your system</h1>"
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
@@ -403,6 +405,38 @@ def render_staff(org_id: str) -> str:
     return _page("Staff", body)
 
 
+# ── SETUP checklist — the "where am I" view that ties onboarding together ─────
+def render_setup(org_id: str) -> str:
+    cfg = get_config(org_id)
+    bot_user = cfg.get("connections", {}).get("telegram", {}).get("bot_username")
+    staff_grp = group_id_for_role(org_id, "staff")
+    staff, pending = list_staff(org_id), list_candidates(org_id)
+
+    def step(done, label, link, hint):
+        return ("<li style='margin:8px 0'>%s <a href='%s'><b>%s</b></a> — <span class='note'>%s</span></li>"
+                % ("✅" if done else "⬜", link, escape(label), escape(hint)))
+
+    steps = "".join([
+        step(bool(bot_user), "Connect your bot", "/bot",
+             ("@%s connected" % bot_user) if bot_user else "create + verify your bot in BotFather"),
+        step(bool(staff_grp), "Tag your staff group", "/groups",
+             "done" if staff_grp else "add the bot to your groups, then tag the staff one"),
+        step(len(staff) > 0, "Add your staff", "/staff",
+             (("%d added" % len(staff)) + ((", %d to confirm" % len(pending)) if pending else ""))
+             if (staff or pending) else "discover-confirm from the group, or add by hand"),
+        step(True, "Set your rules", "/customer", "attendance · leave · OT · approvals — tweak anytime"),
+    ])
+    done_n = sum([bool(bot_user), bool(staff_grp), len(staff) > 0, True])
+    body = (
+        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/bot'>bot</a> · "
+        "<a href='/groups'>groups</a> · <a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
+        "<h1>🚀 Setup — %d of 4 done</h1>"
+        "<p class='note'>Work through these in any order. The bot does the heavy lifting — you just confirm.</p>"
+        "<div class='box'><ul style='list-style:none;padding-left:0;line-height:1.8'>%s</ul></div>"
+        % (done_n, steps))
+    return _page("Setup", body)
+
+
 # ── GROUPS — the bot's discovered groups + their roles ───────────────────────
 def render_groups(org_id: str) -> str:
     groups = list_groups(org_id)
@@ -544,6 +578,10 @@ def create_app(org_id: str = "twb") -> Flask:
         if sid > 0:
             remove_staff(org_id, sid)
         return redirect("/staff")
+
+    @app.get("/setup")
+    def setup():
+        return render_setup(org_id)
 
     @app.get("/groups")
     def groups():
