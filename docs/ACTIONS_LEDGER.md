@@ -9,6 +9,19 @@
 
 ## Done (with proof)
 
+- **2026-06-23 — AL APPROVAL RE-PING LADDER built + deployed (config-driven; the Heng-stuck class fixed) +
+  HENG #434 AUTO-EXPIRED.** The daily audit flagged Heng's AL #434 pending 4 days — root cause: 1/2 senior
+  approvals (Samphass yes, no 2nd) and the ladder had NO reminder/escalation (`senior_timers` was dead
+  code). Fix (first config-driven feature, owner spec): `core.approvals.reping_decision` rule +
+  `tenant_config.approval_rule('twb','al')` (re-ping non-responders every 6h ×4 · delete-prior · skip
+  responders · escalate to owner after #4 · auto-expire past-window) + `gm_bot._al_reping_job` (30min) +
+  `al_pings` (persistent msg-ids). Deployed tag `session-52h-al-reping-ladder-20260623` = `c765242`, gm
+  active NR=0, suite 936p. **PROOF:** the job's first run auto-expired #434 — independent re-read
+  status=`expired` decided_at 2026-06-23 02:10:34; `gm_events al_expired {"req":434}` + `[AL-LADDER] req
+  #434 EXPIRED (window passed)` (auto-logged). Going forward, a stuck approval can't silently dangle.
+  ⚠ NEEDS OWNER TEST-MODE WALK (I can't tap Telegram): a real pending AL with a non-responding senior →
+  watch the 6h re-ping replace the prior card; the escalation DM after #4.
+
 - **2026-06-23 — LONG (id 1) Jun-21 PAYBACK over-charge CORRECTED (HIGH-RISK payback write; deployed code + vetted
   script + independent before/after + clean audit).** The leave-early-sick bug booked the FULL shift (540) as
   paperless payback; correct = the REMAINING unworked tail (302, "pay-back from now"). Deployed `remaining_shift_min`
