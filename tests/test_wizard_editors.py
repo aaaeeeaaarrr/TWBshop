@@ -52,6 +52,20 @@ def test_setup_checklist_renders():
         assert s in body
 
 
+def test_template_apply_prefills_config():
+    c = _client()
+    _clean()
+    try:
+        assert "Bakery" in c.get("/templates").get_data(as_text=True)
+        c.post("/templates/apply", data={"name": "bakery"})
+        cfg = get_config(ORG)
+        assert cfg["onboarding"]["industry_template"] == "bakery"
+        exp = cfg["categories"]["attendance"]["expertise"]
+        assert exp["enabled"] is True and any(r["name"] == "baker" for r in exp["roles"])
+    finally:
+        _clean()
+
+
 def test_expertise_add_remove_role():
     c = _client()
     _clean()

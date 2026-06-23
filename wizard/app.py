@@ -459,8 +459,31 @@ def render_setup(org_id: str) -> str:
         "<h1>🚀 Setup — %d of 4 done</h1>"
         "<p class='note'>Work through these in any order. The bot does the heavy lifting — you just confirm.</p>"
         "<div class='box'><ul style='list-style:none;padding-left:0;line-height:1.8'>%s</ul></div>"
+        "<p class='note'>New here? <a href='/templates'>Start from a template</a> to pre-fill typical "
+        "skills + rules.</p>"
         % (done_n, steps))
     return _page("Setup", body)
+
+
+def render_templates(org_id: str) -> str:
+    from wizard.templates import TEMPLATES
+    cur = get_config(org_id).get("onboarding", {}).get("industry_template") or ""
+    cards = "".join(
+        "<li style='margin:10px 0'><b>%s</b>%s — <span class='note'>%s</span> "
+        "<form method='post' action='/templates/apply' style='display:inline'>"
+        "<input type='hidden' name='name' value='%s'><button class='btn'>Apply</button></form></li>"
+        % (escape(t["label"]), " ✅ (current)" if name == cur else "", escape(t["blurb"]), name)
+        for name, t in TEMPLATES.items())
+    flash = ("<div class='saved'>✅ Template applied — tweak anything in the other screens.</div>"
+             if request.args.get("applied") else "")
+    body = (
+        "<div class='nav'><a href='/setup'>← setup</a> · <a href='/customer'>customer</a> · "
+        "<a href='/expertise'>expertise</a></div>"
+        "<h1>🧩 Starter templates</h1>%s"
+        "<p class='note'>Pre-fills typical skills + rules for your kind of business — you change everything "
+        "afterwards. (Applying replaces those specific presets; your other settings stay put.)</p>"
+        "<div class='box'><ul style='list-style:none;padding-left:0'>%s</ul></div>" % (flash, cards))
+    return _page("Templates", body)
 
 
 # ── GROUPS — the bot's discovered groups + their roles ───────────────────────
@@ -625,6 +648,16 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/setup")
     def setup():
         return render_setup(org_id)
+
+    @app.get("/templates")
+    def templates():
+        return render_templates(org_id)
+
+    @app.post("/templates/apply")
+    def templates_apply():
+        from wizard.templates import apply_template
+        apply_template(org_id, request.form.get("name") or "")
+        return redirect("/templates?applied=1")
 
     @app.get("/groups")
     def groups():
