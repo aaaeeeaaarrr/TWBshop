@@ -143,15 +143,15 @@ def render_cutover(org_id: str) -> str:
 
 def _admin_dashboard(org_id: str) -> str:
     cfg = get_config(org_id)
+    st = _setup_state(org_id)
     audit = recent_config_audit(org_id, 1)
     last = ("last change %s <code>%s</code> by %s" % (str(audit[0]["at"])[:16], escape(audit[0]["path"]),
             escape(audit[0]["who"] or "?"))) if audit else "no config changes yet"
-    n_issues = len(config_health(org_id))
-    health = "⚠️ %d config issue(s)" % n_issues if n_issues else "✅ config healthy"
-    return ("<div class='box'><b>📊 At a glance</b> &nbsp; %d staff · %d groups · channels: %s · "
-            "<a href='/health'>%s</a> · %s</div>"
-            % (len(list_staff(org_id)), len(list_groups(org_id)),
-               escape(", ".join(cfg.get("channels", [])) or "—"), health, last))
+    health = "⚠️ %d warning(s)" % len(st["warns"]) if st["warns"] else "✅ config healthy"
+    return ("<div class='box'><b>📊 At a glance</b> &nbsp; <a href='/setup'>setup %d/%d</a> · %d staff · "
+            "%d groups · channels: %s · <a href='/health'>%s</a> · %s</div>"
+            % (st["done"], st["total"], len(st["staff"]), len(list_groups(org_id)),
+               escape(", ".join(cfg.get("channels", []) or []) or "—"), health, last))
 
 
 def render_page(org_id: str = "twb") -> str:
@@ -543,12 +543,22 @@ def render_staff_edit(org_id: str, staff_id: int) -> str:
 
 
 # ── SETUP checklist — the "where am I" view that ties onboarding together ─────
-def render_setup(org_id: str) -> str:
+def _setup_state(org_id: str) -> dict:
+    """Onboarding progress — the single source for both /setup and the dashboard (so they can't drift)."""
     cfg = get_config(org_id)
     bot_user = cfg.get("connections", {}).get("telegram", {}).get("bot_username")
     staff_grp = group_id_for_role(org_id, "staff")
-    staff, pending = list_staff(org_id), list_candidates(org_id)
+    staff = list_staff(org_id)
     warns = [m for lvl, m in config_health(org_id) if lvl == "warn"]
+    flags = [bool(bot_user), bool(staff_grp), len(staff) > 0, True, not warns]
+    return {"bot_user": bot_user, "staff_grp": staff_grp, "staff": staff, "warns": warns,
+            "done": sum(flags), "total": len(flags)}
+
+
+def render_setup(org_id: str) -> str:
+    st = _setup_state(org_id)
+    bot_user, staff_grp, staff, warns = st["bot_user"], st["staff_grp"], st["staff"], st["warns"]
+    pending = list_candidates(org_id)
 
     def step(done, label, link, hint):
         return ("<li style='margin:8px 0'>%s <a href='%s'><b>%s</b></a> — <span class='note'>%s</span></li>"
@@ -566,17 +576,17 @@ def render_setup(org_id: str) -> str:
         step(not warns, "Clear config warnings", "/health",
              ("%d to resolve" % len(warns)) if warns else "no warnings"),
     ])
-    done_n = sum([bool(bot_user), bool(staff_grp), len(staff) > 0, True, not warns])
-    ready_banner = ("<div class='saved'>🎉 You're ready to go live!</div>" if done_n == 5 else "")
+    done_n = st["done"]
+    ready_banner = ("<div class='saved'>🎉 You're ready to go live!</div>" if done_n == st["total"] else "")
     body = (
         "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/bot'>bot</a> · "
         "<a href='/groups'>groups</a> · <a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
-        "<h1>🚀 Setup — %d of 5 done</h1>%s"
+        "<h1>🚀 Setup — %d of %d done</h1>%s"
         "<p class='note'>Work through these in any order. The bot does the heavy lifting — you just confirm.</p>"
         "<div class='box'><ul style='list-style:none;padding-left:0;line-height:1.8'>%s</ul></div>"
         "<p class='note'>New here? <a href='/templates'>Start from a template</a> to pre-fill typical "
         "skills + rules.</p>"
-        % (done_n, ready_banner, steps))
+        % (done_n, st["total"], ready_banner, steps))
     return _page("Setup", body)
 
 

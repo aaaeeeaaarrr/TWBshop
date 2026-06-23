@@ -68,6 +68,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Security response headers** `[ship]` — `X-Frame-Options: DENY` · `X-Content-Type-Options: nosniff` ·
   `Referrer-Policy: no-referrer` on every wizard response (anti-clickjacking / MIME-sniffing; W3-prep, zero
   behaviour change). CSP deferred — the inline check-in JS/styles need a nonce or refactor first (parked W3).
+- **Dashboard onboarding progress** `[ship]` — the admin "at a glance" now shows **setup N/5** (linked) +
+  warnings, via a shared `_setup_state` so `/setup` and the dashboard can't drift (truth-consolidation by
+  construction). The owner sees how close a tenant is to go-live without opening /setup.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
