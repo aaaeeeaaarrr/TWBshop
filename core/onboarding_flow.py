@@ -99,6 +99,25 @@ def remove_staff(org_id: str, staff_id: int) -> None:
                         (org_id, staff_id))
 
 
+def get_staff(org_id: str, staff_id: int) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM core_staff WHERE org_id=%s AND staff_id=%s", (org_id, staff_id))
+            r = cur.fetchone()
+            return dict(r) if r else None
+
+
+def update_staff(org_id: str, staff_id: int, name: str, call_name: str = None, role: str = None,
+                 is_senior: bool = False, expertises: list = None, shift_windows: list = None) -> None:
+    """Update a staffer's editable fields (the wizard edit form supplies all of them). Scoped to the org."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE core_staff SET name=%s, call_name=%s, role=%s, is_senior=%s,
+                           expertises=%s, shift_windows=%s WHERE org_id=%s AND staff_id=%s""",
+                        (name, call_name, role, is_senior, json.dumps(expertises or []),
+                         json.dumps(shift_windows or []), org_id, staff_id))
+
+
 # ── GROUPS the bot is in (auto-discovered) + their roles ──────────────────────
 GROUP_ROLES = ["staff", "suppliers", "management", "expenses", "reports"]
 

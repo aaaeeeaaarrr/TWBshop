@@ -20,7 +20,7 @@ from flask import Flask, request, redirect
 
 from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret
-from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff,
+from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
@@ -377,11 +377,12 @@ def render_staff(org_id: str) -> str:
     staff = list_staff(org_id)
     rows = "".join(
         "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-        "<td><form method='post' action='/staff/del' style='display:inline'>"
+        "<td><a href='/staff/edit/%d' class='btn'>edit</a> "
+        "<form method='post' action='/staff/del' style='display:inline'>"
         "<input type='hidden' name='staff_id' value='%d'><button class='btn'>remove</button></form></td></tr>"
         % (escape(s.get("name", "")), escape(s.get("role") or ""), "senior" if s.get("is_senior") else "",
            escape(", ".join(s.get("expertises") or [])), escape(_windows_str(s.get("shift_windows"))),
-           s["staff_id"])
+           s["staff_id"], s["staff_id"])
         for s in staff) or "<tr><td colspan='6' class='note'>No staff yet.</td></tr>"
     body = (
         "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
@@ -403,6 +404,31 @@ def render_staff(org_id: str) -> str:
         "<br><br><button type='submit'>+ add staffer</button></form></div>"
         % rows)
     return _page("Staff", body)
+
+
+def render_staff_edit(org_id: str, staff_id: int) -> str:
+    s = get_staff(org_id, staff_id)
+    if not s:
+        return _page("Edit staff", "<div class='nav'><a href='/staff'>← staff</a></div><p>Not found.</p>")
+    w = s.get("shift_windows") or []
+    w0, w1 = (w[0] if len(w) > 0 else {}), (w[1] if len(w) > 1 else {})
+    body = (
+        "<div class='nav'><a href='/staff'>← staff</a></div><h1>✏️ Edit %s</h1>"
+        "<div class='box'><form method='post' action='/staff/update'>"
+        "<input type='hidden' name='staff_id' value='%d'>"
+        "Name <input type='text' name='name' value='%s'> "
+        "Call-name <input type='text' name='call_name' value='%s' style='width:120px'> "
+        "Role <input type='text' name='role' value='%s' style='width:120px'> "
+        "<label style='font-weight:normal'><input type='checkbox' name='is_senior' %s> senior</label><br><br>"
+        "Skills (comma-separated) <input type='text' name='expertises' value='%s'><br><br>"
+        "Shift <input type='time' name='work_start' value='%s'> to <input type='time' name='work_end' value='%s'> "
+        "&nbsp; split <input type='time' name='split_start' value='%s'> to <input type='time' name='split_end' value='%s'>"
+        "<br><br><button type='submit'>Save</button> <a href='/staff' class='btn'>Cancel</a></form></div>"
+        % (escape(s.get("name", "")), s["staff_id"], escape(s.get("name", "")), escape(s.get("call_name") or ""),
+           escape(s.get("role") or ""), "checked" if s.get("is_senior") else "",
+           escape(", ".join(s.get("expertises") or [])), escape(w0.get("start", "")), escape(w0.get("end", "")),
+           escape(w1.get("start", "")), escape(w1.get("end", ""))))
+    return _page("Edit staff", body)
 
 
 # ── SETUP checklist — the "where am I" view that ties onboarding together ─────
@@ -577,6 +603,23 @@ def create_app(org_id: str = "twb") -> Flask:
         sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
         if sid > 0:
             remove_staff(org_id, sid)
+        return redirect("/staff")
+
+    @app.get("/staff/edit/<int:sid>")
+    def staff_edit(sid):
+        return render_staff_edit(org_id, sid)
+
+    @app.post("/staff/update")
+    def staff_update():
+        sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
+        name = (request.form.get("name") or "").strip()[:60]
+        if sid > 0 and name:
+            exps = [e.strip()[:30] for e in (request.form.get("expertises") or "").split(",") if e.strip()]
+            update_staff(org_id, sid, name,
+                         call_name=((request.form.get("call_name") or "").strip()[:40] or None),
+                         role=((request.form.get("role") or "").strip()[:40] or None),
+                         is_senior=("is_senior" in request.form), expertises=exps,
+                         shift_windows=_windows_from_form(request.form))
         return redirect("/staff")
 
     @app.get("/setup")

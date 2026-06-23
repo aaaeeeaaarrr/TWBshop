@@ -97,6 +97,23 @@ def test_staff_add_overnight_and_remove():
         _clean()
 
 
+def test_staff_edit_updates_fields():
+    from core.onboarding_flow import add_staff_manual, get_staff
+    c = _client()
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Old Name", role="baker", shift_windows=[{"start": "06:00", "end": "14:00"}])
+        body = c.get("/staff/edit/%d" % sid).get_data(as_text=True)
+        assert "Old Name" in body and "06:00" in body                      # pre-filled
+        c.post("/staff/update", data={"staff_id": str(sid), "name": "New Name", "role": "cashier",
+                                      "expertises": "cashier", "work_start": "21:00", "work_end": "06:00"})
+        s = get_staff(ORG, sid)
+        assert s["name"] == "New Name" and s["role"] == "cashier" and s["expertises"] == ["cashier"]
+        assert s["shift_windows"] == [{"start": "21:00", "end": "06:00"}]   # overnight, replaced
+    finally:
+        _clean()
+
+
 def test_staff_split_shift_two_windows():
     c = _client()
     _clean()
