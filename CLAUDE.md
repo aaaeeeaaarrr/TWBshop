@@ -25,6 +25,38 @@
 
 ---
 
+## ▶▶ PRODUCT SECURITY & IP PROTECTION — LAW (owner, 2026-06-23) — think like a serious company, always
+We are building a **product to sell on the market**, not just an internal tool. Treat security, IP, and
+anti-theft as **first-class in every design decision** — bake it in, never bolt it on. This is a standing
+law, applied pervasively (like the Real-Path Standard), and it AUTO-BEDROCKS anything that exposes data,
+logic, or a network surface.
+
+1. **THE BRAIN STAYS SERVER-SIDE — never shippable, never decompilable.** The rules / engine / config /
+   algorithms live and run on OUR servers only. Channels (web page, app, Telegram) are THIN clients that
+   receive rendered views + scoped API responses — NEVER the engine, the full ruleset, the source, or the
+   "why" behind a decision. SaaS is our moat: a customer/competitor never gets code they can reverse-engineer.
+   (This is also WHY the platform is channel-agnostic — the value is the server brain, not the channel.)
+2. **CLIENT GETS ONLY WHAT THAT USER IS ENTITLED TO.** No internal IDs, no other tenant's data, no secrets,
+   no implementation detail, no algorithm, in any page / API response / log / error a user can see. A
+   customer sees THEIR OWN config knobs and THEIR OWN data — never how it's computed beyond the knob, never
+   anyone else's anything.
+3. **AUTH + TENANT ISOLATION ON EVERY SERVER EXIT.** Every endpoint that leaves the server enforces authn +
+   authz + `org_id` scoping SERVER-SIDE (never trust the client to say who it is or which org). Default
+   posture for anything not yet behind real auth: **bind to localhost, reach it via SSH tunnel** (the SSH
+   key is the auth) — nothing public until authn + HTTPS + rate-limit + input-validation exist.
+4. **SECRETS & SURFACE.** Secrets in `secrets.py` only (existing law) — extended: no token/secret/internal
+   id in any client payload, page, log, or error. Any network-exposed surface = rate-limited, input-validated,
+   HTTPS, least-privilege DB access, abuse-monitored.
+5. **AUDITABILITY.** Who-changed-what-when on config and money/data — for customer trust, forensics, and the
+   multi-tenant story. Build the audit trail as we build the feature, not after.
+6. **PROTECT THE REPO.** Private repos (existing) + server-only deploy + minimize what any client can infer.
+   Don't leak the ruleset through verbose client payloads or error messages.
+
+*(Full detail as the product grows → `docs/PRODUCT_SECURITY.md` when first needed. A concise version can be
+mirrored to the global rules on request — `python bootstrap.py --push-global`.)*
+
+---
+
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
 REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-14-A
 
