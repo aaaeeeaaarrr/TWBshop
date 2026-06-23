@@ -211,6 +211,23 @@ DESCRIPTORS = {
         "help": "Pre-fill typical rules/roles/shifts for your kind of business; tweak after.",
         "options": [("", "None", "Start blank."), ("bakery", "Bakery", "Bakery defaults."),
                     ("cafe", "Cafe", "Cafe defaults."), ("retail", "Retail", "Retail defaults.")]},
+    # ── Accountant (built, not live yet — shown so you see the domain + its options) ──
+    "categories.accountant.enabled": {"label": "Accountant module", "type": "bool",
+        "help": "Receipts → expenses, vendors, payables, food allowance. Built; not config-driven/live yet.",
+        "true": "ON.", "false": "OFF."},
+    "categories.accountant.receipt_read.vendor_priors": {"label": "Smarter receipt reads", "type": "bool",
+        "help": "Feed a vendor's usual items/prices to the AI as a soft hint (better reads for known vendors).",
+        "true": "ON.", "false": "OFF — cold read every time."},
+    "categories.accountant.vendors.auto_dedup": {"label": "Auto-dedup vendors", "type": "bool",
+        "help": "Fuzzy-match a new vendor name against existing ones before creating a duplicate (Altas→Atlas).",
+        "true": "ON (recommended).", "false": "OFF."},
+    "categories.accountant.payables.terms_days_default": {"label": "Default payment terms (days)", "type": "int",
+        "min": 0, "max": 180, "unit": "days", "help": "Default days-to-pay for a new supplier."},
+    "categories.accountant.food_money.enabled": {"label": "Food allowance", "type": "bool",
+        "help": "A per-shift food allowance for staff who actually worked.", "true": "ON.", "false": "OFF."},
+    "categories.accountant.food_money.rate_per_shift_hour_riel": {"label": "Food rate (៛ per shift hour)",
+        "type": "int", "min": 0, "max": 10000, "unit": "riel",
+        "help": "Riel per SCHEDULED shift hour (TWB: 500), ÷4000 → USD, rounded half-up."},
 }
 
 # Approval-row fields — described ONCE, shown per request type (al/sick/ot/swap/special_leave/dayoff_move).
@@ -301,6 +318,15 @@ ONBOARDING_GROUPS = [
     ("Setup approach", ["onboarding.auto_provision_bot", "onboarding.listener_mode",
                         "onboarding.staff_entry", "onboarding.industry_template",
                         "onboarding.staff_consent_required"]),
+]
+
+# The Accountant domain (built, not config-driven/live yet) — shown so the platform's 2nd domain is visible.
+ACCOUNTANT_GROUPS = [
+    ("Accountant", ["categories.accountant.enabled", "categories.accountant.receipt_read.vendor_priors",
+                    "categories.accountant.vendors.auto_dedup",
+                    "categories.accountant.payables.terms_days_default",
+                    "categories.accountant.food_money.enabled",
+                    "categories.accountant.food_money.rate_per_shift_hour_riel"]),
 ]
 
 

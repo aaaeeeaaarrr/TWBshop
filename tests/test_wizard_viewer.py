@@ -111,6 +111,18 @@ def test_apply_writes_secret_to_store_not_config():
         _reset(org)
 
 
+def test_accountant_domain_shown_and_editable():
+    org = "twbtest_acc"
+    _reset(org)
+    try:
+        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        assert "Accountant" in body and "Food allowance" in body and "Auto-dedup vendors" in body
+        apply_changes(org, {"categories.accountant.food_money.rate_per_shift_hour_riel": "600"})  # PLANNED → editable
+        assert _get_path(get_config(org), "categories.accountant.food_money.rate_per_shift_hour_riel") == 600
+    finally:
+        _reset(org)
+
+
 def test_apply_rejects_bad_enum_and_clamps_int():
     org = "twbtest_wiz3"
     _reset(org)

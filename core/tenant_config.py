@@ -123,8 +123,29 @@ DEFAULTS = {
                 "dayoff_move": _approval(),
             },
         },
-        # other domains we already run live — stubs now; migrated onto config+shadow as they're ported
-        "accountant": {"enabled": False},
+        # other domains — the accountant's real features modelled as config (still INERT; migrated as ported)
+        "accountant": {
+            "enabled": False,                     # the accountant is built but not config-driven/live yet
+            "receipt_read": {
+                "ai_model": "sonnet",             # which model reads receipts
+                "temperature": 0,                 # 0 = deterministic read (the Khmer-handwriting fix, session 50)
+                "vendor_priors": True,            # feed a vendor's usual items/prices as a soft hint
+            },
+            "vendors": {
+                "auto_dedup": True,               # fuzzy-match a new vendor name before creating a duplicate
+                "needs_review_new": True,         # a staff-proposed vendor is usable but flagged for a 1-tap confirm
+            },
+            "payables": {
+                "terms_days_default": 30,         # default payment terms for a new supplier
+                "once_off_off_run": True,         # once-off market buys stay OFF the recurring payable run
+            },
+            "food_money": {
+                "enabled": False,
+                "rate_per_shift_hour_riel": 500,  # 500៛ per SCHEDULED shift hour
+                "divisor_to_usd": 4000,           # ÷4000 → USD, half-up
+                "rounding": "half_up",
+            },
+        },
         "stock": {"enabled": False},
         "pos": {"enabled": False},
         "hr_payroll": {"enabled": False},
