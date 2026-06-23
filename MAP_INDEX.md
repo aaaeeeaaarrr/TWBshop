@@ -255,6 +255,7 @@
 - `run_listener.py` — Entry point: python run_listener.py
 - `run_live_test.py` — Controlled live test — assessment pipeline + correction/offer flow.
     · _db, setup_session_for_attempt, run_assessment, check_assessment_db, simulate_path_a, simulate_path_b, main
+- `run_onboard_demo.py` — Demo runner — the Telegram DISCOVER-CONFIRM onboarding on a TEST tenant bot.
 - `run_quiz_audit.py`
 - `run_scoring_schema_migration.py`
 - `run_send_historical_photos.py` — Send historical gm_concerns to owner with matched local photos.
