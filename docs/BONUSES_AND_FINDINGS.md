@@ -53,6 +53,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   with no skills · OT banking with a 0 cap · no staff group · Telegram with no token · AL=0 · …); a `/health`
   page + an at-a-glance count on the dashboard. Lets a customer self-correct before it bites — a support-cost
   reducer + trust signal. Add a check = one line in `core/health.py`.
+- **Go-live readiness gate** `[ship]` — `/setup` folds the health-check in as a 5th step ("clear config
+  warnings") and shows a "🎉 Ready to go live!" banner ONLY when all 5 are green. A clear, honest "you're
+  done" signal for onboarding (not just "4 of 4 checkboxes" — it also means the config is sane).
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

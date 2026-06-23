@@ -536,6 +536,7 @@ def render_setup(org_id: str) -> str:
     bot_user = cfg.get("connections", {}).get("telegram", {}).get("bot_username")
     staff_grp = group_id_for_role(org_id, "staff")
     staff, pending = list_staff(org_id), list_candidates(org_id)
+    warns = [m for lvl, m in config_health(org_id) if lvl == "warn"]
 
     def step(done, label, link, hint):
         return ("<li style='margin:8px 0'>%s <a href='%s'><b>%s</b></a> — <span class='note'>%s</span></li>"
@@ -550,17 +551,20 @@ def render_setup(org_id: str) -> str:
              (("%d added" % len(staff)) + ((", %d to confirm" % len(pending)) if pending else ""))
              if (staff or pending) else "discover-confirm from the group, or add by hand"),
         step(True, "Set your rules", "/customer", "attendance · leave · OT · approvals — tweak anytime"),
+        step(not warns, "Clear config warnings", "/health",
+             ("%d to resolve" % len(warns)) if warns else "no warnings"),
     ])
-    done_n = sum([bool(bot_user), bool(staff_grp), len(staff) > 0, True])
+    done_n = sum([bool(bot_user), bool(staff_grp), len(staff) > 0, True, not warns])
+    ready_banner = ("<div class='saved'>🎉 You're ready to go live!</div>" if done_n == 5 else "")
     body = (
         "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/bot'>bot</a> · "
         "<a href='/groups'>groups</a> · <a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
-        "<h1>🚀 Setup — %d of 4 done</h1>"
+        "<h1>🚀 Setup — %d of 5 done</h1>%s"
         "<p class='note'>Work through these in any order. The bot does the heavy lifting — you just confirm.</p>"
         "<div class='box'><ul style='list-style:none;padding-left:0;line-height:1.8'>%s</ul></div>"
         "<p class='note'>New here? <a href='/templates'>Start from a template</a> to pre-fill typical "
         "skills + rules.</p>"
-        % (done_n, steps))
+        % (done_n, ready_banner, steps))
     return _page("Setup", body)
 
 

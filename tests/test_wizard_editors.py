@@ -48,7 +48,8 @@ def test_editors_render():
 
 def test_setup_checklist_renders():
     body = _client().get("/setup").get_data(as_text=True)
-    for s in ("Setup", "Connect your bot", "Tag your staff group", "Add your staff", "Set your rules"):
+    for s in ("Setup", "Connect your bot", "Tag your staff group", "Add your staff", "Set your rules",
+              "Clear config warnings", "of 5 done"):
         assert s in body
 
 
