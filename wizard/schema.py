@@ -175,6 +175,35 @@ DESCRIPTORS = {
         "help": "e.g. acme — your customers reach acme.<our-domain>."},
     "connections.app.enabled": {"label": "Mobile app", "type": "bool",
         "help": "Offer a mobile app as a channel.", "true": "ON.", "false": "OFF."},
+    # ── Schedule: split-shift + overnight ──
+    f"{_ATT}.schedule.split_shift_allowed": {"label": "Allow split shifts", "type": "bool",
+        "help": "Two separate work windows in one day (e.g. 06:00–10:00 and 16:00–20:00).",
+        "true": "ON — a day can have two windows.", "false": "OFF — one window per day."},
+    f"{_ATT}.schedule.overnight_shifts": {"label": "Overnight shifts (cross midnight)", "type": "bool",
+        "help": "Shifts that run past midnight (e.g. 21:00–06:00). Handled by the shift-id model, so a 2am "
+                "check-in correctly belongs to the PRIOR day's shift — no date confusion.",
+        "true": "ON — overnight shifts supported.", "false": "OFF — no shift crosses midnight."},
+    # ── Onboarding: how a new tenant is set up ──
+    "onboarding.listener_mode": {"label": "How the bot reads chats", "type": "enum",
+        "help": "Where the system gets supplier/staff messages from.",
+        "options": [("bot_in_groups", "Bot in the groups (simple)", "Add your bot to the groups; it reads them — no account session. Recommended."),
+                    ("user_session", "User-account listener (advanced)", "A Telegram user-account reads chats — only if you must read chats the bot can't join.")]},
+    "onboarding.staff_entry": {"label": "How staff are added", "type": "enum",
+        "help": "How you build your staff list.",
+        "options": [("discover_confirm", "Discover & confirm (easiest)", "The bot finds people in your staff group; you confirm each one."),
+                    ("manual", "Type them in", "Add each staffer by hand."),
+                    ("bulk_import", "Bulk import", "Paste a list / upload a sheet / import from your current tool.")]},
+    "onboarding.auto_provision_bot": {"label": "Bot setup", "type": "enum",
+        "help": "How your Telegram bot gets created and configured.",
+        "options": [("guided", "Guided (recommended)", "We walk you through BotFather, then auto-configure the bot for you."),
+                    ("managed", "Use our bot", "Run on one of our bots — less branding, no setup.")]},
+    "onboarding.staff_consent_required": {"label": "Ask staff for consent", "type": "bool",
+        "help": "A staffer's first message asks them to consent to attendance/location tracking.",
+        "true": "ON — consent asked + logged (recommended).", "false": "OFF — no consent step."},
+    "onboarding.industry_template": {"label": "Start from a template", "type": "enum",
+        "help": "Pre-fill typical rules/roles/shifts for your kind of business; tweak after.",
+        "options": [("", "None", "Start blank."), ("bakery", "Bakery", "Bakery defaults."),
+                    ("cafe", "Cafe", "Cafe defaults."), ("retail", "Retail", "Retail defaults.")]},
 }
 
 # Approval-row fields — described ONCE, shown per request type (al/sick/ot/swap/special_leave/dayoff_move).
@@ -232,6 +261,7 @@ ATTENDANCE_GROUPS = [
                     f"{_ATT}.leave.sick.leave_early_exempt", f"{_ATT}.leave.sick.paperless_to_payback"]),
     ("Schedule", [f"{_ATT}.schedule.redefine_allowed", f"{_ATT}.schedule.swap_allowed",
                   f"{_ATT}.schedule.dayoff_move_allowed", f"{_ATT}.schedule.weekly_day_off",
+                  f"{_ATT}.schedule.split_shift_allowed", f"{_ATT}.schedule.overnight_shifts",
                   f"{_ATT}.schedule.min_rest_between_shifts_min"]),
     ("Staff rules", [f"{_ATT}.staff_rules.max_consecutive_days", f"{_ATT}.staff_rules.max_weekly_hours",
                      f"{_ATT}.staff_rules.probation_days", f"{_ATT}.staff_rules.auto_clockout_grace_min"]),
@@ -243,6 +273,14 @@ CONNECTIONS_GROUPS = [
     ("Telegram", ["connections.telegram.bot_token", "connections.telegram.listener_enabled",
                   "connections.telegram.listener_session", "connections.telegram.owner_chat_id"]),
     ("Web & app", ["connections.web.enabled", "connections.web.subdomain", "connections.app.enabled"]),
+]
+
+# "Setup" screen — HOW a new tenant is onboarded (discover-confirm staff, guided bot, template). See
+# docs/ONBOARDING_DESIGN.md. The actual discover-confirm/staff-CRUD flow is the next build; these are the knobs.
+ONBOARDING_GROUPS = [
+    ("Setup approach", ["onboarding.auto_provision_bot", "onboarding.listener_mode",
+                        "onboarding.staff_entry", "onboarding.industry_template",
+                        "onboarding.staff_consent_required"]),
 ]
 
 

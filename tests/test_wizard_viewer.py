@@ -49,12 +49,14 @@ def test_healthz():
 
 # ── schema explains everything new ───────────────────────────────────────────
 def test_schema_explains_new_mechanisms():
-    for _g, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS):
+    for _g, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS):
         for p in paths:
             d = schema.describe(p)
             assert d and d.get("help"), p
     assert schema.describe("categories.attendance.ot.disposition")["type"] == "enum"
     assert schema.describe("connections.telegram.bot_token")["type"] == "secret"
+    assert schema.describe("onboarding.staff_entry")["type"] == "enum"          # discover-confirm/manual/bulk
+    assert schema.describe("categories.attendance.schedule.split_shift_allowed")["type"] == "bool"
 
 
 # ── customer view: complete + friendly + no leak ─────────────────────────────
@@ -62,6 +64,8 @@ def test_customer_view_complete_no_internal_leak():
     body = create_app("twb").test_client().get("/customer").get_data(as_text=True)
     assert "Apply changes" in body and "Cancel changes" in body
     assert "Sick leave" in body and "Staff rules" in body and "Connections" in body  # all mechanisms shown
+    assert "Setup &amp; staff" in body and "Discover &amp; confirm" in body          # onboarding section
+    assert "Overnight shifts" in body and "Allow split shifts" in body               # split/midnight options
     assert "What earned overtime becomes" in body                                    # the new OT options
     assert "paste to set" in body and "not set" in body                              # token field, masked
     assert "SHADOW" not in body and "PLANNED" not in body and "LIVE_FIXED" not in body  # no internals leak

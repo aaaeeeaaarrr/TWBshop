@@ -54,6 +54,13 @@ DEFAULTS = {
             "bakong": {"enabled": False, "merchant_id": ""},
         },
     },
+    "onboarding": {                       # HOW a new tenant gets set up — the wizard's approach (docs/ONBOARDING_DESIGN.md)
+        "listener_mode": "bot_in_groups",     # bot_in_groups (simple/safe — the bot reads groups it's in) | user_session (advanced)
+        "staff_entry": "discover_confirm",    # discover_confirm (bot finds staff → confirm 1-by-1) | manual | bulk_import
+        "auto_provision_bot": "guided",       # guided (walk BotFather + auto-configure via Bot API) | managed (our sub-bot)
+        "staff_consent_required": True,       # a staffer's first /start asks consent before any tracking
+        "industry_template": "",              # bakery | cafe | retail | … — prefill typical rules/roles/shifts
+    },
     "ai_power": "computer",               # computer (rules) | ai (model, 2x API) | mixed — per-decision later
     "categories": {
         "attendance": {
@@ -91,6 +98,8 @@ DEFAULTS = {
                 "dayoff_move_allowed": True,
                 "weekly_day_off": True,
                 "min_rest_between_shifts_min": 0,   # 0 = no minimum gap enforced (industry option)
+                "split_shift_allowed": False,       # two work windows in one day (e.g. 06–10 + 16–20)
+                "overnight_shifts": True,           # shifts crossing midnight — handled by the shift-id/interval model
             },
             "staff_rules": {                    # "Rules for staff" — mostly industry options TWB doesn't enforce yet
                 "max_consecutive_days": 0,      # 0 = unlimited

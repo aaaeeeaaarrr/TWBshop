@@ -32,7 +32,9 @@ _RULES = [
     ("categories.attendance.leave.carry_over_unused", "PLANNED"),
     ("categories.attendance.leave.special_leave_types", "PLANNED"),
     ("categories.attendance.schedule.min_rest_between_shifts_min", "PLANNED"),
+    ("categories.attendance.schedule.split_shift_allowed", "PLANNED"),
     ("categories.attendance.staff_rules", "PLANNED"),
+    ("onboarding", "PLANNED"),                   # the new-tenant setup approach (discover-confirm, guided bot, …)
     # LIVE_FIXED — live features today (fixed rules); config will drive them at cut-over
     ("categories.attendance", "LIVE_FIXED"),     # checkin · ot(rest) · leave · sick · points · schedule · non-AL approvals
     ("connections.telegram", "LIVE_FIXED"),      # TWB IS connected (via secrets.py) — this models it

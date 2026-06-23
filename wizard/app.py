@@ -231,13 +231,18 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "“Cancel” throws away your edits. Settings marked 🔒 are live today with fixed rules (you'll set "
             "those when we switch them over). Tokens are write-only — paste to set, never shown back.</p>%s"
             "<form method='post' action='/customer/apply'>"
+            "<h2>Setup &amp; staff</h2><div class='box'>"
+            "<p class='note'>How your system gets set up. The easy path: we guide you to create a bot, you "
+            "add it to your groups, and it <b>finds your staff for you to confirm one-by-one</b> — no typing "
+            "lists. (The guided bot-creation + staff discover-confirm flow is the next build.)</p>%s</div>"
             "<h2>Attendance</h2><div class='box'>%s</div>"
             "<h2>Connections (channels &amp; tokens)</h2><div class='box'>%s</div>"
             "<div class='actions'><button type='submit'>✓ Apply changes</button>"
             "<a href='/customer' class='btn'>✗ Cancel changes</a></div></form>"
             "<h2>Approvals</h2><div class='box'>%s</div>"
             "<h2>Add more to your system</h2><div class='box'>%s</div>"
-            % (saved_banner, _render_groups(cfg, schema.ATTENDANCE_GROUPS, org_id),
+            % (saved_banner, _render_groups(cfg, schema.ONBOARDING_GROUPS, org_id),
+               _render_groups(cfg, schema.ATTENDANCE_GROUPS, org_id),
                _render_groups(cfg, schema.CONNECTIONS_GROUPS, org_id), _render_approvals(cfg),
                _render_locked_modules(cfg)))
     return _page("Configure — your system", body)
@@ -249,7 +254,7 @@ def apply_changes(org_id: str, form) -> dict:
     knob or write an arbitrary key from here."""
     cfg = get_config(org_id)
     over: dict = {}
-    for _glabel, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS):
+    for _glabel, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS + schema.ONBOARDING_GROUPS):
         for path in paths:
             desc = schema.describe(path)
             if not desc:
