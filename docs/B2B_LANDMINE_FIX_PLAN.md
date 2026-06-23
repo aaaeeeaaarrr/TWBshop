@@ -52,7 +52,7 @@ Today `mark_b2b_orders_paid` + `mark_b2b_cake_orders_paid` + `set_b2b_customer_c
 ### E. Proof + guards (HIGH-RISK → mandatory)
 - Staging before/after on a real row: a single confirm credits once; a DOUBLE-TAP / re-delivery credits
   ONCE (not twice); a crash mid-apply leaves a consistent state.
-- Regression tests: `tests/test_b2b_billing_atomic.py` — claim-once, no-double-credit, ON-CONFLICT dedup.
+- Regression tests: a new `test_b2b_billing_atomic` suite — claim-once, no-double-credit, ON-CONFLICT dedup.
 - A second-opinion / red-team pass on the money logic before re-enable.
 - Then, and only then, the owner re-enables `twbshop-b2b`.
 
