@@ -139,18 +139,30 @@ def render_cutover(org_id: str) -> str:
             % ("".join(rows) or "<li>no comparisons yet</li>", s["LIVE"], s["SHADOW"], s["LIVE_FIXED"], s["PLANNED"]))
 
 
+def _admin_dashboard(org_id: str) -> str:
+    cfg = get_config(org_id)
+    audit = recent_config_audit(org_id, 1)
+    last = ("last change %s <code>%s</code> by %s" % (str(audit[0]["at"])[:16], escape(audit[0]["path"]),
+            escape(audit[0]["who"] or "?"))) if audit else "no config changes yet"
+    return ("<div class='box'><b>📊 At a glance</b> &nbsp; %d staff · %d groups · channels: %s · %s</div>"
+            % (len(list_staff(org_id)), len(list_groups(org_id)),
+               escape(", ".join(cfg.get("channels", [])) or "—"), last))
+
+
 def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
     body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
-            "<a href='/bot'>bot setup</a></div>"
+            "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
+            "<a href='/audit'>audit</a></div>"
             "<h1>🧩 Wizard · tenant <code>%s</code> · admin <small style='color:#888'>(internal — badges, read-only)</small></h1>"
-            "%s<div class='box'><b>Legend:</b> %s</div>"
+            "%s%s<div class='box'><b>Legend:</b> %s</div>"
             "<h2>Effective config</h2><div class='box'><ul>%s</ul></div>"
             "<h2>The menu</h2><div class='box'>%s</div>"
-            % (escape(org_id), render_cutover(org_id), legend, _render_node(cfg, "", org_id), _render_catalog()))
+            % (escape(org_id), _admin_dashboard(org_id), render_cutover(org_id), legend,
+               _render_node(cfg, "", org_id), _render_catalog()))
     return _page("Wizard — admin", body)
 
 

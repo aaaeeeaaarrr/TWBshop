@@ -40,6 +40,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   ACT, never the value. A `/audit` page (+ a link from the customer view).
 - **Staff "my recent check-ins"** `[ship]` — the web check-in page shows the staffer their last few check-ins
   (date + verdict); a small transparency/trust touch that completes the staff web view.
+- **Admin command-center dashboard** `[ship]` — the admin home now has a full tool nav (all ~12 routes
+  reachable; the new what-if/audit/templates were orphaned) + an "at a glance" status (staff/groups/channels/
+  last change). Ties the sprawling wizard together. (Also fixed a stray `<\code>` typo in the admin header.)
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing

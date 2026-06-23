@@ -41,6 +41,7 @@ def test_admin_renders_all_states_and_masks_secrets():
     assert "Cut-over status" in body and "disposition" in body and "staff_rules" in body
     assert "🔒 secret" in body            # token shown as a secret status …
     assert "__secret__" not in body       # … never the raw ref/value
+    assert "At a glance" in body and "href='/whatif'" in body and "href='/audit'" in body  # dashboard + tool nav
 
 
 def test_healthz():
