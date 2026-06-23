@@ -63,3 +63,31 @@ runnable web server + the onboarding wizard.
 3. **Sick / no-show / special-leave** ports → close those GAPs (parity where data is sparse).
 4. **Web adapter** → proves channel-agnosticism (the platform's whole premise).
 Each raises this map; the cut-over waits on DAYS of real-data agreement across the PROVEN/PARITY set.
+
+---
+
+## ▶ Platform build state (refreshed 2026-06-23, session 53)
+The table above is the ATTENDANCE shadow-study (the cut-over gate). Separately, session 53 built out the
+sellable PLATFORM around that brain. State key: 🟢 BUILT (works, tested) · ✅ PROVEN (real or e2e flow) ·
+🟡 BUILT-but-UNVALIDATED (mock-tested, no real run) · ⏸ GATED (needs an owner decision/action).
+
+| Piece | State | Note |
+|---|---|---|
+| Config-driven engine (`core/tenant_config`) | 🟢 BUILT | the system IS its config; DEFAULTS = TWB; deep-merge; every `core` path reads it |
+| Wizard — admin + customer editor (4-state badges, Apply/Cancel draft) | 🟢 BUILT | `wizard/app.py`; **127.0.0.1:8090 via SSH tunnel only**; Apply whitelists safe (non-LIVE) knobs |
+| 5 domains configurable (attendance · accountant · stock · POS · HR) | 🟢 BUILT | attendance live-mirrored; the other 4 = INERT modelled config; 5 niche domains stay upsell |
+| Onboarding — Telegram (guided bot · groups · discover-confirm · staff/expertise editors · templates · consent · bulk) | 🟡 UNVALIDATED e2e | mock-tested only — **NO real bot has run it** (the #1 thing to validate) |
+| Channels — Telegram + Web | 🟢 BUILT | web check-in/out via a per-staff token link → `core` (not TWB live); + staff "recent check-ins"; same brain as Telegram/replay |
+| Security — encrypted secret store · auth/logins | 🟢 BUILT (off by default) | Fernet when `ORG_SECRET_KEY` set; `WIZARD_AUTH=1` → login. Before public: set the key + CSRF + HTTPS + rate-limit |
+| What-if preview · config audit log · export/import | 🟢 BUILT | read-only/safe; preview a change's effect · who-changed-what-when · clone a tenant's setup |
+| Platform e2e flow | ✅ PROVEN (own flow) | one test: org→staff→config(audited)→web check-in→history→what-if→export connects |
+| Live-bot menu bool-reset audit | ✅ CLEAR | read-only sweep — the bug class is ABSENT in retail/b2b/hire |
+| Cut-over (shadow→live, per vertical) | ⏸ GATED | check-in is READY; owner keeps it in shadow for more real-data days |
+| Real-bot validation · public hosting+W3 · name · B2B re-enable · `ORG_SECRET_KEY` | ⏸ GATED | owner decisions/actions (parked) |
+
+**Honest platform read:** the platform is **broadly BUILT and self-consistent** (config engine · wizard ·
+onboarding · 2 channels · 5 domains · security · audit · what-if · export-import), with TWB's live shop
+**untouched** throughout (every deploy hit only `twbshop-wizard`). The gating constraints are no longer
+*building* — they're **empirical validation** (a real bot has never run the Telegram onboarding; the
+attendance money-paths await real-data days) and **owner decisions** (cut-over, hosting, name). Capture of
+every win/gotcha → `docs/BONUSES_AND_FINDINGS.md`.

@@ -89,6 +89,12 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   off, so a partial Apply read "absent" as "off" and would mass-reset every bool to False. **The audit log
   SURFACED it** (it logged the spurious resets). Fixed with a hidden `_scope` field naming the bools the form
   carried → Apply flips only those. Applies to ANY checkbox form (retail/b2b/hire menus too — worth a look).
+- ✅ **Live-bot menu audit (read-only): the bool-reset class is ABSENT** `[ship]` — swept retail/b2b/hire.
+  Retail has NO settings/toggle menus (single-row INSERTs). B2B's `upsert_b2b_customer` already `COALESCE`-
+  guards optional fields (the correct fix in place). Hire's `_update(intake_id, **fields)` only SETs the keys
+  passed (safe by construction; all 17 call sites pass 1-3 changed fields). So the wizard fix needs NO porting.
+  Adjacent (different class, already known): b2b money F2/F3/F4 (disabled, documented); hire counter races
+  (low impact, not a flag reset). Verdict: 0 confirmed issues, 0 owner-review candidates.
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
