@@ -57,6 +57,15 @@ mirrored to the global rules on request via `python bootstrap.py --push-global`.
 
 ---
 
+## ▶ BONUSES & FINDINGS — always capture (standing practice, owner 2026-06-23)
+As we build, ALWAYS append the **bonuses** (unexpected wins · sellable angles · leverage) and **findings**
+(discoveries · gotchas · decisions) to **`docs/BONUSES_AND_FINDINGS.md`** — capture EVERYTHING, the owner
+shaves/improves later (don't self-censor; a half-idea logged beats a lost one). One line + a tag per item.
+It's a running ledger like `docs/ACTIONS_LEDGER.md`. Surface the new ones in the reply too, but the doc is
+the durable home.
+
+---
+
 ## Real-Path Precision Standard — UNIVERSAL, ENFORCED (full local copy — self-contained)
 REAL_PATH_PRECISION_STANDARD_VERSION: 2026-06-14-A
 
