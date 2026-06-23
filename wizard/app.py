@@ -21,6 +21,7 @@ from flask import Flask, request, redirect, session
 
 from core.tenant_config import get_config, set_config
 from core.db import set_org_secret, has_org_secret, verify_user, user_count
+from core.whatif import verdict_whatif
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -248,7 +249,8 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<p class='note'>How your system gets set up. The easy path: we guide you to create a bot, you "
             "add it to your groups, and it <b>finds your staff for you to confirm one-by-one</b> — no typing "
             "lists. (The guided bot-creation + staff discover-confirm flow is the next build.)</p>%s</div>"
-            "<h2>Attendance</h2><div class='box'>%s</div>"
+            "<h2>Attendance</h2><div class='box'>%s<p class='note'>"
+            "<a href='/whatif'>🔮 Preview how a grace/early change would reclassify recent check-ins</a></p></div>"
             "<h2>Accountant</h2><div class='box'><p class='note'>Built; not live yet — set your preferences "
             "now, they apply when it's switched on.</p>%s</div>"
             "<h2>Stock</h2><div class='box'><p class='note'>Built features modelled; not live yet.</p>%s</div>"
@@ -689,6 +691,39 @@ def render_checkin(token: str, result: dict = None) -> str:
     return _page("Check in", body)
 
 
+def render_whatif(org_id: str) -> str:
+    """🔮 Preview how changing the check-in grace/early thresholds would reclassify recent check-ins.
+    READ-ONLY (core.whatif) — nothing applied. The 'see a change's effect before committing' feature."""
+    v = get_config(org_id).get("categories", {}).get("attendance", {}).get("verdict", {})
+    cur_g, cur_e = int(v.get("grace_min", 5)), int(v.get("early_bonus_min", 5))
+
+    def _a(name, default):
+        try:
+            return max(0, min(60, int(request.args.get(name, default))))
+        except (TypeError, ValueError):
+            return default
+
+    grace, early = _a("grace", cur_g), _a("early", cur_e)
+    res = verdict_whatif(org_id, grace, early)
+    trans = "".join("<li><b>%d</b> × %s</li>" % (n, escape(k))
+                    for k, n in sorted(res["by_transition"].items(), key=lambda x: -x[1])) or "<li>none</li>"
+    ex = "".join("<li class='note'>%s &nbsp; %s → %s</li>" % (escape(e["at"][:16]), escape(e["from"]), escape(e["to"]))
+                 for e in res["examples"])
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+            "<h1>🔮 What-if — check-in verdict</h1>"
+            "<div class='box'><p class='note'>How would changing the grace / early thresholds reclassify your "
+            "recent check-ins? (Live config: grace %d, early %d.) Read-only — nothing is applied.</p>"
+            "<form method='get' action='/whatif'>"
+            "Grace (min) <input type='number' name='grace' value='%d' min='0' max='60'> &nbsp; "
+            "Early bonus (min) <input type='number' name='early' value='%d' min='0' max='60'> &nbsp; "
+            "<button type='submit'>Preview</button></form></div>"
+            "<div class='box'><h2>%d of %d recent check-ins would change</h2>"
+            "<p>Transitions:</p><ul>%s</ul>%s</div>"
+            % (cur_g, cur_e, grace, early, res["changed"], res["total"], trans,
+               ("<p>Examples:</p><ul>%s</ul>" % ex) if ex else ""))
+    return _page("What-if", body)
+
+
 def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
@@ -868,6 +903,10 @@ def create_app(org_id: str = "twb") -> Flask:
     def logout():
         session.clear()
         return redirect("/login")
+
+    @app.get("/whatif")
+    def whatif():
+        return render_whatif(org_id)
 
     @app.get("/checkin/<token>")
     def checkin(token):

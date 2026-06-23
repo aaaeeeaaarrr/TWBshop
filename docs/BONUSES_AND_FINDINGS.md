@@ -32,6 +32,9 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   HR/payroll (modelled). The "total business platform" pitch is now concrete: one wizard configures the whole
   shop. Adding a domain = a config block + schema group + a customer section + 1 test (~15 min each).
 - **Per-customer shadow + test-mode as a de-risked go-live** `[idea/sell]` — each tenant validates before cutover.
+- **"What-if" config preview** `[ship/sell]` — "if you set grace to 9 min, N of your last M check-ins
+  reclassify (late→on_time)." A customer SEES a change's effect on their REAL data before applying — removes
+  the fear of changing a rule. A genuine confidence/sales feature; more what-ifs (OT cap, AL ladder) slot in.
 
 ### 🔍 Findings
 - ⭐ **`secrets.py` shadows the stdlib `secrets` module** `[gotcha]` — it crashed werkzeug password-hashing
@@ -62,6 +65,12 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - **Config-section vs upsell duplicate** `[gotcha]` — a domain promoted to its own editable section was ALSO
   still listed in the "add more" upsell (catalog `live=False`). Fixed via `_CONFIGURABLE_DOMAINS` exclusion.
   Watch this whenever a catalog category becomes a config section.
+- **What-if runs on the platform's OWN events** `[ship]` — `core.whatif` reads `attendance_events` + recomputes
+  `verdict()` (the pure fn); read-only, self-contained per tenant, no live-TWB-data coupling. The pure verdict
+  fn paid off again (reusable for previews).
+- **The 5 unbuilt catalog domains belong as UPSELL, not config** `[decision]` — marketing/delivery/rostering/
+  crm/payments are honestly "available, not built"; inventing config for them would be padding + a wrong model.
+  Keep them as the upsell hook; promote to a config section only when actually built.
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
