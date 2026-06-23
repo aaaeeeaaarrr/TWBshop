@@ -36,14 +36,68 @@ def _approval(**over):
 DEFAULTS = {
     "package": "attendance",              # sold bundle (attendance | +stock | +pos | total | …)
     "channels": ["telegram"],             # telegram | web | app (mixable)
+    "connections": {                      # the onboarding plumbing the wizard collects (channel-agnostic)
+        "telegram": {
+            # SECRETS are stored as a REFERENCE only — the value lives in the encrypted org-secret store
+            # (core_org_secrets), NEVER in this config blob and NEVER rendered. The wizard shows set/not-set.
+            "bot_token": {"__secret__": "telegram_bot_token"},
+            "listener_enabled": True,
+            "listener_session": {"__secret__": "telegram_listener_session"},   # the user-account session string
+            "listener_watch_chat_ids": [],    # groups/DMs the listener monitors (non-secret)
+            "owner_chat_id": None,            # where owner alerts go (non-secret)
+        },
+        "web": {"enabled": False, "subdomain": ""},                 # e.g. acme.<our-domain>
+        "app": {"enabled": False, "ios_url": "", "android_url": ""},
+        "integrations": {                  # external systems to tap (per the catalog) — keys are SECRETS
+            "quickbooks": {"enabled": False, "api_key": {"__secret__": "quickbooks_api_key"}},
+            "loyverse": {"enabled": False, "api_key": {"__secret__": "loyverse_api_key"}},
+            "bakong": {"enabled": False, "merchant_id": ""},
+        },
+    },
     "ai_power": "computer",               # computer (rules) | ai (model, 2x API) | mixed — per-decision later
     "categories": {
         "attendance": {
             "enabled": True,
             "checkin_method": "telegram_live",   # telegram_live | fingerprint | app_gps | web_kiosk | nfc
+            "checkin_requires_location": True,   # verify the staffer is actually on-site (TWB: yes)
             "verdict": {"grace_min": 5, "early_bonus_min": 5, "rounding": "minute_of_day"},
-            "ot": {"bank_cap_min": 14 * 60},
-            "leave": {"short_notice_days": 7, "al_paperless_to_payback": True, "papers_grace_days": 2},
+            "ot": {
+                "bank_cap_min": 14 * 60,         # most OT a staffer can save up
+                "disposition": "bank",           # bank | convert_al | pay_money | expire — what earned OT BECOMES
+                "rate_multiplier": 1.0,          # OT value vs normal time (1.0 same · 1.5 time-and-a-half · 2.0 double)
+                "min_block_min": 0,              # ignore OT shorter than this many minutes (0 = count all)
+                "auto_settle_at_checkout": True,  # settle OT/payback automatically at checkout
+            },
+            "leave": {
+                "short_notice_days": 7,
+                "al_paperless_to_payback": True,
+                "papers_grace_days": 2,
+                "al_annual_days": 14,            # annual AL entitlement per staffer — CONFIRM your number
+                "al_accrual": "annual_grant",    # annual_grant | monthly_accrual | accrue_per_hours_worked
+                "carry_over_unused": False,      # roll unused AL into next year?
+                "sick": {
+                    "own_self_declared": True,        # own-sick needs no approval
+                    "family_allowed": True,           # me / child / spouse / parent
+                    "late_inform_penalty_points": 15, # the −15 for informing an ABSENCE late
+                    "late_inform_threshold_min": 30,
+                    "leave_early_exempt": True,       # checked-in-then-fell-ill = no −15 (owner Jun 22)
+                    "paperless_to_payback": True,
+                },
+                "special_leave_types": ["maternity", "bereavement", "unpaid"],
+            },
+            "schedule": {
+                "redefine_allowed": True,
+                "swap_allowed": True,
+                "dayoff_move_allowed": True,
+                "weekly_day_off": True,
+                "min_rest_between_shifts_min": 0,   # 0 = no minimum gap enforced (industry option)
+            },
+            "staff_rules": {                    # "Rules for staff" — mostly industry options TWB doesn't enforce yet
+                "max_consecutive_days": 0,      # 0 = unlimited
+                "max_weekly_hours": 0,          # 0 = unlimited
+                "probation_days": 0,
+                "auto_clockout_grace_min": 0,   # auto-close a forgotten checkout this long after shift end
+            },
             "points": {"enabled": True, "catalogue": dict(_CATALOGUE)},
             "approvals": {                  # the wizard's Approvals table (one row per request type)
                 "al": _approval(),

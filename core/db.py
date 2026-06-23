@@ -142,6 +142,19 @@ def init_core_db() -> None:
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
+            # Per-org SECRETS (bot tokens, listener sessions, integration keys) — kept OUT of orgs.config (the
+            # readable blob the wizard renders) and NEVER returned to any page. ⚠ Values are plaintext today
+            # (localhost / SSH-tunnel / owner-only stage); ENCRYPT AT REST before any public/multi-tenant
+            # exposure (W3 hard gate — PRODUCT SECURITY law).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_org_secrets (
+                    org_id   TEXT NOT NULL,
+                    key      TEXT NOT NULL,
+                    value    TEXT NOT NULL,
+                    set_at   TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (org_id, key)
+                )
+            """)
 
 
 def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh") -> None:
@@ -149,3 +162,40 @@ def ensure_org(org_id: str, name: str = None, timezone: str = "Asia/Phnom_Penh")
         with conn.cursor() as cur:
             cur.execute("INSERT INTO orgs (org_id, name, timezone) VALUES (%s,%s,%s) "
                         "ON CONFLICT (org_id) DO NOTHING", (org_id, name or org_id, timezone))
+
+
+# ── per-org SECRETS — bot tokens, listener sessions, integration keys ─────────────────────────────────
+# SECURITY (CLAUDE.md ▶▶ PRODUCT SECURITY & IP): these live OUTSIDE orgs.config and NEVER reach a page.
+# The wizard may SET a secret and ASK whether one is set; only the server-side connector reads the value.
+def set_org_secret(org_id: str, key: str, value: str) -> None:
+    """Store/replace a secret (write-only from the wizard's perspective). Empty value is ignored."""
+    if not value:
+        return
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO core_org_secrets (org_id, key, value) VALUES (%s,%s,%s) "
+                        "ON CONFLICT (org_id, key) DO UPDATE SET value=EXCLUDED.value, set_at=NOW()",
+                        (org_id, key, value))
+
+
+def has_org_secret(org_id: str, key: str) -> bool:
+    """Is a secret set? For the wizard's 'set ✓ / not set' — NEVER reveals the value."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM core_org_secrets WHERE org_id=%s AND key=%s", (org_id, key))
+            return cur.fetchone() is not None
+
+
+def get_org_secret(org_id: str, key: str) -> str | None:
+    """BACKEND ONLY — the connector reads the token to actually connect. NEVER call from a render/response path."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM core_org_secrets WHERE org_id=%s AND key=%s", (org_id, key))
+            r = cur.fetchone()
+            return r["value"] if r else None
+
+
+def clear_org_secret(org_id: str, key: str) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM core_org_secrets WHERE org_id=%s AND key=%s", (org_id, key))

@@ -1,7 +1,7 @@
-"""Wizard — the admin viewer + the customer editor. Proves: badges are grounded; the admin view renders
-the badged config; the customer view is friendly (explanations, true/false meanings, Apply/Cancel) and
-LEAKS NO internal badges; Apply commits ONLY validated SHADOW knobs (clamps ints, rejects bad enums,
-ignores LIVE/unknown). Staging DB; test orgs reset."""
+"""Wizard — admin viewer + customer editor, 4-state model. Proves: badges grounded (the live-but-fixed
+mechanisms read LIVE_FIXED, NOT 'planned'); admin renders all sections with secrets MASKED; customer view
+is friendly, covers attendance + connections, leaks no internal badges, masks tokens; Apply commits only
+safe SHADOW/PLANNED knobs (LIVE_FIXED locked) and writes secrets to the encrypted store. Staging DB."""
 import core.db as cdb
 from shared.database import _db
 from wizard.app import create_app, apply_changes, _get_path
@@ -16,85 +16,97 @@ def _reset(org):
     cdb.ensure_org(org, "T")
     with _db() as c:
         with c.cursor() as cur:
-            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))   # NOT NULL → empty, not NULL
+            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+            cur.execute("DELETE FROM core_org_secrets WHERE org_id=%s", (org,))
 
 
-# ── badges + admin view ──────────────────────────────────────────────────────
-def test_status_badges_are_grounded():
+# ── badges (the LIVE_FIXED fix) ──────────────────────────────────────────────
+def test_status_badges_four_state_grounded():
     assert status_for("categories.attendance.approvals.al") == "LIVE"
-    assert status_for("categories.attendance.approvals.al.reping_hours") == "LIVE"
     assert status_for("categories.attendance.verdict.grace_min") == "SHADOW"
-    assert status_for("categories.attendance.approvals.sick") == "PLANNED"   # only 'al' is wired live
-    assert status_for("categories.accountant") == "PLANNED"
+    # the confusion fix: live-but-not-config-driven features read LIVE_FIXED, not PLANNED
+    assert status_for("categories.attendance.approvals.sick") == "LIVE_FIXED"
+    assert status_for("categories.attendance.approvals.ot.reping_hours") == "LIVE_FIXED"
+    assert status_for("categories.attendance.leave.sick.late_inform_penalty_points") == "LIVE_FIXED"
+    assert status_for("connections.telegram.bot_token") == "LIVE_FIXED"
+    # genuinely new options are PLANNED
+    assert status_for("categories.attendance.ot.disposition") == "PLANNED"
+    assert status_for("categories.attendance.staff_rules.max_consecutive_days") == "PLANNED"
+    assert status_for("connections.web.enabled") == "PLANNED"
 
 
-def test_admin_view_renders_with_badges_and_cutover():
+def test_admin_renders_all_states_and_masks_secrets():
     body = create_app("twb").test_client().get("/").get_data(as_text=True)
-    assert "grace_min" in body and "LIVE" in body and "SHADOW" in body and "Packages" in body
-    assert "Cut-over status" in body and "agree" in body   # the readiness dashboard
+    assert "LIVE_FIXED" in body and "SHADOW" in body and "PLANNED" in body
+    assert "Cut-over status" in body and "disposition" in body and "staff_rules" in body
+    assert "🔒 secret" in body            # token shown as a secret status …
+    assert "__secret__" not in body       # … never the raw ref/value
 
 
 def test_healthz():
     assert create_app().test_client().get("/healthz").status_code == 200
 
 
-# ── schema (the explanations) ────────────────────────────────────────────────
-def test_schema_explains_every_grouped_setting():
-    for _g, paths in schema.ATTENDANCE_GROUPS:
+# ── schema explains everything new ───────────────────────────────────────────
+def test_schema_explains_new_mechanisms():
+    for _g, paths in (schema.ATTENDANCE_GROUPS + schema.CONNECTIONS_GROUPS):
         for p in paths:
             d = schema.describe(p)
             assert d and d.get("help"), p
-            if d["type"] == "bool":
-                assert d.get("true") and d.get("false"), p   # both meanings spelled out
-    # approval fields describe per-kind (with the kind in the label) + cover the if-conditions
-    d = schema.describe("categories.attendance.approvals.al.escalate_to_owner_after_max")
-    assert d and "Annual leave" in d["label"] and "IF" in d["true"].upper()   # if-condition spelled out
+    assert schema.describe("categories.attendance.ot.disposition")["type"] == "enum"
+    assert schema.describe("connections.telegram.bot_token")["type"] == "secret"
 
 
-# ── customer view: friendly + no internal leakage ────────────────────────────
-def test_customer_view_friendly_and_no_internal_badges():
+# ── customer view: complete + friendly + no leak ─────────────────────────────
+def test_customer_view_complete_no_internal_leak():
     body = create_app("twb").test_client().get("/customer").get_data(as_text=True)
     assert "Apply changes" in body and "Cancel changes" in body
-    assert "Lateness grace" in body and "nothing changes until you press" in body
-    assert "On:" in body and "Off:" in body                 # true/false meanings shown
-    assert 'action="/customer/apply"' in body
-    assert "SHADOW" not in body and "PLANNED" not in body   # internal cut-over terms must not leak
+    assert "Sick leave" in body and "Staff rules" in body and "Connections" in body  # all mechanisms shown
+    assert "What earned overtime becomes" in body                                    # the new OT options
+    assert "paste to set" in body and "not set" in body                              # token field, masked
+    assert "SHADOW" not in body and "PLANNED" not in body and "LIVE_FIXED" not in body  # no internals leak
 
 
-# ── Apply: safe, validated, SHADOW-only ──────────────────────────────────────
-def test_apply_commits_shadow_only_ignores_live():
+# ── Apply: safe, validated, status-aware ─────────────────────────────────────
+def test_apply_commits_shadow_and_planned_locks_live_fixed():
     org = "twbtest_wiz1"
     _reset(org)
     try:
-        apply_changes(org, {"categories.attendance.verdict.grace_min": "9",
-                            "categories.attendance.points.enabled": "on",
-                            "categories.attendance.approvals.al.reping_hours": "99"})  # LIVE → ignored
+        apply_changes(org, {
+            "categories.attendance.verdict.grace_min": "9",              # SHADOW → commits
+            "categories.attendance.ot.disposition": "pay_money",          # PLANNED → commits
+            "categories.attendance.leave.sick.late_inform_penalty_points": "99",  # LIVE_FIXED → ignored
+        })
         cfg = get_config(org)
         assert _get_path(cfg, "categories.attendance.verdict.grace_min") == 9
-        assert _get_path(cfg, "categories.attendance.points.enabled") is True
-        assert _get_path(cfg, "categories.attendance.approvals.al.reping_hours") == 6  # unchanged default
+        assert _get_path(cfg, "categories.attendance.ot.disposition") == "pay_money"
+        assert _get_path(cfg, "categories.attendance.leave.sick.late_inform_penalty_points") == 15  # unchanged
     finally:
         _reset(org)
 
 
-def test_apply_clamps_int_and_rejects_bad_enum():
+def test_apply_writes_secret_to_store_not_config():
+    from core.db import has_org_secret
     org = "twbtest_wiz2"
     _reset(org)
     try:
-        apply_changes(org, {"categories.attendance.verdict.grace_min": "9999",     # clamp to max 60
-                            "categories.attendance.checkin_method": "hacker"})      # bad enum → ignored
+        apply_changes(org, {"connections.telegram.bot_token": "123456:ABCDEF"})
+        assert has_org_secret(org, "telegram_bot_token") is True       # written to the encrypted store
         cfg = get_config(org)
-        assert _get_path(cfg, "categories.attendance.verdict.grace_min") == 60
-        assert _get_path(cfg, "categories.attendance.checkin_method") == "telegram_live"
+        # the readable config still holds only the REFERENCE, never the value
+        assert _get_path(cfg, "connections.telegram.bot_token") == {"__secret__": "telegram_bot_token"}
     finally:
         _reset(org)
 
 
-def test_apply_unchecked_bool_becomes_false():
+def test_apply_rejects_bad_enum_and_clamps_int():
     org = "twbtest_wiz3"
     _reset(org)
     try:
-        apply_changes(org, {})   # points checkbox absent ⇒ False (real form-submit semantics)
-        assert _get_path(get_config(org), "categories.attendance.points.enabled") is False
+        apply_changes(org, {"categories.attendance.ot.disposition": "hacker",      # bad enum → ignored
+                            "categories.attendance.ot.min_block_min": "9999"})      # PLANNED int → clamp 120
+        cfg = get_config(org)
+        assert _get_path(cfg, "categories.attendance.ot.disposition") == "bank"     # unchanged default
+        assert _get_path(cfg, "categories.attendance.ot.min_block_min") == 120
     finally:
         _reset(org)

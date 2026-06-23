@@ -22,6 +22,9 @@ handler = RotatingFileHandler("logs/wizard.log", maxBytes=5_000_000, backupCount
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                     handlers=[handler, logging.StreamHandler()])
 
+from core.db import init_core_db
+init_core_db()   # ensure core tables (orgs, core_org_secrets, …) exist — additive, idempotent
+
 from wizard.app import app
 
 if __name__ == "__main__":
