@@ -45,17 +45,21 @@ def confirm_candidate(org_id: str, tg_user_id: int, name: str, call_name: str = 
     never duplicates. Returns the staff_id."""
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT consent FROM core_onboarding_candidates WHERE org_id=%s AND tg_user_id=%s",
+                        (org_id, tg_user_id))
+            row = cur.fetchone()
+            consent = bool(row["consent"]) if row and row["consent"] is not None else False
             cur.execute(
                 """INSERT INTO core_staff (org_id, name, call_name, role, is_senior, expertises,
-                                           shift_windows, telegram_id)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                                           shift_windows, telegram_id, consent)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (org_id, telegram_id) WHERE telegram_id IS NOT NULL DO UPDATE
                      SET name=EXCLUDED.name, call_name=EXCLUDED.call_name, role=EXCLUDED.role,
                          is_senior=EXCLUDED.is_senior, expertises=EXCLUDED.expertises,
-                         shift_windows=EXCLUDED.shift_windows
+                         shift_windows=EXCLUDED.shift_windows, consent=EXCLUDED.consent
                    RETURNING staff_id""",
                 (org_id, name, call_name, role, is_senior, json.dumps(expertises or []),
-                 json.dumps(shift_windows or []), tg_user_id))
+                 json.dumps(shift_windows or []), tg_user_id, consent))
             staff_id = cur.fetchone()["staff_id"]
             cur.execute("UPDATE core_onboarding_candidates SET status='confirmed' "
                         "WHERE org_id=%s AND tg_user_id=%s", (org_id, tg_user_id))
@@ -68,6 +72,15 @@ def skip_candidate(org_id: str, tg_user_id: int) -> None:
         with conn.cursor() as cur:
             cur.execute("UPDATE core_onboarding_candidates SET status='skipped' "
                         "WHERE org_id=%s AND tg_user_id=%s", (org_id, tg_user_id))
+
+
+def record_consent(org_id: str, tg_user_id: int, consented: bool) -> None:
+    """A staffer answered the consent ask (via /start). Stored on the candidate; carried to their staff
+    record at confirm. Also stages them (so a silent staffer who taps the link still becomes a candidate)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE core_onboarding_candidates SET consent=%s WHERE org_id=%s AND tg_user_id=%s",
+                        (bool(consented), org_id, tg_user_id))
 
 
 # ── manual entry / read ──────────────────────────────────────────────────────

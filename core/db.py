@@ -191,6 +191,7 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, tg_user_id)
                 )
             """)
+            cur.execute("ALTER TABLE core_onboarding_candidates ADD COLUMN IF NOT EXISTS consent BOOLEAN")
             # GROUPS the bot is in — auto-discovered; the owner tags each with a role (staff drives discover-confirm).
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_org_groups (

@@ -12,9 +12,17 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 from core.onboarding_flow import (record_seen_member, list_candidates, confirm_candidate, skip_candidate,
-                                  record_group, group_id_for_role)
+                                  record_group, group_id_for_role, record_consent)
+from core.tenant_config import get_config
 
 logger = logging.getLogger("onboard")
+
+
+def _consent_required(org_id: str) -> bool:
+    try:
+        return bool(get_config(org_id).get("onboarding", {}).get("staff_consent_required", True))
+    except Exception:
+        return True
 
 
 def _candidate_card(c: dict):
@@ -81,13 +89,43 @@ def make_handlers(org_id: str):
         else:
             await q.message.reply_text("✅ All done — everyone's been reviewed. Set hours/skills in the wizard.")
 
-    return on_group_message, cmd_onboard, on_callback
+    async def cmd_start(update, context):
+        """A staffer DMs /start (or taps the join link) → staged even if they never posted in the group;
+        consent asked if the tenant requires it (the 'approve a link' path for silent staff)."""
+        u = update.effective_user
+        if not u or u.is_bot:
+            return
+        record_seen_member(org_id, u.id, u.full_name, u.username)
+        if _consent_required(org_id):
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton("✓ I agree", callback_data="cns:yes"),
+                                        InlineKeyboardButton("✗ No", callback_data="cns:no")]])
+            await update.effective_message.reply_text(
+                "Hi %s! This bot records work attendance (check-in time + location) for your workplace. "
+                "Do you consent?" % (u.first_name or "there"), reply_markup=kb)
+        else:
+            await update.effective_message.reply_text(
+                "Thanks %s — you're noted; your manager will confirm you." % (u.first_name or "there"))
+
+    async def on_consent(update, context):
+        q = update.callback_query
+        await q.answer()
+        u = update.effective_user
+        yes = (q.data == "cns:yes")
+        if u and not u.is_bot:
+            record_seen_member(org_id, u.id, u.full_name, u.username)   # ensure a candidate exists
+            record_consent(org_id, u.id, yes)
+        await q.edit_message_text("✅ Thank you — your manager will confirm you." if yes
+                                  else "No problem — tell your manager if you change your mind.")
+
+    return on_group_message, cmd_onboard, on_callback, cmd_start, on_consent
 
 
 def register(app, org_id: str) -> None:
     """Attach the discover-confirm handlers to a tenant's bot Application (the staff group comes from the
     wizard's group mapping, not a fixed id)."""
-    on_msg, cmd, cb = make_handlers(org_id)
+    on_msg, cmd, cb, start, consent = make_handlers(org_id)
     app.add_handler(MessageHandler(filters.ChatType.GROUPS, on_msg), group=5)
     app.add_handler(CommandHandler("onboard", cmd))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(cb, pattern=r"^onb:"))
+    app.add_handler(CallbackQueryHandler(consent, pattern=r"^cns:"))

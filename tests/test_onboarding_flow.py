@@ -65,6 +65,18 @@ def test_confirm_idempotent_per_telegram_id():
         _clean()
 
 
+def test_consent_carries_to_staff():
+    from core.onboarding_flow import record_consent, get_staff
+    _clean()
+    try:
+        record_seen_member(ORG, 3001, "Lin")
+        record_consent(ORG, 3001, True)
+        sid = confirm_candidate(ORG, 3001, "Lin")
+        assert get_staff(ORG, sid)["consent"] is True
+    finally:
+        _clean()
+
+
 def test_manual_add():
     _clean()
     try:
