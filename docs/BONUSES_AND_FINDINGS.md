@@ -226,6 +226,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
 - ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
   dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
   each set-up domain gets a live tile (attendance first, real data).
+- ✅ **Templates set the plan** `[ship]` — picking an industry (bakery/cafe → Ops · retail → Back-office) now
+  also sets the package, so the dashboard immediately shows the right active cards. Ties templates + packaging
+  → genuine one-click industry setup.
 - ✅ **Packaging / lean-per-client BUILT** `[ship/sell]` — the dashboard package-gates: in-plan cards stay
   active, out-of-plan show **🔒 locked** (upsell → `/packages`); locked cards don't count toward progress/
   spotlight. A `/packages` page (each plan · what it unlocks · switch). Switching the plan adapts the

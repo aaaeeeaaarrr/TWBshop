@@ -63,6 +63,7 @@ def test_template_apply_prefills_config():
         assert cfg["onboarding"]["industry_template"] == "bakery"
         exp = cfg["categories"]["attendance"]["expertise"]
         assert exp["enabled"] is True and any(r["name"] == "baker" for r in exp["roles"])
+        assert cfg["package"] == "ops"                          # template also sets a sensible plan
     finally:
         _clean()
 

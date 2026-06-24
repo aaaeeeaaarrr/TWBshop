@@ -9,8 +9,8 @@ from core.tenant_config import set_config
 TEMPLATES = {
     "bakery": {
         "label": "Bakery",
-        "blurb": "Overnight baking, an early counter — bank overtime.",
-        "config": {"categories": {"attendance": {
+        "blurb": "Overnight baking, an early counter — bank overtime. Plan: Ops (attendance + stock + payroll).",
+        "config": {"package": "ops", "categories": {"attendance": {
             "expertise": {"enabled": True, "roles": [{"name": "baker", "min_required": 1},
                                                      {"name": "cashier", "min_required": 1}]},
             "schedule": {"overnight_shifts": True, "split_shift_allowed": False},
@@ -19,8 +19,8 @@ TEMPLATES = {
     },
     "cafe": {
         "label": "Cafe",
-        "blurb": "Day trade with a lunch lull — split shifts, no overnight.",
-        "config": {"categories": {"attendance": {
+        "blurb": "Day trade with a lunch lull — split shifts, no overnight. Plan: Ops.",
+        "config": {"package": "ops", "categories": {"attendance": {
             "expertise": {"enabled": True, "roles": [{"name": "barista", "min_required": 1},
                                                      {"name": "cashier", "min_required": 1}]},
             "schedule": {"overnight_shifts": False, "split_shift_allowed": True},
@@ -28,8 +28,8 @@ TEMPLATES = {
     },
     "retail": {
         "label": "Retail shop",
-        "blurb": "Sales floor + cashier + stockroom; cap weekly hours.",
-        "config": {"categories": {"attendance": {
+        "blurb": "Sales floor + cashier + stockroom; cap weekly hours. Plan: Back-office (+ accounting).",
+        "config": {"package": "back_office", "categories": {"attendance": {
             "expertise": {"enabled": True, "roles": [{"name": "sales", "min_required": 1},
                                                      {"name": "cashier", "min_required": 1},
                                                      {"name": "stockroom", "min_required": 0}]},
