@@ -834,18 +834,27 @@ def render_card_detail(org_id: str, key: str) -> str:
                 "border-radius:10px;padding:1px 8px;font-size:11px'>%s</span><br><span class='note'>%s</span></li>"
                 % (escape(name), badge[st][0], badge[st][1], escape(desc)))
     saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
-    save_btn = ("<div class='actions'><button type='submit'>Save toggles</button></div>" if toggles else "")
+    extra = ""
+    if key == "ai_assist":                                # the "Computer / AI Power" tier lives on the AI card
+        tier = cfg.get("ai_power", "computer")
+        opts = "".join("<label style='display:block;margin:5px 0'><input type='radio' name='ai_power' value='%s' %s> "
+                       "<b>%s</b> — <span class='note'>%s</span></label>"
+                       % (k, "checked" if k == tier else "", escape(k), escape(v))
+                       for k, v in catalog.AI_POWER.items())
+        extra = ("<div class='box'><h3>AI power tier</h3>"
+                 "<p class='note'>How decisions are made — rules vs a model, per the catalog.</p>%s</div>" % opts)
+    save_btn = ("<div class='actions'><button type='submit'>Save</button></div>" if (toggles or extra) else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
             "<h1>%s %s</h1>%s"
             "<div class='box'><p>%s</p><p class='note'>Industry standard — like %s. &nbsp;<b>%d</b> options · "
             "<b>%d</b> toggleable now.</p></div>"
-            "<form method='post' action='/card/%s/save'><div class='box'><h3>What's inside</h3>"
+            "<form method='post' action='/card/%s/save'>%s<div class='box'><h3>What's inside</h3>"
             "<ul style='list-style:none;padding-left:0'>%s</ul>%s</div></form>"
             "<p class='note'>Toggle on what you want — config-driven, behavior follows per option. "
             "<span style='color:#16a34a'>✓ built</span> · <span style='color:#d97706'>planned</span> · "
             "<span style='color:#6b7280'>idea</span>.</p>"
             % (escape(d["configure"]), d["icon"], escape(d["title"]), saved, escape(d["what"]), escape(d["ref"]),
-               len(d["options"]), len(toggles), escape(key), "".join(items), save_btn))
+               len(d["options"]), len(toggles), escape(key), extra, "".join(items), save_btn))
     return _page(d["title"], body)
 
 
@@ -1479,6 +1488,10 @@ def create_app(org_id: str = "twb") -> Flask:
             if _get_path(cfg, path) != newval:
                 changes.append((path, _get_path(cfg, path), newval))
             _set_path(over, path, newval)
+        ai = request.form.get("ai_power")                 # the AI-power tier selector (ai_assist card)
+        if ai in catalog.AI_POWER and cfg.get("ai_power") != ai:
+            over["ai_power"] = ai
+            changes.append(("ai_power", cfg.get("ai_power"), ai))
         if over:
             set_config(org_id, over)
             who = _current_user()

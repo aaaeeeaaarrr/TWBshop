@@ -226,6 +226,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
 - ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
   dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
   each set-up domain gets a live tile (attendance first, real data).
+- ✅ **AI-power tier surfaced** `[ship]` — the owner's "Computer / AI Power" tier (computer · ai · mixed,
+  per-decision rules-vs-model) is now selectable on the AI assist card (saves `ai_power`, audited). The
+  AI-power concept is now configurable, not just modeled.
 - ✅ **Templates set the plan** `[ship]` — picking an industry (bakery/cafe → Ops · retail → Back-office) now
   also sets the package, so the dashboard immediately shows the right active cards. Ties templates + packaging
   → genuine one-click industry setup.

@@ -23,7 +23,7 @@ def test_card_detail_page_renders(monkeypatch):
     body = c.get("/card/accountant").get_data(as_text=True)
     assert "Accountant" in body and "What's inside" in body and "Receipt capture" in body  # its OWN options
     assert "QuickBooks" in body                                                             # industry ref
-    assert "checkbox" in body and "Save toggles" in body                                    # wired toggles
+    assert "checkbox" in body and "Save" in body                                            # wired toggles
     assert "Unknown card" in c.get("/card/nope").get_data(as_text=True)                     # bad key handled
 
 
@@ -42,6 +42,26 @@ def test_card_toggle_save(monkeypatch):
         assert get_config(org)["categories"]["accountant"]["invoices"] is True
         c.post("/card/accountant/save", data={})                                          # all absent → off
         assert get_config(org)["categories"]["accountant"]["invoices"] is False
+    finally:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+
+
+def test_ai_power_tier_on_ai_card(monkeypatch):
+    from shared.database import _db
+    from core.tenant_config import get_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    org = "test_ai_tier"
+    cdb.ensure_org(org, "T")
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+    try:
+        c = create_app(org).test_client()
+        assert "AI power tier" in c.get("/card/ai_assist").get_data(as_text=True)   # the Computer/AI Power selector
+        c.post("/card/ai_assist/save", data={"ai_power": "mixed"})
+        assert get_config(org)["ai_power"] == "mixed"                               # tier persists
     finally:
         with _db() as conn:
             with conn.cursor() as cur:
