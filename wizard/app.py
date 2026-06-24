@@ -33,6 +33,7 @@ from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, ge
                                   ensure_checkin_token, staff_by_checkin_token)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
+from wizard.card_details import CARD_DETAILS
 
 _BADGE_CSS = {"LIVE": "#b3261e", "SHADOW": "#1a73e8", "LIVE_FIXED": "#d97706", "PLANNED": "#6b7280"}
 _CSS = ("body{font-family:system-ui,Arial;margin:24px;max-width:940px;color:#111;line-height:1.4}"
@@ -663,31 +664,31 @@ def dashboard_cards(org_id: str) -> dict:
         box("att", "👥", "Add your team", "everyone tracked", "/staff", 95, b(has_staff)),
         box("att", "🏷️", "Tag staff group", "the bot finds your team", "/groups", 90, b(has_grp)),
         box("att", "✅", "Settings sane", "no rule conflicts", "/health", 60, b(not st["warns"])),
-        box("cover", "🎯", "Always covered", "never understaffed on a skill", "/expertise", 70, em, 2),
-        box("acct", "🍚", "Turn on accounting", "receipts → expenses, auto", "/customer/config",58, b(acc.get("enabled"))),
-        box("acct", "🍱", "Food allowance", "staff meal money, auto", "/customer/config",40,
+        box("cover", "🎯", "Always covered", "never understaffed on a skill", "/card/coverage", 70, em, 2),
+        box("acct", "🍚", "Turn on accounting", "receipts → expenses, auto", "/card/accountant", 58, b(acc.get("enabled"))),
+        box("acct", "🍱", "Food allowance", "staff meal money, auto", "/card/accountant", 40,
             b(acc.get("enabled") and acc.get("food_money", {}).get("enabled"))),
-        box("stock", "📦", "Turn on stock", "track inventory", "/customer/config",45, b(stk.get("enabled"))),
-        box("stock", "📊", "Par levels", "reorder before you run out", "/customer/config",35,
+        box("stock", "📦", "Turn on stock", "track inventory", "/card/stock", 45, b(stk.get("enabled"))),
+        box("stock", "📊", "Par levels", "reorder before you run out", "/card/stock", 35,
             b(stk.get("enabled") and stk.get("par_levels"))),
-        box("stock", "💲", "Price compare", "buy from the cheapest", "/customer/config",30,
+        box("stock", "💲", "Price compare", "buy from the cheapest", "/card/stock", 30,
             b(stk.get("enabled") and stk.get("supplier_price_compare"))),
-        box("pos", "🛒", "Turn on POS", "be the till", "/customer/config",36, b(pos.get("enabled"))),
-        box("pos", "📱", "Accept KHQR", "take QR payments", "/customer/config",26,
+        box("pos", "🛒", "Turn on POS", "be the till", "/card/pos", 36, b(pos.get("enabled"))),
+        box("pos", "📱", "Accept KHQR", "take QR payments", "/card/pos", 26,
             b(pos.get("enabled") and pos.get("khqr_payments"))),
-        box("hr", "💼", "Turn on payroll", "slips + pay runs", "/customer/config",32, b(hr.get("enabled"))),
-        box("hr", "🧾", "Payslips", "auto payslips", "/customer/config",22,
+        box("hr", "💼", "Turn on payroll", "slips + pay runs", "/card/hr_payroll", 32, b(hr.get("enabled"))),
+        box("hr", "🧾", "Payslips", "auto payslips", "/card/hr_payroll", 22,
             b(hr.get("enabled") and hr.get("payslips"))),
     ]
     # Frontier capabilities (borrowed from the leaders) — wired in, OFF by default → the owner sees the full
-    # breadth + where the shop is 0%; flip them on per client when ready.
+    # breadth + where the shop is 0%; flip them on per client when ready. Each opens its own industry-std inside.
     frontier = [
-        box("more", "📊", "Reports & trends", "who/what/when over time", "/reports", 20, b(fr.get("reports"))),
-        box("more", "🤖", "AI assist", "smart suggestions & alerts", "/customer/config", 18, b(fr.get("ai_assist"))),
-        box("more", "⚙️", "Automations", "your own if-this-then rules", "/customer/config", 16, b(fr.get("automations"))),
-        box("more", "🎓", "Learn", "guided how-tos in-app", "/customer/config", 12, b(fr.get("learn"))),
-        box("more", "🧩", "Marketplace", "add-ons & integrations", "/customer/config", 10, b(fr.get("marketplace"))),
-        box("more", "📱", "Mobile app", "your branded app", "/customer/config", 8, b(fr.get("mobile_app"))),
+        box("more", "📊", "Reports & trends", "who/what/when over time", "/card/reports", 20, b(fr.get("reports"))),
+        box("more", "🤖", "AI assist", "smart suggestions & alerts", "/card/ai_assist", 18, b(fr.get("ai_assist"))),
+        box("more", "⚙️", "Automations", "your own if-this-then rules", "/card/automations", 16, b(fr.get("automations"))),
+        box("more", "🎓", "Learn", "guided how-tos in-app", "/card/learn", 12, b(fr.get("learn"))),
+        box("more", "🧩", "Marketplace", "add-ons & integrations", "/card/marketplace", 10, b(fr.get("marketplace"))),
+        box("more", "📱", "Mobile app", "your branded app", "/card/mobile_app", 8, b(fr.get("mobile_app"))),
     ]
     for f in frontier:
         f["label"] = "on ✓" if f["done"] else "coming soon"
@@ -785,6 +786,31 @@ def render_reports(org_id: str) -> str:
             "sales reports follow as those domains record data. (Bar greener = fewer late that day.)</p>"
             % (rep["total"], rep["late"], rep["on_time_rate"], rows))
     return _page("Reports", body)
+
+
+def render_card_detail(key: str) -> str:
+    """A card's own inside — the industry-standard MENU of options it could contain (review → decide to wire)."""
+    d = CARD_DETAILS.get(key)
+    if not d:
+        return _page("Not found", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
+                     "<div class='box'>Unknown card.</div>")
+    badge = {"built": ("#16a34a", "✓ built"), "planned": ("#d97706", "planned"), "idea": ("#6b7280", "idea")}
+    rows = "".join(
+        "<li style='margin:9px 0'><b>%s</b> &nbsp;<span style='background:%s;color:#fff;border-radius:10px;"
+        "padding:1px 8px;font-size:11px'>%s</span><br><span class='note'>%s</span></li>"
+        % (escape(name), badge[st][0], badge[st][1], escape(desc)) for name, desc, st in d["options"])
+    built = sum(1 for _n, _d, st in d["options"] if st == "built")
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
+            "<h1>%s %s</h1>"
+            "<div class='box'><p>%s</p><p class='note'>Industry standard — like %s. &nbsp;<b>%d of %d</b> "
+            "built so far.</p></div>"
+            "<div class='box'><h3>What's inside</h3><ul style='list-style:none;padding-left:0'>%s</ul></div>"
+            "<p class='note'>The menu of what this card could contain — review it and tell me which to wire. "
+            "<span style='color:#16a34a'>✓ built</span> · <span style='color:#d97706'>planned</span> · "
+            "<span style='color:#6b7280'>idea</span>.</p>"
+            % (escape(d["configure"]), d["icon"], escape(d["title"]), escape(d["what"]), escape(d["ref"]),
+               built, len(d["options"]), rows))
+    return _page(d["title"], body)
 
 
 def render_templates(org_id: str) -> str:
@@ -1367,6 +1393,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/reports")
     def reports():
         return render_reports(org_id)
+
+    @app.get("/card/<key>")
+    def card_detail(key):
+        return render_card_detail(key)
 
     @app.get("/health")
     def health():

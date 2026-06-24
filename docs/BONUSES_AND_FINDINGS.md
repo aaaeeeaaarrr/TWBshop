@@ -226,6 +226,13 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
 - ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
   dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
   each set-up domain gets a live tile (attendance first, real data).
+- ✅ **Per-card "inside" pages BUILT** `[ship]` (owner: "many cards show the same settings") — every domain +
+  frontier card now opens **`/card/<key>`** = its OWN industry-standard menu of options (built/planned/idea
+  badges), not the generic editor. `wizard/card_details.py` = ~80 standard options across 11 capabilities,
+  ref'd to QuickBooks/Xero · Square/Toast/Loyverse · Deputy · Gusto/Rippling · Salesforce/ServiceNow · Shopify.
+  It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
+  Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
+  option-menus (full functional builds follow once the owner picks from the menu).
 - ✅ **Reports — first frontier card BUILT OUT** `[ship]` — `core.reports.attendance_report` + a `/reports`
   page: daily attendance trend (check-ins · late · on-time %) with colour-graded volume bars (greener = fewer
   late). The Reports card now links there. Expense/stock/sales reports slot in beside it as those domains
