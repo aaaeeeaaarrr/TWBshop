@@ -608,52 +608,53 @@ def _bar_color(frac: float) -> str:
     return "#9ca3af"       # grey — not started
 
 
+# Filter index (sticky): "All tools" + named categories → show fewer boxes. (id, label, icon)
+_DASH_CATS = [("all", "All tools", "▦"), ("att", "Attendance", "⏱️"), ("cover", "Coverage", "🎯"),
+              ("acct", "Accountant", "🍚"), ("stock", "Stock", "📦"), ("pos", "POS", "🛒"), ("hr", "Payroll", "💼")]
+
+
 def dashboard_cards(org_id: str) -> dict:
-    """The customer dashboard as benefit cards with REAL per-card progress, RANKED by reward — the
-    highest-impact card (the biggest cascade for the least work) sits on top, so finishing the top card
-    unlocks the most. Each card: icon · name (outcome) · reward (the cascade) · done/total · link · value.
-    Copy/values are a STARTER draft for the owner to shave."""
+    """The customer dashboard as benefit-framed task BOXES, each with REAL completion, tagged by category
+    (for the sticky filter) and weighted by `value` (for the stable order + the 'do next' spotlight). A
+    sub-step only counts once its module is on. Copy/values are STARTER drafts for the owner to shave."""
     st = _setup_state(org_id)
     cats = get_config(org_id).get("categories", {})
-    att = cats.get("attendance", {})
-    exp = att.get("expertise", {})
+    att, exp = cats.get("attendance", {}), cats.get("attendance", {}).get("expertise", {})
+    acc, stk, pos, hr = (cats.get("accountant", {}), cats.get("stock", {}),
+                         cats.get("pos", {}), cats.get("hr_payroll", {}))
     has_bot, has_grp, has_staff = bool(st["bot_user"]), bool(st["staff_grp"]), len(st["staff"]) > 0
-    no_warns = not st["warns"]
+    b = lambda x: 1 if x else 0
 
-    def _mod(enabled, *substeps):
-        """Module progress: step 1 = turn it on, then each config sub-step (only counts once on)."""
-        total = 1 + len(substeps)
-        done = (1 + sum(1 for s in substeps if s)) if enabled else 0
-        return done, total
+    def box(cat, icon, name, reward, link, value, done, total=1):
+        label = "✓ done" if done >= total else ("tap to start" if done == 0 else "%d/%d" % (done, total))
+        return {"cat": cat, "icon": icon, "name": name, "reward": reward, "link": link, "value": value,
+                "done": done, "total": total, "label": label}
 
-    # (icon, name, reward[cascade], link, value, (done, total)) — value = impact; ranked highest-first
-    raw = [
-        ("⏱️", "Track your team", "→ late-tracking, payroll & scheduling", "/setup", 100,
-         (sum([has_bot, has_staff, has_grp, no_warns]), 4)),
-        ("🎯", "Always covered", "never understaffed on a skill", "/expertise", 70,
-         _mod(exp.get("enabled"), bool(exp.get("roles")))),
-        ("🍚", "Money sorted", "receipts → expenses · food allowance", "/customer", 60,
-         _mod(cats.get("accountant", {}).get("enabled"),
-              cats.get("accountant", {}).get("food_money", {}).get("enabled"))),
-        ("📦", "Never run out", "par levels · cheapest supplier", "/customer", 45,
-         _mod(cats.get("stock", {}).get("enabled"),
-              cats.get("stock", {}).get("par_levels"), cats.get("stock", {}).get("supplier_price_compare"))),
-        ("🛒", "Be the till", "sell + track stock together", "/customer", 35,
-         _mod(cats.get("pos", {}).get("enabled"), cats.get("pos", {}).get("khqr_payments"))),
-        ("💼", "Payroll done", "slips + pay runs, automatic", "/customer", 30,
-         _mod(cats.get("hr_payroll", {}).get("enabled"),
-              cats.get("hr_payroll", {}).get("payslips"), cats.get("hr_payroll", {}).get("salary_owner_only"))),
+    em = (1 if exp.get("enabled") else 0) + (1 if exp.get("enabled") and exp.get("roles") else 0)
+    cards = [
+        box("att", "🤖", "Connect bot", "staff clock in by phone", "/bot", 100, b(has_bot)),
+        box("att", "👥", "Add your team", "everyone tracked", "/staff", 95, b(has_staff)),
+        box("att", "🏷️", "Tag staff group", "the bot finds your team", "/groups", 90, b(has_grp)),
+        box("att", "✅", "Settings sane", "no rule conflicts", "/health", 60, b(not st["warns"])),
+        box("cover", "🎯", "Always covered", "never understaffed on a skill", "/expertise", 70, em, 2),
+        box("acct", "🍚", "Turn on accounting", "receipts → expenses, auto", "/customer", 58, b(acc.get("enabled"))),
+        box("acct", "🍱", "Food allowance", "staff meal money, auto", "/customer", 40,
+            b(acc.get("enabled") and acc.get("food_money", {}).get("enabled"))),
+        box("stock", "📦", "Turn on stock", "track inventory", "/customer", 45, b(stk.get("enabled"))),
+        box("stock", "📊", "Par levels", "reorder before you run out", "/customer", 35,
+            b(stk.get("enabled") and stk.get("par_levels"))),
+        box("stock", "💲", "Price compare", "buy from the cheapest", "/customer", 30,
+            b(stk.get("enabled") and stk.get("supplier_price_compare"))),
+        box("pos", "🛒", "Turn on POS", "be the till", "/customer", 36, b(pos.get("enabled"))),
+        box("pos", "📱", "Accept KHQR", "take QR payments", "/customer", 26,
+            b(pos.get("enabled") and pos.get("khqr_payments"))),
+        box("hr", "💼", "Turn on payroll", "slips + pay runs", "/customer", 32, b(hr.get("enabled"))),
+        box("hr", "🧾", "Payslips", "auto payslips", "/customer", 22,
+            b(hr.get("enabled") and hr.get("payslips"))),
     ]
-    cards = []
-    for icon, name, reward, link, value, (done, total) in raw:
-        label = "✓ done" if done >= total else ("tap to start" if done == 0 else "%d/%d set up" % (done, total))
-        cards.append({"icon": icon, "name": name, "reward": reward, "link": link, "value": value,
-                      "done": done, "total": total, "label": label})
-    # STABLE order by value (never reshuffles on completion → muscle-memory for re-tweaking); a separate
-    # "next" list feeds the top spotlight (the biggest wins still to do).
-    cards.sort(key=lambda c: -c["value"])
-    nxt = [c for c in cards if c["done"] < c["total"]][:3]
-    return {"cards": cards, "next": nxt,
+    cards.sort(key=lambda c: -c["value"])                 # STABLE order by value (never reshuffles)
+    nxt = [c for c in cards if c["done"] < c["total"]][:4]  # the biggest wins still to do → spotlight
+    return {"cards": cards, "next": nxt, "cats": _DASH_CATS,
             "done": sum(c["done"] for c in cards), "total": sum(c["total"] for c in cards)}
 
 
@@ -662,12 +663,13 @@ def _dash_card(c: dict) -> str:
     bar = ("<div style='background:#eef0f2;border-radius:6px;height:8px;margin:8px 0 6px'>"
            "<div style='background:%s;height:8px;border-radius:6px;width:%d%%'></div></div>"
            % (_bar_color(frac), int(frac * 100)))
-    return ("<a href='%s' style='text-decoration:none;color:inherit'>"
+    return ("<a href='%s' class='dcard' data-cat='%s' style='text-decoration:none;color:inherit'>"
             "<div style='border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff;height:100%%'>"
             "<div style='font-size:22px'>%s</div><div style='font-weight:600;margin-top:6px'>%s</div>"
             "<div style='color:#6b7280;font-size:13px'>%s</div>%s"
             "<div style='color:#6b7280;font-size:12px'>%s</div></div></a>"
-            % (escape(c["link"]), c["icon"], escape(c["name"]), escape(c["reward"]), bar, escape(c["label"])))
+            % (escape(c["link"]), escape(c.get("cat", "all")), c["icon"], escape(c["name"]),
+               escape(c["reward"]), bar, escape(c["label"])))
 
 
 def render_dashboard(org_id: str) -> str:
@@ -690,12 +692,25 @@ def render_dashboard(org_id: str) -> str:
     else:
         spotlight = ("<div class='box' style='background:#f0fdf4;border-color:#bbf7d0'>"
                      "<b>✓ You're all set up</b> &nbsp;<span class='note'>tweak anything below, anytime</span></div>")
+    pills = "".join(
+        "<button class='fpill' data-cat='%s' onclick=\"filt('%s')\" style='margin:0 6px 6px 0;padding:6px 12px;"
+        "border:1px solid #e5e7eb;border-radius:20px;background:%s;color:%s;cursor:pointer;font-size:13px'>"
+        "%s %s</button>"
+        % (cid, cid, "#0c4a6e" if cid == "all" else "#fff", "#fff" if cid == "all" else "#111", icon, escape(label))
+        for cid, label, icon in d["cats"])
+    filter_bar = ("<div style='position:sticky;top:0;z-index:5;background:#fafafa;padding:10px 0;"
+                  "border-bottom:1px solid #eee;margin-bottom:10px;white-space:nowrap;overflow-x:auto'>%s</div>"
+                  % pills)
+    js = ("<script>function filt(c){"
+          "document.querySelectorAll('.dcard').forEach(function(e){e.style.display=(c==='all'||e.dataset.cat===c)?'':'none';});"
+          "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
+          "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
     body = ("<div class='nav'><a href='/customer'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>%s"
+            "<h1>⚡ Your system</h1>%s%s"
             "<div class='box'><b>%d%% set up</b>%s</div>%s"
-            "<p class='note'>Prototype — order is fixed (find anything fast); the spotlight surfaces what's "
-            "next. Names are starter drafts. Tap any card to open it.</p>"
-            % (spotlight, pct, big_bar, grid))
+            "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
+            "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
+            % (filter_bar, spotlight, pct, big_bar, grid, js))
     return _page("Dashboard", body)
 
 

@@ -164,6 +164,11 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
 - 🎁 **Reward-per-effort ranking = activation engine** `[idea/sell]` (owner) — order cards so one small task
   cascades into many benefits ("finish the top → most happens"); the dashboard becomes a self-driving setup
   funnel that maximises the customer's first-win feeling. Each card's `value` weight is the tunable lever.
+- 🎁 **Sticky category filter / index** `[ship]` (owner, 2026-06-25) — a sticky "All tools + named categories"
+  bar (follows scroll, minimal height, horizontally scrollable) filters the boxes to one category → reach a
+  setting fast. Ergonomics, not just looks. Un-folded the 6 capabilities into **~14 categorized task boxes**
+  (each real completion, sub-steps gated on the module being on) so the filter is meaningful. JS-only filter
+  (no reload). 🔍 the box set is the lever for "what shows where"; more boxes = more filter value.
 - 🎁 **Stable grid + "Do this next" spotlight** `[ship]` (owner refinement, 2026-06-25) — the BEST pattern:
   grid order is FIXED by value (never reshuffles → muscle-memory to find/re-tweak anything, even at 100%), and
   a top **👉 Do this next** box surfaces the 3 biggest incomplete wins as one-click chips (the funnel, without

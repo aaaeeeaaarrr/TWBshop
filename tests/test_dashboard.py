@@ -1,5 +1,6 @@
-"""Wizard /dashboard — ranked benefit cards with REAL per-card progress + colour-shifting bars. Highest-
-reward (most cascade) card on top; modules show real config progress, not just on/off. Additive."""
+"""Wizard /dashboard — categorized benefit BOXES with REAL completion + colour-shifting bars, a STABLE
+order (find anything), a 'Do this next' spotlight (funnel), and a sticky category FILTER (ergonomics).
+Additive (alongside /customer)."""
 import core.db as cdb
 from shared.database import _db
 import wizard.app as wa
@@ -24,33 +25,33 @@ def test_bar_colour_progression():
     assert _bar_color(1.0) == "#16a34a"      # green — done
 
 
-def test_stable_order_real_progress_and_next():
+def test_boxes_categorized_stable_and_real_progress():
     _reset()
     try:
         d = dashboard_cards(ORG)
-        assert len(d["cards"]) == 6
-        assert d["cards"][0]["name"] == "Track your team"            # STABLE: highest-value always top
-        money = next(c for c in d["cards"] if c["name"] == "Money sorted")
-        assert money["done"] == 0 and money["total"] == 2            # module off → real 0/2 (not on/off)
-        assert "Money sorted" in [c["name"] for c in d["next"]]      # top-3 incomplete → in the spotlight
-        # fully configure accountant → it stays in the grid (stable) but drops from "next"
-        set_config(ORG, {"categories": {"accountant": {"enabled": True, "food_money": {"enabled": True}}}})
-        d2 = dashboard_cards(ORG)
-        m2 = next(c for c in d2["cards"] if c["name"] == "Money sorted")
-        assert m2["done"] == m2["total"]                             # real progress → done
-        assert "Money sorted" not in [c["name"] for c in d2["next"]]  # left the spotlight
-        assert d2["cards"][0]["name"] == "Track your team"           # order unchanged (stable)
+        assert len(d["cards"]) == 14
+        assert d["cards"][0]["name"] == "Connect bot"                  # highest value, stable top
+        assert {c["cat"] for c in d["cards"]} >= {"att", "cover", "acct", "stock", "pos", "hr"}
+        assert any(cat[0] == "all" for cat in d["cats"])               # "All tools" filter present
+        par = next(c for c in d["cards"] if c["name"] == "Par levels")
+        assert par["done"] == 0                                        # sub-step gated: off while stock off
+        set_config(ORG, {"categories": {"stock": {"enabled": True, "par_levels": True}}})
+        par2 = next(c for c in dashboard_cards(ORG)["cards"] if c["name"] == "Par levels")
+        assert par2["done"] == 1                                       # real progress once stock is on
+        assert dashboard_cards(ORG)["cards"][0]["name"] == "Connect bot"   # order still stable
     finally:
         _reset()
 
 
-def test_dashboard_renders_with_spotlight(monkeypatch):
+def test_dashboard_renders_filter_spotlight_bars(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _reset()
     try:
         body = create_app(ORG).test_client().get("/dashboard").get_data(as_text=True)
-        assert "Your system" in body and "Track your team" in body and "set up" in body
-        assert "Do this next" in body                                # the spotlight box
-        assert "#16a34a" in body or "#d97706" in body or "#9ca3af" in body     # colour-shifting bars
+        assert "Your system" in body and "Connect bot" in body
+        assert "Do this next" in body                                  # the spotlight
+        assert "All tools" in body and "data-cat" in body and "filt(" in body  # sticky filter + JS
+        assert "position:sticky" in body                               # follows scroll
+        assert "#16a34a" in body or "#9ca3af" in body                  # colour bars
     finally:
         _reset()
