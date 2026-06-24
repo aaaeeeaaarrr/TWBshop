@@ -187,6 +187,41 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
   colour — exactly the "less reading" goal. 🔍 pair colour WITH the number (5/5) not colour alone
   (colour-blind safe); keep the palette calm (no harsh red — a soft amber→green reads as "progress", not "error").
 
+### 🧭 Card restructure — strategy + competitive read (2026-06-25)
+What emerged from the dashboard restructure, and how it sits vs what other services give clients.
+- 🎁 **The card/checklist IS the industry-standard activation pattern** `[ship]` — Shopify setup guide, Stripe
+  activation checklist, Meta growth tasks (the ref), Square, Notion/Linear getting-started. We're adopting a
+  PROVEN, familiar UX → low risk, instantly legible to anyone who's used a modern SaaS.
+- 🎁 **Our PERSISTENT stable dashboard > the norm** `[sell]` — most tools HIDE the setup guide once you're done
+  (Shopify dismisses it), then bury settings in menus. The owner's "stable order, always there, re-tweak
+  anytime + a spotlight for what's next" keeps it as the permanent home → genuinely MORE ergonomic than the
+  typical vanishing onboarding checklist. A differentiator, not a copy.
+- ⭐ **BIG IDEA — the evolving card (setup-task → live widget)** `[idea/sell]` — a card you finish at 100% can
+  FLIP from "set me up" to a live status tile ("Track your team → 12 in · 1 late today"). Most products split
+  a SETUP view from an OPERATING dashboard; ours could be ONE surface that grows with the customer. Closes the
+  gap below and is a strong, ownable design.
+- 🎁 **In-card contextual upsell = an integrated marketplace** `[sell]` — the locked module cards ("turn on
+  Stock — Pro") upsell in context, where the value lands. Shopify/Square use separate app stores + pricing
+  pages; contextual in-card upsell converts better and avoids app-store fragmentation.
+- 🎁 **Cascade copy = value/outcome onboarding** `[sell]` — framing a step by what it UNLOCKS (not the feature)
+  is the Stripe/Slack playbook; the "one task → many things" leverage is the strongest activation lever.
+- 🔍 **Market position: we're BROAD; most rivals do 1-3 dimensions** `[decision]` — Deputy/Homebase/When-I-Work
+  = workforce only · QuickBooks/Xero = accounting only · Square/Toast/Lightspeed = POS-first (+some stock) ·
+  Gusto/Rippling = HR/payroll (Rippling broadest, but enterprise/Western). Few do the WHOLE shop (attendance +
+  accounting + stock + POS + HR + back-office) for an SMB — our breadth-in-one is rare at this segment.
+- 🔍 **Telegram-native = a distribution moat** `[sell]` — nearly every competitor assumes a dedicated app/web
+  login; SMBs (esp. SE-Asia) resist adopting yet another app. Meeting them on a channel they ALREADY live in
+  is a real edge most can't easily copy.
+- 🔍 **Shadow-run cutover is rare** `[sell]` — most tools are rip-and-replace; "run beside your current way,
+  prove it, then switch" de-risks the scariest part of changing systems.
+- 🔍 **GAP/opportunity — we have a SETUP dashboard, not an OPERATING one** `[idea]` — once configured, customers
+  expect a "today" view (who's in, sales so far, low-stock, cash). The evolving-card idea (above) is the
+  cleanest way to deliver it without a second surface.
+- 🔍 **What to BORROW from the leaders** `[idea]` — micro-interaction polish (Linear/Stripe) · reporting/
+  analytics depth (QuickBooks/Toast) · a native app (everyone) · eventual third-party extensibility (Shopify
+  app store) · in-app contextual help/docs (Intercom/Pendo). Ours wins on breadth + channel + ergonomics;
+  these are where the polished incumbents are ahead.
+
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
   set **`ORG_SECRET_KEY`** · public hosting + W3.
