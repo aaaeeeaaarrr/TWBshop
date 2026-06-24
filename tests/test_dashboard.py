@@ -39,6 +39,7 @@ def test_boxes_categorized_stable_and_real_progress():
         par2 = next(c for c in dashboard_cards(ORG)["cards"] if c["name"] == "Par levels")
         assert par2["done"] == 1                                       # real progress once stock is on
         assert dashboard_cards(ORG)["cards"][0]["name"] == "Connect bot"   # order still stable
+        assert all(c.get("cascade") for c in d["cards"])                   # every box has a cascade line
     finally:
         _reset()
 
@@ -52,6 +53,7 @@ def test_dashboard_renders_filter_spotlight_bars(monkeypatch):
         assert "Do this next" in body                                  # the spotlight
         assert "All tools" in body and "data-cat" in body and "filt(" in body  # sticky filter + JS
         assert "position:sticky" in body                               # follows scroll
+        assert "what you unlock" in body and "clock in from their phone" in body  # cascade reveal + copy
         assert "#16a34a" in body or "#9ca3af" in body                  # colour bars
     finally:
         _reset()

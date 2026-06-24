@@ -612,6 +612,24 @@ def _bar_color(frac: float) -> str:
 _DASH_CATS = [("all", "All tools", "▦"), ("att", "Attendance", "⏱️"), ("cover", "Coverage", "🎯"),
               ("acct", "Accountant", "🍚"), ("stock", "Stock", "📦"), ("pos", "POS", "🛒"), ("hr", "Payroll", "💼")]
 
+# Cascade copy (the "what one task unlocks" reveal — STARTER drafts for the owner to shave).
+_CASCADES = {
+    "Connect bot": "Staff clock in from their phone — no hardware. Switches on every attendance feature below.",
+    "Add your team": "Once they're in: lateness, hours, overtime, points and leave all track on their own.",
+    "Tag staff group": "The bot watches that one group and finds new staff for you — confirm with a tap, no typing.",
+    "Settings sane": "Your grace / overtime / leave rules with no conflicts — so pay and penalties compute right.",
+    "Always covered": "Set how many of each skill you need on shift — get warned before a shift is understaffed.",
+    "Turn on accounting": "Snap a receipt → logged as an expense, supplier tracked, prices remembered.",
+    "Food allowance": "Staff meal money worked out automatically from who actually worked — no tallying.",
+    "Turn on stock": "Track what you have, get low-stock alerts, and build order lists without guesswork.",
+    "Par levels": "Set a level once → a reorder nudge before you run out, every time.",
+    "Price compare": "Each item's price across suppliers → buy from the cheapest, flagged for you.",
+    "Turn on POS": "Ring up sales on any phone — or tap your existing till — tied into stock and reports.",
+    "Accept KHQR": "Take Bakong / KHQR payments at checkout — money in, logged instantly.",
+    "Turn on payroll": "Turn tracked hours and overtime into pay runs and payslips — no spreadsheets.",
+    "Payslips": "Each staffer gets a clear payslip automatically every cycle.",
+}
+
 
 def dashboard_cards(org_id: str) -> dict:
     """The customer dashboard as benefit-framed task BOXES, each with REAL completion, tagged by category
@@ -628,7 +646,7 @@ def dashboard_cards(org_id: str) -> dict:
     def box(cat, icon, name, reward, link, value, done, total=1):
         label = "✓ done" if done >= total else ("tap to start" if done == 0 else "%d/%d" % (done, total))
         return {"cat": cat, "icon": icon, "name": name, "reward": reward, "link": link, "value": value,
-                "done": done, "total": total, "label": label}
+                "done": done, "total": total, "label": label, "cascade": _CASCADES.get(name, "")}
 
     em = (1 if exp.get("enabled") else 0) + (1 if exp.get("enabled") and exp.get("roles") else 0)
     cards = [
@@ -663,13 +681,17 @@ def _dash_card(c: dict) -> str:
     bar = ("<div style='background:#eef0f2;border-radius:6px;height:8px;margin:8px 0 6px'>"
            "<div style='background:%s;height:8px;border-radius:6px;width:%d%%'></div></div>"
            % (_bar_color(frac), int(frac * 100)))
-    return ("<a href='%s' class='dcard' data-cat='%s' style='text-decoration:none;color:inherit'>"
-            "<div style='border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff;height:100%%'>"
+    more = (("<details onclick='event.stopPropagation()' style='margin-top:8px'>"
+             "<summary style='cursor:pointer;color:#0c4a6e;font-size:12px'>what you unlock ›</summary>"
+             "<div style='font-size:12px;color:#374151;margin-top:5px;line-height:1.4'>%s</div></details>"
+             % escape(c["cascade"])) if c.get("cascade") else "")
+    return ("<div class='dcard' data-cat='%s' onclick=\"location.href='%s'\" "
+            "style='cursor:pointer;border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff'>"
             "<div style='font-size:22px'>%s</div><div style='font-weight:600;margin-top:6px'>%s</div>"
             "<div style='color:#6b7280;font-size:13px'>%s</div>%s"
-            "<div style='color:#6b7280;font-size:12px'>%s</div></div></a>"
-            % (escape(c["link"]), escape(c.get("cat", "all")), c["icon"], escape(c["name"]),
-               escape(c["reward"]), bar, escape(c["label"])))
+            "<div style='color:#6b7280;font-size:12px'>%s</div>%s</div>"
+            % (escape(c.get("cat", "all")), escape(c["link"]), c["icon"], escape(c["name"]),
+               escape(c["reward"]), bar, escape(c["label"]), more))
 
 
 def render_dashboard(org_id: str) -> str:
