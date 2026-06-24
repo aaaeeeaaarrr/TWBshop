@@ -48,6 +48,27 @@ def test_card_toggle_save(monkeypatch):
                 cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
 
 
+def test_card_master_enable(monkeypatch):
+    from shared.database import _db
+    from core.tenant_config import get_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    org = "test_card_en"
+    cdb.ensure_org(org, "T")
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+    try:
+        c = create_app(org).test_client()
+        assert "This module is OFF" in c.get("/card/stock").get_data(as_text=True)    # off by default
+        c.post("/card/stock/save", data={"categories.stock.enabled": "on"})
+        assert get_config(org)["categories"]["stock"]["enabled"] is True              # enabled FROM the card
+        assert "This module is ON" in c.get("/card/stock").get_data(as_text=True)
+    finally:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+
+
 def test_ai_power_tier_on_ai_card(monkeypatch):
     from shared.database import _db
     from core.tenant_config import get_config

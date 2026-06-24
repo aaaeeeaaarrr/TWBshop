@@ -808,15 +808,33 @@ def render_reports(org_id: str) -> str:
     return _page("Reports", body)
 
 
+# Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
+_CARD_ENABLE = {
+    "accountant": "categories.accountant.enabled", "stock": "categories.stock.enabled",
+    "pos": "categories.pos.enabled", "hr_payroll": "categories.hr_payroll.enabled",
+    "coverage": "categories.attendance.expertise.enabled",
+    "reports": "frontier.reports", "ai_assist": "frontier.ai_assist", "automations": "frontier.automations",
+    "learn": "frontier.learn", "marketplace": "frontier.marketplace", "mobile_app": "frontier.mobile_app",
+}
+
+
 def render_card_detail(org_id: str, key: str) -> str:
-    """A card's own inside — the industry-standard menu, with the wired options as on/off TOGGLES (config-driven;
-    behavior follows per option). Idea/not-yet-wired options show as a status badge."""
+    """A card's own inside — a master on/off for the module, the industry-standard menu with wired options as
+    TOGGLES (config-driven; behavior follows per option), and idea options as status badges."""
     d = CARD_DETAILS.get(key)
     if not d:
         return _page("Not found", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
                      "<div class='box'>Unknown card.</div>")
     toggles = TOGGLES.get(key, {})
     cfg = get_config(org_id)
+    ep = _CARD_ENABLE.get(key)
+    master = ""
+    if ep:
+        on = bool(_get_path(cfg, ep))
+        master = ("<div class='box' style='background:%s'><label style='cursor:pointer;font-size:15px'>"
+                  "<input type='checkbox' name='%s' %s> <b>This module is %s</b> "
+                  "<span class='note'>— tick to turn on / untick to turn off</span></label></div>"
+                  % ("#ecfdf5" if on else "#fafafa", escape(ep), "checked" if on else "", "ON" if on else "OFF"))
     badge = {"built": ("#16a34a", "✓ built"), "planned": ("#d97706", "planned"), "idea": ("#6b7280", "idea")}
     items = []
     for name, desc, st in d["options"]:
@@ -843,18 +861,18 @@ def render_card_detail(org_id: str, key: str) -> str:
                        for k, v in catalog.AI_POWER.items())
         extra = ("<div class='box'><h3>AI power tier</h3>"
                  "<p class='note'>How decisions are made — rules vs a model, per the catalog.</p>%s</div>" % opts)
-    save_btn = ("<div class='actions'><button type='submit'>Save</button></div>" if (toggles or extra) else "")
+    save_btn = ("<div class='actions'><button type='submit'>Save</button></div>" if (ep or toggles or extra) else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
             "<h1>%s %s</h1>%s"
             "<div class='box'><p>%s</p><p class='note'>Industry standard — like %s. &nbsp;<b>%d</b> options · "
             "<b>%d</b> toggleable now.</p></div>"
-            "<form method='post' action='/card/%s/save'>%s<div class='box'><h3>What's inside</h3>"
+            "<form method='post' action='/card/%s/save'>%s%s<div class='box'><h3>What's inside</h3>"
             "<ul style='list-style:none;padding-left:0'>%s</ul>%s</div></form>"
             "<p class='note'>Toggle on what you want — config-driven, behavior follows per option. "
             "<span style='color:#16a34a'>✓ built</span> · <span style='color:#d97706'>planned</span> · "
             "<span style='color:#6b7280'>idea</span>.</p>"
             % (escape(d["configure"]), d["icon"], escape(d["title"]), saved, escape(d["what"]), escape(d["ref"]),
-               len(d["options"]), len(toggles), escape(key), extra, "".join(items), save_btn))
+               len(d["options"]), len(toggles), escape(key), master, extra, "".join(items), save_btn))
     return _page(d["title"], body)
 
 
@@ -1488,6 +1506,12 @@ def create_app(org_id: str = "twb") -> Flask:
             if _get_path(cfg, path) != newval:
                 changes.append((path, _get_path(cfg, path), newval))
             _set_path(over, path, newval)
+        ep = _CARD_ENABLE.get(key)                        # the module master on/off
+        if ep:
+            newval = ep in request.form
+            if _get_path(cfg, ep) != newval:
+                changes.append((ep, _get_path(cfg, ep), newval))
+            _set_path(over, ep, newval)
         ai = request.form.get("ai_power")                 # the AI-power tier selector (ai_assist card)
         if ai in catalog.AI_POWER and cfg.get("ai_power") != ai:
             over["ai_power"] = ai
