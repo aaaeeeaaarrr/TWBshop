@@ -155,10 +155,15 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
   config = the power-user drill-down behind each card. Keep BOTH; don't lose the depth.
 - 🔍 **Reward copy is the real work** `[decision]` — the 1-2-word benefit names + ultra-short rewards per
   domain/task are a copywriting task (owner-led; I can draft a full set to shave).
-- ✅ **Prototype BUILT** `[ship]` — `/dashboard`: benefit-framed task cards (drafted names) + colour-shifting
-  bars (grey→amber→teal→green) + REAL setup/health/config completion, ALONGSIDE `/customer` (nothing replaced).
-  Starter benefit copy: Connect bot·Tag staff group·Add your team·Set your rules·Clear warnings (get set up) +
-  Track your team·Money sorted·Never run out·Be the till·Payroll done (add to your system). Tunnel in → iterate.
+- ✅ **Prototype BUILT + RANKED** `[ship]` — `/dashboard`: benefit cards + colour-shifting bars
+  (grey→amber→teal→green) + REAL per-card progress, ALONGSIDE `/customer` (nothing replaced). **Owner restructure
+  (2026-06-25): rank by REWARD-PER-EFFORT** — the highest-impact card (biggest cascade for least work) sits top;
+  finishing it unlocks the most; done cards sink, next-biggest rises. **Module cards now show real N/M progress**
+  (turn-on + each config step), not just on/off. Top card = "Track your team" (→ late-tracking·payroll·scheduling),
+  the core that lights up the whole live system. Copy/value-weights are starter drafts to shave.
+- 🎁 **Reward-per-effort ranking = activation engine** `[idea/sell]` (owner) — order cards so one small task
+  cascades into many benefits ("finish the top → most happens"); the dashboard becomes a self-driving setup
+  funnel that maximises the customer's first-win feeling. Each card's `value` weight is the tunable lever.
 - 🎁 **Colour-shifting progress bars** `[idea]` (owner) — the bar changes colour the closer to 100%/5-5
   (e.g. red <34% → amber → teal → green at done), so the customer reads the whole dashboard at a GLANCE by
   colour — exactly the "less reading" goal. 🔍 pair colour WITH the number (5/5) not colour alone

@@ -609,36 +609,49 @@ def _bar_color(frac: float) -> str:
 
 
 def dashboard_cards(org_id: str) -> dict:
-    """The customer dashboard as benefit-framed task cards with REAL completion (no fake progress). Each card:
-    icon · name (the OUTCOME, 1-2 words) · reward (short) · done/total · label · link. Copy is a STARTER
-    draft for the owner to shave."""
+    """The customer dashboard as benefit cards with REAL per-card progress, RANKED by reward — the
+    highest-impact card (the biggest cascade for the least work) sits on top, so finishing the top card
+    unlocks the most. Each card: icon · name (outcome) · reward (the cascade) · done/total · link · value.
+    Copy/values are a STARTER draft for the owner to shave."""
     st = _setup_state(org_id)
-    staff_n = len(st["staff"])
     cats = get_config(org_id).get("categories", {})
-    activation = [
-        {"icon": "🤖", "name": "Connect bot", "reward": "staff clock in by phone", "link": "/bot",
-         "done": 1 if st["bot_user"] else 0, "total": 1,
-         "label": ("@%s ✓" % st["bot_user"]) if st["bot_user"] else "not set"},
-        {"icon": "🏷️", "name": "Tag staff group", "reward": "the bot finds your team", "link": "/groups",
-         "done": 1 if st["staff_grp"] else 0, "total": 1, "label": "set ✓" if st["staff_grp"] else "not set"},
-        {"icon": "👥", "name": "Add your team", "reward": "everyone clocks in", "link": "/staff",
-         "done": 1 if staff_n else 0, "total": 1, "label": ("%d added" % staff_n) if staff_n else "none yet"},
-        {"icon": "⚙️", "name": "Set your rules", "reward": "your policy, automated", "link": "/customer",
-         "done": 1, "total": 1, "label": "defaults ready · tweak anytime"},
-        {"icon": "✅", "name": "Clear warnings", "reward": "settings make sense", "link": "/health",
-         "done": 0 if st["warns"] else 1, "total": 1,
-         "label": ("%d to fix" % len(st["warns"])) if st["warns"] else "all clear"},
+    att = cats.get("attendance", {})
+    exp = att.get("expertise", {})
+    has_bot, has_grp, has_staff = bool(st["bot_user"]), bool(st["staff_grp"]), len(st["staff"]) > 0
+    no_warns = not st["warns"]
+
+    def _mod(enabled, *substeps):
+        """Module progress: step 1 = turn it on, then each config sub-step (only counts once on)."""
+        total = 1 + len(substeps)
+        done = (1 + sum(1 for s in substeps if s)) if enabled else 0
+        return done, total
+
+    # (icon, name, reward[cascade], link, value, (done, total)) — value = impact; ranked highest-first
+    raw = [
+        ("⏱️", "Track your team", "→ late-tracking, payroll & scheduling", "/setup", 100,
+         (sum([has_bot, has_staff, has_grp, no_warns]), 4)),
+        ("🎯", "Always covered", "never understaffed on a skill", "/expertise", 70,
+         _mod(exp.get("enabled"), bool(exp.get("roles")))),
+        ("🍚", "Money sorted", "receipts → expenses · food allowance", "/customer", 60,
+         _mod(cats.get("accountant", {}).get("enabled"),
+              cats.get("accountant", {}).get("food_money", {}).get("enabled"))),
+        ("📦", "Never run out", "par levels · cheapest supplier", "/customer", 45,
+         _mod(cats.get("stock", {}).get("enabled"),
+              cats.get("stock", {}).get("par_levels"), cats.get("stock", {}).get("supplier_price_compare"))),
+        ("🛒", "Be the till", "sell + track stock together", "/customer", 35,
+         _mod(cats.get("pos", {}).get("enabled"), cats.get("pos", {}).get("khqr_payments"))),
+        ("💼", "Payroll done", "slips + pay runs, automatic", "/customer", 30,
+         _mod(cats.get("hr_payroll", {}).get("enabled"),
+              cats.get("hr_payroll", {}).get("payslips"), cats.get("hr_payroll", {}).get("salary_owner_only"))),
     ]
-    _mods = [("⏱️", "Track your team", "who's late · payroll saved", "attendance"),
-             ("🍚", "Money sorted", "receipts → expenses, auto", "accountant"),
-             ("📦", "Never run out", "par levels · cheapest supplier", "stock"),
-             ("🛒", "Be the till", "sell + track stock together", "pos"),
-             ("💼", "Payroll done", "slips + pay runs, automatic", "hr_payroll")]
-    modules = [{"icon": i, "name": n, "reward": r, "link": "/customer",
-                "done": 1 if cats.get(k, {}).get("enabled") else 0, "total": 1,
-                "label": "on ✓" if cats.get(k, {}).get("enabled") else "tap to turn on"}
-               for i, n, r, k in _mods]
-    return {"activation": activation, "modules": modules, "setup_done": st["done"], "setup_total": st["total"]}
+    cards = []
+    for icon, name, reward, link, value, (done, total) in raw:
+        label = "✓ done" if done >= total else ("tap to start" if done == 0 else "%d/%d set up" % (done, total))
+        cards.append({"icon": icon, "name": name, "reward": reward, "link": link, "value": value,
+                      "done": done, "total": total, "label": label})
+    # rank: biggest remaining reward on top — incomplete high-value first; finished cards sink
+    cards.sort(key=lambda c: (c["done"] >= c["total"], -c["value"]))
+    return {"cards": cards, "done": sum(c["done"] for c in cards), "total": sum(c["total"] for c in cards)}
 
 
 def _dash_card(c: dict) -> str:
@@ -656,21 +669,19 @@ def _dash_card(c: dict) -> str:
 
 def render_dashboard(org_id: str) -> str:
     d = dashboard_cards(org_id)
-    frac = (d["setup_done"] / d["setup_total"]) if d["setup_total"] else 0
+    frac = (d["done"] / d["total"]) if d["total"] else 0
+    pct = int(frac * 100)
     big_bar = ("<div style='background:#eef0f2;border-radius:8px;height:12px;margin:10px 0'>"
                "<div style='background:%s;height:12px;border-radius:8px;width:%d%%'></div></div>"
-               % (_bar_color(frac), int(frac * 100)))
-
-    def grid(cs):
-        return ("<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));"
-                "gap:14px;margin:10px 0 24px'>" + "".join(_dash_card(c) for c in cs) + "</div>")
-
+               % (_bar_color(frac), pct))
+    grid = ("<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;"
+            "margin:12px 0'>" + "".join(_dash_card(c) for c in d["cards"]) + "</div>")
     body = ("<div class='nav'><a href='/customer'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>"
-            "<div class='box'><b>🚀 Go live — %d of %d done</b>%s</div>"
-            "<h2>Get set up</h2>%s<h2>Add to your system</h2>%s"
-            "<p class='note'>Prototype — benefit names are starter drafts; tap any card to open it.</p>"
-            % (d["setup_done"], d["setup_total"], big_bar, grid(d["activation"]), grid(d["modules"])))
+            "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>top cards give the most — finish "
+            "one to unlock the most</span>%s</div>%s"
+            "<p class='note'>Prototype — cards rank by reward; names are starter drafts. Tap any to open it.</p>"
+            % (pct, big_bar, grid))
     return _page("Dashboard", body)
 
 
