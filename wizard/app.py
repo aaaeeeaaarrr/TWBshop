@@ -26,6 +26,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
 from core.whatif import verdict_whatif
 from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
+from core.reports import attendance_report
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -681,7 +682,7 @@ def dashboard_cards(org_id: str) -> dict:
     # Frontier capabilities (borrowed from the leaders) — wired in, OFF by default → the owner sees the full
     # breadth + where the shop is 0%; flip them on per client when ready.
     frontier = [
-        box("more", "📊", "Reports & trends", "who/what/when over time", "/customer/config", 20, b(fr.get("reports"))),
+        box("more", "📊", "Reports & trends", "who/what/when over time", "/reports", 20, b(fr.get("reports"))),
         box("more", "🤖", "AI assist", "smart suggestions & alerts", "/customer/config", 18, b(fr.get("ai_assist"))),
         box("more", "⚙️", "Automations", "your own if-this-then rules", "/customer/config", 16, b(fr.get("automations"))),
         box("more", "🎓", "Learn", "guided how-tos in-app", "/customer/config", 12, b(fr.get("learn"))),
@@ -761,6 +762,29 @@ def render_dashboard(org_id: str) -> str:
             "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
             % (filter_bar, live, spotlight, pct, big_bar, grid, js))
     return _page("Dashboard", body)
+
+
+def render_reports(org_id: str) -> str:
+    """📊 The first frontier capability built out — attendance trends over time (read-only)."""
+    rep = attendance_report(org_id, 14)
+    maxt = max([d["total"] for d in rep["daily"]], default=1)
+    rows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td>"
+        "<td><div style='background:#eef0f2;border-radius:4px;height:10px;width:160px;display:inline-block'>"
+        "<div style='background:%s;height:10px;border-radius:4px;width:%d%%'></div></div></td></tr>"
+        % (escape(d["day"]), d["total"], d["late"],
+           _bar_color(1 - (d["late"] / d["total"] if d["total"] else 0)), int(100 * d["total"] / maxt))
+        for d in rep["daily"]) or "<tr><td colspan='4' class='note'>No check-ins recorded yet.</td></tr>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+            "<h1>📊 Reports — attendance (last 14 days)</h1>"
+            "<div class='box'><b>%d check-ins · %d late · %d%% on-time</b></div>"
+            "<div class='box'><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
+            "<th>Late</th><th>Volume</th></tr>%s</table></div>"
+            "<p class='note'>The first report — built from the platform's attendance data. Expense, stock and "
+            "sales reports follow as those domains record data. (Bar greener = fewer late that day.)</p>"
+            % (rep["total"], rep["late"], rep["on_time_rate"], rows))
+    return _page("Reports", body)
 
 
 def render_templates(org_id: str) -> str:
@@ -1339,6 +1363,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/dashboard")
     def dashboard():
         return render_dashboard(org_id)
+
+    @app.get("/reports")
+    def reports():
+        return render_reports(org_id)
 
     @app.get("/health")
     def health():

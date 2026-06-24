@@ -226,6 +226,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
 - ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
   dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
   each set-up domain gets a live tile (attendance first, real data).
+- ✅ **Reports — first frontier card BUILT OUT** `[ship]` — `core.reports.attendance_report` + a `/reports`
+  page: daily attendance trend (check-ins · late · on-time %) with colour-graded volume bars (greener = fewer
+  late). The Reports card now links there. Expense/stock/sales reports slot in beside it as those domains
+  record data. Read-only; the pattern is set for the rest.
 - ✅ **Frontier capabilities WIRED IN (off)** `[ship]` — `tenant_config.frontier` flags + 6 dashboard cards in a
   **"Coming soon"** category: Reports & trends · AI assist · Automations · Learn · Marketplace · Mobile app.
   Owner sees the FULL breadth + where the shop is 0% (all off today); flip on per client when ready (owner's
@@ -244,6 +248,16 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   lean per client via (1) package gating (show only what their plan/type includes), (2) the sticky filter,
   (3) progressive disclosure (card → drill-down → cascade), (4) the spotlight (one next thing). The more we
   wire in, the more these keep a given client's view simple. **A client only ever sees their slice.**
+
+### ⏸ PARKED — owner will review after seeing the whole thing (2026-06-25)
+Sensible defaults are live; these wait for the owner's eyes on the full build, then comment:
+- **Wire TWBshop's real live data into the dashboard** — do AFTER the setup is complete enough (owner's call),
+  so the dashboard mirrors TWB's actual shop (real staff, today's real check-ins), not just platform-migration.
+- **Shave the copy** — the card names + 20 cascade lines (all my drafts).
+- **Tune the dials** — `value` weights (ranking) + colour thresholds + which frontier cards to flip on.
+- **Packaging** — which cards show for which client type/plan (so "lean per client" is real per segment).
+- **Build out the other frontier cards** — AI assist · Automations · Learn · Marketplace · Mobile app (Reports
+  done first; the rest follow the same pattern when wanted).
 
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
