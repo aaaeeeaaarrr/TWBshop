@@ -33,7 +33,7 @@ from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, ge
                                   ensure_checkin_token, staff_by_checkin_token)
 from wizard.status import status_for, LEGEND, summary, EDITABLE
 from wizard import catalog, schema
-from wizard.card_details import CARD_DETAILS
+from wizard.card_details import CARD_DETAILS, TOGGLES
 
 _BADGE_CSS = {"LIVE": "#b3261e", "SHADOW": "#1a73e8", "LIVE_FIXED": "#d97706", "PLANNED": "#6b7280"}
 _CSS = ("body{font-family:system-ui,Arial;margin:24px;max-width:940px;color:#111;line-height:1.4}"
@@ -788,28 +788,44 @@ def render_reports(org_id: str) -> str:
     return _page("Reports", body)
 
 
-def render_card_detail(key: str) -> str:
-    """A card's own inside — the industry-standard MENU of options it could contain (review → decide to wire)."""
+def render_card_detail(org_id: str, key: str) -> str:
+    """A card's own inside — the industry-standard menu, with the wired options as on/off TOGGLES (config-driven;
+    behavior follows per option). Idea/not-yet-wired options show as a status badge."""
     d = CARD_DETAILS.get(key)
     if not d:
         return _page("Not found", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
                      "<div class='box'>Unknown card.</div>")
+    toggles = TOGGLES.get(key, {})
+    cfg = get_config(org_id)
     badge = {"built": ("#16a34a", "✓ built"), "planned": ("#d97706", "planned"), "idea": ("#6b7280", "idea")}
-    rows = "".join(
-        "<li style='margin:9px 0'><b>%s</b> &nbsp;<span style='background:%s;color:#fff;border-radius:10px;"
-        "padding:1px 8px;font-size:11px'>%s</span><br><span class='note'>%s</span></li>"
-        % (escape(name), badge[st][0], badge[st][1], escape(desc)) for name, desc, st in d["options"])
-    built = sum(1 for _n, _d, st in d["options"] if st == "built")
+    items = []
+    for name, desc, st in d["options"]:
+        if name in toggles:
+            on = bool(_get_path(cfg, toggles[name]))
+            items.append(
+                "<li style='margin:10px 0'><label style='cursor:pointer'><input type='checkbox' name='%s' %s> "
+                "<b>%s</b> <span style='background:%s;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px'>"
+                "%s</span></label><br><span class='note'>%s</span></li>"
+                % (escape(toggles[name]), "checked" if on else "", escape(name),
+                   "#0d9488" if on else "#9ca3af", "on" if on else "off", escape(desc)))
+        else:
+            items.append(
+                "<li style='margin:10px 0'><b>%s</b> &nbsp;<span style='background:%s;color:#fff;"
+                "border-radius:10px;padding:1px 8px;font-size:11px'>%s</span><br><span class='note'>%s</span></li>"
+                % (escape(name), badge[st][0], badge[st][1], escape(desc)))
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    save_btn = ("<div class='actions'><button type='submit'>Save toggles</button></div>" if toggles else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
-            "<h1>%s %s</h1>"
-            "<div class='box'><p>%s</p><p class='note'>Industry standard — like %s. &nbsp;<b>%d of %d</b> "
-            "built so far.</p></div>"
-            "<div class='box'><h3>What's inside</h3><ul style='list-style:none;padding-left:0'>%s</ul></div>"
-            "<p class='note'>The menu of what this card could contain — review it and tell me which to wire. "
+            "<h1>%s %s</h1>%s"
+            "<div class='box'><p>%s</p><p class='note'>Industry standard — like %s. &nbsp;<b>%d</b> options · "
+            "<b>%d</b> toggleable now.</p></div>"
+            "<form method='post' action='/card/%s/save'><div class='box'><h3>What's inside</h3>"
+            "<ul style='list-style:none;padding-left:0'>%s</ul>%s</div></form>"
+            "<p class='note'>Toggle on what you want — config-driven, behavior follows per option. "
             "<span style='color:#16a34a'>✓ built</span> · <span style='color:#d97706'>planned</span> · "
             "<span style='color:#6b7280'>idea</span>.</p>"
-            % (escape(d["configure"]), d["icon"], escape(d["title"]), escape(d["what"]), escape(d["ref"]),
-               built, len(d["options"]), rows))
+            % (escape(d["configure"]), d["icon"], escape(d["title"]), saved, escape(d["what"]), escape(d["ref"]),
+               len(d["options"]), len(toggles), escape(key), "".join(items), save_btn))
     return _page(d["title"], body)
 
 
@@ -1396,7 +1412,26 @@ def create_app(org_id: str = "twb") -> Flask:
 
     @app.get("/card/<key>")
     def card_detail(key):
-        return render_card_detail(key)
+        return render_card_detail(org_id, key)
+
+    @app.post("/card/<key>/save")
+    def card_save(key):
+        toggles = TOGGLES.get(key, {})
+        cfg = get_config(org_id)
+        over, changes = {}, []
+        for _name, path in toggles.items():
+            if status_for(path) not in EDITABLE:        # never flip a LIVE knob from a toggle
+                continue
+            newval = path in request.form
+            if _get_path(cfg, path) != newval:
+                changes.append((path, _get_path(cfg, path), newval))
+            _set_path(over, path, newval)
+        if over:
+            set_config(org_id, over)
+            who = _current_user()
+            for p, old, new in changes:
+                log_config_change(org_id, who, p, old, new)
+        return redirect("/card/%s?saved=1" % key)
 
     @app.get("/health")
     def health():

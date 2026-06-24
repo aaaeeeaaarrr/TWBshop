@@ -112,6 +112,7 @@ DEFAULTS = {
                 "enabled": False,           # TWB doesn't use coverage-by-skill yet → off
                 "roles": [],                # [{"name": skill, "min_required": N}] — set in the Expertise editor
                 "coverage_overrides": [],   # [{role, days:[…], hours:"HH:MM-HH:MM", min}] — raise/lower for special times
+                "coverage_warnings": False,  # planned→wired: alert when a shift would be under-covered
             },
             "points": {"enabled": True, "catalogue": dict(_CATALOGUE)},
             "approvals": {                  # the wizard's Approvals table (one row per request type)
@@ -145,6 +146,10 @@ DEFAULTS = {
                 "divisor_to_usd": 4000,           # ÷4000 → USD, half-up
                 "rounding": "half_up",
             },
+            "expense_categories": False,          # planned→wired: chart of accounts / categories per expense
+            "invoices": False,                    # planned→wired: bill customers, track receivables
+            "reconciliation": False,              # planned→wired: match recorded spend to bank/cash
+            "financial_reports": False,           # planned→wired: P&L / cash-flow statements
         },
         "stock": {                            # stock/inventory — modelled as config (INERT; ported later)
             "enabled": False,
@@ -153,6 +158,9 @@ DEFAULTS = {
             "reorder_suggestions": True,      # suggest a reorder when an item drops below par
             "supplier_price_compare": True,   # compare the same item's price across suppliers (a PRIMARY goal)
             "low_stock_alert": True,          # alert when stock is low
+            "item_catalog": False,            # planned→wired: SKUs, categories, units, photos
+            "purchase_orders": False,         # planned→wired: build + send order lists
+            "stock_movements": False,         # planned→wired: in/out/waste/transfer
         },
         "pos": {                              # point of sale — be the POS or tap theirs (INERT; modelled)
             "enabled": False,
@@ -161,6 +169,10 @@ DEFAULTS = {
             "khqr_payments": True,            # accept KHQR / Bakong
             "receipt": "print_or_send",       # print_or_send | none
             "tips_enabled": False,
+            "product_catalog": False,         # planned→wired: items, variants, modifiers
+            "discounts": False,               # planned→wired: % / fixed, promos
+            "refunds": False,                 # planned→wired: refunds & voids with audit
+            "cash_drawer": False,             # planned→wired: open/close + reconcile the drawer
         },
         "hr_payroll": {                       # staff records · salary/slips · payroll run (INERT; modelled)
             "enabled": False,
@@ -168,6 +180,9 @@ DEFAULTS = {
             "payslips": True,                 # generate payslips
             "nssf_export": False,             # Cambodia social-security export
             "salary_owner_only": True,        # senior+ salaries are owner-only (privacy rule)
+            "wage_structures": False,         # planned→wired: monthly/daily/hourly + allowances
+            "pay_runs": False,                # planned→wired: scheduled pay runs
+            "deductions": False,              # planned→wired: NSSF/tax/advances/paybacks
         },
     },
     # Borrowed-from-the-leaders capabilities — WIRED IN but OFF by default; the owner unleashes per client

@@ -226,6 +226,12 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
 - ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
   dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
   each set-up domain gets a live tile (attendance first, real data).
+- ✅ **Planned options BUILT OUT → toggles** `[ship]` (owner: "build out the planned options next") — 15 planned
+  options across accountant (expense-categories · invoices · reconciliation · financial-reports) · stock
+  (item-catalog · purchase-orders · stock-movements) · pos (product-catalog · discounts · refunds · cash-drawer)
+  · hr (wage-structures · pay-runs · deductions) · coverage (warnings) are now real `tenant_config` flags +
+  on/off **toggles** on each card's inside page (save → config, audited, whitelisted to non-LIVE knobs;
+  behavior follows per option). The card insides are now CONFIGURABLE surfaces, not just menus.
 - ✅ **Per-card "inside" pages BUILT** `[ship]` (owner: "many cards show the same settings") — every domain +
   frontier card now opens **`/card/<key>`** = its OWN industry-standard menu of options (built/planned/idea
   badges), not the generic editor. `wizard/card_details.py` = ~80 standard options across 11 capabilities,

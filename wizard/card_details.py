@@ -166,3 +166,43 @@ CARD_DETAILS = {
         ],
     },
 }
+
+# Option name → config path, for options now WIRED as on/off toggles on the card page (config-driven; behavior
+# follows per option). Only non-LIVE knobs; the save handler whitelists to these + re-checks editability.
+TOGGLES = {
+    "accountant": {
+        "Food allowance": "categories.accountant.food_money.enabled",
+        "Expense categories": "categories.accountant.expense_categories",
+        "Invoices & receivables": "categories.accountant.invoices",
+        "Bank / cash reconciliation": "categories.accountant.reconciliation",
+        "P&L · cash-flow reports": "categories.accountant.financial_reports",
+    },
+    "stock": {
+        "Par / reorder levels": "categories.stock.par_levels",
+        "Supplier price compare": "categories.stock.supplier_price_compare",
+        "Low-stock & expiry alerts": "categories.stock.low_stock_alert",
+        "Item catalog": "categories.stock.item_catalog",
+        "Purchase orders": "categories.stock.purchase_orders",
+        "Stock movements": "categories.stock.stock_movements",
+    },
+    "pos": {
+        "Tips": "categories.pos.tips_enabled",
+        "Decrement stock on sale": "categories.pos.track_inventory",
+        "Product catalog + modifiers": "categories.pos.product_catalog",
+        "Discounts & promos": "categories.pos.discounts",
+        "Refunds & voids": "categories.pos.refunds",
+        "Cash drawer / shift": "categories.pos.cash_drawer",
+    },
+    "hr_payroll": {
+        "Salary privacy": "categories.hr_payroll.salary_owner_only",
+        "Salary / wage structures": "categories.hr_payroll.wage_structures",
+        "Pay runs": "categories.hr_payroll.pay_runs",
+        "Payslips": "categories.hr_payroll.payslips",
+        "Deductions & contributions": "categories.hr_payroll.deductions",
+        "Bank payroll file / NSSF export": "categories.hr_payroll.nssf_export",
+    },
+    "coverage": {
+        "Min coverage per skill": "categories.attendance.expertise.enabled",
+        "Coverage warnings": "categories.attendance.expertise.coverage_warnings",
+    },
+}
