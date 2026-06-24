@@ -136,6 +136,30 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   Adjacent (different class, already known): b2b money F2/F3/F4 (disabled, documented); hire counter races
   (low impact, not a flag reset). Verdict: 0 confirmed issues, 0 owner-review candidates.
 
+### 🎴 Customer dashboard → task-card / completion redesign (owner idea, 2026-06-25)
+Owner: the long category/sub-category lists feel heavy; show them as BOXES with a completion rate + a
+rewarding 1-2-word name + the short reward each gives. Less reading, more ease. (Ref: Meta growth-tasks UI.)
+- 🎁 **Cards = benefits, not categories** `[idea/sell]` — name each card by the OUTCOME ("Track your team",
+  "Money sorted"), reward as a one-liner. The customer view then SELLS the product back to them — doubles as
+  a demo/upsell surface. The single highest-leverage reframe of the idea.
+- 🎁 **Gamified completion drives self-serve activation** `[idea]` — a progress nudge gets customers to finish
+  setup; directly serves the North Star (stupid-proof self-serve wizard). Proven onboarding pattern.
+- 🎁 **Locked modules become aspirational upsell cards** `[idea/sell]` — "🔓 Cut waste · Stock (Pro plan)".
+- 🎁 **~70% of the data already exists** `[idea]` — `/setup` (N/5), health-check (warnings), per-domain config.
+  The cards are mostly a PRESENTATION layer + a per-domain completion calc, not new logic. Cheap to prototype.
+- 🔍 **Config ≠ tasks** `[gotcha]` — a knob (grace=5) isn't "50% complete". Completion fits SETUP steps +
+  per-domain READINESS, never invented tasks to pad a %. Model it as setup-completeness, or it feels fake.
+- 🔍 **Keep it professional, not cartoonish** `[gotcha]` — payroll/ops tool: subtle bars + benefit copy + a
+  quiet "✓ ready", NOT confetti/"Quest complete!". The Meta tone is for casual social growth.
+- 🔍 **Two audiences, one view** `[decision]` — cards = the "less reading" front door; the existing long-list
+  config = the power-user drill-down behind each card. Keep BOTH; don't lose the depth.
+- 🔍 **Reward copy is the real work** `[decision]` — the 1-2-word benefit names + ultra-short rewards per
+  domain/task are a copywriting task (owner-led; I can draft a full set to shave).
+- 🎁 **Colour-shifting progress bars** `[idea]` (owner) — the bar changes colour the closer to 100%/5-5
+  (e.g. red <34% → amber → teal → green at done), so the customer reads the whole dashboard at a GLANCE by
+  colour — exactly the "less reading" goal. 🔍 pair colour WITH the number (5/5) not colour alone
+  (colour-blind safe); keep the palette calm (no harsh red — a soft amber→green reads as "progress", not "error").
+
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
   set **`ORG_SECRET_KEY`** · public hosting + W3.
