@@ -159,8 +159,8 @@ def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
-    body = ("<div class='nav'><b>Admin</b> · <a href='/dashboard'>⚡ dashboard</a> · <a href='/setup'>setup</a> · "
-            "<a href='/customer'>customer view</a> · "
+    body = ("<div class='nav'><b>Admin</b> · <a href='/customer'>⚡ dashboard</a> · <a href='/setup'>setup</a> · "
+            "<a href='/customer/config'>config</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
             "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
             "<a href='/audit'>audit</a> · <a href='/health'>health</a> · <a href='/shadow'>shadow</a> · "
@@ -305,7 +305,7 @@ def render_customer(org_id: str = "twb", saved: bool = False) -> str:
             "<h2>HR &amp; payroll</h2><div class='box'><p class='note'>Modelled; not live yet.</p>%s</div>"
             "<h2>Connections (channels &amp; tokens)</h2><div class='box'>%s</div>"
             "<div class='actions'><button type='submit'>✓ Apply changes</button>"
-            "<a href='/customer' class='btn'>✗ Cancel changes</a> "
+            "<a href='/customer/config' class='btn'>✗ Cancel changes</a> "
             "<a href='/audit' class='btn'>📝 Change history</a></div></form>"
             "<h2>Approvals</h2><div class='box'>%s</div>"
             "<h2>Add more to your system</h2><div class='box'>%s</div>"
@@ -576,7 +576,7 @@ def render_setup(org_id: str) -> str:
         step(len(staff) > 0, "Add your staff", "/staff",
              (("%d added" % len(staff)) + ((", %d to confirm" % len(pending)) if pending else ""))
              if (staff or pending) else "discover-confirm from the group, or add by hand"),
-        step(True, "Set your rules", "/customer", "attendance · leave · OT · approvals — tweak anytime"),
+        step(True, "Set your rules", "/customer/config","attendance · leave · OT · approvals — tweak anytime"),
         step(not warns, "Clear config warnings", "/health",
              ("%d to resolve" % len(warns)) if warns else "no warnings"),
     ])
@@ -655,19 +655,19 @@ def dashboard_cards(org_id: str) -> dict:
         box("att", "🏷️", "Tag staff group", "the bot finds your team", "/groups", 90, b(has_grp)),
         box("att", "✅", "Settings sane", "no rule conflicts", "/health", 60, b(not st["warns"])),
         box("cover", "🎯", "Always covered", "never understaffed on a skill", "/expertise", 70, em, 2),
-        box("acct", "🍚", "Turn on accounting", "receipts → expenses, auto", "/customer", 58, b(acc.get("enabled"))),
-        box("acct", "🍱", "Food allowance", "staff meal money, auto", "/customer", 40,
+        box("acct", "🍚", "Turn on accounting", "receipts → expenses, auto", "/customer/config",58, b(acc.get("enabled"))),
+        box("acct", "🍱", "Food allowance", "staff meal money, auto", "/customer/config",40,
             b(acc.get("enabled") and acc.get("food_money", {}).get("enabled"))),
-        box("stock", "📦", "Turn on stock", "track inventory", "/customer", 45, b(stk.get("enabled"))),
-        box("stock", "📊", "Par levels", "reorder before you run out", "/customer", 35,
+        box("stock", "📦", "Turn on stock", "track inventory", "/customer/config",45, b(stk.get("enabled"))),
+        box("stock", "📊", "Par levels", "reorder before you run out", "/customer/config",35,
             b(stk.get("enabled") and stk.get("par_levels"))),
-        box("stock", "💲", "Price compare", "buy from the cheapest", "/customer", 30,
+        box("stock", "💲", "Price compare", "buy from the cheapest", "/customer/config",30,
             b(stk.get("enabled") and stk.get("supplier_price_compare"))),
-        box("pos", "🛒", "Turn on POS", "be the till", "/customer", 36, b(pos.get("enabled"))),
-        box("pos", "📱", "Accept KHQR", "take QR payments", "/customer", 26,
+        box("pos", "🛒", "Turn on POS", "be the till", "/customer/config",36, b(pos.get("enabled"))),
+        box("pos", "📱", "Accept KHQR", "take QR payments", "/customer/config",26,
             b(pos.get("enabled") and pos.get("khqr_payments"))),
-        box("hr", "💼", "Turn on payroll", "slips + pay runs", "/customer", 32, b(hr.get("enabled"))),
-        box("hr", "🧾", "Payslips", "auto payslips", "/customer", 22,
+        box("hr", "💼", "Turn on payroll", "slips + pay runs", "/customer/config",32, b(hr.get("enabled"))),
+        box("hr", "🧾", "Payslips", "auto payslips", "/customer/config",22,
             b(hr.get("enabled") and hr.get("payslips"))),
     ]
     cards.sort(key=lambda c: -c["value"])                 # STABLE order by value (never reshuffles)
@@ -727,7 +727,7 @@ def render_dashboard(org_id: str) -> str:
           "document.querySelectorAll('.dcard').forEach(function(e){e.style.display=(c==='all'||e.dataset.cat===c)?'':'none';});"
           "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
-    body = ("<div class='nav'><a href='/customer'>detailed view</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>%s%s"
             "<div class='box'><b>%d%% set up</b>%s</div>%s"
             "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
@@ -1132,12 +1132,16 @@ def create_app(org_id: str = "twb") -> Flask:
 
     @app.get("/customer")
     def customer():
-        return render_customer(org_id, saved=request.args.get("saved") == "1")
+        return render_dashboard(org_id)                       # the customer LANDING is now the dashboard
+
+    @app.get("/customer/config")
+    def customer_config():
+        return render_customer(org_id, saved=request.args.get("saved") == "1")   # the detailed editor
 
     @app.post("/customer/apply")
     def customer_apply():
         apply_changes(org_id, request.form)
-        return redirect("/customer?saved=1")
+        return redirect("/customer/config?saved=1")
 
     @app.get("/expertise")
     def expertise():

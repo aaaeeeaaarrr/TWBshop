@@ -44,6 +44,19 @@ def test_boxes_categorized_stable_and_real_progress():
         _reset()
 
 
+def test_customer_landing_is_dashboard(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    _reset()
+    try:
+        c = create_app(ORG).test_client()
+        landing = c.get("/customer").get_data(as_text=True)
+        assert "Your system" in landing and "Connect bot" in landing       # /customer is the dashboard now
+        cfg = c.get("/customer/config").get_data(as_text=True)
+        assert "Apply changes" in cfg                                       # editor moved to /customer/config
+    finally:
+        _reset()
+
+
 def test_dashboard_renders_filter_spotlight_bars(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _reset()

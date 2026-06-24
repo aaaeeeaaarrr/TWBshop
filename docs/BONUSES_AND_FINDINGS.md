@@ -164,6 +164,10 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
 - 🎁 **Reward-per-effort ranking = activation engine** `[idea/sell]` (owner) — order cards so one small task
   cascades into many benefits ("finish the top → most happens"); the dashboard becomes a self-driving setup
   funnel that maximises the customer's first-win feeling. Each card's `value` weight is the tunable lever.
+- ✅ **Dashboard is the customer LANDING** `[ship]` (owner, 2026-06-25) — `/customer` now serves the dashboard;
+  the detailed long-list editor moved to **`/customer/config`** (module cards · "detailed view" · apply→saved ·
+  cancel all point there; admin nav = ⚡dashboard + config). Card dashboard = front door, editor = drill-down.
+  Tests repointed. `/dashboard` kept as an alias.
 - 🎁 **Cascade copy wired** `[ship]` (owner, 2026-06-25) — each box has a **"what you unlock ›"** tap-reveal
   (native `<details>` → works desktop+mobile, doesn't clutter the grid; stop-propagation so it doesn't open
   the card) showing the CHAIN one task unlocks. 14 starter cascade lines drafted in `_CASCADES` (e.g. Connect

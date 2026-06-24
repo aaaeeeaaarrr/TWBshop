@@ -89,7 +89,7 @@ def test_schema_explains_new_mechanisms():
 
 # ── customer view: complete + friendly + no leak ─────────────────────────────
 def test_customer_view_complete_no_internal_leak():
-    body = create_app("twb").test_client().get("/customer").get_data(as_text=True)
+    body = create_app("twb").test_client().get("/customer/config").get_data(as_text=True)
     assert "Apply changes" in body and "Cancel changes" in body
     assert "Sick leave" in body and "Staff rules" in body and "Connections" in body  # all mechanisms shown
     assert "Setup &amp; staff" in body and "Discover &amp; confirm" in body          # onboarding section
@@ -139,7 +139,7 @@ def test_accountant_domain_shown_and_editable():
     org = "twbtest_acc"
     _reset(org)
     try:
-        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        body = create_app(org).test_client().get("/customer/config").get_data(as_text=True)
         assert "Accountant" in body and "Food allowance" in body and "Auto-dedup vendors" in body
         apply_changes(org, {"categories.accountant.food_money.rate_per_shift_hour_riel": "600"})  # PLANNED → editable
         assert _get_path(get_config(org), "categories.accountant.food_money.rate_per_shift_hour_riel") == 600
@@ -151,7 +151,7 @@ def test_stock_domain_shown_and_editable():
     org = "twbtest_stk"
     _reset(org)
     try:
-        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        body = create_app(org).test_client().get("/customer/config").get_data(as_text=True)
         assert "Stock" in body and "Compare supplier prices" in body and "How stock is counted" in body
         apply_changes(org, {"categories.stock.count_method": "barcode"})   # PLANNED → editable
         assert _get_path(get_config(org), "categories.stock.count_method") == "barcode"
@@ -165,7 +165,7 @@ def test_customer_view_shows_health_warning():
     _reset(org)
     try:
         set_config(org, {"categories": {"attendance": {"expertise": {"enabled": True, "roles": []}}}})
-        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        body = create_app(org).test_client().get("/customer/config").get_data(as_text=True)
         assert "worth checking" in body and "Expertise" in body          # customer sees their own warning
         assert "SHADOW" not in body and "PLANNED" not in body            # still no internal badge leak
     finally:
@@ -176,7 +176,7 @@ def test_pos_and_hr_domains_shown_and_editable():
     org = "twbtest_dom"
     _reset(org)
     try:
-        body = create_app(org).test_client().get("/customer").get_data(as_text=True)
+        body = create_app(org).test_client().get("/customer/config").get_data(as_text=True)
         assert "POS" in body and "HR &amp; payroll" in body and "Pay cycle" in body and "Be the POS" in body
         apply_changes(org, {"categories.pos.mode": "tap_existing", "categories.hr_payroll.pay_cycle": "weekly"})
         cfg = get_config(org)
