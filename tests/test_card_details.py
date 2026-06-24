@@ -49,7 +49,11 @@ def test_card_toggle_save(monkeypatch):
 
 
 def test_each_card_opens_its_own_inside(monkeypatch):
+    from core.tenant_config import set_config
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
-    body = create_app("twb").test_client().get("/customer").get_data(as_text=True)
+    org = "test_card_inside"
+    cdb.ensure_org(org, "T")
+    set_config(org, {"package": "total"})                                                  # unlock all → /card links show
+    body = create_app(org).test_client().get("/customer").get_data(as_text=True)
     for link in ("/card/accountant", "/card/stock", "/card/pos", "/card/hr_payroll", "/card/ai_assist"):
         assert link in body                                                                # distinct insides, not the generic editor

@@ -693,13 +693,32 @@ def dashboard_cards(org_id: str) -> dict:
     for f in frontier:
         f["label"] = "on ✓" if f["done"] else "coming soon"
     cards += frontier
+    # PACKAGE GATING (lean-per-client): a domain card not in the tenant's plan shows LOCKED (upsell); frontier
+    # cards are add-ons (never locked). Locked cards don't count toward progress or the spotlight.
+    pkg = cfg.get("package", "attendance")
+    pkg_cats = set(catalog.PACKAGES.get(pkg, []))
+    _cat_pkg = {"att": "attendance", "cover": "attendance", "acct": "accountant",
+                "stock": "stock", "pos": "pos", "hr": "hr_payroll"}
+    for c in cards:
+        m = _cat_pkg.get(c["cat"])
+        c["locked"] = bool(m) and m not in pkg_cats
     cards.sort(key=lambda c: -c["value"])                 # STABLE order by value (never reshuffles)
-    nxt = [c for c in cards if c["done"] < c["total"]][:4]  # the biggest wins still to do → spotlight
-    return {"cards": cards, "next": nxt, "cats": _DASH_CATS,
-            "done": sum(c["done"] for c in cards), "total": sum(c["total"] for c in cards)}
+    active = [c for c in cards if not c.get("locked")]
+    nxt = [c for c in active if c["done"] < c["total"]][:4]  # biggest wins still to do (in-plan only) → spotlight
+    return {"cards": cards, "next": nxt, "cats": _DASH_CATS, "package": pkg,
+            "done": sum(c["done"] for c in active), "total": sum(c["total"] for c in active)}
 
 
 def _dash_card(c: dict) -> str:
+    if c.get("locked"):                                   # out-of-plan → upsell tile (no toggle/progress)
+        return ("<div class='dcard' data-cat='%s' style='border:1px dashed #d1d5db;border-radius:14px;"
+                "padding:16px;background:#fafafa;opacity:.8'>"
+                "<div style='font-size:22px'>%s</div>"
+                "<div style='font-weight:600;margin-top:6px;color:#6b7280'>🔒 %s</div>"
+                "<div style='color:#9ca3af;font-size:13px'>%s</div>"
+                "<div style='color:#9ca3af;font-size:12px;margin-top:8px'>in a higher plan · "
+                "<a href='/packages'>see plans →</a></div></div>"
+                % (escape(c.get("cat", "all")), c["icon"], escape(c["name"]), escape(c["reward"])))
     frac = (c["done"] / c["total"]) if c["total"] else 0
     bar = ("<div style='background:#eef0f2;border-radius:6px;height:8px;margin:8px 0 6px'>"
            "<div style='background:%s;height:8px;border-radius:6px;width:%d%%'></div></div>"
@@ -758,10 +777,11 @@ def render_dashboard(org_id: str) -> str:
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>%s%s%s"
-            "<div class='box'><b>%d%% set up</b>%s</div>%s"
+            "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>plan: "
+            "<a href='/packages'>%s</a> — locked cards need a higher plan</span>%s</div>%s"
             "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
             "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
-            % (filter_bar, live, spotlight, pct, big_bar, grid, js))
+            % (filter_bar, live, spotlight, pct, escape(d["package"].replace("_", " ").title()), big_bar, grid, js))
     return _page("Dashboard", body)
 
 
@@ -827,6 +847,27 @@ def render_card_detail(org_id: str, key: str) -> str:
             % (escape(d["configure"]), d["icon"], escape(d["title"]), saved, escape(d["what"]), escape(d["ref"]),
                len(d["options"]), len(toggles), escape(key), "".join(items), save_btn))
     return _page(d["title"], body)
+
+
+def render_packages(org_id: str) -> str:
+    """Plans — what each unlocks + switch. Switching changes which dashboard cards are active vs locked."""
+    cur = get_config(org_id).get("package", "attendance")
+    rows = ""
+    for pkg, catlist in catalog.PACKAGES.items():
+        is_cur = (pkg == cur)
+        rows += ("<div class='box' style='%s'><b>%s</b> %s<br>"
+                 "<span class='note'>includes: %s</span><br>"
+                 "<form method='post' action='/packages/set' style='margin-top:8px'>"
+                 "<input type='hidden' name='package' value='%s'>"
+                 "<button %s>%s</button></form></div>"
+                 % ("border-color:#16a34a" if is_cur else "", escape(pkg.replace("_", " ").title()),
+                    "<span style='color:#16a34a'>✓ current</span>" if is_cur else "",
+                    escape(", ".join(catlist)), escape(pkg),
+                    "disabled" if is_cur else "", "current plan" if is_cur else "switch to this"))
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+            "<h1>🎟️ Plans</h1><p class='note'>What each plan unlocks. Switching changes which cards are active "
+            "vs locked on the dashboard — your client only sees their slice.</p>%s" % rows)
+    return _page("Plans", body)
 
 
 def render_templates(org_id: str) -> str:
@@ -1413,6 +1454,18 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/card/<key>")
     def card_detail(key):
         return render_card_detail(org_id, key)
+
+    @app.get("/packages")
+    def packages():
+        return render_packages(org_id)
+
+    @app.post("/packages/set")
+    def packages_set():
+        pkg = request.form.get("package")
+        if pkg in catalog.PACKAGES:
+            set_config(org_id, {"package": pkg})
+            log_config_change(org_id, _current_user(), "package", None, pkg)
+        return redirect("/packages")
 
     @app.post("/card/<key>/save")
     def card_save(key):

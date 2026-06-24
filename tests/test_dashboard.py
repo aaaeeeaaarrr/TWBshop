@@ -47,6 +47,33 @@ def test_boxes_categorized_stable_and_real_progress():
         _reset()
 
 
+def test_package_gating_locks_out_of_plan_cards():
+    _reset()                                                       # config '{}' → package defaults to 'attendance'
+    try:
+        d = dashboard_cards(ORG)
+        assert d["package"] == "attendance"
+        locked = {c["name"] for c in d["cards"] if c.get("locked")}
+        assert "Turn on POS" in locked and "Turn on accounting" in locked    # not in the attendance plan
+        assert not any(c.get("locked") for c in d["cards"] if c["cat"] == "att")   # attendance stays active
+        set_config(ORG, {"package": "total"})
+        assert not any(c.get("locked") for c in dashboard_cards(ORG)["cards"])      # total unlocks everything
+    finally:
+        _reset()
+
+
+def test_packages_page_and_switch(monkeypatch):
+    from core.tenant_config import get_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    _reset()
+    try:
+        c = create_app(ORG).test_client()
+        assert "Plans" in c.get("/packages").get_data(as_text=True)
+        c.post("/packages/set", data={"package": "total"})
+        assert get_config(ORG)["package"] == "total"                # switching the plan persists
+    finally:
+        _reset()
+
+
 def test_evolving_live_tile(monkeypatch):
     from datetime import datetime
     from zoneinfo import ZoneInfo
