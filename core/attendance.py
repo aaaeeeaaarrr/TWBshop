@@ -104,3 +104,17 @@ def recent_checkins(org_id, staff_id, limit: int = 5) -> list:
                            ORDER BY e.at DESC LIMIT %s""", (org_id, staff_id, int(limit)))
             return [{"at": r["at"], "state": (r["detail"] or {}).get("state"), "day": r["business_day"]}
                     for r in cur.fetchall()]
+
+
+def today_summary(org_id, tz: str = "Asia/Phnom_Penh") -> dict:
+    """Live: today's check-ins for the org (read-only) — {in, late}. Drives the dashboard's 'evolving card'
+    live tile, where a set-up card flips from setup-task to a today-status tile."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    start = datetime.now(ZoneInfo(tz)).replace(hour=0, minute=0, second=0, microsecond=0)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT detail FROM attendance_events WHERE org_id=%s AND type='checked_in' AND at >= %s",
+                        (org_id, start))
+            rows = cur.fetchall()
+    return {"in": len(rows), "late": sum(1 for r in rows if (r["detail"] or {}).get("state") == "late")}

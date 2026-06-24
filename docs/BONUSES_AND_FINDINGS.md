@@ -222,6 +222,29 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   app store) · in-app contextual help/docs (Intercom/Pendo). Ours wins on breadth + channel + ergonomics;
   these are where the polished incumbents are ahead.
 
+### 🏗️ Build update + Salesforce/ServiceNow (2026-06-25)
+- ✅ **Evolving card BUILT** `[ship]` — `core.attendance.today_summary` + a **"🟢 Live today"** tile on the
+  dashboard (N in · M late) that appears once there's activity — the setup→operating FLIP, proven. Generalises:
+  each set-up domain gets a live tile (attendance first, real data).
+- ✅ **Frontier capabilities WIRED IN (off)** `[ship]` — `tenant_config.frontier` flags + 6 dashboard cards in a
+  **"Coming soon"** category: Reports & trends · AI assist · Automations · Learn · Marketplace · Mobile app.
+  Owner sees the FULL breadth + where the shop is 0% (all off today); flip on per client when ready (owner's
+  "build early, evolve switched-off, unleash when right").
+- 🔍 **Salesforce/ServiceNow — what's worth taking** `[idea]` (owner asked):
+  • Salesforce **Reports & Dashboards** + ServiceNow **Performance Analytics** → our **Reports & trends** (over-time).
+  • Salesforce **Einstein** + ServiceNow **Now Assist** → **AI assist** (suggestions/anomaly alerts; we have AI tiers).
+  • Salesforce **Flow** + ServiceNow **Workflow** → **Automations** (customer's own if-this-then; our bot-rule is the seed).
+  • Salesforce **Trailhead** → **Learn** (gamified in-app how-tos — sits right beside our cards).
+  • Salesforce **AppExchange** + Shopify store → **Marketplace** (extensibility/add-ons).
+  • ServiceNow **Service Catalog** → our module cards ALREADY are this (formalise later).
+  • ServiceNow **CMDB** (single source of truth) → our entity+event model ALREADY is this.
+  • ServiceNow **SLAs/escalations** → our AL re-ping ladder ALREADY is this. (So several are done; the new ones
+    are Reports/AI/Automations/Learn/Marketplace/App — now scaffolded off.)
+- ⭐ **LEAN- for-broad-clients principle** `[decision]` (owner) — breadth lives in the ENGINE; the SURFACE stays
+  lean per client via (1) package gating (show only what their plan/type includes), (2) the sticky filter,
+  (3) progressive disclosure (card → drill-down → cascade), (4) the spotlight (one next thing). The more we
+  wire in, the more these keep a given client's view simple. **A client only ever sees their slice.**
+
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
   set **`ORG_SECRET_KEY`** · public hosting + W3.

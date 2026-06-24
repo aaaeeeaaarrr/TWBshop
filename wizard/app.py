@@ -610,7 +610,8 @@ def _bar_color(frac: float) -> str:
 
 # Filter index (sticky): "All tools" + named categories → show fewer boxes. (id, label, icon)
 _DASH_CATS = [("all", "All tools", "▦"), ("att", "Attendance", "⏱️"), ("cover", "Coverage", "🎯"),
-              ("acct", "Accountant", "🍚"), ("stock", "Stock", "📦"), ("pos", "POS", "🛒"), ("hr", "Payroll", "💼")]
+              ("acct", "Accountant", "🍚"), ("stock", "Stock", "📦"), ("pos", "POS", "🛒"),
+              ("hr", "Payroll", "💼"), ("more", "Coming soon", "✨")]
 
 # Cascade copy (the "what one task unlocks" reveal — STARTER drafts for the owner to shave).
 _CASCADES = {
@@ -628,6 +629,12 @@ _CASCADES = {
     "Accept KHQR": "Take Bakong / KHQR payments at checkout — money in, logged instantly.",
     "Turn on payroll": "Turn tracked hours and overtime into pay runs and payslips — no spreadsheets.",
     "Payslips": "Each staffer gets a clear payslip automatically every cycle.",
+    "Reports & trends": "See trends over time — busiest days, lateness patterns, top expenses, slow stock.",
+    "AI assist": "The system flags oddities and suggests fixes — a late spike, a price jump, a stockout risk.",
+    "Automations": "Build your own 'if this → then that' — e.g. if a baker calls in sick, alert the senior.",
+    "Learn": "Short guided how-tos right where you are — no manuals, no training day.",
+    "Marketplace": "Add-ons and connections to tools you already use — switch on only what you need.",
+    "Mobile app": "Your own branded app for staff and customers — on top of Telegram and web.",
 }
 
 
@@ -636,7 +643,8 @@ def dashboard_cards(org_id: str) -> dict:
     (for the sticky filter) and weighted by `value` (for the stable order + the 'do next' spotlight). A
     sub-step only counts once its module is on. Copy/values are STARTER drafts for the owner to shave."""
     st = _setup_state(org_id)
-    cats = get_config(org_id).get("categories", {})
+    cfg = get_config(org_id)
+    cats, fr = cfg.get("categories", {}), cfg.get("frontier", {})
     att, exp = cats.get("attendance", {}), cats.get("attendance", {}).get("expertise", {})
     acc, stk, pos, hr = (cats.get("accountant", {}), cats.get("stock", {}),
                          cats.get("pos", {}), cats.get("hr_payroll", {}))
@@ -670,6 +678,19 @@ def dashboard_cards(org_id: str) -> dict:
         box("hr", "🧾", "Payslips", "auto payslips", "/customer/config",22,
             b(hr.get("enabled") and hr.get("payslips"))),
     ]
+    # Frontier capabilities (borrowed from the leaders) — wired in, OFF by default → the owner sees the full
+    # breadth + where the shop is 0%; flip them on per client when ready.
+    frontier = [
+        box("more", "📊", "Reports & trends", "who/what/when over time", "/customer/config", 20, b(fr.get("reports"))),
+        box("more", "🤖", "AI assist", "smart suggestions & alerts", "/customer/config", 18, b(fr.get("ai_assist"))),
+        box("more", "⚙️", "Automations", "your own if-this-then rules", "/customer/config", 16, b(fr.get("automations"))),
+        box("more", "🎓", "Learn", "guided how-tos in-app", "/customer/config", 12, b(fr.get("learn"))),
+        box("more", "🧩", "Marketplace", "add-ons & integrations", "/customer/config", 10, b(fr.get("marketplace"))),
+        box("more", "📱", "Mobile app", "your branded app", "/customer/config", 8, b(fr.get("mobile_app"))),
+    ]
+    for f in frontier:
+        f["label"] = "on ✓" if f["done"] else "coming soon"
+    cards += frontier
     cards.sort(key=lambda c: -c["value"])                 # STABLE order by value (never reshuffles)
     nxt = [c for c in cards if c["done"] < c["total"]][:4]  # the biggest wins still to do → spotlight
     return {"cards": cards, "next": nxt, "cats": _DASH_CATS,
@@ -695,7 +716,13 @@ def _dash_card(c: dict) -> str:
 
 
 def render_dashboard(org_id: str) -> str:
+    from core.attendance import today_summary
     d = dashboard_cards(org_id)
+    ts = today_summary(org_id)
+    live = (("<div class='box' style='background:#ecfdf5;border-color:#a7f3d0'>"
+             "<b>🟢 Live today</b> &nbsp; ⏱️ <b>%d</b> in · <b>%d</b> late "
+             "<span class='note'>— the 'evolving card': once a domain is set up, its card flips to today's "
+             "status instead of setup steps</span></div>" % (ts["in"], ts["late"])) if ts["in"] else "")
     frac = (d["done"] / d["total"]) if d["total"] else 0
     pct = int(frac * 100)
     big_bar = ("<div style='background:#eef0f2;border-radius:8px;height:12px;margin:10px 0'>"
@@ -728,11 +755,11 @@ def render_dashboard(org_id: str) -> str:
           "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>%s%s"
+            "<h1>⚡ Your system</h1>%s%s%s"
             "<div class='box'><b>%d%% set up</b>%s</div>%s"
             "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
             "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
-            % (filter_bar, spotlight, pct, big_bar, grid, js))
+            % (filter_bar, live, spotlight, pct, big_bar, grid, js))
     return _page("Dashboard", body)
 
 

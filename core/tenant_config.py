@@ -170,6 +170,16 @@ DEFAULTS = {
             "salary_owner_only": True,        # senior+ salaries are owner-only (privacy rule)
         },
     },
+    # Borrowed-from-the-leaders capabilities — WIRED IN but OFF by default; the owner unleashes per client
+    # type when each is ready (build early, evolve while switched off). Salesforce/ServiceNow/Shopify lineage.
+    "frontier": {
+        "reports": False,        # trends & analytics over time (Salesforce Reports · ServiceNow Perf Analytics · QuickBooks)
+        "ai_assist": False,      # smart suggestions / anomaly alerts (Salesforce Einstein · ServiceNow Now Assist)
+        "automations": False,    # the customer's own if-this-then rules (Salesforce Flow · ServiceNow Workflow)
+        "learn": False,          # guided in-app how-tos (Salesforce Trailhead)
+        "marketplace": False,    # add-ons & integrations (Shopify App Store · Salesforce AppExchange)
+        "mobile_app": False,     # a branded native app
+    },
 }
 
 

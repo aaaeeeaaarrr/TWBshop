@@ -17,6 +17,8 @@ def _reset():
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_staff WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM attendance_events WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM shifts WHERE org_id=%s", (ORG,))
 
 
 def test_bar_colour_progression():
@@ -29,10 +31,11 @@ def test_boxes_categorized_stable_and_real_progress():
     _reset()
     try:
         d = dashboard_cards(ORG)
-        assert len(d["cards"]) == 14
+        assert len(d["cards"]) == 20                                   # 14 domain + 6 frontier boxes
         assert d["cards"][0]["name"] == "Connect bot"                  # highest value, stable top
-        assert {c["cat"] for c in d["cards"]} >= {"att", "cover", "acct", "stock", "pos", "hr"}
-        assert any(cat[0] == "all" for cat in d["cats"])               # "All tools" filter present
+        assert {c["cat"] for c in d["cards"]} >= {"att", "cover", "acct", "stock", "pos", "hr", "more"}
+        assert any(c["name"] == "AI assist" for c in d["cards"])       # frontier capability wired in (off)
+        assert any(cat[0] == "more" for cat in d["cats"])              # "Coming soon" filter present
         par = next(c for c in d["cards"] if c["name"] == "Par levels")
         assert par["done"] == 0                                        # sub-step gated: off while stock off
         set_config(ORG, {"categories": {"stock": {"enabled": True, "par_levels": True}}})
@@ -40,6 +43,22 @@ def test_boxes_categorized_stable_and_real_progress():
         assert par2["done"] == 1                                       # real progress once stock is on
         assert dashboard_cards(ORG)["cards"][0]["name"] == "Connect bot"   # order still stable
         assert all(c.get("cascade") for c in d["cards"])                   # every box has a cascade line
+    finally:
+        _reset()
+
+
+def test_evolving_live_tile(monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from core.attendance import check_in, today_summary
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    _reset()
+    try:
+        c = create_app(ORG).test_client()
+        assert "Live today" not in c.get("/dashboard").get_data(as_text=True)    # no activity → no tile
+        check_in(ORG, 1, datetime.now(ZoneInfo("Asia/Phnom_Penh")), "00:00", "23:59", "Asia/Phnom_Penh")
+        assert today_summary(ORG)["in"] >= 1
+        assert "Live today" in c.get("/dashboard").get_data(as_text=True)         # the card evolves to live
     finally:
         _reset()
 
