@@ -649,9 +649,12 @@ def dashboard_cards(org_id: str) -> dict:
         label = "✓ done" if done >= total else ("tap to start" if done == 0 else "%d/%d set up" % (done, total))
         cards.append({"icon": icon, "name": name, "reward": reward, "link": link, "value": value,
                       "done": done, "total": total, "label": label})
-    # rank: biggest remaining reward on top — incomplete high-value first; finished cards sink
-    cards.sort(key=lambda c: (c["done"] >= c["total"], -c["value"]))
-    return {"cards": cards, "done": sum(c["done"] for c in cards), "total": sum(c["total"] for c in cards)}
+    # STABLE order by value (never reshuffles on completion → muscle-memory for re-tweaking); a separate
+    # "next" list feeds the top spotlight (the biggest wins still to do).
+    cards.sort(key=lambda c: -c["value"])
+    nxt = [c for c in cards if c["done"] < c["total"]][:3]
+    return {"cards": cards, "next": nxt,
+            "done": sum(c["done"] for c in cards), "total": sum(c["total"] for c in cards)}
 
 
 def _dash_card(c: dict) -> str:
@@ -676,12 +679,23 @@ def render_dashboard(org_id: str) -> str:
                % (_bar_color(frac), pct))
     grid = ("<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;"
             "margin:12px 0'>" + "".join(_dash_card(c) for c in d["cards"]) + "</div>")
+    if d["next"]:
+        chips = "".join("<a href='%s' style='display:inline-block;margin:6px 8px 0 0;padding:7px 13px;"
+                        "background:#fff;border:1px solid #bae6fd;border-radius:20px;text-decoration:none;"
+                        "color:#0c4a6e;font-size:14px'>%s <b>%s</b> <span style='color:#64748b'>· %s</span></a>"
+                        % (escape(c["link"]), c["icon"], escape(c["name"]), escape(c["reward"])) for c in d["next"])
+        spotlight = ("<div class='box' style='background:#f0f9ff;border-color:#bae6fd'>"
+                     "<b>👉 Do this next</b> &nbsp;<span class='note'>biggest wins still to do — one click each</span>"
+                     "<div>%s</div></div>" % chips)
+    else:
+        spotlight = ("<div class='box' style='background:#f0fdf4;border-color:#bbf7d0'>"
+                     "<b>✓ You're all set up</b> &nbsp;<span class='note'>tweak anything below, anytime</span></div>")
     body = ("<div class='nav'><a href='/customer'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>"
-            "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>top cards give the most — finish "
-            "one to unlock the most</span>%s</div>%s"
-            "<p class='note'>Prototype — cards rank by reward; names are starter drafts. Tap any to open it.</p>"
-            % (pct, big_bar, grid))
+            "<h1>⚡ Your system</h1>%s"
+            "<div class='box'><b>%d%% set up</b>%s</div>%s"
+            "<p class='note'>Prototype — order is fixed (find anything fast); the spotlight surfaces what's "
+            "next. Names are starter drafts. Tap any card to open it.</p>"
+            % (spotlight, pct, big_bar, grid))
     return _page("Dashboard", body)
 
 

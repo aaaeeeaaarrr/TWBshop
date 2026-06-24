@@ -164,6 +164,11 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
 - 🎁 **Reward-per-effort ranking = activation engine** `[idea/sell]` (owner) — order cards so one small task
   cascades into many benefits ("finish the top → most happens"); the dashboard becomes a self-driving setup
   funnel that maximises the customer's first-win feeling. Each card's `value` weight is the tunable lever.
+- 🎁 **Stable grid + "Do this next" spotlight** `[ship]` (owner refinement, 2026-06-25) — the BEST pattern:
+  grid order is FIXED by value (never reshuffles → muscle-memory to find/re-tweak anything, even at 100%), and
+  a top **👉 Do this next** box surfaces the 3 biggest incomplete wins as one-click chips (the funnel, without
+  moving the layout). Done cards stay put (show the win) but drop out of the spotlight. Becomes "✓ all set up"
+  when nothing's left. (`dashboard_cards` returns `cards` [stable] + `next` [top-3 incomplete].)
 - 🎁 **Colour-shifting progress bars** `[idea]` (owner) — the bar changes colour the closer to 100%/5-5
   (e.g. red <34% → amber → teal → green at done), so the customer reads the whole dashboard at a GLANCE by
   colour — exactly the "less reading" goal. 🔍 pair colour WITH the number (5/5) not colour alone
