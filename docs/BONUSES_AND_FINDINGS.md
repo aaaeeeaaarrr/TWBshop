@@ -155,6 +155,10 @@ rewarding 1-2-word name + the short reward each gives. Less reading, more ease. 
   config = the power-user drill-down behind each card. Keep BOTH; don't lose the depth.
 - 🔍 **Reward copy is the real work** `[decision]` — the 1-2-word benefit names + ultra-short rewards per
   domain/task are a copywriting task (owner-led; I can draft a full set to shave).
+- ✅ **Prototype BUILT** `[ship]` — `/dashboard`: benefit-framed task cards (drafted names) + colour-shifting
+  bars (grey→amber→teal→green) + REAL setup/health/config completion, ALONGSIDE `/customer` (nothing replaced).
+  Starter benefit copy: Connect bot·Tag staff group·Add your team·Set your rules·Clear warnings (get set up) +
+  Track your team·Money sorted·Never run out·Be the till·Payroll done (add to your system). Tunnel in → iterate.
 - 🎁 **Colour-shifting progress bars** `[idea]` (owner) — the bar changes colour the closer to 100%/5-5
   (e.g. red <34% → amber → teal → green at done), so the customer reads the whole dashboard at a GLANCE by
   colour — exactly the "less reading" goal. 🔍 pair colour WITH the number (5/5) not colour alone

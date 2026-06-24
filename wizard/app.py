@@ -159,7 +159,8 @@ def render_page(org_id: str = "twb") -> str:
     cfg = get_config(org_id)
     legend = " &nbsp; ".join("%s <small style='color:#555'>%s</small>" % (_badge(k), escape(v))
                              for k, v in LEGEND.items())
-    body = ("<div class='nav'><b>Admin</b> · <a href='/setup'>setup</a> · <a href='/customer'>customer view</a> · "
+    body = ("<div class='nav'><b>Admin</b> · <a href='/dashboard'>⚡ dashboard</a> · <a href='/setup'>setup</a> · "
+            "<a href='/customer'>customer view</a> · "
             "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · "
             "<a href='/bot'>bot setup</a> · <a href='/templates'>templates</a> · <a href='/whatif'>what-if</a> · "
             "<a href='/audit'>audit</a> · <a href='/health'>health</a> · <a href='/shadow'>shadow</a> · "
@@ -283,7 +284,8 @@ def _health_banner(org_id: str) -> str:
 def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/setup'>setup</a> · <a href='/staff'>staff</a> · "
+    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/dashboard'>⚡ dashboard</a> · "
+            "<a href='/setup'>setup</a> · <a href='/staff'>staff</a> · "
             "<a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>⚙️ Configure your system</h1>"
             "<p class='note'>Play with anything — <b>nothing changes until you press “Apply changes”.</b> "
@@ -590,6 +592,86 @@ def render_setup(org_id: str) -> str:
         "skills + rules.</p>"
         % (done_n, st["total"], ready_banner, steps))
     return _page("Setup", body)
+
+
+# ── DASHBOARD (task-card / completion prototype — benefit-framed cards + colour-shifting bars) ──────────
+def _bar_color(frac: float) -> str:
+    """Calm amber→teal→green progression (no harsh red — 'not yet' isn't an error)."""
+    if frac >= 1.0:
+        return "#16a34a"   # green — done
+    if frac >= 0.67:
+        return "#0d9488"   # teal — getting there
+    if frac >= 0.34:
+        return "#d97706"   # amber
+    if frac > 0:
+        return "#f59e0b"   # light amber — started
+    return "#9ca3af"       # grey — not started
+
+
+def dashboard_cards(org_id: str) -> dict:
+    """The customer dashboard as benefit-framed task cards with REAL completion (no fake progress). Each card:
+    icon · name (the OUTCOME, 1-2 words) · reward (short) · done/total · label · link. Copy is a STARTER
+    draft for the owner to shave."""
+    st = _setup_state(org_id)
+    staff_n = len(st["staff"])
+    cats = get_config(org_id).get("categories", {})
+    activation = [
+        {"icon": "🤖", "name": "Connect bot", "reward": "staff clock in by phone", "link": "/bot",
+         "done": 1 if st["bot_user"] else 0, "total": 1,
+         "label": ("@%s ✓" % st["bot_user"]) if st["bot_user"] else "not set"},
+        {"icon": "🏷️", "name": "Tag staff group", "reward": "the bot finds your team", "link": "/groups",
+         "done": 1 if st["staff_grp"] else 0, "total": 1, "label": "set ✓" if st["staff_grp"] else "not set"},
+        {"icon": "👥", "name": "Add your team", "reward": "everyone clocks in", "link": "/staff",
+         "done": 1 if staff_n else 0, "total": 1, "label": ("%d added" % staff_n) if staff_n else "none yet"},
+        {"icon": "⚙️", "name": "Set your rules", "reward": "your policy, automated", "link": "/customer",
+         "done": 1, "total": 1, "label": "defaults ready · tweak anytime"},
+        {"icon": "✅", "name": "Clear warnings", "reward": "settings make sense", "link": "/health",
+         "done": 0 if st["warns"] else 1, "total": 1,
+         "label": ("%d to fix" % len(st["warns"])) if st["warns"] else "all clear"},
+    ]
+    _mods = [("⏱️", "Track your team", "who's late · payroll saved", "attendance"),
+             ("🍚", "Money sorted", "receipts → expenses, auto", "accountant"),
+             ("📦", "Never run out", "par levels · cheapest supplier", "stock"),
+             ("🛒", "Be the till", "sell + track stock together", "pos"),
+             ("💼", "Payroll done", "slips + pay runs, automatic", "hr_payroll")]
+    modules = [{"icon": i, "name": n, "reward": r, "link": "/customer",
+                "done": 1 if cats.get(k, {}).get("enabled") else 0, "total": 1,
+                "label": "on ✓" if cats.get(k, {}).get("enabled") else "tap to turn on"}
+               for i, n, r, k in _mods]
+    return {"activation": activation, "modules": modules, "setup_done": st["done"], "setup_total": st["total"]}
+
+
+def _dash_card(c: dict) -> str:
+    frac = (c["done"] / c["total"]) if c["total"] else 0
+    bar = ("<div style='background:#eef0f2;border-radius:6px;height:8px;margin:8px 0 6px'>"
+           "<div style='background:%s;height:8px;border-radius:6px;width:%d%%'></div></div>"
+           % (_bar_color(frac), int(frac * 100)))
+    return ("<a href='%s' style='text-decoration:none;color:inherit'>"
+            "<div style='border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff;height:100%%'>"
+            "<div style='font-size:22px'>%s</div><div style='font-weight:600;margin-top:6px'>%s</div>"
+            "<div style='color:#6b7280;font-size:13px'>%s</div>%s"
+            "<div style='color:#6b7280;font-size:12px'>%s</div></div></a>"
+            % (escape(c["link"]), c["icon"], escape(c["name"]), escape(c["reward"]), bar, escape(c["label"])))
+
+
+def render_dashboard(org_id: str) -> str:
+    d = dashboard_cards(org_id)
+    frac = (d["setup_done"] / d["setup_total"]) if d["setup_total"] else 0
+    big_bar = ("<div style='background:#eef0f2;border-radius:8px;height:12px;margin:10px 0'>"
+               "<div style='background:%s;height:12px;border-radius:8px;width:%d%%'></div></div>"
+               % (_bar_color(frac), int(frac * 100)))
+
+    def grid(cs):
+        return ("<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));"
+                "gap:14px;margin:10px 0 24px'>" + "".join(_dash_card(c) for c in cs) + "</div>")
+
+    body = ("<div class='nav'><a href='/customer'>detailed view</a> · <a href='/'>admin</a></div>"
+            "<h1>⚡ Your system</h1>"
+            "<div class='box'><b>🚀 Go live — %d of %d done</b>%s</div>"
+            "<h2>Get set up</h2>%s<h2>Add to your system</h2>%s"
+            "<p class='note'>Prototype — benefit names are starter drafts; tap any card to open it.</p>"
+            % (d["setup_done"], d["setup_total"], big_bar, grid(d["activation"]), grid(d["modules"])))
+    return _page("Dashboard", body)
 
 
 def render_templates(org_id: str) -> str:
@@ -1160,6 +1242,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/shadow")
     def shadow():
         return render_shadow(org_id)
+
+    @app.get("/dashboard")
+    def dashboard():
+        return render_dashboard(org_id)
 
     @app.get("/health")
     def health():
