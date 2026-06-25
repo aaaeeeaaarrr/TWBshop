@@ -29,3 +29,22 @@ def attendance_report(org_id, days: int = 14, tz: str = "Asia/Phnom_Penh") -> di
     late = sum(x["late"] for x in daily)
     return {"daily": daily, "total": total, "late": late,
             "on_time_rate": (100 * (total - late) // total) if total else 0}
+
+
+def staff_attendance_report(org_id, days: int = 14, tz: str = "Asia/Phnom_Penh") -> list:
+    """Per-staff punctuality over the last `days` days (read-only): [{staff_id, name, total, late, on_time_rate}],
+    worst-punctuality first. Names from core_staff where present, else a '#id' fallback."""
+    since = (datetime.now(ZoneInfo(tz)) - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT e.staff_id sid, COALESCE(s.call_name, s.name, 'Staff #' || e.staff_id) nm, "
+                "COUNT(*) total, COUNT(*) FILTER (WHERE e.detail->>'state' = 'late') late "
+                "FROM attendance_events e "
+                "LEFT JOIN core_staff s ON s.org_id = e.org_id AND s.staff_id = e.staff_id "
+                "WHERE e.org_id = %s AND e.type = 'checked_in' AND e.at >= %s "
+                "GROUP BY e.staff_id, s.call_name, s.name ORDER BY late DESC, total DESC",
+                (org_id, since))
+            rows = cur.fetchall()
+    return [{"staff_id": r["sid"], "name": r["nm"], "total": r["total"], "late": r["late"],
+             "on_time_rate": (100 * (r["total"] - r["late"]) // r["total"]) if r["total"] else 0} for r in rows]

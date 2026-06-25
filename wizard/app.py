@@ -26,7 +26,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
 from core.whatif import verdict_whatif
 from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
-from core.reports import attendance_report
+from core.reports import attendance_report, staff_attendance_report
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -786,8 +786,15 @@ def render_dashboard(org_id: str) -> str:
 
 
 def render_reports(org_id: str) -> str:
-    """📊 The first frontier capability built out — attendance trends over time (read-only)."""
-    rep = attendance_report(org_id, 14)
+    """📊 The Reports capability — attendance trends + per-staff punctuality over a selectable period (read-only)."""
+    try:
+        days = int(request.args.get("days", 14))
+    except (TypeError, ValueError):
+        days = 14
+    if days not in (7, 14, 30):
+        days = 14
+    rep = attendance_report(org_id, days)
+    staff = staff_attendance_report(org_id, days)
     maxt = max([d["total"] for d in rep["daily"]], default=1)
     rows = "".join(
         "<tr><td>%s</td><td>%d</td><td>%d</td>"
@@ -796,15 +803,30 @@ def render_reports(org_id: str) -> str:
         % (escape(d["day"]), d["total"], d["late"],
            _bar_color(1 - (d["late"] / d["total"] if d["total"] else 0)), int(100 * d["total"] / maxt))
         for d in rep["daily"]) or "<tr><td colspan='4' class='note'>No check-ins recorded yet.</td></tr>"
+    srows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td>"
+        "<td><div style='background:#eef0f2;border-radius:4px;height:10px;width:110px;display:inline-block'>"
+        "<div style='background:%s;height:10px;border-radius:4px;width:%d%%'></div></div> %d%%</td></tr>"
+        % (escape(s["name"]), s["total"], s["late"], _bar_color(s["on_time_rate"] / 100),
+           s["on_time_rate"], s["on_time_rate"])
+        for s in staff) or "<tr><td colspan='4' class='note'>No staff check-ins yet.</td></tr>"
+    period = " · ".join(("<b>%dd</b>" % n) if n == days else "<a href='/reports?days=%d'>%dd</a>" % (n, n)
+                        for n in (7, 14, 30))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
-            "<h1>📊 Reports — attendance (last 14 days)</h1>"
-            "<div class='box'><b>%d check-ins · %d late · %d%% on-time</b></div>"
-            "<div class='box'><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<h1>📊 Reports — attendance</h1><p class='note'>Period: %s</p>"
+            "<div class='box'><b>%d check-ins · %d late · %d%% on-time</b> "
+            "<span class='note'>(last %d days)</span></div>"
+            "<div class='box'><h3>Daily trend</h3>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
             "<th>Late</th><th>Volume</th></tr>%s</table></div>"
-            "<p class='note'>The first report — built from the platform's attendance data. Expense, stock and "
-            "sales reports follow as those domains record data. (Bar greener = fewer late that day.)</p>"
-            % (rep["total"], rep["late"], rep["on_time_rate"], rows))
+            "<div class='box'><h3>Punctuality by staff</h3>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Staff</th><th>Check-ins</th>"
+            "<th>Late</th><th>On-time</th></tr>%s</table></div>"
+            "<p class='note'>Built from the platform's attendance data. Expense, stock and sales reports "
+            "follow as those domains record data. (Greener = better.)</p>"
+            % (period, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows))
     return _page("Reports", body)
 
 

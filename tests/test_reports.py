@@ -8,7 +8,7 @@ from shared.database import _db
 import wizard.app as wa
 from wizard.app import create_app
 from core.attendance import check_in
-from core.reports import attendance_report
+from core.reports import attendance_report, staff_attendance_report
 
 cdb.init_core_db()
 ORG = "test_reports"
@@ -36,13 +36,29 @@ def test_attendance_report_aggregates():
         _clean()
 
 
+def test_staff_attendance_report():
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        now = datetime.now(ZoneInfo(TZ))
+        check_in(ORG, 1, now, "00:00", "23:59", TZ)
+        check_in(ORG, 2, now, "00:00", "23:59", TZ)
+        rep = staff_attendance_report(ORG, 14)
+        assert len(rep) == 2                                            # one row per staff
+        assert all(s["name"] and s["total"] == 1 for s in rep)         # name (fallback) + count
+        assert all(0 <= s["on_time_rate"] <= 100 for s in rep)
+    finally:
+        _clean()
+
+
 def test_reports_page_renders(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     cdb.ensure_org(ORG, "T")
     _clean()
     try:
         check_in(ORG, 1, datetime.now(ZoneInfo(TZ)), "00:00", "23:59", TZ)
-        body = create_app(ORG).test_client().get("/reports").get_data(as_text=True)
-        assert "Reports" in body and "check-ins" in body and "on-time" in body
+        body = create_app(ORG).test_client().get("/reports?days=30").get_data(as_text=True)
+        assert "Reports" in body and "Daily trend" in body and "Punctuality by staff" in body
+        assert "Period:" in body and "30d" in body                     # selectable period
     finally:
         _clean()
