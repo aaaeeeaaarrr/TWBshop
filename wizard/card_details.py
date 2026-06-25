@@ -25,7 +25,7 @@ CARD_DETAILS = {
     "stock": {
         "icon": "📦", "title": "Stock / Inventory",
         "what": "Know what you have, never run out, buy from the cheapest.",
-        "ref": "Lightspeed · StoreHub · Sortly · Loyverse", "configure": "/customer/config",
+        "ref": "Lightspeed · StoreHub · Sortly · Loyverse", "configure": "/stock",
         "options": [
             ("Stock counts", "Cycle + full counts (paperless / photo / AppSheet)", "built"),
             ("Par / reorder levels", "Target per item → reorder nudge before you run out", "built"),

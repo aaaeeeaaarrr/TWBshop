@@ -260,6 +260,33 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_cfg_audit_org ON core_config_audit (org_id, at DESC)")
 
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_stock_items (
+                    item_id    BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    name       TEXT NOT NULL,
+                    unit       TEXT DEFAULT 'unit',
+                    category   TEXT,
+                    par_level  NUMERIC DEFAULT 0,
+                    on_hand    NUMERIC DEFAULT 0,
+                    active     BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_items_org ON core_stock_items (org_id, active)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_stock_counts (
+                    count_id   BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    item_id    BIGINT NOT NULL,
+                    qty        NUMERIC NOT NULL,
+                    note       TEXT,
+                    counted_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_counts_item "
+                        "ON core_stock_counts (org_id, item_id, counted_at DESC)")
+
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
     """Append a who-changed-what-when row for a config edit (auditability)."""

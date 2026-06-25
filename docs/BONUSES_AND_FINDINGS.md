@@ -255,6 +255,11 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **STOCK domain made REAL (1st non-attendance domain)** `[ship]` — `core/stock.py` (item catalog · par
+  levels · stock counts · low-stock reorder list) + `core_stock_items`/`core_stock_counts` tables + a `/stock`
+  manager page (gated by `categories.stock.enabled`; the Stock card opens it). **Shadow-style: its OWN tables,
+  NOT TWB's live stock** (`gm_bot/stock.py` untouched). Proves the platform can grow a real domain beyond
+  attendance. *Schema:* 2 new additive core tables, created idempotently by `run_wizard.py`'s `init_core_db()`.
 - ✅ **AI assist made REAL (anomaly check)** `[ship]` — `core.reports.attendance_anomalies` (pure statistics
   over attendance: lateness-spike + low-turnout vs the trailing baseline, NO model cost) surfaced on the AI card
   as a **"🔔 Live anomaly check"**. The first AI-assist feature actually working (computer-tier; the model tiers
