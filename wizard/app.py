@@ -1518,8 +1518,17 @@ def render_whatif(org_id: str) -> str:
 
 
 def render_audit(org_id: str) -> str:
-    """📝 The config change log — who changed which knob, when (PRODUCT SECURITY law #5: auditability)."""
+    """📝 The config change log — who changed which knob, when (PRODUCT SECURITY law #5: auditability) + a
+    tamper-evidence check over the hash-chained mirror (core.audit)."""
+    from core import audit
     rows = recent_config_audit(org_id, 100)
+    chain = audit.verify_chain(org_id)
+    ok = chain["result"] == "PASS"
+    chain_box = ("<div class='box' style='background:%s'><b>🔗 Tamper-check: %s</b> "
+                 "<span class='note'>— %d hash-chained entries; each row's hash links to the one before, so an "
+                 "edited or deleted record is detectable.</span>%s</div>"
+                 % ("#ecfdf5" if ok else "#fef2f2", "PASS ✓" if ok else "FAIL ✗", chain["checked"],
+                    "" if ok else ("<ul>" + "".join("<li>%s</li>" % escape(f) for f in chain["failures"][:5]) + "</ul>")))
     items = "".join(
         "<li><b>%s</b> &nbsp; <code>%s</code> &nbsp; %s → %s <span class='note'>(by %s)</span></li>"
         % (escape(str(r["at"])[:16]), escape(r["path"]),
@@ -1527,8 +1536,8 @@ def render_audit(org_id: str) -> str:
            escape("—" if r["new_val"] is None else r["new_val"]), escape(r["who"] or "?"))
         for r in rows) or "<li class='note'>No config changes recorded yet.</li>"
     body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
-            "<h1>📝 Config change log</h1><div class='box'><p class='note'>Who changed which setting, when. "
-            "Newest first. (Secrets log the act, never the value.)</p><ul>%s</ul></div>" % items)
+            "<h1>📝 Config change log</h1>%s<div class='box'><p class='note'>Who changed which setting, when. "
+            "Newest first. (Secrets log the act, never the value.)</p><ul>%s</ul></div>" % (chain_box, items))
     return _page("Audit", body)
 
 

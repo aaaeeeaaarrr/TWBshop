@@ -36,7 +36,17 @@
 
 ---
 
-## ▶ PHASE 1 — Audit hash-chain (do this first)
+## ▶ PHASE 1 — Audit hash-chain (✅ SHIPPED 2026-06-25)
+
+> **Done:** `core/audit.py` (`write` + `_canonical` + `verify_chain` + `recent`; per-org chain; **per-org advisory
+> lock** so concurrent writers can't fork) · `core_audit` table (NOT NULL hashes from row 1) · `log_config_change`
+> now writes the chained mirror · `/audit` shows **🔗 Tamper-check: PASS/FAIL** · `scripts/verify_audit_core.py`
+> CLI · `tests/test_audit_chain.py` (6: chain-links · content-tamper→FAIL · deletion→FAIL · genesis · per-org
+> isolation · NOT-NULL · `log_config_change` round-trip). Adversarial pass: added the advisory lock + documented
+> two honest limits (changes must be JSON-safe; a full DB-admin re-chain is caught only by the **anchor = Phase
+> 1b**, deferred). Additive/inert — adds tamper-evidence to the existing log, no live behavior change.
+
+Original plan below (kept for the record):
 
 ### Goal
 Replace our flat `core_config_audit` (a plain who/what/when log, no tamper-evidence) with a **tamper-evident

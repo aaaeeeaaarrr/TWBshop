@@ -255,6 +255,14 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **HARVEST Phase 1 SHIPPED — tamper-evident audit hash-chain** `[ship/sell]` — first POSBusiness harvest, into
+  `core/audit.py` (re-derived for psycopg2, **re-tested from scratch** — its design was ChatGPT-planned). Each
+  audit row carries `entry_hash`=SHA-256(canonical) + `previous_hash`=prior row's hash (per-org chain, genesis
+  `0*64`) → content edits AND row deletions are detectable; `verify_chain` re-walks it (PASS/FAIL). `core_audit`
+  table; `log_config_change` now writes the chained mirror; `/audit` shows "🔗 Tamper-check: PASS/FAIL"; a
+  `verify_audit_core` CLI. Adversarial pass → a **per-org advisory lock** (no fork under concurrency) + honest
+  limits (JSON-safe changes; full re-chain needs the external **anchor = Phase 1b**). 6 tests. The harvest
+  pattern is proven: reference an external design → adapt to our stack → re-prove with our own tests.
 - 🔍 **POSBusiness = a harvest goldmine** `[sell/decision]` — the owner's *other* project (`aaaeeeaaarrr/POSbusiness`)
   is a near-production full-stack POS far deeper than our sales-log: hash-chained tamper-evident audit (+ external
   anchor), shifts/Z-report/drawer-reconcile/cash-variance-gates, refunds/voids/credit-notes, ABA PayWay/KHQR

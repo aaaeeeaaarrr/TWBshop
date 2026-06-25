@@ -261,6 +261,23 @@ def init_core_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_cfg_audit_org ON core_config_audit (org_id, at DESC)")
 
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_audit (
+                    id            TEXT PRIMARY KEY,
+                    org_id        TEXT NOT NULL,
+                    who           TEXT,
+                    action        TEXT NOT NULL,
+                    resource_type TEXT NOT NULL,
+                    resource_id   TEXT,
+                    changes       JSONB,
+                    at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    previous_hash CHAR(64) NOT NULL,
+                    entry_hash    CHAR(64) NOT NULL
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_org ON core_audit (org_id, at)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_res ON core_audit (resource_type, resource_id)")
+
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_stock_items (
                     item_id    BIGSERIAL PRIMARY KEY,
                     org_id     TEXT NOT NULL,
@@ -358,13 +375,16 @@ def init_core_db() -> None:
 
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
-    """Append a who-changed-what-when row for a config edit (auditability)."""
+    """Append a who-changed-what-when row for a config edit (auditability) AND a tamper-evident hash-chained
+    mirror in core_audit (core.audit). The flat table stays the readable log; the chain adds tamper-evidence."""
+    ov = None if old_val is None else str(old_val)[:200]
+    nv = None if new_val is None else str(new_val)[:200]
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO core_config_audit (org_id, who, path, old_val, new_val) "
-                        "VALUES (%s,%s,%s,%s,%s)",
-                        (org_id, who or "?", path, None if old_val is None else str(old_val)[:200],
-                         None if new_val is None else str(new_val)[:200]))
+                        "VALUES (%s,%s,%s,%s,%s)", (org_id, who or "?", path, ov, nv))
+    from core import audit                                     # hash-chained mirror (separate txn; additive)
+    audit.write(org_id, who or "?", "config.update", "config", path, {"old": ov, "new": nv})
 
 
 def recent_config_audit(org_id: str, limit: int = 100) -> list:
