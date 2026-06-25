@@ -7,12 +7,12 @@ from zoneinfo import ZoneInfo
 from shared.database import _db
 
 
-def add_expense(org_id, amount, supplier=None, category=None, note=None) -> int:
+def add_expense(org_id, amount, supplier=None, category=None, note=None, actor=None) -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO core_expenses (org_id, supplier, category, amount, note) "
-                        "VALUES (%s,%s,%s,%s,%s) RETURNING expense_id",
-                        (org_id, (supplier or None), (category or None), amount, (note or None)))
+            cur.execute("INSERT INTO core_expenses (org_id, supplier, category, amount, note, actor) "
+                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING expense_id",
+                        (org_id, (supplier or None), (category or None), amount, (note or None), actor))
             return cur.fetchone()["expense_id"]
 
 

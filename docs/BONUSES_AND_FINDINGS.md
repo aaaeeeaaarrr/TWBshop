@@ -255,6 +255,28 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **INVESTIGATION card BUILT (forensic / loss-prevention)** `[ship/sell]` (owner idea) — `/investigate` +
+  `core/investigate.py`: **who was working on a day** (camera-check anchor) · **item timeline** (when an item was
+  last counted/sold + by whom) · **cross-domain activity feed** (last 48h of check-ins/counts/sales/expenses,
+  newest first). + **actor tracking** added (`actor` on counts/sales/expenses, threaded from the logged-in user)
+  so actions name a person, not just a time. A dashboard card. Purpose: pinpoint WHEN + WHO → jump to the camera
+  fast, without scrubbing hours of footage.
+- 🔎 **More investigation ideas (owner asked — the menu)** `[idea]`: **stock variance / shrinkage** (counted vs
+  expected = last count + receives − sales; a negative gap flags theft/waste + the window to review — the killer
+  one) · **voids / refunds / discounts log** (the classic POS shrinkage vector — who, when, how much) · **cash
+  drawer over/short** (counted vs expected by shift/person) · **after-hours / off-shift activity** (a sale or
+  count when no one should be working) · **config / price / salary change audit** (we have `core_config_audit`;
+  surface it) · **large/unusual outliers** (a huge expense, a suspiciously big discount) · **repeat-pattern
+  correlation** (same staffer on shift at EVERY shrinkage event — the cross-domain edge) · **no-sale / drawer-
+  open** events · **edit/delete-after-the-fact** log.
+- 💼 **Competitor read — loss prevention is a whole industry** `[sell]`: **Solink · Envysion · DTT · Interface ·
+  March Networks** = POS-transaction + VIDEO (a flagged event → the camera clip at that timestamp — EXACTLY this
+  card, productized; Solink lets you search "every void > $20 + its clip"). **Lightspeed/Toast/Square** =
+  built-in exception/void/refund/discount-by-employee reports. **Restaurant365 · MarketMan** = inventory
+  variance / waste / shrinkage. **ServiceNow · Salesforce** = audit trail / field history. **OUR EDGE:** we hold
+  attendance + stock + sales + expenses together, so we answer **cross-domain** ("who was on shift when this
+  stock went missing") that single-domain video-POS tools can't. **Future bonus:** store a camera deep-link per
+  zone → an alert/event links straight to the clip (be Solink, lean — we give time+who, they keep their own DVR).
 - ✅ **Reorder loop closed (2nd cross-domain link: stock↔accountant)** `[ship]` — `stock.receive_purchase`
   restocks an item AND logs the cost as a `stock` expense in ONE transaction; a "📥 Receive a purchase" form on
   `/stock`. Closes the low-stock → reorder → received → restocked + expensed loop (the "needs attention" feed

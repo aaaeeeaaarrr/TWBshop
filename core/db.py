@@ -349,6 +349,11 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_payslips_run ON core_payslips (org_id, run_id)")
 
+            # actor on each recorded action — for the Investigation card (who did what, when)
+            cur.execute("ALTER TABLE core_stock_counts ADD COLUMN IF NOT EXISTS actor TEXT")
+            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS actor TEXT")
+            cur.execute("ALTER TABLE core_expenses ADD COLUMN IF NOT EXISTS actor TEXT")
+
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
     """Append a who-changed-what-when row for a config edit (auditability)."""

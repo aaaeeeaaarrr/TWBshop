@@ -34,7 +34,7 @@ def test_boxes_categorized_stable_and_real_progress():
     _reset()
     try:
         d = dashboard_cards(ORG)
-        assert len(d["cards"]) == 20                                   # 14 domain + 6 frontier boxes
+        assert len(d["cards"]) == 21                                   # 14 domain + Investigate + 6 frontier
         assert d["cards"][0]["name"] == "Connect bot"                  # highest value, stable top
         assert {c["cat"] for c in d["cards"]} >= {"att", "cover", "acct", "stock", "pos", "hr", "more"}
         assert any(c["name"] == "AI assist" for c in d["cards"])       # frontier capability wired in (off)

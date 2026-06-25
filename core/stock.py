@@ -59,7 +59,7 @@ def cheapest_overview(org_id) -> dict:
             return {r["item_id"]: {"supplier": r["supplier"], "price": float(r["price"])} for r in cur.fetchall()}
 
 
-def receive_purchase(org_id, item_id, qty, total_cost, supplier=None) -> int:
+def receive_purchase(org_id, item_id, qty, total_cost, supplier=None, actor=None) -> int:
     """Receive a restock: add qty to on_hand AND log an expense for the cost — ONE transaction (the cross-domain
     stock↔accountant link that closes the reorder loop). Returns the expense_id."""
     with _db() as conn:
@@ -68,9 +68,9 @@ def receive_purchase(org_id, item_id, qty, total_cost, supplier=None) -> int:
                         "RETURNING name", (qty, org_id, item_id))
             r = cur.fetchone()
             name = r["name"] if r else None
-            cur.execute("INSERT INTO core_expenses (org_id, supplier, category, amount, note) "
-                        "VALUES (%s,%s,'stock',%s,%s) RETURNING expense_id",
-                        (org_id, supplier or None, total_cost, "restock %s x%s" % (name, qty)))
+            cur.execute("INSERT INTO core_expenses (org_id, supplier, category, amount, note, actor) "
+                        "VALUES (%s,%s,'stock',%s,%s,%s) RETURNING expense_id",
+                        (org_id, supplier or None, total_cost, "restock %s x%s" % (name, qty), actor))
             return cur.fetchone()["expense_id"]
 
 
@@ -88,12 +88,12 @@ def deactivate_item(org_id, item_id) -> None:
                         (org_id, item_id))
 
 
-def record_count(org_id, item_id, qty, note=None) -> int:
+def record_count(org_id, item_id, qty, note=None, actor=None) -> int:
     """Record a stock count: append a count row (history) AND set the item's on_hand — one transaction."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO core_stock_counts (org_id, item_id, qty, note) VALUES (%s,%s,%s,%s) "
-                        "RETURNING count_id", (org_id, item_id, qty, note))
+            cur.execute("INSERT INTO core_stock_counts (org_id, item_id, qty, note, actor) VALUES (%s,%s,%s,%s,%s) "
+                        "RETURNING count_id", (org_id, item_id, qty, note, actor))
             cid = cur.fetchone()["count_id"]
             cur.execute("UPDATE core_stock_items SET on_hand=%s WHERE org_id=%s AND item_id=%s",
                         (qty, org_id, item_id))

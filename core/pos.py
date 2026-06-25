@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from shared.database import _db
 
 
-def record_sale(org_id, item_id, qty, unit_price, item_name=None) -> int:
+def record_sale(org_id, item_id, qty, unit_price, item_name=None, actor=None) -> int:
     """Record a sale: log it AND (if it's a stock item) decrement on_hand — one transaction. Returns sale_id."""
     with _db() as conn:
         with conn.cursor() as cur:
@@ -16,8 +16,9 @@ def record_sale(org_id, item_id, qty, unit_price, item_name=None) -> int:
                 cur.execute("SELECT name FROM core_stock_items WHERE org_id=%s AND item_id=%s", (org_id, item_id))
                 r = cur.fetchone()
                 name = r["name"] if r else None
-            cur.execute("INSERT INTO core_sales (org_id, item_id, item_name, qty, unit_price) "
-                        "VALUES (%s,%s,%s,%s,%s) RETURNING sale_id", (org_id, item_id or None, name, qty, unit_price))
+            cur.execute("INSERT INTO core_sales (org_id, item_id, item_name, qty, unit_price, actor) "
+                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING sale_id",
+                        (org_id, item_id or None, name, qty, unit_price, actor))
             sid = cur.fetchone()["sale_id"]
             if item_id:                                          # cross-domain: a sale reduces stock on-hand
                 cur.execute("UPDATE core_stock_items SET on_hand = on_hand - %s WHERE org_id=%s AND item_id=%s",

@@ -613,7 +613,7 @@ def _bar_color(frac: float) -> str:
 # Filter index (sticky): "All tools" + named categories → show fewer boxes. (id, label, icon)
 _DASH_CATS = [("all", "All tools", "▦"), ("att", "Attendance", "⏱️"), ("cover", "Coverage", "🎯"),
               ("acct", "Accountant", "🍚"), ("stock", "Stock", "📦"), ("pos", "POS", "🛒"),
-              ("hr", "Payroll", "💼"), ("more", "Coming soon", "✨")]
+              ("hr", "Payroll", "💼"), ("more", "Extras", "✨")]
 
 # Cascade copy (the "what one task unlocks" reveal — STARTER drafts for the owner to shave).
 _CASCADES = {
@@ -637,6 +637,8 @@ _CASCADES = {
     "Learn": "Short guided how-tos right where you are — no manuals, no training day.",
     "Marketplace": "Add-ons and connections to tools you already use — switch on only what you need.",
     "Mobile app": "Your own branded app for staff and customers — on top of Telegram and web.",
+    "Investigate": "Something off? Pinpoint when an item was last touched and who was on shift — jump straight "
+                   "to the camera at that minute, across attendance · stock · sales · expenses.",
 }
 
 
@@ -679,6 +681,7 @@ def dashboard_cards(org_id: str) -> dict:
         box("hr", "💼", "Turn on payroll", "slips + pay runs", "/card/hr_payroll", 32, b(hr.get("enabled"))),
         box("hr", "🧾", "Payslips", "auto payslips", "/card/hr_payroll", 22,
             b(hr.get("enabled") and hr.get("payslips"))),
+        box("more", "🔎", "Investigate", "pinpoint times for camera checks", "/investigate", 28, 1),
     ]
     # Frontier capabilities (borrowed from the leaders) — wired in, OFF by default → the owner sees the full
     # breadth + where the shop is 0%; flip them on per client when ready. Each opens its own industry-std inside.
@@ -1110,6 +1113,50 @@ def render_payroll(org_id: str) -> str:
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Staff</th><th>Gross</th></tr>%s</table></div>"
             % (saved, staff_rows, run_rows, slip_rows))
     return _page("Payroll", body)
+
+
+def render_investigate(org_id: str) -> str:
+    """🔎 The Investigation card — forensic queries that pinpoint WHEN + WHO, to jump to the camera fast.
+    Cross-domain (attendance + stock + sales + expenses). Read-only."""
+    from core import investigate, stock
+    date_q = (request.args.get("date") or "").strip()
+    item_q = (request.args.get("item_id") or "").strip()
+    items = stock.list_items(org_id)
+    item_opts = "<option value=''>— pick an item —</option>" + "".join(
+        "<option value='%s' %s>%s</option>" % (i["item_id"], "selected" if str(i["item_id"]) == item_q else "",
+                                                escape(i["name"])) for i in items)
+    present = investigate.who_present_on(org_id, date_q) if date_q else []
+    present_html = ("".join("<li><b>%s</b> — %s</li>"
+                           % (escape(p["name"]), ", ".join("%s %s" % (e["type"].replace("_", " "), e["at"])
+                                                           for e in p["events"])) for p in present)
+                   or ("<li class='note'>No one recorded that day.</li>" if date_q else "<li class='note'>Pick a date.</li>"))
+    tl = investigate.item_timeline(org_id, int(item_q)) if item_q.isdigit() else []
+    tl_html = ("".join("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+                       % (escape(t["when"]), escape(t["detail"]), escape(t["by"])) for t in tl)
+               or "<tr><td colspan='3' class='note'>%s</td></tr>"
+               % ("No activity for that item." if item_q else "Pick an item."))
+    acts = investigate.activity_timeline(org_id, 48)
+    act_html = ("".join("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+                        % (escape(a["when"]), escape(a["what"]), escape(a["by"])) for a in acts)
+                or "<tr><td colspan='3' class='note'>No recent activity.</td></tr>")
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
+            "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "
+            "check the camera at that minute. Cross-domain (attendance · stock · sales · expenses).</p>"
+            "<div class='box'><h3>Who was working on a day?</h3>"
+            "<form method='get' action='/investigate'><input type='date' name='date' value='%s'> "
+            "<button type='submit'>Show</button></form><ul style='list-style:none;padding-left:0'>%s</ul></div>"
+            "<div class='box'><h3>Item history — when was it last touched?</h3>"
+            "<form method='get' action='/investigate'><select name='item_id'>%s</select> "
+            "<button type='submit'>Show</button></form>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
+            "%s</table></div>"
+            "<div class='box'><h3>Recent activity (last 48h)</h3>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
+            "%s</table></div>"
+            % (escape(date_q), present_html, item_opts, tl_html, act_html))
+    return _page("Investigate", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1821,7 +1868,7 @@ def create_app(org_id: str = "twb") -> Flask:
             iid, qty = int(request.form.get("item_id")), float(request.form.get("qty"))
         except (TypeError, ValueError):
             return redirect("/stock")
-        stock.record_count(org_id, iid, qty)
+        stock.record_count(org_id, iid, qty, actor=_current_user())
         return redirect("/stock?saved=1")
 
     @app.post("/stock/price")
@@ -1844,7 +1891,7 @@ def create_app(org_id: str = "twb") -> Flask:
                               float(request.form.get("total_cost")))
         except (TypeError, ValueError):
             return redirect("/stock")
-        stock.receive_purchase(org_id, iid, qty, cost, request.form.get("supplier") or None)
+        stock.receive_purchase(org_id, iid, qty, cost, request.form.get("supplier") or None, actor=_current_user())
         return redirect("/stock?saved=1")
 
     @app.get("/expenses")
@@ -1859,7 +1906,8 @@ def create_app(org_id: str = "twb") -> Flask:
         except (TypeError, ValueError):
             return redirect("/expenses")
         expenses.add_expense(org_id, amount, request.form.get("supplier") or None,
-                             request.form.get("category") or None, request.form.get("note") or None)
+                             request.form.get("category") or None, request.form.get("note") or None,
+                             actor=_current_user())
         return redirect("/expenses?saved=1")
 
     @app.get("/pos")
@@ -1874,7 +1922,7 @@ def create_app(org_id: str = "twb") -> Flask:
                                float(request.form.get("unit_price")))
         except (TypeError, ValueError):
             return redirect("/pos")
-        pos.record_sale(org_id, iid, qty, price)
+        pos.record_sale(org_id, iid, qty, price, actor=_current_user())
         return redirect("/pos?saved=1")
 
     @app.get("/payroll")
@@ -1897,6 +1945,10 @@ def create_app(org_id: str = "twb") -> Flask:
         period = (request.form.get("period") or "").strip() or "this period"
         payroll.run_payroll(org_id, period)
         return redirect("/payroll?saved=1")
+
+    @app.get("/investigate")
+    def investigate_page():
+        return render_investigate(org_id)
 
     @app.get("/reports/export")
     def reports_export():
