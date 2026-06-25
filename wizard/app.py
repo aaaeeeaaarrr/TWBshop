@@ -822,6 +822,16 @@ def render_reports(org_id: str) -> str:
         for w in week)
     period = " · ".join(("<b>%dd</b>" % n) if n == days else "<a href='/reports?days=%d'>%dd</a>" % (n, n)
                         for n in (7, 14, 30))
+    stock_box = ""                                            # multi-domain Reports: a Stock section when it's on
+    if bool(_get_path(get_config(org_id), "categories.stock.enabled")):
+        from core import stock as _stock
+        ss, low = _stock.stock_summary(org_id), _stock.low_stock_items(org_id)
+        low_li = ("".join("<li>⚠️ %s (%g ≤ par %g)</li>"
+                          % (escape(l["name"]), float(l["on_hand"] or 0), float(l["par_level"] or 0)) for l in low)
+                  if low else "<li class='note'>nothing below par 👍</li>")
+        stock_box = ("<div class='box'><h3>📦 Stock</h3><b>%d items · %d low · $%g on-hand value</b>"
+                     "<ul style='list-style:none;padding-left:0'>%s</ul><a href='/stock'>manage →</a></div>"
+                     % (ss["item_count"], ss["low_count"], ss["total_value"], low_li))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
             "<h1>📊 Reports — attendance</h1>"
             "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
@@ -839,9 +849,10 @@ def render_reports(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
             "<th>Late</th><th>Volume</th></tr>%s</table></div>"
-            "<p class='note'>Built from the platform's attendance data. Expense, stock and sales reports "
+            "%s"
+            "<p class='note'>Built from the platform's attendance + stock data. Sales / expense reports "
             "follow as those domains record data. (Greener = better.)</p>"
-            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows))
+            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows, stock_box))
     return _page("Reports", body)
 
 

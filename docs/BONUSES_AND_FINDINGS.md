@@ -255,6 +255,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Multi-domain Reports** `[ship]` — `/reports` now shows a **📦 Stock** section (items · low · $value +
+  low-stock list, link to manage) alongside attendance, when stock is on. The Reports vision (all domains in
+  one place) realized across 2 real domains — sales/expense slot in the same way as they record data.
 - ✅ **Stock PRICE-COMPARE (the PRIMARY goal, real)** `[ship/sell]` — `core_stock_prices` + `add_price` /
   `item_prices` / `cheapest_overview` (cheapest supplier per item) + a "💲 Price compare — cheapest supplier"
   section + add-price form on `/stock`. The owner's "buy from the cheapest" made real on the platform (per-

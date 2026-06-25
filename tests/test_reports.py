@@ -98,6 +98,31 @@ def test_reports_empty_org_no_crash(monkeypatch):
         _clean()
 
 
+def test_reports_includes_stock_when_enabled(monkeypatch):
+    from core.tenant_config import set_config
+    from core import stock
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        with _db() as c:
+            with c.cursor() as cur:
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
+        assert "📦 Stock" not in create_app(ORG).test_client().get("/reports").get_data(as_text=True)  # off → no section
+        set_config(ORG, {"categories": {"stock": {"enabled": True}}})
+        iid = stock.add_item(ORG, "Flour", "kg", par_level=10)
+        stock.record_count(ORG, iid, 3)                                            # below par
+        body = create_app(ORG).test_client().get("/reports").get_data(as_text=True)
+        assert "📦 Stock" in body and "Flour" in body                             # multi-domain reports
+    finally:
+        with _db() as c:
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM core_stock_counts WHERE org_id=%s", (ORG,))
+                cur.execute("DELETE FROM core_stock_items WHERE org_id=%s", (ORG,))
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
+        _clean()
+
+
 def test_reports_csv_export(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     cdb.ensure_org(ORG, "T")
