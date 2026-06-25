@@ -48,3 +48,22 @@ def staff_attendance_report(org_id, days: int = 14, tz: str = "Asia/Phnom_Penh")
             rows = cur.fetchall()
     return [{"staff_id": r["sid"], "name": r["nm"], "total": r["total"], "late": r["late"],
              "on_time_rate": (100 * (r["total"] - r["late"]) // r["total"]) if r["total"] else 0} for r in rows]
+
+
+def weekday_pattern(org_id, days: int = 30, tz: str = "Asia/Phnom_Penh") -> list:
+    """Check-ins + lateness by weekday over the last `days` days (read-only): [{name, total, late}] Mon→Sun —
+    a staffing-pattern view (which days are busy / late-prone)."""
+    since = (datetime.now(ZoneInfo(tz)) - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT EXTRACT(DOW FROM (at AT TIME ZONE %s))::int dow, detail FROM attendance_events "
+                        "WHERE org_id=%s AND type='checked_in' AND at >= %s", (tz, org_id, since))
+            rows = cur.fetchall()
+    names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]   # Postgres DOW: 0=Sunday
+    agg = {i: {"name": names[i], "total": 0, "late": 0} for i in range(7)}
+    for r in rows:
+        rec = agg[r["dow"]]
+        rec["total"] += 1
+        if (r["detail"] or {}).get("state") == "late":
+            rec["late"] += 1
+    return [agg[i] for i in (1, 2, 3, 4, 5, 6, 0)]               # display Mon→Sun

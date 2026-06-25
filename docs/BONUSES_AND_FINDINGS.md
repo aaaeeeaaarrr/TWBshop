@@ -255,6 +255,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Reports — by-weekday pattern** `[ship]` — `core.reports.weekday_pattern` + a "By weekday" section
+  (check-ins + lateness per weekday, Mon→Sun) — a staffing-pattern view (busy/late-prone days). Reports now =
+  daily trend · per-staff punctuality · by-weekday · selectable period · CSV export.
 - ✅ **Reports CSV export** `[ship]` — `/reports/export?days=N` downloads the daily trend + per-staff data as a
   CSV (a real report-feature; QuickBooks/Salesforce export lineage). Export link on the page.
 - ✅ **Reports made REAL (2nd report type + period)** `[ship]` — added `core.reports.staff_attendance_report`

@@ -26,7 +26,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
 from core.whatif import verdict_whatif
 from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
-from core.reports import attendance_report, staff_attendance_report
+from core.reports import attendance_report, staff_attendance_report, weekday_pattern
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -795,7 +795,9 @@ def render_reports(org_id: str) -> str:
         days = 14
     rep = attendance_report(org_id, days)
     staff = staff_attendance_report(org_id, days)
+    week = weekday_pattern(org_id, days)
     maxt = max([d["total"] for d in rep["daily"]], default=1)
+    maxw = max([w["total"] for w in week], default=1)
     rows = "".join(
         "<tr><td>%s</td><td>%d</td><td>%d</td>"
         "<td><div style='background:#eef0f2;border-radius:4px;height:10px;width:160px;display:inline-block'>"
@@ -810,6 +812,13 @@ def render_reports(org_id: str) -> str:
         % (escape(s["name"]), s["total"], s["late"], _bar_color(s["on_time_rate"] / 100),
            s["on_time_rate"], s["on_time_rate"])
         for s in staff) or "<tr><td colspan='4' class='note'>No staff check-ins yet.</td></tr>"
+    wrows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td>"
+        "<td><div style='background:#eef0f2;border-radius:4px;height:10px;width:130px;display:inline-block'>"
+        "<div style='background:%s;height:10px;border-radius:4px;width:%d%%'></div></div></td></tr>"
+        % (w["name"], w["total"], w["late"], _bar_color(1 - (w["late"] / w["total"] if w["total"] else 0)),
+           int(100 * w["total"] / maxw))
+        for w in week)
     period = " · ".join(("<b>%dd</b>" % n) if n == days else "<a href='/reports?days=%d'>%dd</a>" % (n, n)
                         for n in (7, 14, 30))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
@@ -825,9 +834,13 @@ def render_reports(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Staff</th><th>Check-ins</th>"
             "<th>Late</th><th>On-time</th></tr>%s</table></div>"
+            "<div class='box'><h3>By weekday</h3>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
+            "<th>Late</th><th>Volume</th></tr>%s</table></div>"
             "<p class='note'>Built from the platform's attendance data. Expense, stock and sales reports "
             "follow as those domains record data. (Greener = better.)</p>"
-            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows))
+            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows))
     return _page("Reports", body)
 
 
