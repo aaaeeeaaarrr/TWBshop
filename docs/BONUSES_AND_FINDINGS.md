@@ -255,6 +255,11 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- 🟡 **Unattended / after-hours detector (built; gate+deploy pending a dev↔DB network blip)** `[ship/sell]` —
+  `investigate.unattended_activity` flags sales/counts recorded when **no one was clocked in** (~16h-before
+  window) → a 🌙 section on `/investigate` + an attention-feed alert. The off-the-books / after-hours catch.
+  Code written + imports clean; the full gate is waiting on the managed-PG host DNS recovering from dev (SSH/git
+  fine — it's the DB host specifically; deployed wizard is unaffected, it's on the DO network).
 - ✅ **Shrinkage → SUSPECT LIST (owner's original idea, fully realized)** `[ship/sell]` — `stock_variance` now
   carries the window [prior count → this count]; `investigate.who_in_window` names who was on shift in it; the
   shrinkage alert AND the `/investigate` shrinkage box now show **"on shift: [names]"**. So a shortfall →

@@ -73,6 +73,19 @@ def test_who_in_window():
         _clean()
 
 
+def test_unattended_activity():
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Vodka", "btl", par_level=2)
+        stock.record_count(ORG, iid, 10)                                 # actions with NO check-in on record
+        pos.record_sale(ORG, iid, 1, 5)
+        assert len(investigate.unattended_activity(ORG)) >= 2            # both flagged — no one was clocked in
+        check_in(ORG, 7, datetime.now(ZoneInfo(TZ)), "00:00", "23:59", TZ)
+        assert investigate.unattended_activity(ORG) == []               # now someone was clocked in around then
+    finally:
+        _clean()
+
+
 def test_shrinkage_in_feed_and_page(monkeypatch):
     from core import insights
     from core.tenant_config import set_config

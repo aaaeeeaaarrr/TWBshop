@@ -33,4 +33,10 @@ def attention_feed(org_id) -> list:
         prior = pos.sales_summary(org_id, 14)["revenue"] - s7
         if prior >= 1 and s7 < prior * 0.6:
             out.append({"domain": "sales", "msg": "🛒 Sales down: $%g in the last 7 days vs $%g the prior 7." % (s7, prior)})
+    from core import investigate                                       # security: unattended / after-hours actions
+    unatt = investigate.unattended_activity(org_id, 7)
+    if unatt:
+        out.append({"domain": "security",
+                    "msg": "🌙 %d unattended action(s) — recorded with no one clocked in (e.g. %s @ %s)"
+                    % (len(unatt), unatt[0]["what"], unatt[0]["when"])})
     return out

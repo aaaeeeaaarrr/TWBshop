@@ -1149,6 +1149,10 @@ def render_investigate(org_id: str) -> str:
                         % (escape(v["item"]), g(-v["variance"]), g(v["book"]), g(v["counted"]), escape(v["when"]),
                            _susp(v)) for v in var)
                 if var else "<li class='note'>No shortfalls at the last count. 👍</li>")
+    unatt = investigate.unattended_activity(org_id)
+    unatt_html = ("".join("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
+                          % (escape(u["when"]), escape(u["what"]), escape(u["by"])) for u in unatt)
+                  if unatt else "<tr><td colspan='3' class='note'>None — every action had someone clocked in. 👍</td></tr>")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
             "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "
             "check the camera at that minute. Cross-domain (attendance · stock · sales · expenses).</p>"
@@ -1156,6 +1160,12 @@ def render_investigate(org_id: str) -> str:
             "<p class='note'>An item that came up short of what the system expected (last count + receipts − "
             "sales) — theft, waste, or a mistake. Drill into its history + who was on shift.</p>"
             "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
+            "<div class='box' style='background:#fff7ed;border-color:#fed7aa'><h3>🌙 Unattended activity</h3>"
+            "<p class='note'>Sales or stock counts recorded when no one was clocked in (last 14 days) — "
+            "after-hours or off-the-books. Check the camera at these minutes.</p>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
+            "%s</table></div>"
             "<div class='box'><h3>Who was working on a day?</h3>"
             "<form method='get' action='/investigate'><input type='date' name='date' value='%s'> "
             "<button type='submit'>Show</button></form><ul style='list-style:none;padding-left:0'>%s</ul></div>"
@@ -1169,7 +1179,7 @@ def render_investigate(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
             "%s</table></div>"
-            % (var_html, escape(date_q), present_html, item_opts, tl_html, act_html))
+            % (var_html, unatt_html, escape(date_q), present_html, item_opts, tl_html, act_html))
     return _page("Investigate", body)
 
 
