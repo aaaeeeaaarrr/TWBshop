@@ -5,7 +5,10 @@ row deletions. Exit 0 = all PASS, 1 = any FAIL. Run in a quiet window; read-only
 
 Usage:  TWBSHOP_ENV=prod python scripts/verify_audit_core.py [org_id]
 """
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # repo root on path (run from scripts/)
 
 from core import audit
 from shared.database import _db

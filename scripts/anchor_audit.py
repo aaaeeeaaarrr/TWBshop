@@ -4,6 +4,11 @@
 Usage:  TWBSHOP_ENV=prod python scripts/anchor_audit.py
 Set ANCHOR_DIR (where the file lives, off the DB host) and ANCHOR_HMAC_KEY (in secrets) for production.
 """
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # repo root on path (run from scripts/)
+
 from core import audit_anchor
 from shared.database import _db
 
