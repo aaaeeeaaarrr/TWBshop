@@ -796,8 +796,8 @@ def render_reports(org_id: str) -> str:
     rep = attendance_report(org_id, days)
     staff = staff_attendance_report(org_id, days)
     week = weekday_pattern(org_id, days)
-    maxt = max([d["total"] for d in rep["daily"]], default=1)
-    maxw = max([w["total"] for w in week], default=1)
+    maxt = max([d["total"] for d in rep["daily"]], default=1) or 1   # all-zero (no data) → avoid /0
+    maxw = max([w["total"] for w in week], default=1) or 1           # week always has 7 rows → max can be 0
     rows = "".join(
         "<tr><td>%s</td><td>%d</td><td>%d</td>"
         "<td><div style='background:#eef0f2;border-radius:4px;height:10px;width:160px;display:inline-block'>"

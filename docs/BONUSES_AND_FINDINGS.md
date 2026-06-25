@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ⚠️ **`max(..., default=1)` ≠ floor** `[gotcha]` — `weekday_pattern` always returns 7 rows, so an org with NO
+  check-ins gives `max([0,0,…])==0` (default only applies to an EMPTY list) → `/reports` divided by zero (500).
+  Fixed with `max(...) or 1` + a `test_reports_empty_org_no_crash` guard. **Caught by the dashboard e2e** (its
+  org has no check-ins) — the value of the coherence test, proven on its first real run.
 - ✅ **Reports — by-weekday pattern** `[ship]` — `core.reports.weekday_pattern` + a "By weekday" section
   (check-ins + lateness per weekday, Mon→Sun) — a staffing-pattern view (busy/late-prone days). Reports now =
   daily trend · per-staff punctuality · by-weekday · selectable period · CSV export.

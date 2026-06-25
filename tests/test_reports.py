@@ -78,6 +78,17 @@ def test_reports_page_renders(monkeypatch):
         _clean()
 
 
+def test_reports_empty_org_no_crash(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    cdb.ensure_org(ORG, "T")
+    _clean()                                                            # NO check-ins → all weekday totals 0
+    try:
+        r = create_app(ORG).test_client().get("/reports")
+        assert r.status_code == 200 and "Reports" in r.get_data(as_text=True)   # renders, no division-by-zero
+    finally:
+        _clean()
+
+
 def test_reports_csv_export(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     cdb.ensure_org(ORG, "T")
