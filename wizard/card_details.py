@@ -8,7 +8,7 @@ CARD_DETAILS = {
     "accountant": {
         "icon": "🍚", "title": "Accountant / Bookkeeping",
         "what": "Receipts and bills → clean books: expenses, suppliers, payables, food allowance.",
-        "ref": "QuickBooks · Xero · Wave", "configure": "/customer/config",
+        "ref": "QuickBooks · Xero · Wave", "configure": "/expenses",
         "options": [
             ("Receipt capture (OCR)", "Snap a photo → items + total read automatically (deterministic, Khmer-aware)", "built"),
             ("Vendors & suppliers", "Supplier list with dedup, aliases, contact + payment terms", "built"),

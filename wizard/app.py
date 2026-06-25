@@ -832,6 +832,15 @@ def render_reports(org_id: str) -> str:
         stock_box = ("<div class='box'><h3>📦 Stock</h3><b>%d items · %d low · $%g on-hand value</b>"
                      "<ul style='list-style:none;padding-left:0'>%s</ul><a href='/stock'>manage →</a></div>"
                      % (ss["item_count"], ss["low_count"], ss["total_value"], low_li))
+    exp_box = ""                                              # multi-domain Reports: an Expenses section when on
+    if bool(_get_path(get_config(org_id), "categories.accountant.enabled")):
+        from core import expenses as _exp
+        es = _exp.expense_summary(org_id, days)
+        cat_li = ("".join("<li>%s — $%g</li>" % (escape(c["category"]), c["total"]) for c in es["by_category"][:6])
+                  if es["by_category"] else "<li class='note'>no expenses yet</li>")
+        exp_box = ("<div class='box'><h3>🍚 Expenses</h3><b>$%g spent · %d expenses</b> "
+                   "<span class='note'>(last %d days)</span><ul style='list-style:none;padding-left:0'>%s</ul>"
+                   "<a href='/expenses'>manage →</a></div>" % (es["total"], es["count"], days, cat_li))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
             "<h1>📊 Reports — attendance</h1>"
             "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
@@ -849,10 +858,11 @@ def render_reports(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
             "<th>Late</th><th>Volume</th></tr>%s</table></div>"
-            "%s"
-            "<p class='note'>Built from the platform's attendance + stock data. Sales / expense reports "
-            "follow as those domains record data. (Greener = better.)</p>"
-            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows, stock_box))
+            "%s%s"
+            "<p class='note'>Built from the platform's attendance + stock + expense data. Sales reports "
+            "follow as that domain records data. (Greener = better.)</p>"
+            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows,
+               stock_box, exp_box))
     return _page("Reports", body)
 
 
@@ -938,6 +948,43 @@ def render_stock(org_id: str) -> str:
             % (saved, summ["item_count"], summ["low_count"], sg(summ["total_value"]), low_html, rows,
                crows, item_opts))
     return _page("Stock", body)
+
+
+def render_expenses(org_id: str) -> str:
+    """🍚 The Accountant domain made REAL — an expense log (record by supplier/category) + spend summaries
+    (core.expenses; its own table, not TWB's live accountant lane). Gated by categories.accountant.enabled."""
+    from core import expenses
+    if not bool(_get_path(get_config(org_id), "categories.accountant.enabled")):
+        return _page("Expenses", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
+                     "<h1>🍚 Accountant — expenses</h1><div class='box'>Accounting is off. "
+                     "<a href='/card/accountant'>Turn it on →</a></div>")
+    sg = lambda x: ("%g" % float(x)) if x is not None else "0"
+    summ, recent = expenses.expense_summary(org_id, 30), expenses.list_expenses(org_id, 30)
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    cat_rows = "".join("<tr><td>%s</td><td>%d</td><td>$%s</td></tr>"
+                       % (escape(c["category"]), c["count"], sg(c["total"])) for c in summ["by_category"]) \
+        or "<tr><td colspan='3' class='note'>No expenses yet.</td></tr>"
+    rec_rows = "".join("<tr><td>%s</td><td>%s</td><td>%s</td><td>$%s</td></tr>"
+                       % (str(e["spent_at"])[:10], escape(e["supplier"] or "—"), escape(e["category"] or "—"),
+                          sg(e["amount"])) for e in recent) \
+        or "<tr><td colspan='4' class='note'>No expenses yet.</td></tr>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/accountant'>card</a></div>"
+            "<h1>🍚 Accountant — expenses</h1>%s"
+            "<div class='box'><b>$%s spent · %d expenses</b> <span class='note'>(last 30 days)</span></div>"
+            "<div class='box'><h3>By category</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Category</th><th>#</th><th>Total</th>"
+            "</tr>%s</table></div>"
+            "<div class='box'><h3>Recent</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Date</th><th>Supplier</th>"
+            "<th>Category</th><th>Amount</th></tr>%s</table></div>"
+            "<div class='box'><h3>Add expense</h3><form method='post' action='/expenses/add'>"
+            "<input name='amount' type='number' step='any' placeholder='amount' required style='width:90px'> "
+            "<input name='supplier' placeholder='supplier' style='width:120px'> "
+            "<input name='category' placeholder='category' style='width:120px'> "
+            "<input name='note' placeholder='note' style='width:140px'> "
+            "<button type='submit'>Add</button></form></div>"
+            % (saved, sg(summ["total"]), summ["count"], cat_rows, rec_rows))
+    return _page("Expenses", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1661,6 +1708,21 @@ def create_app(org_id: str = "twb") -> Flask:
         if supplier:
             stock.add_price(org_id, iid, supplier, price)
         return redirect("/stock?saved=1")
+
+    @app.get("/expenses")
+    def expenses_page():
+        return render_expenses(org_id)
+
+    @app.post("/expenses/add")
+    def expenses_add():
+        from core import expenses
+        try:
+            amount = float(request.form.get("amount"))
+        except (TypeError, ValueError):
+            return redirect("/expenses")
+        expenses.add_expense(org_id, amount, request.form.get("supplier") or None,
+                             request.form.get("category") or None, request.form.get("note") or None)
+        return redirect("/expenses?saved=1")
 
     @app.get("/reports/export")
     def reports_export():
