@@ -255,6 +255,16 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- 🔍 **POSBusiness = a harvest goldmine** `[sell/decision]` — the owner's *other* project (`aaaeeeaaarrr/POSbusiness`)
+  is a near-production full-stack POS far deeper than our sales-log: hash-chained tamper-evident audit (+ external
+  anchor), shifts/Z-report/drawer-reconcile/cash-variance-gates, refunds/voids/credit-notes, ABA PayWay/KHQR
+  (sandbox-verified), offline-first (IndexedDB queue + idempotency), ESC/POS printers, RBAC, 652 backend + 60
+  Playwright tests, 12 migrations, full go-live pilot docs. **Owner's prior criticism FOUND** (its `advisor-round.md`
+  §5): the GUI is *"clean but shallow — an average POS"* → resolved "evolve don't rewrite" (UI = cheap layer,
+  backend = the moat). **Decision: HARVEST into `core/`, don't merge** (two stacks; FastAPI/SQLAlchemy vs our
+  psycopg2 config-core) — and **re-test from scratch** (it was planned by ChatGPT + tested for ITS stack; we
+  re-prove on ours). Plan → `docs/POSBUSINESS_HARVEST_PLAN.md`; **audit hash-chain is Phase 1** (self-contained,
+  no money, upgrades our security/auditability LAW).
 - ✅ **Repeat-pattern correlation** `[ship/sell]` — `investigate.repeat_offenders` tallies who was on shift
   across ALL stock shortfalls → ranked; a "🔁 Repeat presence at shortfalls" box on `/investigate`. The signal:
   one name at the top of several shortfalls = look closer. The cross-domain edge, made into a lead.
