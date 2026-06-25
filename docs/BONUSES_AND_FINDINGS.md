@@ -255,6 +255,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Roadmap / idea-overview page** `[ship]` (owner: "good to give me more ideas") — `/roadmap` lists every
+  option across all 11 cards grouped by status (✓ built · planned · ideas) — the whole idea menu in one scan,
+  linked from the dashboard. Reads the static catalog (no tenant data).
 - ✅ **Frontier sub-options WIRED (preview)** `[ship]` (owner: "have the frontier sub-options too — good to give
   me more ideas") — all 28 frontier-card sub-options (reports · ai_assist · automations · learn · marketplace ·
   mobile_app) wired as preview toggles via a `frontier_options` config block. **Now EVERY card option (domain +

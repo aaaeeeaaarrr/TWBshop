@@ -778,7 +778,8 @@ def render_dashboard(org_id: str) -> str:
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>%s%s%s"
             "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>plan: "
-            "<a href='/packages'>%s</a> — locked cards need a higher plan</span>%s</div>%s"
+            "<a href='/packages'>%s</a> · <a href='/roadmap'>🗺️ all ideas</a> — locked cards need a higher "
+            "plan</span>%s</div>%s"
             "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
             "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
             % (filter_bar, live, spotlight, pct, escape(d["package"].replace("_", " ").title()), big_bar, grid, js))
@@ -842,6 +843,32 @@ def render_reports(org_id: str) -> str:
             "follow as those domains record data. (Greener = better.)</p>"
             % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows))
     return _page("Reports", body)
+
+
+def render_roadmap() -> str:
+    """🗺️ Every capability option across all cards, grouped by status — the idea menu in one place (reads the
+    static catalog; no tenant data)."""
+    order = [("built", "✓ Built today", "#16a34a"), ("planned", "Planned (designed)", "#d97706"),
+             ("idea", "Ideas (worth considering)", "#6b7280")]
+    buckets = {"built": [], "planned": [], "idea": []}
+    for d in CARD_DETAILS.values():
+        card = d["title"].split(" / ")[0]
+        for name, desc, st in d["options"]:
+            buckets.setdefault(st, []).append((d["icon"], card, name, desc))
+    secs = ""
+    for st, label, color in order:
+        rows = "".join(
+            "<li style='margin:7px 0'>%s <b>%s</b> <span class='note'>· %s</span><br>"
+            "<span class='note'>%s</span></li>"
+            % (ic, escape(nm), escape(card), escape(desc)) for ic, card, nm, desc in buckets.get(st, []))
+        secs += ("<div class='box'><h3 style='color:%s'>%s — %d</h3>"
+                 "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
+                 % (color, label, len(buckets.get(st, [])), rows))
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+            "<h1>🗺️ Capability roadmap</h1>"
+            "<p class='note'>Every option across all cards, by status — the whole idea menu in one place. "
+            "Tap any card on the dashboard to switch one on.</p>%s" % secs)
+    return _page("Roadmap", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1515,6 +1542,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/reports")
     def reports():
         return render_reports(org_id)
+
+    @app.get("/roadmap")
+    def roadmap():
+        return render_roadmap()
 
     @app.get("/reports/export")
     def reports_export():
