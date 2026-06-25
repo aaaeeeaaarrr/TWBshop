@@ -73,6 +73,18 @@ def test_who_in_window():
         _clean()
 
 
+def test_repeat_offenders():
+    _clean()
+    try:
+        assert investigate.repeat_offenders(ORG) == []                   # no shortfalls → no offenders
+        iid = stock.add_item(ORG, "Beer", "btl", par_level=2)
+        stock.record_count(ORG, iid, 50)                                 # baseline
+        stock.record_count(ORG, iid, 40)                                 # a shortfall (−10)
+        assert isinstance(investigate.repeat_offenders(ORG), list)       # runs over a real shortfall, no crash
+    finally:
+        _clean()
+
+
 def test_unattended_activity():
     _clean()
     try:

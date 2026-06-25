@@ -1153,6 +1153,13 @@ def render_investigate(org_id: str) -> str:
     unatt_html = ("".join("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
                           % (escape(u["when"]), escape(u["what"]), escape(u["by"])) for u in unatt)
                   if unatt else "<tr><td colspan='3' class='note'>None — every action had someone clocked in. 👍</td></tr>")
+    offenders = investigate.repeat_offenders(org_id)
+    off_box = (("<div class='box' style='background:#fef2f2;border-color:#fecaca'>"
+                "<h3>🔁 Repeat presence at shortfalls</h3><p class='note'>Across all shortfalls, who was on shift "
+                "each time — a name at the top of several is worth a closer look.</p>"
+                "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
+                % "".join("<li><b>%s</b> — on shift for <b>%d</b> shortfall(s)</li>"
+                          % (escape(o["name"]), o["count"]) for o in offenders)) if offenders else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
             "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "
             "check the camera at that minute. Cross-domain (attendance · stock · sales · expenses).</p>"
@@ -1160,6 +1167,7 @@ def render_investigate(org_id: str) -> str:
             "<p class='note'>An item that came up short of what the system expected (last count + receipts − "
             "sales) — theft, waste, or a mistake. Drill into its history + who was on shift.</p>"
             "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
+            "%s"
             "<div class='box' style='background:#fff7ed;border-color:#fed7aa'><h3>🌙 Unattended activity</h3>"
             "<p class='note'>Sales or stock counts recorded when no one was clocked in (last 14 days) — "
             "after-hours or off-the-books. Check the camera at these minutes.</p>"
@@ -1179,7 +1187,7 @@ def render_investigate(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
             "%s</table></div>"
-            % (var_html, unatt_html, escape(date_q), present_html, item_opts, tl_html, act_html))
+            % (var_html, off_box, unatt_html, escape(date_q), present_html, item_opts, tl_html, act_html))
     return _page("Investigate", body)
 
 

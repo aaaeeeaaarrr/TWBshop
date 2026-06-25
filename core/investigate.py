@@ -66,6 +66,24 @@ def unattended_activity(org_id, days: int = 14, limit: int = 100) -> list:
     return out
 
 
+def repeat_offenders(org_id) -> list:
+    """Across ALL stock shortfalls (every count that came up short of book), tally who was on shift in each
+    window → [{name, count}] ranked. The correlation: who keeps being around when stock goes missing."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT c.qty, c.book_before, c.counted_at, "
+                        "(SELECT MAX(c2.counted_at) FROM core_stock_counts c2 WHERE c2.org_id=c.org_id "
+                        " AND c2.item_id=c.item_id AND c2.counted_at < c.counted_at) prev_at "
+                        "FROM core_stock_counts c WHERE c.org_id=%s AND c.book_before IS NOT NULL "
+                        "AND c.qty < c.book_before", (org_id,))
+            shorts = cur.fetchall()
+    tally = {}
+    for s in shorts:
+        for nm in who_in_window(org_id, s["prev_at"], s["counted_at"]):
+            tally[nm] = tally.get(nm, 0) + 1
+    return sorted([{"name": k, "count": v} for k, v in tally.items()], key=lambda x: -x["count"])
+
+
 def item_timeline(org_id, item_id, limit: int = 50) -> list:
     """A per-item forensic timeline (counts + sales), newest first: [{kind, when, detail, by}] — when an item was
     last counted/sold and by whom."""

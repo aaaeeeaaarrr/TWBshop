@@ -255,11 +255,16 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
-- 🟡 **Unattended / after-hours detector (built; gate+deploy pending a dev↔DB network blip)** `[ship/sell]` —
-  `investigate.unattended_activity` flags sales/counts recorded when **no one was clocked in** (~16h-before
-  window) → a 🌙 section on `/investigate` + an attention-feed alert. The off-the-books / after-hours catch.
-  Code written + imports clean; the full gate is waiting on the managed-PG host DNS recovering from dev (SSH/git
-  fine — it's the DB host specifically; deployed wizard is unaffected, it's on the DO network).
+- ✅ **Repeat-pattern correlation** `[ship/sell]` — `investigate.repeat_offenders` tallies who was on shift
+  across ALL stock shortfalls → ranked; a "🔁 Repeat presence at shortfalls" box on `/investigate`. The signal:
+  one name at the top of several shortfalls = look closer. The cross-domain edge, made into a lead.
+- ✅ **Unattended / after-hours detector** `[ship/sell]` — `investigate.unattended_activity` flags sales/counts
+  recorded when **no one was clocked in** (~16h-before window) → a 🌙 section on `/investigate` + an
+  attention-feed alert. The off-the-books / after-hours catch.
+- 🟢 **FINDING — dev↔DB DNS blip (resolved)** `[gotcha]`: mid-session the dev machine lost DNS (couldn't resolve
+  github.com OR the managed-PG host) → couldn't push/gate/deploy for ~minutes. Held (didn't pile up un-gated
+  commits); recovered on retry. The deployed wizard was unaffected (it's on the DO network). Lesson: a dev-side
+  DNS outage blocks all of push/gate/deploy at once — wait it out, don't deploy un-gated.
 - ✅ **Shrinkage → SUSPECT LIST (owner's original idea, fully realized)** `[ship/sell]` — `stock_variance` now
   carries the window [prior count → this count]; `investigate.who_in_window` names who was on shift in it; the
   shrinkage alert AND the `/investigate` shrinkage box now show **"on shift: [names]"**. So a shortfall →
