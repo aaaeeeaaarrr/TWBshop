@@ -48,6 +48,26 @@ def test_card_toggle_save(monkeypatch):
                 cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
 
 
+def test_idea_options_wired_as_preview_toggles(monkeypatch):
+    from shared.database import _db
+    from core.tenant_config import get_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    org = "test_idea_tog"
+    cdb.ensure_org(org, "T")
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+    try:
+        c = create_app(org).test_client()
+        assert "idea — preview" in c.get("/card/stock").get_data(as_text=True)    # idea option marked honestly
+        c.post("/card/stock/save", data={"categories.stock.valuation": "on"})     # an idea option is switchable
+        assert get_config(org)["categories"]["stock"]["valuation"] is True
+    finally:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+
+
 def test_card_master_enable(monkeypatch):
     from shared.database import _db
     from core.tenant_config import get_config

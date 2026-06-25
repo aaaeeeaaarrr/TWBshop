@@ -255,6 +255,11 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Idea options WIRED as "preview" toggles** `[ship]` (owner: "wire all things in, I'll switch off") — the 8
+  domain idea options (tax/VAT · multi-currency · barcode · recipes/BOM · valuation · tables · contracts/e-sign
+  · auto-schedule) are now `tenant_config` flags + toggles on their cards, marked **"idea — preview"** (honest:
+  switchable but not a ready feature). Now EVERY domain card option (built/planned/idea) is switchable.
+  *Remaining:* the FRONTIER-card sub-options (AI/automations/learn/…) need a structured frontier-options pass.
 - ⚠️ **`max(..., default=1)` ≠ floor** `[gotcha]` — `weekday_pattern` always returns 7 rows, so an org with NO
   check-ins gives `max([0,0,…])==0` (default only applies to an EMPTY list) → `/reports` divided by zero (500).
   Fixed with `max(...) or 1` + a `test_reports_empty_org_no_crash` guard. **Caught by the dashboard e2e** (its

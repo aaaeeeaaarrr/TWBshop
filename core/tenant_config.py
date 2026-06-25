@@ -113,6 +113,7 @@ DEFAULTS = {
                 "roles": [],                # [{"name": skill, "min_required": N}] — set in the Expertise editor
                 "coverage_overrides": [],   # [{role, days:[…], hours:"HH:MM-HH:MM", min}] — raise/lower for special times
                 "coverage_warnings": False,  # planned→wired: alert when a shift would be under-covered
+                "auto_schedule": False,      # idea→wired (preview): build rosters that meet the minimums
             },
             "points": {"enabled": True, "catalogue": dict(_CATALOGUE)},
             "approvals": {                  # the wizard's Approvals table (one row per request type)
@@ -150,6 +151,8 @@ DEFAULTS = {
             "invoices": False,                    # planned→wired: bill customers, track receivables
             "reconciliation": False,              # planned→wired: match recorded spend to bank/cash
             "financial_reports": False,           # planned→wired: P&L / cash-flow statements
+            "tax_vat": False,                     # idea→wired (preview): input/output tax + returns
+            "multi_currency": False,              # idea→wired (preview): USD / KHR side by side
         },
         "stock": {                            # stock/inventory — modelled as config (INERT; ported later)
             "enabled": False,
@@ -161,6 +164,9 @@ DEFAULTS = {
             "item_catalog": False,            # planned→wired: SKUs, categories, units, photos
             "purchase_orders": False,         # planned→wired: build + send order lists
             "stock_movements": False,         # planned→wired: in/out/waste/transfer
+            "barcode_qr": False,              # idea→wired (preview): scan to count / sell
+            "recipes_bom": False,             # idea→wired (preview): ingredients per item, auto-deduct
+            "valuation": False,               # idea→wired (preview): FIFO / average cost, stock value
         },
         "pos": {                              # point of sale — be the POS or tap theirs (INERT; modelled)
             "enabled": False,
@@ -173,6 +179,7 @@ DEFAULTS = {
             "discounts": False,               # planned→wired: % / fixed, promos
             "refunds": False,                 # planned→wired: refunds & voids with audit
             "cash_drawer": False,             # planned→wired: open/close + reconcile the drawer
+            "tables_orders": False,           # idea→wired (preview): dine-in tabs, kitchen tickets
         },
         "hr_payroll": {                       # staff records · salary/slips · payroll run (INERT; modelled)
             "enabled": False,
@@ -183,6 +190,7 @@ DEFAULTS = {
             "wage_structures": False,         # planned→wired: monthly/daily/hourly + allowances
             "pay_runs": False,                # planned→wired: scheduled pay runs
             "deductions": False,              # planned→wired: NSSF/tax/advances/paybacks
+            "contracts_esign": False,         # idea→wired (preview): store + sign documents
         },
     },
     # Borrowed-from-the-leaders capabilities — WIRED IN but OFF by default; the owner unleashes per client

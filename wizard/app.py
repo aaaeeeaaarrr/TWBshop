@@ -876,12 +876,14 @@ def render_card_detail(org_id: str, key: str) -> str:
     for name, desc, st in d["options"]:
         if name in toggles:
             on = bool(_get_path(cfg, toggles[name]))
+            pv = (" <span style='background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;"
+                  "font-size:11px'>idea — preview</span>" if st == "idea" else "")
             items.append(
                 "<li style='margin:10px 0'><label style='cursor:pointer'><input type='checkbox' name='%s' %s> "
                 "<b>%s</b> <span style='background:%s;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px'>"
-                "%s</span></label><br><span class='note'>%s</span></li>"
+                "%s</span>%s</label><br><span class='note'>%s</span></li>"
                 % (escape(toggles[name]), "checked" if on else "", escape(name),
-                   "#0d9488" if on else "#9ca3af", "on" if on else "off", escape(desc)))
+                   "#0d9488" if on else "#9ca3af", "on" if on else "off", pv, escape(desc)))
         else:
             items.append(
                 "<li style='margin:10px 0'><b>%s</b> &nbsp;<span style='background:%s;color:#fff;"

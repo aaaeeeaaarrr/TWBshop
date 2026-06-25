@@ -176,6 +176,8 @@ TOGGLES = {
         "Invoices & receivables": "categories.accountant.invoices",
         "Bank / cash reconciliation": "categories.accountant.reconciliation",
         "P&L · cash-flow reports": "categories.accountant.financial_reports",
+        "Tax / VAT tracking": "categories.accountant.tax_vat",
+        "Multi-currency": "categories.accountant.multi_currency",
     },
     "stock": {
         "Par / reorder levels": "categories.stock.par_levels",
@@ -184,6 +186,9 @@ TOGGLES = {
         "Item catalog": "categories.stock.item_catalog",
         "Purchase orders": "categories.stock.purchase_orders",
         "Stock movements": "categories.stock.stock_movements",
+        "Barcode / QR": "categories.stock.barcode_qr",
+        "Recipes / BOM": "categories.stock.recipes_bom",
+        "Valuation": "categories.stock.valuation",
     },
     "pos": {
         "Tips": "categories.pos.tips_enabled",
@@ -192,6 +197,7 @@ TOGGLES = {
         "Discounts & promos": "categories.pos.discounts",
         "Refunds & voids": "categories.pos.refunds",
         "Cash drawer / shift": "categories.pos.cash_drawer",
+        "Tables & orders (F&B)": "categories.pos.tables_orders",
     },
     "hr_payroll": {
         "Salary privacy": "categories.hr_payroll.salary_owner_only",
@@ -200,9 +206,11 @@ TOGGLES = {
         "Payslips": "categories.hr_payroll.payslips",
         "Deductions & contributions": "categories.hr_payroll.deductions",
         "Bank payroll file / NSSF export": "categories.hr_payroll.nssf_export",
+        "Contracts & e-sign": "categories.hr_payroll.contracts_esign",
     },
     "coverage": {
         "Min coverage per skill": "categories.attendance.expertise.enabled",
         "Coverage warnings": "categories.attendance.expertise.coverage_warnings",
+        "Auto-schedule by coverage": "categories.attendance.expertise.auto_schedule",
     },
 }
