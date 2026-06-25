@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Frontier sub-options WIRED (preview)** `[ship]` (owner: "have the frontier sub-options too — good to give
+  me more ideas") — all 28 frontier-card sub-options (reports · ai_assist · automations · learn · marketplace ·
+  mobile_app) wired as preview toggles via a `frontier_options` config block. **Now EVERY card option (domain +
+  frontier) is switchable — "wire it all in" is 100% complete**, and the card insides double as an idea menu.
 - ✅ **Idea options WIRED as "preview" toggles** `[ship]` (owner: "wire all things in, I'll switch off") — the 8
   domain idea options (tax/VAT · multi-currency · barcode · recipes/BOM · valuation · tables · contracts/e-sign
   · auto-schedule) are now `tenant_config` flags + toggles on their cards, marked **"idea — preview"** (honest:

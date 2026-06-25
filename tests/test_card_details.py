@@ -68,6 +68,27 @@ def test_idea_options_wired_as_preview_toggles(monkeypatch):
                 cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
 
 
+def test_frontier_card_options_wired(monkeypatch):
+    from shared.database import _db
+    from core.tenant_config import get_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    org = "test_frontier_opt"
+    cdb.ensure_org(org, "T")
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+    try:
+        c = create_app(org).test_client()
+        body = c.get("/card/ai_assist").get_data(as_text=True)
+        assert "Anomaly alerts" in body and "idea — preview" in body and "checkbox" in body   # frontier sub-options wired
+        c.post("/card/ai_assist/save", data={"frontier_options.ai_assist.forecasting": "on"})
+        assert get_config(org)["frontier_options"]["ai_assist"]["forecasting"] is True         # saves
+    finally:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
+
+
 def test_card_master_enable(monkeypatch):
     from shared.database import _db
     from core.tenant_config import get_config

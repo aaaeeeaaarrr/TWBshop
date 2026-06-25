@@ -203,6 +203,19 @@ DEFAULTS = {
         "marketplace": False,    # add-ons & integrations (Shopify App Store · Salesforce AppExchange)
         "mobile_app": False,     # a branded native app
     },
+    # Frontier-card SUB-OPTIONS — each wired as a preview toggle so the owner sees/collects ideas (off; the
+    # master frontier.<key> gates the card). All planned/idea (the cards' built options stay as badges).
+    "frontier_options": {
+        "reports": {"expense": False, "stock": False, "sales": False, "payroll": False,
+                    "custom": False, "scheduled": False},
+        "ai_assist": {"anomaly": False, "suggestions": False, "forecasting": False, "nl_ask": False},
+        "automations": {"triggers": False, "conditions": False, "actions": False, "templates": False},
+        "learn": {"guided_tours": False, "how_to_library": False, "per_industry_tips": False},
+        "marketplace": {"messaging": False, "accounting": False, "payments": False, "pos": False,
+                        "delivery": False, "third_party": False},
+        "mobile_app": {"staff_app": False, "customer_app": False, "push": False, "offline": False,
+                       "app_store": False},
+    },
 }
 
 
