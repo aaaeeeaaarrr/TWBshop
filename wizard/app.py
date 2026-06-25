@@ -879,33 +879,36 @@ def render_stock(org_id: str) -> str:
         return _page("Stock", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
                      "<h1>📦 Stock</h1><div class='box'>Stock is off. <a href='/card/stock'>Turn it on →</a></div>")
     sg = lambda x: ("%g" % float(x)) if x is not None else "0"
-    items, low = stock.list_items(org_id), stock.low_stock_items(org_id)
+    items, low, summ = stock.list_items(org_id), stock.low_stock_items(org_id), stock.stock_summary(org_id)
     saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
     low_html = ("".join("<li>⚠️ <b>%s</b> — %s %s ≤ par %s</li>"
                         % (escape(l["name"]), sg(l["on_hand"]), escape(l["unit"]), sg(l["par_level"])) for l in low)
                 if low else "<li class='note'>Nothing below par. 👍</li>")
     rows = "".join(
-        "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
+        "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
         "<td><form method='post' action='/stock/count' style='margin:0'>"
         "<input type='hidden' name='item_id' value='%s'>"
         "<input name='qty' type='number' step='any' style='width:70px' placeholder='count'> "
         "<button type='submit'>set</button></form></td></tr>"
-        % (escape(i["name"]), escape(i["unit"]), sg(i["par_level"]), sg(i["on_hand"]), i["item_id"])
-        for i in items) or "<tr><td colspan='5' class='note'>No items yet — add one below.</td></tr>"
+        % (escape(i["name"]), escape(i["unit"]), sg(i["par_level"]), sg(i["on_hand"]), sg(i.get("unit_cost")),
+           sg(float(i["on_hand"] or 0) * float(i.get("unit_cost") or 0)), i["item_id"])
+        for i in items) or "<tr><td colspan='7' class='note'>No items yet — add one below.</td></tr>"
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/stock'>card</a></div>"
             "<h1>📦 Stock</h1>%s"
+            "<div class='box'><b>%d items · %d low · $%s on-hand value</b></div>"
             "<div class='box'><h3>⚠️ Reorder (at/below par)</h3>"
             "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
             "<div class='box'><h3>Items</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Item</th><th>Unit</th><th>Par</th>"
-            "<th>On hand</th><th>Count</th></tr>%s</table></div>"
+            "<th>On hand</th><th>Cost</th><th>Value</th><th>Count</th></tr>%s</table></div>"
             "<div class='box'><h3>Add item</h3><form method='post' action='/stock/add'>"
             "<input name='name' placeholder='name' required> "
             "<input name='unit' placeholder='unit (kg/pcs)' style='width:100px'> "
             "<input name='category' placeholder='category' style='width:120px'> "
             "<input name='par_level' type='number' step='any' placeholder='par' style='width:70px'> "
+            "<input name='unit_cost' type='number' step='any' placeholder='cost' style='width:70px'> "
             "<button type='submit'>Add</button></form></div>"
-            % (saved, low_html, rows))
+            % (saved, summ["item_count"], summ["low_count"], sg(summ["total_value"]), low_html, rows))
     return _page("Stock", body)
 
 
@@ -1600,12 +1603,13 @@ def create_app(org_id: str = "twb") -> Flask:
         from core import stock
         name = (request.form.get("name") or "").strip()
         if name:
-            try:
-                par = float(request.form.get("par_level") or 0)
-            except (TypeError, ValueError):
-                par = 0
+            def _num(k):
+                try:
+                    return float(request.form.get(k) or 0)
+                except (TypeError, ValueError):
+                    return 0
             stock.add_item(org_id, name, request.form.get("unit") or "unit",
-                           request.form.get("category") or None, par)
+                           request.form.get("category") or None, _num("par_level"), _num("unit_cost"))
         return redirect("/stock?saved=1")
 
     @app.post("/stock/count")

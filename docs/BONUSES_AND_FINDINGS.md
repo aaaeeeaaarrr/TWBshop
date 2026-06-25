@@ -255,6 +255,9 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Stock VALUE (unit cost)** `[ship/sell]` — per-item `unit_cost` (idempotent ALTER) → stock **value**
+  (Σ on-hand × cost) + a summary line (items · low · $value) on `/stock`. Toward the owner's "prices = PRIMARY
+  goal" (per-supplier price compare is the bigger next piece — needs a suppliers/prices table).
 - ✅ **STOCK domain made REAL (1st non-attendance domain)** `[ship]` — `core/stock.py` (item catalog · par
   levels · stock counts · low-stock reorder list) + `core_stock_items`/`core_stock_counts` tables + a `/stock`
   manager page (gated by `categories.stock.enabled`; the Stock card opens it). **Shadow-style: its OWN tables,

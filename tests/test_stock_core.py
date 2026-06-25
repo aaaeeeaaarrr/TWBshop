@@ -35,6 +35,18 @@ def test_stock_item_count_and_low():
         _clean()
 
 
+def test_stock_value_summary():
+    _clean()
+    try:
+        stock.add_item(ORG, "Oil", "L", "kitchen", par_level=5, unit_cost=3)
+        iid = stock.list_items(ORG)[0]["item_id"]
+        stock.record_count(ORG, iid, 10)                                  # 10 × $3 = $30 on-hand value
+        s = stock.stock_summary(ORG)
+        assert s["item_count"] == 1 and s["total_value"] == 30.0
+    finally:
+        _clean()
+
+
 def test_stock_page_and_actions(monkeypatch):
     from core.tenant_config import set_config
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)

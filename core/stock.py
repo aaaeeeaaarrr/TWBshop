@@ -4,22 +4,33 @@ TWB's live stock (gm_bot/stock.py). No model calls. Tables created by core.db.in
 from shared.database import _db
 
 
-def add_item(org_id, name, unit="unit", category=None, par_level=0) -> int:
+def add_item(org_id, name, unit="unit", category=None, par_level=0, unit_cost=0) -> int:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO core_stock_items (org_id, name, unit, category, par_level) "
-                        "VALUES (%s,%s,%s,%s,%s) RETURNING item_id",
-                        (org_id, name.strip(), unit.strip() or "unit", (category or None), par_level or 0))
+            cur.execute("INSERT INTO core_stock_items (org_id, name, unit, category, par_level, unit_cost) "
+                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING item_id",
+                        (org_id, name.strip(), unit.strip() or "unit", (category or None),
+                         par_level or 0, unit_cost or 0))
             return cur.fetchone()["item_id"]
 
 
 def list_items(org_id, active_only=True) -> list:
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT item_id, name, unit, category, par_level, on_hand, active "
+            cur.execute("SELECT item_id, name, unit, category, par_level, on_hand, unit_cost, active "
                         "FROM core_stock_items WHERE org_id=%s" + (" AND active" if active_only else "") +
                         " ORDER BY name", (org_id,))
             return [dict(r) for r in cur.fetchall()]
+
+
+def stock_summary(org_id) -> dict:
+    """Headline stock numbers (read-only): item_count · low_count · total_value (Σ on_hand × unit_cost)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) n, COALESCE(SUM(on_hand * unit_cost), 0) val "
+                        "FROM core_stock_items WHERE org_id=%s AND active", (org_id,))
+            r = cur.fetchone()
+    return {"item_count": r["n"], "total_value": float(r["val"] or 0), "low_count": len(low_stock_items(org_id))}
 
 
 def set_par(org_id, item_id, par_level) -> None:
