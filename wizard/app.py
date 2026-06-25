@@ -1139,9 +1139,19 @@ def render_investigate(org_id: str) -> str:
     act_html = ("".join("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
                         % (escape(a["when"]), escape(a["what"]), escape(a["by"])) for a in acts)
                 or "<tr><td colspan='3' class='note'>No recent activity.</td></tr>")
+    g = lambda x: "%g" % float(x)
+    var = stock.stock_variance(org_id)
+    var_html = ("".join("<li>⚠️ <b>%s</b> short by <b>%s</b> (book said %s, counted %s) @ %s</li>"
+                        % (escape(v["item"]), g(-v["variance"]), g(v["book"]), g(v["counted"]), escape(v["when"]))
+                        for v in var)
+                if var else "<li class='note'>No shortfalls at the last count. 👍</li>")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
             "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "
             "check the camera at that minute. Cross-domain (attendance · stock · sales · expenses).</p>"
+            "<div class='box' style='background:#fef2f2;border-color:#fecaca'><h3>⚠️ Shrinkage — counted vs book</h3>"
+            "<p class='note'>An item that came up short of what the system expected (last count + receipts − "
+            "sales) — theft, waste, or a mistake. Drill into its history + who was on shift.</p>"
+            "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
             "<div class='box'><h3>Who was working on a day?</h3>"
             "<form method='get' action='/investigate'><input type='date' name='date' value='%s'> "
             "<button type='submit'>Show</button></form><ul style='list-style:none;padding-left:0'>%s</ul></div>"
@@ -1155,7 +1165,7 @@ def render_investigate(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
             "%s</table></div>"
-            % (escape(date_q), present_html, item_opts, tl_html, act_html))
+            % (var_html, escape(date_q), present_html, item_opts, tl_html, act_html))
     return _page("Investigate", body)
 
 

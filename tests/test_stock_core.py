@@ -49,6 +49,20 @@ def test_stock_value_summary():
         _clean()
 
 
+def test_stock_variance_detects_shrinkage():
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Whisky", "btl", par_level=2)
+        stock.record_count(ORG, iid, 20)                                 # baseline (book_before 0) → not flagged
+        stock.record_count(ORG, iid, 17)                                 # book 20, counted 17 → short by 3
+        var = stock.stock_variance(ORG)
+        assert len(var) == 1 and var[0]["item"] == "Whisky" and var[0]["variance"] == -3.0
+        stock.record_count(ORG, iid, 17)                                 # book 17, counted 17 → variance 0
+        assert stock.stock_variance(ORG) == []                          # a matching recount clears it
+    finally:
+        _clean()
+
+
 def test_receive_purchase_restocks_and_logs_expense():
     from core import expenses
     _clean()

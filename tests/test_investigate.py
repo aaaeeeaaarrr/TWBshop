@@ -59,3 +59,20 @@ def test_investigate_page(monkeypatch):
         assert "Investigate" in body and "Who was working" in body and "Recent activity" in body
     finally:
         _clean()
+
+
+def test_shrinkage_in_feed_and_page(monkeypatch):
+    from core import insights
+    from core.tenant_config import set_config
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    _clean()
+    try:
+        set_config(ORG, {"categories": {"stock": {"enabled": True}}})
+        iid = stock.add_item(ORG, "Gin", "btl", par_level=2)
+        stock.record_count(ORG, iid, 20)
+        stock.record_count(ORG, iid, 15)                                 # short by 5
+        assert any("shrinkage" in a["msg"] for a in insights.attention_feed(ORG))   # in the needs-attention feed
+        body = create_app(ORG).test_client().get("/investigate").get_data(as_text=True)
+        assert "Shrinkage" in body and "Gin" in body                    # on the Investigate page
+    finally:
+        _clean()

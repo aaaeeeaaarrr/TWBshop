@@ -74,6 +74,27 @@ def receive_purchase(org_id, item_id, qty, total_cost, supplier=None, actor=None
             return cur.fetchone()["expense_id"]
 
 
+def stock_variance(org_id) -> list:
+    """Items whose LATEST physical count came up SHORT of the book (shrinkage): [{item, counted, book, variance,
+    when}], variance < 0. variance = counted - book_before; the book = last count + receives − sales. Skips the
+    first (baseline) count of each item. The killer loss-prevention query."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT ON (c.item_id) i.name nm, c.qty, c.book_before, c.counted_at "
+                        "FROM core_stock_counts c "
+                        "JOIN core_stock_items i ON i.org_id=c.org_id AND i.item_id=c.item_id "
+                        "WHERE c.org_id=%s AND c.book_before IS NOT NULL "
+                        "ORDER BY c.item_id, c.counted_at DESC", (org_id,))
+            rows = cur.fetchall()
+    out = []
+    for r in rows:
+        var = float(r["qty"]) - float(r["book_before"])
+        if var < 0:                                            # came up short → possible theft / waste / error
+            out.append({"item": r["nm"], "counted": float(r["qty"]), "book": float(r["book_before"]),
+                        "variance": var, "when": str(r["counted_at"])[:16]})
+    return out
+
+
 def set_par(org_id, item_id, par_level) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
@@ -89,11 +110,15 @@ def deactivate_item(org_id, item_id) -> None:
 
 
 def record_count(org_id, item_id, qty, note=None, actor=None) -> int:
-    """Record a stock count: append a count row (history) AND set the item's on_hand — one transaction."""
+    """Record a stock count: capture the book on-hand BEFORE (for variance), append a count row, set on_hand —
+    one transaction. variance = counted - book_before (negative = came up short = shrinkage)."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO core_stock_counts (org_id, item_id, qty, note, actor) VALUES (%s,%s,%s,%s,%s) "
-                        "RETURNING count_id", (org_id, item_id, qty, note, actor))
+            cur.execute("SELECT on_hand FROM core_stock_items WHERE org_id=%s AND item_id=%s", (org_id, item_id))
+            r = cur.fetchone()
+            book = r["on_hand"] if r else None
+            cur.execute("INSERT INTO core_stock_counts (org_id, item_id, qty, note, actor, book_before) "
+                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING count_id", (org_id, item_id, qty, note, actor, book))
             cid = cur.fetchone()["count_id"]
             cur.execute("UPDATE core_stock_items SET on_hand=%s WHERE org_id=%s AND item_id=%s",
                         (qty, org_id, item_id))

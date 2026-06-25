@@ -255,6 +255,12 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **STOCK-VARIANCE / SHRINKAGE detector BUILT (the killer investigation)** `[ship/sell]` — `record_count` now
+  captures **`book_before`** (the system's on-hand the instant before a physical count overwrote it = last count
+  + receipts − sales); `stock.stock_variance` flags any item whose latest count came up **short of the book**
+  (counted < book = theft/waste/error) with the variance + when. Surfaced in the **"needs attention" feed** AND a
+  **⚠️ Shrinkage section on `/investigate`**. Turns "something feels off" into "Gin short by 5 on [date]" → drill
+  into its history + who was on shift → camera. *Schema:* 1 additive column. (A matching recount clears the flag.)
 - ✅ **INVESTIGATION card BUILT (forensic / loss-prevention)** `[ship/sell]` (owner idea) — `/investigate` +
   `core/investigate.py`: **who was working on a day** (camera-check anchor) · **item timeline** (when an item was
   last counted/sold + by whom) · **cross-domain activity feed** (last 48h of check-ins/counts/sales/expenses,

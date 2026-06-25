@@ -351,6 +351,8 @@ def init_core_db() -> None:
 
             # actor on each recorded action — for the Investigation card (who did what, when)
             cur.execute("ALTER TABLE core_stock_counts ADD COLUMN IF NOT EXISTS actor TEXT")
+            # book_before = the system's on-hand JUST BEFORE a physical count overwrote it → variance = counted - book
+            cur.execute("ALTER TABLE core_stock_counts ADD COLUMN IF NOT EXISTS book_before NUMERIC")
             cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS actor TEXT")
             cur.execute("ALTER TABLE core_expenses ADD COLUMN IF NOT EXISTS actor TEXT")
 
