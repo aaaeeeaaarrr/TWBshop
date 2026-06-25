@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Stock PRICE-COMPARE (the PRIMARY goal, real)** `[ship/sell]` — `core_stock_prices` + `add_price` /
+  `item_prices` / `cheapest_overview` (cheapest supplier per item) + a "💲 Price compare — cheapest supplier"
+  section + add-price form on `/stock`. The owner's "buy from the cheapest" made real on the platform (per-
+  supplier price trend/history is the data; cross-supplier cheapest is shown).
 - ✅ **Stock VALUE (unit cost)** `[ship/sell]` — per-item `unit_cost` (idempotent ALTER) → stock **value**
   (Σ on-hand × cost) + a summary line (items · low · $value) on `/stock`. Toward the owner's "prices = PRIMARY
   goal" (per-supplier price compare is the bigger next piece — needs a suppliers/prices table).

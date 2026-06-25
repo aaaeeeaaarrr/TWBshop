@@ -893,6 +893,14 @@ def render_stock(org_id: str) -> str:
         % (escape(i["name"]), escape(i["unit"]), sg(i["par_level"]), sg(i["on_hand"]), sg(i.get("unit_cost")),
            sg(float(i["on_hand"] or 0) * float(i.get("unit_cost") or 0)), i["item_id"])
         for i in items) or "<tr><td colspan='7' class='note'>No items yet — add one below.</td></tr>"
+    cheap = stock.cheapest_overview(org_id)
+    item_opts = "".join("<option value='%s'>%s</option>" % (i["item_id"], escape(i["name"])) for i in items)
+    crows = "".join(
+        "<tr><td>%s</td><td>%s</td></tr>"
+        % (escape(i["name"]),
+           ("<b>%s</b> @ $%s" % (escape(cheap[i["item_id"]]["supplier"]), "%g" % cheap[i["item_id"]]["price"]))
+           if i["item_id"] in cheap else "<span class='note'>no prices yet</span>")
+        for i in items) or "<tr><td colspan='2' class='note'>Add items first.</td></tr>"
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/stock'>card</a></div>"
             "<h1>📦 Stock</h1>%s"
             "<div class='box'><b>%d items · %d low · $%s on-hand value</b></div>"
@@ -901,6 +909,14 @@ def render_stock(org_id: str) -> str:
             "<div class='box'><h3>Items</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Item</th><th>Unit</th><th>Par</th>"
             "<th>On hand</th><th>Cost</th><th>Value</th><th>Count</th></tr>%s</table></div>"
+            "<div class='box'><h3>💲 Price compare — cheapest supplier</h3>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Item</th><th>Cheapest</th></tr>%s"
+            "</table><h4>Add a supplier price</h4><form method='post' action='/stock/price'>"
+            "<select name='item_id'>%s</select> "
+            "<input name='supplier' placeholder='supplier' required> "
+            "<input name='price' type='number' step='any' placeholder='price' required> "
+            "<button type='submit'>Add price</button></form></div>"
             "<div class='box'><h3>Add item</h3><form method='post' action='/stock/add'>"
             "<input name='name' placeholder='name' required> "
             "<input name='unit' placeholder='unit (kg/pcs)' style='width:100px'> "
@@ -908,7 +924,8 @@ def render_stock(org_id: str) -> str:
             "<input name='par_level' type='number' step='any' placeholder='par' style='width:70px'> "
             "<input name='unit_cost' type='number' step='any' placeholder='cost' style='width:70px'> "
             "<button type='submit'>Add</button></form></div>"
-            % (saved, summ["item_count"], summ["low_count"], sg(summ["total_value"]), low_html, rows))
+            % (saved, summ["item_count"], summ["low_count"], sg(summ["total_value"]), low_html, rows,
+               crows, item_opts))
     return _page("Stock", body)
 
 
@@ -1620,6 +1637,18 @@ def create_app(org_id: str = "twb") -> Flask:
         except (TypeError, ValueError):
             return redirect("/stock")
         stock.record_count(org_id, iid, qty)
+        return redirect("/stock?saved=1")
+
+    @app.post("/stock/price")
+    def stock_price():
+        from core import stock
+        supplier = (request.form.get("supplier") or "").strip()
+        try:
+            iid, price = int(request.form.get("item_id")), float(request.form.get("price"))
+        except (TypeError, ValueError):
+            return redirect("/stock")
+        if supplier:
+            stock.add_price(org_id, iid, supplier, price)
         return redirect("/stock?saved=1")
 
     @app.get("/reports/export")

@@ -33,6 +33,32 @@ def stock_summary(org_id) -> dict:
     return {"item_count": r["n"], "total_value": float(r["val"] or 0), "low_count": len(low_stock_items(org_id))}
 
 
+def add_price(org_id, item_id, supplier, price) -> int:
+    """Record a supplier's price for an item (append-only history)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO core_stock_prices (org_id, item_id, supplier, price) "
+                        "VALUES (%s,%s,%s,%s) RETURNING price_id", (org_id, item_id, supplier.strip(), price))
+            return cur.fetchone()["price_id"]
+
+
+def item_prices(org_id, item_id) -> list:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT supplier, price, seen_at FROM core_stock_prices "
+                        "WHERE org_id=%s AND item_id=%s ORDER BY price ASC", (org_id, item_id))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def cheapest_overview(org_id) -> dict:
+    """item_id → {supplier, price} for the cheapest recorded price per item (the 'buy from the cheapest' goal)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT ON (item_id) item_id, supplier, price FROM core_stock_prices "
+                        "WHERE org_id=%s ORDER BY item_id, price ASC, seen_at DESC", (org_id,))
+            return {r["item_id"]: {"supplier": r["supplier"], "price": float(r["price"])} for r in cur.fetchall()}
+
+
 def set_par(org_id, item_id, par_level) -> None:
     with _db() as conn:
         with conn.cursor() as cur:

@@ -287,6 +287,18 @@ def init_core_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_counts_item "
                         "ON core_stock_counts (org_id, item_id, counted_at DESC)")
             cur.execute("ALTER TABLE core_stock_items ADD COLUMN IF NOT EXISTS unit_cost NUMERIC DEFAULT 0")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_stock_prices (
+                    price_id   BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    item_id    BIGINT NOT NULL,
+                    supplier   TEXT NOT NULL,
+                    price      NUMERIC NOT NULL,
+                    seen_at    TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_prices_item "
+                        "ON core_stock_prices (org_id, item_id, price)")
 
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:

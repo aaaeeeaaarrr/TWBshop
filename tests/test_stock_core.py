@@ -15,6 +15,7 @@ def _clean():
     with _db() as c:
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_stock_prices WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_stock_counts WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_stock_items WHERE org_id=%s", (ORG,))
 
@@ -43,6 +44,19 @@ def test_stock_value_summary():
         stock.record_count(ORG, iid, 10)                                  # 10 × $3 = $30 on-hand value
         s = stock.stock_summary(ORG)
         assert s["item_count"] == 1 and s["total_value"] == 30.0
+    finally:
+        _clean()
+
+
+def test_stock_price_compare():
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Eggs", "tray", par_level=2)
+        for sup, pr in [("Market A", 5.0), ("Market B", 4.2), ("Market C", 4.8)]:
+            stock.add_price(ORG, iid, sup, pr)
+        cheap = stock.cheapest_overview(ORG)
+        assert cheap[iid]["supplier"] == "Market B" and cheap[iid]["price"] == 4.2   # cheapest flagged
+        assert len(stock.item_prices(ORG, iid)) == 3
     finally:
         _clean()
 
