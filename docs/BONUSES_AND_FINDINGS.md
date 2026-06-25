@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Shrinkage → SUSPECT LIST (owner's original idea, fully realized)** `[ship/sell]` — `stock_variance` now
+  carries the window [prior count → this count]; `investigate.who_in_window` names who was on shift in it; the
+  shrinkage alert AND the `/investigate` shrinkage box now show **"on shift: [names]"**. So a shortfall →
+  the time + the suspects → straight to the camera. Exactly "who was available / in-charge."
 - ✅ **STOCK-VARIANCE / SHRINKAGE detector BUILT (the killer investigation)** `[ship/sell]` — `record_count` now
   captures **`book_before`** (the system's on-hand the instant before a physical count overwrote it = last count
   + receipts − sales); `stock.stock_variance` flags any item whose latest count came up **short of the book**

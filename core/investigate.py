@@ -27,6 +27,20 @@ def who_present_on(org_id, date_str, tz: str = "Asia/Phnom_Penh") -> list:
     return list(by_staff.values())
 
 
+def who_in_window(org_id, from_at, to_at) -> list:
+    """Staff who checked in within [from_at, to_at] — the 'suspects' for a shrinkage window. Names only."""
+    if not from_at or not to_at:
+        return []
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT COALESCE(s.call_name, s.name, 'Staff #' || e.staff_id) nm "
+                        "FROM attendance_events e "
+                        "LEFT JOIN core_staff s ON s.org_id=e.org_id AND s.staff_id=e.staff_id "
+                        "WHERE e.org_id=%s AND e.type='checked_in' AND e.at >= %s AND e.at <= %s ORDER BY nm",
+                        (org_id, from_at, to_at))
+            return [r["nm"] for r in cur.fetchall()]
+
+
 def item_timeline(org_id, item_id, limit: int = 50) -> list:
     """A per-item forensic timeline (counts + sales), newest first: [{kind, when, detail, by}] — when an item was
     last counted/sold and by whom."""

@@ -1141,9 +1141,13 @@ def render_investigate(org_id: str) -> str:
                 or "<tr><td colspan='3' class='note'>No recent activity.</td></tr>")
     g = lambda x: "%g" % float(x)
     var = stock.stock_variance(org_id)
-    var_html = ("".join("<li>⚠️ <b>%s</b> short by <b>%s</b> (book said %s, counted %s) @ %s</li>"
-                        % (escape(v["item"]), g(-v["variance"]), g(v["book"]), g(v["counted"]), escape(v["when"]))
-                        for v in var)
+
+    def _susp(v):
+        who = investigate.who_in_window(org_id, v.get("since"), v.get("at"))
+        return (" — <span class='note'>on shift: %s</span>" % escape(", ".join(who))) if who else ""
+    var_html = ("".join("<li>⚠️ <b>%s</b> short by <b>%s</b> (book said %s, counted %s) @ %s%s</li>"
+                        % (escape(v["item"]), g(-v["variance"]), g(v["book"]), g(v["counted"]), escape(v["when"]),
+                           _susp(v)) for v in var)
                 if var else "<li class='note'>No shortfalls at the last count. 👍</li>")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
             "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "

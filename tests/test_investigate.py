@@ -61,6 +61,18 @@ def test_investigate_page(monkeypatch):
         _clean()
 
 
+def test_who_in_window():
+    from datetime import timedelta
+    _clean()
+    try:
+        now = datetime.now(ZoneInfo(TZ))
+        check_in(ORG, 7, now, "00:00", "23:59", TZ)
+        assert len(investigate.who_in_window(ORG, now - timedelta(hours=1), now + timedelta(hours=1))) == 1  # inside
+        assert investigate.who_in_window(ORG, now + timedelta(hours=1), now + timedelta(hours=2)) == []       # outside
+    finally:
+        _clean()
+
+
 def test_shrinkage_in_feed_and_page(monkeypatch):
     from core import insights
     from core.tenant_config import set_config

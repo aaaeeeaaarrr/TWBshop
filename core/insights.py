@@ -16,10 +16,13 @@ def attention_feed(org_id) -> list:
         if low:
             names = ", ".join(l["name"] for l in low[:5])
             out.append({"domain": "stock", "msg": "📦 %d item(s) at/below par — reorder: %s" % (len(low), names)})
+        from core import investigate
         for v in stock.stock_variance(org_id):                         # stock: shrinkage (counted < book)
+            who = investigate.who_in_window(org_id, v.get("since"), v.get("at"))
+            suspects = (" · on shift: " + ", ".join(who)) if who else ""
             out.append({"domain": "stock",
-                        "msg": "⚠️ %s SHORT by %g (book %g, counted %g) — possible shrinkage @ %s"
-                        % (v["item"], -v["variance"], v["book"], v["counted"], v["when"])})
+                        "msg": "⚠️ %s SHORT by %g (book %g, counted %g) — possible shrinkage @ %s%s"
+                        % (v["item"], -v["variance"], v["book"], v["counted"], v["when"], suspects)})
     if cats.get("accountant", {}).get("enabled"):                      # expenses: spend spike (last 7d vs prior 7d)
         e7 = expenses.expense_summary(org_id, 7)["total"]
         prior = expenses.expense_summary(org_id, 14)["total"] - e7

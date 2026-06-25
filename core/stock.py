@@ -80,7 +80,9 @@ def stock_variance(org_id) -> list:
     first (baseline) count of each item. The killer loss-prevention query."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT ON (c.item_id) i.name nm, c.qty, c.book_before, c.counted_at "
+            cur.execute("SELECT DISTINCT ON (c.item_id) c.item_id, i.name nm, c.qty, c.book_before, c.counted_at, "
+                        "(SELECT MAX(c2.counted_at) FROM core_stock_counts c2 WHERE c2.org_id=c.org_id "
+                        " AND c2.item_id=c.item_id AND c2.counted_at < c.counted_at) prev_at "
                         "FROM core_stock_counts c "
                         "JOIN core_stock_items i ON i.org_id=c.org_id AND i.item_id=c.item_id "
                         "WHERE c.org_id=%s AND c.book_before IS NOT NULL "
@@ -90,8 +92,9 @@ def stock_variance(org_id) -> list:
     for r in rows:
         var = float(r["qty"]) - float(r["book_before"])
         if var < 0:                                            # came up short → possible theft / waste / error
-            out.append({"item": r["nm"], "counted": float(r["qty"]), "book": float(r["book_before"]),
-                        "variance": var, "when": str(r["counted_at"])[:16]})
+            out.append({"item": r["nm"], "item_id": r["item_id"], "counted": float(r["qty"]),
+                        "book": float(r["book_before"]), "variance": var, "when": str(r["counted_at"])[:16],
+                        "since": r["prev_at"], "at": r["counted_at"]})    # raw window [since, at] for who-was-on-shift
     return out
 
 
