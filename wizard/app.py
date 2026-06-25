@@ -769,6 +769,12 @@ def render_dashboard(org_id: str) -> str:
              "<b>🟢 Live now</b> &nbsp; %s "
              "<span class='note'>— each set-up domain shows its real status, not setup steps</span></div>"
              % " &nbsp;·&nbsp; ".join(tiles)) if tiles else "")
+    from core.insights import attention_feed
+    attn = attention_feed(org_id)
+    attn_box = (("<div class='box' style='background:#fef2f2;border-color:#fecaca'>"
+                 "<b>⚠️ Needs attention (%d)</b><ul style='list-style:none;padding-left:0;margin:6px 0 0'>%s</ul>"
+                 "<a href='/card/ai_assist'>view all →</a></div>"
+                 % (len(attn), "".join("<li>%s</li>" % escape(a["msg"]) for a in attn[:4]))) if attn else "")
     frac = (d["done"] / d["total"]) if d["total"] else 0
     pct = int(frac * 100)
     big_bar = ("<div style='background:#eef0f2;border-radius:8px;height:12px;margin:10px 0'>"
@@ -801,13 +807,14 @@ def render_dashboard(org_id: str) -> str:
           "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>%s%s%s"
+            "<h1>⚡ Your system</h1>%s%s%s%s"
             "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>plan: "
             "<a href='/packages'>%s</a> · <a href='/roadmap'>🗺️ all ideas</a> — locked cards need a higher "
             "plan</span>%s</div>%s"
             "<p class='note'>Prototype — pick a category above to narrow · order is fixed (find anything fast) · "
             "the spotlight shows what's next. Names are drafts; tap a card to open it.</p>%s"
-            % (filter_bar, live, spotlight, pct, escape(d["package"].replace("_", " ").title()), big_bar, grid, js))
+            % (filter_bar, live, attn_box, spotlight, pct, escape(d["package"].replace("_", " ").title()),
+               big_bar, grid, js))
     return _page("Dashboard", body)
 
 
@@ -1153,12 +1160,14 @@ def render_card_detail(org_id: str, key: str) -> str:
                        for k, v in catalog.AI_POWER.items())
         extra = ("<div class='box'><h3>AI power tier</h3>"
                  "<p class='note'>How decisions are made — rules vs a model, per the catalog.</p>%s</div>" % opts)
-        alerts = attendance_anomalies(org_id)             # 'anomaly alerts' made real (read-only, over attendance)
-        alert_html = ("".join("<li style='margin:5px 0'>%s</li>" % escape(a) for a in alerts)
-                      if alerts else "<li class='note'>Nothing unusual right now.</li>")
-        extra += ("<div class='box'><h3>🔔 Live anomaly check</h3>"
-                  "<p class='note'>A real check over your attendance data (no model cost) — the first AI-assist "
-                  "feature working.</p><ul style='list-style:none;padding-left:0'>%s</ul></div>" % alert_html)
+        from core.insights import attention_feed         # cross-domain 'needs attention' feed (read-only)
+        alerts = attention_feed(org_id)
+        alert_html = ("".join("<li style='margin:5px 0'>%s</li>" % escape(a["msg"]) for a in alerts)
+                      if alerts else "<li class='note'>Nothing needs attention right now. 👍</li>")
+        extra += ("<div class='box'><h3>🔔 Needs attention — cross-domain</h3>"
+                  "<p class='note'>A real check across every ON domain (attendance · stock · spend · sales), no "
+                  "model cost — the AI-assist feed working.</p>"
+                  "<ul style='list-style:none;padding-left:0'>%s</ul></div>" % alert_html)
     save_btn = ("<div class='actions'><button type='submit'>Save</button></div>" if (ep or toggles or extra) else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
             "<h1>%s %s</h1>%s"

@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **CROSS-DOMAIN intelligence layer** `[ship/sell]` — `core/insights.py` `attention_feed` scans every ON
+  domain for notable conditions (lateness spike · stock at/below par · spend spike · sales drop) → one **"Needs
+  attention"** feed on the AI card + a **dashboard banner** (⚠️ N need attention). The 5 real domains now feed
+  proactive cross-domain insights, NO model cost. Extends the AI-assist anomaly check across all domains.
 - ✅ **LIVE operating dashboard (all 5 domains)** `[ship/sell]` — the "🟢 Live now" strip (`_live_tiles`) shows
   REAL status per ON domain: attendance (in/late today) · stock (items/low) · expenses ($ 30d) · sales ($ 30d)
   · payroll ($ last run). The dashboard is now a **live multi-domain operating view**, not just a setup
