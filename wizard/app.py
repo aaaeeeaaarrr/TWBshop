@@ -18,7 +18,7 @@ import re
 from html import escape
 from urllib.parse import quote
 
-from flask import Flask, request, redirect, session
+from flask import Flask, request, redirect, session, Response
 
 from core.tenant_config import get_config, set_config, raw_overrides, DEFAULTS
 from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
@@ -813,7 +813,8 @@ def render_reports(org_id: str) -> str:
     period = " · ".join(("<b>%dd</b>" % n) if n == days else "<a href='/reports?days=%d'>%dd</a>" % (n, n)
                         for n in (7, 14, 30))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
-            "<h1>📊 Reports — attendance</h1><p class='note'>Period: %s</p>"
+            "<h1>📊 Reports — attendance</h1>"
+            "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
             "<div class='box'><b>%d check-ins · %d late · %d%% on-time</b> "
             "<span class='note'>(last %d days)</span></div>"
             "<div class='box'><h3>Daily trend</h3>"
@@ -826,7 +827,7 @@ def render_reports(org_id: str) -> str:
             "<th>Late</th><th>On-time</th></tr>%s</table></div>"
             "<p class='note'>Built from the platform's attendance data. Expense, stock and sales reports "
             "follow as those domains record data. (Greener = better.)</p>"
-            % (period, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows))
+            % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows))
     return _page("Reports", body)
 
 
@@ -1499,6 +1500,24 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/reports")
     def reports():
         return render_reports(org_id)
+
+    @app.get("/reports/export")
+    def reports_export():
+        try:
+            days = int(request.args.get("days", 14))
+        except (TypeError, ValueError):
+            days = 14
+        if days not in (7, 14, 30):
+            days = 14
+        rep = attendance_report(org_id, days)
+        lines = ["section,key,check_ins,late,on_time_pct"]
+        for d in rep["daily"]:
+            ot = (100 * (d["total"] - d["late"]) // d["total"]) if d["total"] else 0
+            lines.append("daily,%s,%d,%d,%d" % (d["day"], d["total"], d["late"], ot))
+        for s in staff_attendance_report(org_id, days):
+            lines.append("staff,%s,%d,%d,%d" % (s["name"].replace(",", " "), s["total"], s["late"], s["on_time_rate"]))
+        return Response("\n".join(lines) + "\n", mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=attendance_report_%dd.csv" % days})
 
     @app.get("/card/<key>")
     def card_detail(key):

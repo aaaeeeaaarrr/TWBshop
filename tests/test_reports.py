@@ -60,5 +60,22 @@ def test_reports_page_renders(monkeypatch):
         body = create_app(ORG).test_client().get("/reports?days=30").get_data(as_text=True)
         assert "Reports" in body and "Daily trend" in body and "Punctuality by staff" in body
         assert "Period:" in body and "30d" in body                     # selectable period
+        assert "Export CSV" in body                                    # export link
+    finally:
+        _clean()
+
+
+def test_reports_csv_export(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        check_in(ORG, 1, datetime.now(ZoneInfo(TZ)), "00:00", "23:59", TZ)
+        r = create_app(ORG).test_client().get("/reports/export?days=14")
+        assert r.headers["Content-Type"].startswith("text/csv")
+        assert "attachment" in r.headers["Content-Disposition"]
+        body = r.get_data(as_text=True)
+        assert "section,key,check_ins,late,on_time_pct" in body         # header row
+        assert "daily," in body and "staff," in body                    # both sections exported
     finally:
         _clean()

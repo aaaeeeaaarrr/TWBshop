@@ -255,6 +255,8 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Reports CSV export** `[ship]` — `/reports/export?days=N` downloads the daily trend + per-staff data as a
+  CSV (a real report-feature; QuickBooks/Salesforce export lineage). Export link on the page.
 - ✅ **Reports made REAL (2nd report type + period)** `[ship]` — added `core.reports.staff_attendance_report`
   (per-staff punctuality — who's late most, on-time% per staff, names from `core_staff`) + a **selectable
   period** (7/14/30 days) on `/reports`. Reports now = daily trend + per-staff, period-controlled, from data we
