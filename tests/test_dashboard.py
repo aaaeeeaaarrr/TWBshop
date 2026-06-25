@@ -19,6 +19,9 @@ def _reset():
             cur.execute("DELETE FROM core_staff WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM attendance_events WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM shifts WHERE org_id=%s", (ORG,))
+            for t in ("core_stock_items", "core_stock_counts", "core_stock_prices", "core_sales",
+                      "core_expenses", "core_pay_runs", "core_payslips"):
+                cur.execute("DELETE FROM %s WHERE org_id=%%s" % t, (ORG,))
 
 
 def test_bar_colour_progression():
@@ -74,18 +77,24 @@ def test_packages_page_and_switch(monkeypatch):
         _reset()
 
 
-def test_evolving_live_tile(monkeypatch):
+def test_evolving_live_tile_multidomain(monkeypatch):
     from datetime import datetime
     from zoneinfo import ZoneInfo
     from core.attendance import check_in, today_summary
+    from core import stock
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _reset()
     try:
         c = create_app(ORG).test_client()
-        assert "Live today" not in c.get("/dashboard").get_data(as_text=True)    # no activity → no tile
+        assert "Live now" not in c.get("/dashboard").get_data(as_text=True)       # no activity → no strip
         check_in(ORG, 1, datetime.now(ZoneInfo("Asia/Phnom_Penh")), "00:00", "23:59", "Asia/Phnom_Penh")
         assert today_summary(ORG)["in"] >= 1
-        assert "Live today" in c.get("/dashboard").get_data(as_text=True)         # the card evolves to live
+        body = c.get("/dashboard").get_data(as_text=True)
+        assert "Live now" in body and "in today" in body                         # attendance tile
+        set_config(ORG, {"categories": {"stock": {"enabled": True}}})            # turn on a 2nd domain
+        iid = stock.add_item(ORG, "Flour", "kg", par_level=5)
+        stock.record_count(ORG, iid, 2)
+        assert "📦" in c.get("/dashboard").get_data(as_text=True)                 # multi-domain live strip
     finally:
         _reset()
 

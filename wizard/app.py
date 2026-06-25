@@ -736,14 +736,39 @@ def _dash_card(c: dict) -> str:
                escape(c["reward"]), bar, escape(c["label"]), more))
 
 
-def render_dashboard(org_id: str) -> str:
+def _live_tiles(org_id: str) -> list:
+    """A real, live headline per ON domain — turns the dashboard into an operating view (read-only)."""
     from core.attendance import today_summary
-    d = dashboard_cards(org_id)
+    cats = get_config(org_id).get("categories", {})
+    tiles = []
     ts = today_summary(org_id)
+    if ts["in"]:
+        tiles.append("⏱️ <b>%d</b> in today · <b>%d</b> late" % (ts["in"], ts["late"]))
+    if cats.get("stock", {}).get("enabled"):
+        from core import stock
+        ss = stock.stock_summary(org_id)
+        tiles.append("📦 <b>%d</b> items · <b>%d</b> low" % (ss["item_count"], ss["low_count"]))
+    if cats.get("accountant", {}).get("enabled"):
+        from core import expenses
+        tiles.append("🍚 <b>$%g</b> spent (30d)" % expenses.expense_summary(org_id, 30)["total"])
+    if cats.get("pos", {}).get("enabled"):
+        from core import pos
+        tiles.append("🛒 <b>$%g</b> revenue (30d)" % pos.sales_summary(org_id, 30)["revenue"])
+    if cats.get("hr_payroll", {}).get("enabled"):
+        from core import payroll
+        lr = payroll.latest_run(org_id)
+        if lr:
+            tiles.append("💼 <b>$%g</b> last run" % float(lr["total"]))
+    return tiles
+
+
+def render_dashboard(org_id: str) -> str:
+    d = dashboard_cards(org_id)
+    tiles = _live_tiles(org_id)
     live = (("<div class='box' style='background:#ecfdf5;border-color:#a7f3d0'>"
-             "<b>🟢 Live today</b> &nbsp; ⏱️ <b>%d</b> in · <b>%d</b> late "
-             "<span class='note'>— the 'evolving card': once a domain is set up, its card flips to today's "
-             "status instead of setup steps</span></div>" % (ts["in"], ts["late"])) if ts["in"] else "")
+             "<b>🟢 Live now</b> &nbsp; %s "
+             "<span class='note'>— each set-up domain shows its real status, not setup steps</span></div>"
+             % " &nbsp;·&nbsp; ".join(tiles)) if tiles else "")
     frac = (d["done"] / d["total"]) if d["total"] else 0
     pct = int(frac * 100)
     big_bar = ("<div style='background:#eef0f2;border-radius:8px;height:12px;margin:10px 0'>"

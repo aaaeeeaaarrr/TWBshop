@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **LIVE operating dashboard (all 5 domains)** `[ship/sell]` — the "🟢 Live now" strip (`_live_tiles`) shows
+  REAL status per ON domain: attendance (in/late today) · stock (items/low) · expenses ($ 30d) · sales ($ 30d)
+  · payroll ($ last run). The dashboard is now a **live multi-domain operating view**, not just a setup
+  checklist — the owner's "evolving card" vision realized across all 5 real domains.
 - ✅ **PAYROLL domain made REAL → ALL 5 domain cards now real + Reports → 5** `[ship/sell]` — `core/payroll.py`
   + `core_pay_runs`/`core_payslips` + `core_staff.monthly_salary` (ALTER) + a `/payroll` manager (set salaries →
   run a pay run → a payslip per active staffer → view runs/payslips) + a **💼 Payroll** section in `/reports`.
