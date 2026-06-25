@@ -121,7 +121,9 @@ def test_ai_power_tier_on_ai_card(monkeypatch):
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (org,))
     try:
         c = create_app(org).test_client()
-        assert "AI power tier" in c.get("/card/ai_assist").get_data(as_text=True)   # the Computer/AI Power selector
+        body = c.get("/card/ai_assist").get_data(as_text=True)
+        assert "AI power tier" in body                                              # the Computer/AI Power selector
+        assert "Live anomaly check" in body                                         # the first AI-assist feature, working
         c.post("/card/ai_assist/save", data={"ai_power": "mixed"})
         assert get_config(org)["ai_power"] == "mixed"                               # tier persists
     finally:

@@ -8,7 +8,7 @@ from shared.database import _db
 import wizard.app as wa
 from wizard.app import create_app
 from core.attendance import check_in
-from core.reports import attendance_report, staff_attendance_report, weekday_pattern
+from core.reports import attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 
 cdb.init_core_db()
 ORG = "test_reports"
@@ -47,6 +47,15 @@ def test_staff_attendance_report():
         assert len(rep) == 2                                            # one row per staff
         assert all(s["name"] and s["total"] == 1 for s in rep)         # name (fallback) + count
         assert all(0 <= s["on_time_rate"] <= 100 for s in rep)
+    finally:
+        _clean()
+
+
+def test_attendance_anomalies_safe():
+    cdb.ensure_org(ORG, "T")
+    _clean()
+    try:
+        assert attendance_anomalies(ORG) == []          # no / insufficient data → no false alerts, no crash
     finally:
         _clean()
 

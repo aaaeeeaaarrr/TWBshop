@@ -67,3 +67,23 @@ def weekday_pattern(org_id, days: int = 30, tz: str = "Asia/Phnom_Penh") -> list
         if (r["detail"] or {}).get("state") == "late":
             rec["late"] += 1
     return [agg[i] for i in (1, 2, 3, 4, 5, 6, 0)]               # display Mon→Sun
+
+
+def attendance_anomalies(org_id, tz: str = "Asia/Phnom_Penh") -> list:
+    """AI-assist 'anomaly alerts' made real (read-only): compare the latest day-with-data to the trailing
+    baseline; return alert strings for notable deviations (lateness spike / unusually low turnout). Pure
+    statistics over the platform's attendance data — no model call."""
+    daily = attendance_report(org_id, 14, tz)["daily"]
+    if len(daily) < 4:
+        return []                                                # not enough history to judge
+    latest, base = daily[-1], daily[:-1]
+    alerts = []
+    latest_lr = (100 * latest["late"] // latest["total"]) if latest["total"] else 0
+    base_tot = sum(d["total"] for d in base)
+    base_lr = (100 * sum(d["late"] for d in base) // base_tot) if base_tot else 0
+    if latest["total"] >= 3 and latest_lr >= base_lr + 20:
+        alerts.append("📈 Lateness up: %d%% late on the latest day vs %d%% recent average." % (latest_lr, base_lr))
+    base_avg = base_tot / len(base) if base else 0
+    if base_avg >= 4 and latest["total"] <= base_avg * 0.6:
+        alerts.append("📉 Low turnout: %d check-ins on the latest day vs ~%d typical." % (latest["total"], round(base_avg)))
+    return alerts

@@ -26,7 +26,7 @@ from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
 from core.whatif import verdict_whatif
 from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
-from core.reports import attendance_report, staff_attendance_report, weekday_pattern
+from core.reports import attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
@@ -926,6 +926,12 @@ def render_card_detail(org_id: str, key: str) -> str:
                        for k, v in catalog.AI_POWER.items())
         extra = ("<div class='box'><h3>AI power tier</h3>"
                  "<p class='note'>How decisions are made — rules vs a model, per the catalog.</p>%s</div>" % opts)
+        alerts = attendance_anomalies(org_id)             # 'anomaly alerts' made real (read-only, over attendance)
+        alert_html = ("".join("<li style='margin:5px 0'>%s</li>" % escape(a) for a in alerts)
+                      if alerts else "<li class='note'>Nothing unusual right now.</li>")
+        extra += ("<div class='box'><h3>🔔 Live anomaly check</h3>"
+                  "<p class='note'>A real check over your attendance data (no model cost) — the first AI-assist "
+                  "feature working.</p><ul style='list-style:none;padding-left:0'>%s</ul></div>" % alert_html)
     save_btn = ("<div class='actions'><button type='submit'>Save</button></div>" if (ep or toggles or extra) else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='%s'>open / configure →</a></div>"
             "<h1>%s %s</h1>%s"

@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **AI assist made REAL (anomaly check)** `[ship]` — `core.reports.attendance_anomalies` (pure statistics
+  over attendance: lateness-spike + low-turnout vs the trailing baseline, NO model cost) surfaced on the AI card
+  as a **"🔔 Live anomaly check"**. The first AI-assist feature actually working (computer-tier; the model tiers
+  are the upsell). Depth, over data we already have.
 - ✅ **Roadmap / idea-overview page** `[ship]` (owner: "good to give me more ideas") — `/roadmap` lists every
   option across all 11 cards grouped by status (✓ built · planned · ideas) — the whole idea menu in one scan,
   linked from the dashboard. Reads the static catalog (no tenant data).
