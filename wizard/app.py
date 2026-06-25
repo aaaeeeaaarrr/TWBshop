@@ -841,6 +841,13 @@ def render_reports(org_id: str) -> str:
         exp_box = ("<div class='box'><h3>🍚 Expenses</h3><b>$%g spent · %d expenses</b> "
                    "<span class='note'>(last %d days)</span><ul style='list-style:none;padding-left:0'>%s</ul>"
                    "<a href='/expenses'>manage →</a></div>" % (es["total"], es["count"], days, cat_li))
+    sales_box = ""                                            # multi-domain Reports: a Sales section when POS on
+    if bool(_get_path(get_config(org_id), "categories.pos.enabled")):
+        from core import pos as _pos
+        ps = _pos.sales_summary(org_id, days)
+        sales_box = ("<div class='box'><h3>🛒 Sales</h3><b>$%g revenue · %d sales · %g units</b> "
+                     "<span class='note'>(last %d days)</span> &nbsp;<a href='/pos'>open →</a></div>"
+                     % (ps["revenue"], ps["count"], ps["units"], days))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
             "<h1>📊 Reports — attendance</h1>"
             "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
@@ -858,11 +865,11 @@ def render_reports(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
             "<th>Late</th><th>Volume</th></tr>%s</table></div>"
-            "%s%s"
-            "<p class='note'>Built from the platform's attendance + stock + expense data. Sales reports "
-            "follow as that domain records data. (Greener = better.)</p>"
+            "%s%s%s"
+            "<p class='note'>Built from the platform's own data across domains — attendance · stock · expenses · "
+            "sales — each section appears once that domain is on. (Greener = better.)</p>"
             % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows,
-               stock_box, exp_box))
+               stock_box, exp_box, sales_box))
     return _page("Reports", body)
 
 
@@ -985,6 +992,37 @@ def render_expenses(org_id: str) -> str:
             "<button type='submit'>Add</button></form></div>"
             % (saved, sg(summ["total"]), summ["count"], cat_rows, rec_rows))
     return _page("Expenses", body)
+
+
+def render_pos(org_id: str) -> str:
+    """🛒 The POS domain made REAL — record sales → revenue, auto-decrementing Stock (core.pos; own table, not
+    TWB's live POS). Gated by categories.pos.enabled."""
+    from core import pos, stock
+    if not bool(_get_path(get_config(org_id), "categories.pos.enabled")):
+        return _page("POS", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
+                     "<h1>🛒 POS</h1><div class='box'>POS is off. <a href='/card/pos'>Turn it on →</a></div>")
+    sg = lambda x: ("%g" % float(x)) if x is not None else "0"
+    summ, recent, items = pos.sales_summary(org_id, 30), pos.recent_sales(org_id, 30), stock.list_items(org_id)
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    item_opts = "".join("<option value='%s'>%s</option>" % (i["item_id"], escape(i["name"])) for i in items)
+    rec_rows = "".join("<tr><td>%s</td><td>%s</td><td>%s</td><td>$%s</td><td>$%s</td></tr>"
+                       % (str(s["sold_at"])[:10], escape(s["item_name"] or "—"), sg(s["qty"]), sg(s["unit_price"]),
+                          sg(float(s["qty"] or 0) * float(s["unit_price"] or 0))) for s in recent) \
+        or "<tr><td colspan='5' class='note'>No sales yet.</td></tr>"
+    sale_form = ("<form method='post' action='/pos/sale'><select name='item_id'>%s</select> "
+                 "<input name='qty' type='number' step='any' placeholder='qty' required style='width:70px'> "
+                 "<input name='unit_price' type='number' step='any' placeholder='price' required style='width:80px'> "
+                 "<button type='submit'>Record sale</button></form>" % item_opts) if items \
+        else "<p class='note'>Add <a href='/stock'>stock items</a> first — sales draw from your stock.</p>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/pos'>card</a></div>"
+            "<h1>🛒 POS</h1>%s"
+            "<div class='box'><b>$%s revenue · %d sales · %s units</b> <span class='note'>(last 30 days)</span></div>"
+            "<div class='box'><h3>Recent sales</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Date</th><th>Item</th><th>Qty</th>"
+            "<th>Price</th><th>Total</th></tr>%s</table></div>"
+            "<div class='box'><h3>Record a sale</h3><p class='note'>A sale auto-reduces the item's stock.</p>%s</div>"
+            % (saved, sg(summ["revenue"]), summ["count"], sg(summ["units"]), rec_rows, sale_form))
+    return _page("POS", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1723,6 +1761,21 @@ def create_app(org_id: str = "twb") -> Flask:
         expenses.add_expense(org_id, amount, request.form.get("supplier") or None,
                              request.form.get("category") or None, request.form.get("note") or None)
         return redirect("/expenses?saved=1")
+
+    @app.get("/pos")
+    def pos_page():
+        return render_pos(org_id)
+
+    @app.post("/pos/sale")
+    def pos_sale():
+        from core import pos
+        try:
+            iid, qty, price = (int(request.form.get("item_id")), float(request.form.get("qty")),
+                               float(request.form.get("unit_price")))
+        except (TypeError, ValueError):
+            return redirect("/pos")
+        pos.record_sale(org_id, iid, qty, price)
+        return redirect("/pos?saved=1")
 
     @app.get("/reports/export")
     def reports_export():

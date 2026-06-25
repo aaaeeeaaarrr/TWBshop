@@ -255,6 +255,11 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **POS domain made REAL + cross-domain (sale → decrement Stock) + Reports → 4** `[ship/sell]` —
+  `core/pos.py` + `core_sales` table + a `/pos` manager (record a sale → revenue, **auto-decrementing the
+  item's Stock on-hand** — the first cross-domain integration) + a **🛒 Sales** section in `/reports`. 3rd
+  non-attendance domain; the POS card opens it. Now Reports spans attendance · stock · expenses · sales.
+  *Schema:* 1 additive core table (init_core_db).
 - ✅ **ACCOUNTANT domain made REAL (expense log) + Reports → 3 domains** `[ship]` — `core/expenses.py` +
   `core_expenses` table + a `/expenses` manager (record by supplier/category · spend summary · by-category ·
   recent) + a **🍚 Expenses** section in `/reports`. The 2nd non-attendance domain; the Accountant card opens

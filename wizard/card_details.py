@@ -42,7 +42,7 @@ CARD_DETAILS = {
     "pos": {
         "icon": "🛒", "title": "POS / Point of sale",
         "what": "Ring up sales on any device — or tap your existing till — tied into stock + books.",
-        "ref": "Square · Toast · Loyverse · StoreHub", "configure": "/customer/config",
+        "ref": "Square · Toast · Loyverse · StoreHub", "configure": "/pos",
         "options": [
             ("Be the POS or tap existing", "Use ours, or read sales from Loyverse / Square", "built"),
             ("Payments", "Cash · KHQR / Bakong · card", "built"),

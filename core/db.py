@@ -313,6 +313,19 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_expenses_org ON core_expenses (org_id, spent_at DESC)")
 
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_sales (
+                    sale_id    BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    item_id    BIGINT,
+                    item_name  TEXT,
+                    qty        NUMERIC NOT NULL,
+                    unit_price NUMERIC NOT NULL,
+                    sold_at    TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_org ON core_sales (org_id, sold_at DESC)")
+
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
     """Append a who-changed-what-when row for a config edit (auditability)."""
