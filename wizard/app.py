@@ -1063,7 +1063,8 @@ def render_pos(org_id: str) -> str:
                  "<input name='unit_price' type='number' step='any' placeholder='price' required style='width:80px'> "
                  "<button type='submit'>Record sale</button></form>" % item_opts) if items \
         else "<p class='note'>Add <a href='/stock'>stock items</a> first — sales draw from your stock.</p>"
-    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/pos'>card</a></div>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/pos'>card</a> · "
+            "<a href='/till'>💵 till / cash drawer</a></div>"
             "<h1>🛒 POS</h1>%s"
             "<div class='box'><b>$%s revenue · %d sales · %s units</b> <span class='note'>(last 30 days)</span></div>"
             "<div class='box'><h3>Recent sales</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
@@ -1072,6 +1073,57 @@ def render_pos(org_id: str) -> str:
             "<div class='box'><h3>Record a sale</h3><p class='note'>A sale auto-reduces the item's stock.</p>%s</div>"
             % (saved, sg(summ["revenue"]), summ["count"], sg(summ["units"]), rec_rows, sale_form))
     return _page("POS", body)
+
+
+def render_till(org_id: str) -> str:
+    """💵 The till / cash-drawer (POSBusiness shift model): open → sell → drawer events → close → Z-report.
+    Gated by categories.pos.enabled. HIGH-RISK money — the logic lives in core.till (atomic-claim + audited)."""
+    from core import till
+    nav = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/pos'>POS</a></div><h1>💵 Till</h1>")
+    if not bool(_get_path(get_config(org_id), "categories.pos.enabled")):
+        return _page("Till", nav + "<div class='box'>POS is off. <a href='/card/pos'>Turn it on →</a></div>")
+    sg = lambda x: ("%g" % float(x)) if x is not None else "0"
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    ve = ("<div class='box' style='background:#fef2f2;border-color:#fecaca'>⚠️ Large cash variance (≥ $2) — type a "
+          "reason to close.</div>" if request.args.get("ve") else "")
+    closed = request.args.get("closed")
+    if closed and closed.isdigit():
+        z = till.zreport(org_id, int(closed))
+        zbox = ("<div class='box' style='background:#ecfdf5;border-color:#a7f3d0'>"
+                "<h3>🧾 Z-report — shift #%s closed</h3>"
+                "<b style='font-size:17px'>Expected $%s · Counted $%s · Variance $%s</b><br>"
+                "<span class='note'>%d sales · $%s sales · float $%s · drops $%s · payouts $%s · refunds $%s%s</span>"
+                "</div><div class='box'><a href='/till'>← till</a></div>"
+                % (closed, sg(z["expected_cash"]), sg(z.get("counted_cash")), sg(z.get("variance")),
+                   z["order_count"], sg(z["net_sales"]), sg(z["opening_float"]), sg(z["drops"]), sg(z["payouts"]),
+                   sg(z["refunds"]), (" · note: " + escape(z["note"])) if z.get("note") else ""))
+        return _page("Till", nav + zbox)
+    s = till.current_shift(org_id)
+    if not s:
+        return _page("Till", nav + saved + "<div class='box'><h3>No open shift</h3>"
+                     "<form method='post' action='/till/open'>Opening float $"
+                     "<input name='opening_float' type='number' step='any' value='0' style='width:90px'> "
+                     "<button type='submit'>Open shift</button></form></div>")
+    fin = till.shift_summary(org_id)
+
+    def ev(t, lbl):
+        return ("<form method='post' action='/till/event' style='display:inline-block;margin:0 10px 6px 0'>"
+                "<input type='hidden' name='type' value='%s'>$<input name='amount' type='number' step='any' "
+                "value='0' style='width:70px'> <button type='submit'>%s</button></form>" % (t, lbl))
+    body = (nav + saved + ve +
+            "<div class='box'><b>Shift #%s</b> <span class='note'>open by %s</span><br>"
+            "<b style='font-size:18px'>Expected drawer: $%s</b><br><span class='note'>float $%s · %d sales $%s · "
+            "drops $%s · payouts $%s · refunds $%s</span></div>"
+            "<div class='box'><h3>Drawer</h3>%s%s%s%s</div>"
+            "<div class='box'><h3>Close shift</h3><form method='post' action='/till/close'>Counted cash $"
+            "<input name='counted_cash' type='number' step='any' required style='width:90px'> "
+            "<input name='note' placeholder='reason (needed if variance ≥ $2)' style='width:250px'> "
+            "<button type='submit'>Close → Z-report</button></form></div>"
+            % (s["shift_id"], escape(s["who"] or "—"), sg(fin["expected_cash"]), sg(fin["opening_float"]),
+               fin["order_count"], sg(fin["cash_sales"]), sg(fin["drops"]), sg(fin["payouts"]), sg(fin["refunds"]),
+               ev("drop", "Drop to safe"), ev("payout", "Payout"), ev("refund", "Cash refund"),
+               ev("no_sale", "No-sale (open)")))
+    return _page("Till", body)
 
 
 def render_payroll(org_id: str) -> str:
@@ -1965,6 +2017,44 @@ def create_app(org_id: str = "twb") -> Flask:
             return redirect("/pos")
         pos.record_sale(org_id, iid, qty, price, actor=_current_user())
         return redirect("/pos?saved=1")
+
+    @app.get("/till")
+    def till_page():
+        return render_till(org_id)
+
+    @app.post("/till/open")
+    def till_open():
+        from core import till
+        try:
+            f = float(request.form.get("opening_float") or 0)
+        except (TypeError, ValueError):
+            f = 0
+        till.open_shift(org_id, _current_user(), f)
+        return redirect("/till?saved=1")
+
+    @app.post("/till/event")
+    def till_event():
+        from core import till
+        try:
+            amt = float(request.form.get("amount"))
+        except (TypeError, ValueError):
+            return redirect("/till")
+        till.cash_event(org_id, request.form.get("type"), amt)
+        return redirect("/till?saved=1")
+
+    @app.post("/till/close")
+    def till_close():
+        from core import till
+        try:
+            counted = float(request.form.get("counted_cash"))
+        except (TypeError, ValueError):
+            return redirect("/till")
+        z, err = till.close_shift(org_id, counted, request.form.get("note") or None)
+        if isinstance(err, dict):                                  # variance-reason gate
+            return redirect("/till?ve=1")
+        if err:
+            return redirect("/till")
+        return redirect("/till?closed=%d" % z["shift_id"])
 
     @app.get("/payroll")
     def payroll_page():

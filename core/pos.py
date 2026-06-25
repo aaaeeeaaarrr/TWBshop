@@ -16,9 +16,12 @@ def record_sale(org_id, item_id, qty, unit_price, item_name=None, actor=None) ->
                 cur.execute("SELECT name FROM core_stock_items WHERE org_id=%s AND item_id=%s", (org_id, item_id))
                 r = cur.fetchone()
                 name = r["name"] if r else None
-            cur.execute("INSERT INTO core_sales (org_id, item_id, item_name, qty, unit_price, actor) "
-                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING sale_id",
-                        (org_id, item_id or None, name, qty, unit_price, actor))
+            cur.execute("SELECT shift_id FROM core_shifts WHERE org_id=%s AND status='open'", (org_id,))
+            sr = cur.fetchone()
+            shift_id = sr["shift_id"] if sr else None       # the cash counts toward the open shift's drawer
+            cur.execute("INSERT INTO core_sales (org_id, item_id, item_name, qty, unit_price, actor, shift_id) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING sale_id",
+                        (org_id, item_id or None, name, qty, unit_price, actor, shift_id))
             sid = cur.fetchone()["sale_id"]
             if item_id:                                          # cross-domain: a sale reduces stock on-hand
                 cur.execute("UPDATE core_stock_items SET on_hand = on_hand - %s WHERE org_id=%s AND item_id=%s",

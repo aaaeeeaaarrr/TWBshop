@@ -277,6 +277,39 @@ def init_core_db() -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_org ON core_audit (org_id, at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_res ON core_audit (resource_type, resource_id)")
 
+            # POS till / cash-drawer money model (harvested from POSBusiness shift_service, adapted to cash-only).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_shifts (
+                    shift_id      BIGSERIAL PRIMARY KEY,
+                    org_id        TEXT NOT NULL,
+                    who           TEXT,
+                    opened_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    opening_float NUMERIC NOT NULL DEFAULT 0,
+                    closed_at     TIMESTAMPTZ,
+                    counted_cash  NUMERIC,
+                    expected_cash NUMERIC,
+                    variance      NUMERIC,
+                    note          TEXT,
+                    status        TEXT NOT NULL DEFAULT 'open'      -- open | closed
+                )
+            """)
+            # S3 atomic claim: at most ONE open shift per org — a 2nd open insert hits this and is rejected.
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_one_open_shift ON core_shifts (org_id) "
+                        "WHERE status = 'open'")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_cash_events (
+                    event_id BIGSERIAL PRIMARY KEY,
+                    org_id   TEXT NOT NULL,
+                    shift_id BIGINT NOT NULL,
+                    type     TEXT NOT NULL,                          -- open | drop | payout | refund | no_sale | close
+                    amount   NUMERIC NOT NULL,
+                    note     TEXT,
+                    at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_cash_events_shift ON core_cash_events (org_id, shift_id)")
+            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS shift_id BIGINT")  # sale's cash → its open shift
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_stock_items (
                     item_id    BIGSERIAL PRIMARY KEY,

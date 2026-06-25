@@ -122,7 +122,23 @@ behavior change (it only *adds* tamper-evidence to an existing log). Then flip `
 
 ---
 
-## ▶ PHASE 2 — POS money model (sketch; HIGH-RISK, own session)
+## ▶ PHASE 2a — Shifts · cash drawer · Z-report (✅ SHIPPED 2026-06-25)
+
+> **Done:** `core/till.py` (`open_shift` · `current_shift` · `cash_event` · `shift_summary` · `close_shift` ·
+> `zreport`) + `core_shifts`/`core_cash_events` tables + `shift_id` on `core_sales` (sales tie to the open shift)
+> + a `/till` UI (open → sell → drawer events → close → Z-report) gated by `categories.pos.enabled`. Rules
+> harvested from POSBusiness `shift_service`, adapted to cash-only (the QR/reconciliation/manual close-gates are
+> N/A — we have no payment intents). **State-Integrity Laws held + proven on real rows:** S3 atomic one-open-shift
+> claim (`uq_one_open_shift` partial-unique → 2nd open rejected) · S2 idempotent close (flip-status-first) · S4
+> `expected_cash = float = opening_float + cash_sales − drops − payouts − refunds` from real events · variance-
+> reason gate (≥ $2 needs a note). Every shift open/close + cash event → the audit chain (core.audit). 6 tests.
+> **Second-opinion findings (recorded, not blockers — cash-only makes them low-impact):** (1) **precision** — float
+> + `round(2)` is cent-exact for a cash-only till; switch to **Decimal** when 2b adds tax/discounts (fractional
+> compounding). (2) **audit atomicity** — `audit.write` runs in a separate txn from the shift op (tiny failure
+> window); POSBusiness writes audit in the same txn — a clean hardening (give `audit.write` an optional caller
+> cursor). **2b (refunds/voids, single-refund constraint) is the remaining half — own session.**
+
+### Phase 2 — original sketch (the rest)
 Port the **rules** (not the SQLAlchemy): shift open/close, **Z-report**, **cash-drawer reconciliation +
 variance-reason gate**, **refunds/voids/credit-notes** (single-full-refund DB constraint), tax in/exclusive.
 Source: `services/{shift_service,refund_service,tax_service,order_service}.py` + `models/{shift,order,refund}.py`.

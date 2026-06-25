@@ -263,6 +263,14 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   `verify_audit_core` CLI. Adversarial pass → a **per-org advisory lock** (no fork under concurrency) + honest
   limits (JSON-safe changes; full re-chain needs the external **anchor = Phase 1b**). 6 tests. The harvest
   pattern is proven: reference an external design → adapt to our stack → re-prove with our own tests.
+- ✅ **HARVEST Phase 2a SHIPPED — POS till / cash-drawer money model** `[ship/sell]` — `core/till.py` (shifts ·
+  cash drawer · Z-report) harvested from POSBusiness `shift_service`, adapted to cash-only, re-tested on real rows.
+  **State-Integrity Laws proven:** S3 atomic one-open-shift claim (partial-unique `uq_one_open_shift` → 2nd open
+  rejected by the DB, not a race) · S2 idempotent close (flip-status-first) · S4 `expected_cash = float + drawer
+  events` · variance-reason gate (≥ $2 needs a note). `core_shifts`/`core_cash_events` + `shift_id` on sales + a
+  `/till` UI (open→sell→events→close→Z-report). All shift events → the audit chain. 6 tests. **2nd-opinion findings
+  (recorded):** float→Decimal when 2b adds tax/discounts · audit in a separate txn (atomic-audit = a clean
+  hardening). Money LOGIC correct + proven; the deepest, most dangerous harvest slice, shipped safely.
 - ✅ **HARVEST Phase 1b SHIPPED — external audit anchor** `[ship/sell]` — `core/audit_anchor.py` appends each org's
   chain head to a JSONL file OUTSIDE Postgres (HMAC-signed if `ANCHOR_HMAC_KEY` set) → catches the one thing the
   in-DB chain can't: a DB-admin who rewrites AND re-chains the whole log (a re-chain erases the old anchored heads
