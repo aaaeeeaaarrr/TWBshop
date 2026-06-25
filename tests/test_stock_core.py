@@ -15,6 +15,7 @@ def _clean():
     with _db() as c:
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_expenses WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_stock_prices WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_stock_counts WHERE org_id=%s", (ORG,))
             cur.execute("DELETE FROM core_stock_items WHERE org_id=%s", (ORG,))
@@ -44,6 +45,20 @@ def test_stock_value_summary():
         stock.record_count(ORG, iid, 10)                                  # 10 × $3 = $30 on-hand value
         s = stock.stock_summary(ORG)
         assert s["item_count"] == 1 and s["total_value"] == 30.0
+    finally:
+        _clean()
+
+
+def test_receive_purchase_restocks_and_logs_expense():
+    from core import expenses
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Milk", "L", par_level=10)
+        stock.record_count(ORG, iid, 2)                                  # low
+        stock.receive_purchase(ORG, iid, 20, 30, "Dairy Co")            # receive 20 @ $30 total
+        assert float(stock.list_items(ORG)[0]["on_hand"]) == 22          # restocked (2 + 20) — stock side
+        es = expenses.expense_summary(ORG, 30)
+        assert es["total"] == 30.0 and any(c["category"] == "stock" for c in es["by_category"])  # accountant side
     finally:
         _clean()
 

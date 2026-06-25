@@ -255,6 +255,10 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **Reorder loop closed (2nd cross-domain link: stock↔accountant)** `[ship]` — `stock.receive_purchase`
+  restocks an item AND logs the cost as a `stock` expense in ONE transaction; a "📥 Receive a purchase" form on
+  `/stock`. Closes the low-stock → reorder → received → restocked + expensed loop (the "needs attention" feed
+  flags it, this acts on it).
 - ✅ **CROSS-DOMAIN intelligence layer** `[ship/sell]` — `core/insights.py` `attention_feed` scans every ON
   domain for notable conditions (lateness spike · stock at/below par · spend spike · sales drop) → one **"Needs
   attention"** feed on the AI card + a **dashboard banner** (⚠️ N need attention). The 5 real domains now feed

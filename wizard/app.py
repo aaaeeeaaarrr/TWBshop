@@ -984,6 +984,13 @@ def render_stock(org_id: str) -> str:
             "<input name='supplier' placeholder='supplier' required> "
             "<input name='price' type='number' step='any' placeholder='price' required> "
             "<button type='submit'>Add price</button></form></div>"
+            "<div class='box'><h3>📥 Receive a purchase</h3>"
+            "<p class='note'>Restocks the item AND logs the cost as an expense — closes the reorder loop.</p>"
+            "<form method='post' action='/stock/receive'><select name='item_id'>%s</select> "
+            "<input name='qty' type='number' step='any' placeholder='qty' required style='width:70px'> "
+            "<input name='total_cost' type='number' step='any' placeholder='total cost' required style='width:90px'> "
+            "<input name='supplier' placeholder='supplier' style='width:110px'> "
+            "<button type='submit'>Receive</button></form></div>"
             "<div class='box'><h3>Add item</h3><form method='post' action='/stock/add'>"
             "<input name='name' placeholder='name' required> "
             "<input name='unit' placeholder='unit (kg/pcs)' style='width:100px'> "
@@ -992,7 +999,7 @@ def render_stock(org_id: str) -> str:
             "<input name='unit_cost' type='number' step='any' placeholder='cost' style='width:70px'> "
             "<button type='submit'>Add</button></form></div>"
             % (saved, summ["item_count"], summ["low_count"], sg(summ["total_value"]), low_html, rows,
-               crows, item_opts))
+               crows, item_opts, item_opts))
     return _page("Stock", body)
 
 
@@ -1827,6 +1834,17 @@ def create_app(org_id: str = "twb") -> Flask:
             return redirect("/stock")
         if supplier:
             stock.add_price(org_id, iid, supplier, price)
+        return redirect("/stock?saved=1")
+
+    @app.post("/stock/receive")
+    def stock_receive():
+        from core import stock
+        try:
+            iid, qty, cost = (int(request.form.get("item_id")), float(request.form.get("qty")),
+                              float(request.form.get("total_cost")))
+        except (TypeError, ValueError):
+            return redirect("/stock")
+        stock.receive_purchase(org_id, iid, qty, cost, request.form.get("supplier") or None)
         return redirect("/stock?saved=1")
 
     @app.get("/expenses")
