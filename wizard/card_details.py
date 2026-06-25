@@ -59,7 +59,7 @@ CARD_DETAILS = {
     "hr_payroll": {
         "icon": "💼", "title": "HR & payroll",
         "what": "Tracked hours → pay runs, payslips, records — no spreadsheets.",
-        "ref": "Gusto · Rippling · Deel", "configure": "/customer/config",
+        "ref": "Gusto · Rippling · Deel", "configure": "/payroll",
         "options": [
             ("Employee records", "Profiles, roles, seniority, documents", "built"),
             ("Leave balances", "AL / sick / unpaid — accrual + carryover", "built"),

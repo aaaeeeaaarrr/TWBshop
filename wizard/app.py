@@ -848,6 +848,13 @@ def render_reports(org_id: str) -> str:
         sales_box = ("<div class='box'><h3>🛒 Sales</h3><b>$%g revenue · %d sales · %g units</b> "
                      "<span class='note'>(last %d days)</span> &nbsp;<a href='/pos'>open →</a></div>"
                      % (ps["revenue"], ps["count"], ps["units"], days))
+    pay_box = ""                                              # multi-domain Reports: a Payroll section when on
+    if bool(_get_path(get_config(org_id), "categories.hr_payroll.enabled")):
+        from core import payroll as _pay
+        lr = _pay.latest_run(org_id)
+        pay_box = ("<div class='box'><h3>💼 Payroll</h3>%s &nbsp;<a href='/payroll'>open →</a></div>"
+                   % (("<b>$%g</b> latest run <span class='note'>(%s)</span>"
+                       % (float(lr["total"]), escape(lr["period"]))) if lr else "<span class='note'>no pay runs yet</span>"))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
             "<h1>📊 Reports — attendance</h1>"
             "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
@@ -865,11 +872,11 @@ def render_reports(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Day</th><th>Check-ins</th>"
             "<th>Late</th><th>Volume</th></tr>%s</table></div>"
-            "%s%s%s"
+            "%s%s%s%s"
             "<p class='note'>Built from the platform's own data across domains — attendance · stock · expenses · "
-            "sales — each section appears once that domain is on. (Greener = better.)</p>"
+            "sales · payroll — each section appears once that domain is on. (Greener = better.)</p>"
             % (period, days, rep["total"], rep["late"], rep["on_time_rate"], days, rows, srows, wrows,
-               stock_box, exp_box, sales_box))
+               stock_box, exp_box, sales_box, pay_box))
     return _page("Reports", body)
 
 
@@ -1023,6 +1030,47 @@ def render_pos(org_id: str) -> str:
             "<div class='box'><h3>Record a sale</h3><p class='note'>A sale auto-reduces the item's stock.</p>%s</div>"
             % (saved, sg(summ["revenue"]), summ["count"], sg(summ["units"]), rec_rows, sale_form))
     return _page("POS", body)
+
+
+def render_payroll(org_id: str) -> str:
+    """💼 The Payroll domain made REAL — per-staff monthly salary → a pay run that snapshots a payslip per
+    active staffer (core.payroll; own tables, not TWB's live payroll). Gated by categories.hr_payroll.enabled."""
+    from core import payroll
+    if not bool(_get_path(get_config(org_id), "categories.hr_payroll.enabled")):
+        return _page("Payroll", "<div class='nav'><a href='/customer'>← dashboard</a></div>"
+                     "<h1>💼 Payroll</h1><div class='box'>Payroll is off. <a href='/card/hr_payroll'>Turn it on →</a></div>")
+    sg = lambda x: ("%g" % float(x)) if x is not None else "0"
+    staff, runs, latest = payroll.staff_with_salary(org_id), payroll.list_pay_runs(org_id, 10), payroll.latest_run(org_id)
+    slips = payroll.payslips(org_id, latest["run_id"]) if latest else []
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    staff_rows = "".join(
+        "<tr><td>%s</td><td><form method='post' action='/payroll/salary' style='margin:0'>"
+        "<input type='hidden' name='staff_id' value='%s'>"
+        "<input name='amount' type='number' step='any' value='%s' style='width:90px'> "
+        "<button type='submit'>set</button></form></td></tr>"
+        % (escape(s["nm"]), s["staff_id"], sg(s["sal"])) for s in staff) \
+        or "<tr><td colspan='2' class='note'>No staff yet — add via <a href='/staff'>/staff</a>.</td></tr>"
+    run_rows = "".join("<tr><td>%s</td><td>$%s</td><td>%s</td></tr>"
+                       % (escape(r["period"]), sg(r["total"]), str(r["created_at"])[:10]) for r in runs) \
+        or "<tr><td colspan='3' class='note'>No pay runs yet.</td></tr>"
+    slip_rows = "".join("<tr><td>%s</td><td>$%s</td></tr>" % (escape(p["staff_name"] or "—"), sg(p["gross"]))
+                        for p in slips) or "<tr><td colspan='2' class='note'>—</td></tr>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/card/hr_payroll'>card</a></div>"
+            "<h1>💼 Payroll</h1>%s"
+            "<div class='box'><h3>Monthly salaries</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Staff</th><th>Monthly salary</th></tr>"
+            "%s</table></div>"
+            "<div class='box'><h3>Run payroll</h3><form method='post' action='/payroll/run'>"
+            "<input name='period' placeholder='period (e.g. 2026-06)' style='width:170px'> "
+            "<button type='submit'>Run pay run</button></form>"
+            "<p class='note'>Creates a payslip per active staffer at their monthly salary.</p></div>"
+            "<div class='box'><h3>Pay runs</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Period</th><th>Total</th><th>Run on</th>"
+            "</tr>%s</table></div>"
+            "<div class='box'><h3>Latest payslips</h3><table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Staff</th><th>Gross</th></tr>%s</table></div>"
+            % (saved, staff_rows, run_rows, slip_rows))
+    return _page("Payroll", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1776,6 +1824,27 @@ def create_app(org_id: str = "twb") -> Flask:
             return redirect("/pos")
         pos.record_sale(org_id, iid, qty, price)
         return redirect("/pos?saved=1")
+
+    @app.get("/payroll")
+    def payroll_page():
+        return render_payroll(org_id)
+
+    @app.post("/payroll/salary")
+    def payroll_salary():
+        from core import payroll
+        try:
+            sid, amt = int(request.form.get("staff_id")), float(request.form.get("amount"))
+        except (TypeError, ValueError):
+            return redirect("/payroll")
+        payroll.set_salary(org_id, sid, amt)
+        return redirect("/payroll?saved=1")
+
+    @app.post("/payroll/run")
+    def payroll_run():
+        from core import payroll
+        period = (request.form.get("period") or "").strip() or "this period"
+        payroll.run_payroll(org_id, period)
+        return redirect("/payroll?saved=1")
 
     @app.get("/reports/export")
     def reports_export():

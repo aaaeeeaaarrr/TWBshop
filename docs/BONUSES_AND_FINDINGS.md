@@ -255,6 +255,11 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   It's the REVIEW MENU: owner takes a round turn, marks what to wire. The 5 remaining frontier cards (AI assist,
   Automations, Learn, Marketplace, Mobile app) now each have a real inside too — "build out the rest" done as
   option-menus (full functional builds follow once the owner picks from the menu).
+- ✅ **PAYROLL domain made REAL → ALL 5 domain cards now real + Reports → 5** `[ship/sell]` — `core/payroll.py`
+  + `core_pay_runs`/`core_payslips` + `core_staff.monthly_salary` (ALTER) + a `/payroll` manager (set salaries →
+  run a pay run → a payslip per active staffer → view runs/payslips) + a **💼 Payroll** section in `/reports`.
+  The HR card opens it. **The platform now has 5 real working domains (attendance · stock · accountant · pos ·
+  payroll) + unified 5-domain Reports + a cross-domain integration.** *Schema:* 2 tables + 1 column (init_core_db).
 - ✅ **POS domain made REAL + cross-domain (sale → decrement Stock) + Reports → 4** `[ship/sell]` —
   `core/pos.py` + `core_sales` table + a `/pos` manager (record a sale → revenue, **auto-decrementing the
   item's Stock on-hand** — the first cross-domain integration) + a **🛒 Sales** section in `/reports`. 3rd

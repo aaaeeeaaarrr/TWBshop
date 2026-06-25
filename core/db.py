@@ -326,6 +326,29 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_org ON core_sales (org_id, sold_at DESC)")
 
+            cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS monthly_salary NUMERIC DEFAULT 0")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_pay_runs (
+                    run_id     BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    period     TEXT NOT NULL,
+                    total      NUMERIC DEFAULT 0,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_pay_runs_org ON core_pay_runs (org_id, created_at DESC)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS core_payslips (
+                    slip_id    BIGSERIAL PRIMARY KEY,
+                    org_id     TEXT NOT NULL,
+                    run_id     BIGINT NOT NULL,
+                    staff_id   BIGINT,
+                    staff_name TEXT,
+                    gross      NUMERIC NOT NULL
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_payslips_run ON core_payslips (org_id, run_id)")
+
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
     """Append a who-changed-what-when row for a config edit (auditability)."""
