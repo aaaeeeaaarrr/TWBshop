@@ -263,6 +263,16 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   `verify_audit_core` CLI. Adversarial pass → a **per-org advisory lock** (no fork under concurrency) + honest
   limits (JSON-safe changes; full re-chain needs the external **anchor = Phase 1b**). 6 tests. The harvest
   pattern is proven: reference an external design → adapt to our stack → re-prove with our own tests.
+- ✅ **HARVEST Phase 1b SHIPPED — external audit anchor** `[ship/sell]` — `core/audit_anchor.py` appends each org's
+  chain head to a JSONL file OUTSIDE Postgres (HMAC-signed if `ANCHOR_HMAC_KEY` set) → catches the one thing the
+  in-DB chain can't: a DB-admin who rewrites AND re-chains the whole log (a re-chain erases the old anchored heads
+  → `verify_anchors` FAIL). `scripts/anchor_audit.py` (cron) + `verify_audit_core.py --anchors`. 3 tests
+  (anchor+verify · full-re-chain→FAIL · HMAC file-tamper). Ops to activate: `ANCHOR_DIR` off-host + `ANCHOR_HMAC_KEY`
+  in secrets + nightly cron + offsite copy. **Both audit tamper-layers now exist** — production-grade auditability.
+- ⚠️ **FINDING — new files need `gen_map_index` + plan docs need the doc-refs DENY** `[gotcha]`: the Phase-1 gate
+  caught 2 fails — a stale `MAP_INDEX.md` (added `core/audit*.py` without regenerating) and `test_doc_refs` flagging
+  the harvest plan's cross-repo/forward paths. Fixes: run `scripts/gen_map_index.py` on any file add; a plan that
+  cites another repo's files goes in the doc-refs `DENY` set. (Both guards did their job.)
 - 🔍 **POSBusiness = a harvest goldmine** `[sell/decision]` — the owner's *other* project (`aaaeeeaaarrr/POSbusiness`)
   is a near-production full-stack POS far deeper than our sales-log: hash-chained tamper-evident audit (+ external
   anchor), shifts/Z-report/drawer-reconcile/cash-variance-gates, refunds/voids/credit-notes, ABA PayWay/KHQR

@@ -16,7 +16,8 @@ import os
 import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DENY = {"docs/HISTORY.md", "docs/VERIFICATION_RECORD.md", "MAP_INDEX.md"}
+DENY = {"docs/HISTORY.md", "docs/VERIFICATION_RECORD.md", "MAP_INDEX.md",
+        "docs/POSBUSINESS_HARVEST_PLAN.md"}   # cross-repo + forward-looking: cites POSbusiness files + not-yet-built core/* paths
 # backtick-quoted, dir-qualified (>=1 slash) path ending in a known extension; optional ::symbol
 _REF = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*/[A-Za-z0-9_./-]+\.(?:py|ps1|sh|json|md))(?:::([A-Za-z0-9_]+))?`")
 

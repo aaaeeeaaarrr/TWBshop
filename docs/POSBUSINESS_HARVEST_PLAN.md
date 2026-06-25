@@ -36,7 +36,15 @@
 
 ---
 
-## ▶ PHASE 1 — Audit hash-chain (✅ SHIPPED 2026-06-25)
+## ▶ PHASE 1 + 1b — Audit hash-chain + external anchor (✅ SHIPPED 2026-06-25)
+
+> **Phase 1b also done:** `core/audit_anchor.py` (`anchor_head` + `verify_anchors`) appends each org's chain head
+> to a JSONL file **outside Postgres** (HMAC-signed if `ANCHOR_HMAC_KEY` set) + `scripts/anchor_audit.py` (cron) +
+> `verify_audit_core.py --anchors` + `tests/test_audit_anchor.py` (3: anchor+verify PASS · a full DB-admin
+> **re-chain → anchor FAIL** (the one thing the in-DB chain can't catch) · HMAC detects file tampering). **Ops to
+> finish it for production:** set `ANCHOR_DIR` (off the DB host) + `ANCHOR_HMAC_KEY` (secrets), schedule
+> `anchor_audit.py` nightly, and copy the anchor file offsite. Both tamper layers now exist.
+
 
 > **Done:** `core/audit.py` (`write` + `_canonical` + `verify_chain` + `recent`; per-org chain; **per-org advisory
 > lock** so concurrent writers can't fork) · `core_audit` table (NOT NULL hashes from row 1) · `log_config_change`

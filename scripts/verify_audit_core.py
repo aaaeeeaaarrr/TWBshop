@@ -19,15 +19,24 @@ def _all_orgs():
 
 
 def main():
-    orgs = [sys.argv[1]] if len(sys.argv) > 1 else _all_orgs()
+    do_anchors = "--anchors" in sys.argv[1:]                  # also verify the external anchor file
+    pos = [a for a in sys.argv[1:] if not a.startswith("--")]
+    orgs = [pos[0]] if pos else _all_orgs()
     bad = 0
     for o in orgs:
         v = audit.verify_chain(o)
-        print("%-24s %s  (%d entries)" % (o, v["result"], v["checked"]))
+        print("%-24s chain  %s  (%d entries)" % (o, v["result"], v["checked"]))
         for f in v["failures"]:
             print("    - " + f)
         bad += 0 if v["result"] == "PASS" else 1
-    print("---", "ALL PASS" if not bad else "%d org(s) FAILED" % bad)
+        if do_anchors:
+            from core import audit_anchor
+            a = audit_anchor.verify_anchors(o)
+            print("%-24s anchor %s  (%d anchored)" % (o, a["result"], a["checked"]))
+            for f in a["failures"]:
+                print("    - " + f)
+            bad += 0 if a["result"] == "PASS" else 1
+    print("---", "ALL PASS" if not bad else "%d FAILED" % bad)
     sys.exit(1 if bad else 0)
 
 

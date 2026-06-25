@@ -188,6 +188,8 @@
     · compare, summary, cheapest, report
 
 ## scripts/
+- `scripts/anchor_audit.py` — Anchor every org's audit-chain HEAD to the external anchor file (core.audit_anchor). Run on a schedule
+    · _orgs, main
 - `scripts/facts.py` — facts.py — the truth registry: one home per machine-knowable fact, + its lineage.
     · load, _save, _read_literal, derive, _render, reconcile, _bad_pointers, append_lineage, lineage_for, set_fact, explain
 - `scripts/fetch_report_receipts.py` — Download photo media from a chat using the read-only ops_listener session.
@@ -222,6 +224,8 @@
 - `scripts/seed_vendors.py` — Seed acc_vendors from scripts/vendor_seed.py.
     · main
 - `scripts/vendor_seed.py` — Curated supplier-vendor -> Telegram-group seed for acc_vendors (P0 populate).
+- `scripts/verify_audit_core.py` — Verify the tamper-evident audit hash-chain (core.audit) for one org or all orgs.
+    · _all_orgs, main
 - `scripts/verify_live.py` — Deploy/live verification (Hook 2) — TWBshop.
     · run, main, _q
 - `scripts/whatis.py` — whatis.py — one call, all map layers: "what's true + where to look" for a topic.
