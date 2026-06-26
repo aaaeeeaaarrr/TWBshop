@@ -245,6 +245,15 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   + the AL short-notice boundary are dashboard-tweakable instant-live. BEHAVIOR-PRESERVING (PROD: TWB leave
   override=null → 2/7 = the constants) + staging-proven (13 tests). DEPLOYED-LIVE (8d79721, PP 22:40 quiet window),
   behavior-VERIFIED on prod (effective 2/7) — 4 leave/verdict settings now instant-live. (ot_cap #5 = a careful pass.)
+- ✅ **ot.bank_cap_min migrated — the OT money path, carefully** `[ship/sell]` (owner) — `cap_room` parameterized;
+  the live bank-write cap (`bot.py:2542`) + 2 display calcs read `tenant_config` fresh (fail-safe to 14h). DEPLOYED
+  0b176b5 (PP 22:59); behavior-VERIFIED on prod (override=null→840, over-bank still blocked: bank 13h50 + 200 OT →
+  banks 10). **ALL 5 easy cut-over wins now LIVE** (grace · early · papers · short · ot_cap).
+- ⭐ **FINDING — second-opinion on the over-bank class paid off** `[decision]` — before deploying the cap migration I
+  traced EVERY ot_bank write: `bot.py:2542` is the only fresh-add cap (migrated); `database.py:4078` is a correct
+  OT-rest REFUND (returns spent minutes on buyback-cancel, S1 — correctly uncapped); `grant_fits`/`duration_options`
+  (pre-session-31 grant model) are vestigial/not-live. So the migration touches exactly one cap, behavior-preserving.
+  Lesson: on the money path, ENUMERATE every writer before touching a cap — never assume a single call site.
 - ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
   (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
   localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config

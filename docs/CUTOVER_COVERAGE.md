@@ -30,8 +30,11 @@ logic cut-over. The swap rule is the template:
 3. ✅ **DEPLOYED-LIVE (8d79721, PP 22:40) — `attendance.leave.papers_grace_days`** (=2) → live callers `bot.py:3873/4033`
    read `attendance("twb")["leave"]` fresh (fail-safe). Behavior-VERIFIED on prod (override=`null`→effective 2).
 4. ✅ **DEPLOYED-LIVE (8d79721) — `attendance.leave.short_notice_days`** (=7) → live caller `bot.py:3361` reads config
-   (fail-safe). Behavior-VERIFIED on prod (null→effective 7). #1–#4 now all LIVE; only #5 (ot_cap, money path) left.
-5. **`attendance.ot.bank_cap_min`** (=14*60) → `gm_bot/ot.py:13` — the OT-bank ceiling.
+   (fail-safe). Behavior-VERIFIED on prod (null→effective 7).
+5. ✅ **DEPLOYED-LIVE (0b176b5, PP 22:59) — `attendance.ot.bank_cap_min`** (=14h) → `cap_room` parameterized; the live
+   bank-write cap `bot.py:2542` + 2 display calcs read config fresh (fail-safe). Second-opinion clean (the only
+   fresh-add cap; `database.py:4078` is a correct OT-rest refund). Behavior-VERIFIED on prod (override=null→840,
+   over-bank still blocked). **▶▶ ALL 5 EASY WINS NOW LIVE.**
 
 These five are the cleanest "tweakable instantly" wins a customer would actually want, each behavior-preserving.
 
