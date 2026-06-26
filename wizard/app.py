@@ -1333,6 +1333,40 @@ def render_welcome(org_id: str) -> str:
     return _page("Welcome", body)
 
 
+def render_automations(org_id: str) -> str:
+    """⚡ Automations — one-tap plain-words recipes (condition → action). Toggle a recipe + pick who to alert;
+    the conditions ride our existing detectors (no model cost). 'Would fire now' previews against real data."""
+    from core import automations as au
+    en = au.enabled_recipes(org_id)
+    rows = []
+    for key, r in au.RECIPES.items():
+        c = en.get(key, {})
+        on = "checked" if c.get("enabled") else ""
+        who_sel = "".join("<option value='%s' %s>%s</option>"
+                          % (w, "selected" if (c.get("who") or r["who"]) == w else "", escape(lbl))
+                          for w, lbl in au.WHO.items())
+        rows.append("<tr style='border-bottom:1px solid #f1f5f9'>"
+                    "<td><label><input type='checkbox' name='on' value='%s' %s> &nbsp;%s</label></td>"
+                    "<td style='white-space:nowrap'>alert <select name='who_%s'>%s</select></td></tr>"
+                    % (key, on, escape(r["label"] % "…"), key, who_sel))
+    fires = au.evaluate(org_id)
+    fire_html = ("".join("<div class='box' style='background:#fff7ed;border-color:#fed7aa'><b>%s</b>"
+                         "<ul style='margin:.3em 0'>%s</ul></div>"
+                         % (escape(f["label"]), "".join("<li>%s</li>" % escape(x) for x in f["fires"]))
+                         for f in fires)
+                 if fires else "<p class='note'>Nothing would fire right now — all quiet. 👍</p>")
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>⚡ Automations</h1>"
+            "<p class='note'>Turn on a recipe and pick who to alert — plain words, one tap. The conditions run "
+            "on your own data (no AI cost), and every alert is just a notification: nothing moves money by itself."
+            "%s</p>"
+            "<form method='post' action='/automations/save'>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='8'>%s</table>"
+            "<div style='margin-top:12px'><button type='submit'>Save automations</button></div></form>"
+            "<h3 style='margin-top:22px'>🔮 Would fire now</h3>%s"
+            % (" &nbsp;<b>✓ saved</b>" if request.args.get("saved") == "1" else "", "".join(rows), fire_html))
+    return _page("Automations", body)
+
+
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
 _CARD_ENABLE = {
     "accountant": "categories.accountant.enabled", "stock": "categories.stock.enabled",
@@ -1867,6 +1901,21 @@ def create_app(org_id: str = "twb") -> Flask:
         from wizard import onboarding_quiz as oq
         oq.apply_quiz(org_id)
         return redirect("/customer?welcome=1")
+
+    @app.get("/automations")
+    def automations_page():
+        return render_automations(org_id)
+
+    @app.post("/automations/save")
+    def automations_save():
+        from core import automations as au
+        on_keys = set(request.form.getlist("on"))
+        changes = []
+        for key in au.RECIPES:
+            au.set_recipe(org_id, key, key in on_keys, request.form.get("who_%s" % key))
+            changes.append("%s=%s" % (key, "on" if key in on_keys else "off"))
+        log_config_change(org_id, _current_user(), "automations.recipes", None, ", ".join(changes))
+        return redirect("/automations?saved=1")
 
     @app.get("/expertise")
     def expertise():

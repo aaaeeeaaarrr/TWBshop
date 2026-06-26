@@ -117,7 +117,7 @@ CARD_DETAILS = {
     "automations": {
         "icon": "⚙️", "title": "Automations",
         "what": "Your own if-this-then-that rules — no code.",
-        "ref": "Salesforce Flow · ServiceNow Workflow · Zapier", "configure": "/customer/config",
+        "ref": "Salesforce Flow · ServiceNow Workflow · Zapier", "configure": "/automations",
         "options": [
             ("Bot-as-approver", "Auto-decide on coverage / quota rules", "built"),
             ("Re-ping / escalation ladders", "Chase non-responders, escalate to owner", "built"),

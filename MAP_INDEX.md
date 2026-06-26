@@ -69,6 +69,8 @@
     · _at_key, _canonical, write, _append, verify_chain, recent
 - `core/audit_anchor.py` — core.audit_anchor — Phase 1b: the external tamper-anchor for the audit chain (harvested from POSBusiness
     · _anchor_path, _sig, _head, anchor_head, _read_anchors, verify_anchors
+- `core/automations.py` — core.automations — the AUTOMATIONS recipes (lean Fin-borrow). A recipe = a plain-words {condition → action}
+    · _cash_short, _repeat, recipe_label, enabled_recipes, set_recipe, evaluate
 - `core/channel.py` — core.channel — the channel-agnostic command spine (platform principle #1, docs/PLATFORM_VISION.md).
     · _verdict_settings, handle
 - `core/db.py` — core.db — the platform's multi-tenant schema + persistence (entity + event log).
@@ -324,7 +326,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+55, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+56, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

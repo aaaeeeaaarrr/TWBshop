@@ -168,6 +168,15 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   doesn't reach the server (push-then-pull); the running bot also needs a restart to load it. The server's
   GitHub PAT was dead too, so `--sync` failed — fixed by an SSH copy + restart. Diagnosis path: getMe(401) +
   token-fingerprint dev-vs-server. (Full proof → docs/ACTIONS_LEDGER.md.)
+- ✅ **onboarding questionnaire (packaging per client-type)** `[ship/sell]` (owner) — a `/welcome` flow: 3
+  information-gain-ordered questions (industry → size → biggest pain) → a starter template + package tier +
+  enabled domains (a tunable table), skippable any time, then 'Customize your experience'. The 'stupid-proof
+  self-serve wizard' North Star made concrete; built on the existing apply_template/packages/config levers.
+- ✅ **automations recipes** `[ship/sell]` (owner) — `core/automations.py` + `/automations`: 8 one-tap plain-words
+  recipes (condition → action) riding the EXISTING detectors (insights.attention_feed + investigate) so they're
+  computer-tier (NO model cost), config-driven, with a 'would fire now' preview. The lean Fin-borrow: a simple
+  front door (recipes) onto ONE {condition,action} engine; the custom builder is the advanced door (next), and
+  the live SEND (adapter/gm dispatch) is the follow-up. Both doors compile to the same shape.
 
 ---
 

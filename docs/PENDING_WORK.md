@@ -74,8 +74,10 @@
 
 ## 🤖 Fin-inspired borrows (→ ledger; do leaner than Fin)
 - [ ] "Ask your business" (in flight, above).
-- [ ] Automations — plain-words **trigger → condition → action** ("if a baker is sick, alert the senior"),
-      riding our existing event hooks (the leaner "Procedures").
+- [~] **Automations — recipes tier BUILT (s55)** — `core/automations.py` + `/automations`: 8 one-tap plain-words
+      recipes (condition → action) riding our existing detectors (insights.attention_feed + investigate),
+      config-driven (`automations.recipes`), with a "would fire now" preview. ⏳ Next: the custom builder (the
+      advanced door) + live SEND wiring (adapter/gm — it currently PREVIEWS what would fire, doesn't yet dispatch).
 - [ ] An **"optimize" view** + an outcome metric — "X% of approvals / checks / reorders handled automatically."
 
 ## 🔎 Investigation ideas still open
