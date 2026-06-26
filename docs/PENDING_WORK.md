@@ -5,6 +5,48 @@
 > this is the index so nothing slips. Tick items here as they ship. (Also see `docs/ROADMAP.md`,
 > `docs/ACTIONS_LEDGER.md`, `docs/POSBUSINESS_HARVEST_PLAN.md`, `docs/BONUSES_AND_FINDINGS.md`.)
 
+## ▶▶ SESSION-55 WRAP — the LIVE pending map (one scan; nothing lost)
+> A huge multi-thread session (audit → hardening → token incident → swap rule → questionnaire → automations →
+> comms). This block is the single "what's left." Detail is in the sections below + the linked docs. (2026-06-26.)
+
+### ✅ Shipped + LIVE this session (deployed + verified)
+- **Audit hardening** — audit chain same-txn/seq/un-forkable · ledger over-bank+phantom · leave_ledger sign ·
+  domain idempotency · STOCK-NEG · PAYROLL-IDEMP · web-adapter · map auto-discover · money-guard self-provision.
+- **Live-fix deploys** (gm/hire) — own-sick double-book race · init-order + gm-boot-isolation · hire-token.
+- **GM-token incident** — server token fixed, gm restored (→ `docs/ACTIONS_LEDGER.md`).
+- **Swap rule** → overlap-based + config-driven (fixed Norin↔Chomreun). (gm.)
+- **Onboarding questionnaire** (packaging per client-type) · **Automations recipes** · **cash-drawer/voids +
+  verdict parity-lock + domain→audit-chain**. (wizard.)
+
+### 🅿️ Built this session, PARKED — needs you to finish/deploy
+- **Comms escalation** — the DETERMINISTIC brain (`gm_bot/comms.py`) + the data-capture fix (ops_messages now
+  stores `reply_to_msg_id` + `mentioned_ids`; the listener captures them) are BUILT + tested. **Remaining (all
+  parked):** (1) **listener deploy** so the structured data starts flowing · (2) the **gm job** (fetch recent
+  monitored-group msgs → resolve reply_to → `comms.find_unanswered(staff tg ids)` → `comms.stage_for` + a
+  `comms_actions` idempotent table → gated nudge DM / escalate-to-Supervisors) · (3) **gm deploy** · (4) your
+  **test-mode walk + wording (Khmer) review** · (5) flip the gate `gm_state comms_escalation_live`.
+  **Scope:** group MESSAGES = deterministic; 1-to-1 Telegram CALLS = invisible to the listener (not a party);
+  cellular calls = need a phone app.
+
+### 🔴 Owner-gated — decisions / credentials (can't do without you)
+- B2B F2/F3/F4 fix-session (real ledger, at re-enable) · `secret_guard.py:33` bot-prefix regex (in .claude/hooks,
+  guard-blocks me) · validate onboarding on a real BotFather bot · check-in cut-over (HELD in shadow) · company
+  name · W3 hardening (`ORG_SECRET_KEY` + CSRF + rate-limit + HTTPS) · Harvest Phase 4 (PayWay creds) / 5 (ESC/POS
+  hardware) / Anchor-OPS (`ANCHOR_DIR`+`ANCHOR_HMAC_KEY` in secrets) · refresh the server GitHub PAT (so `--sync` works).
+
+### 🎨 Owner-shaped — give me a steer + I build (designed, ready)
+- **Automations**: live dispatch (map who→a real Telegram target) · the custom builder (the advanced door).
+- **Comms**: the gm-job wiring above (decide window / ladder / groups / repeat-flag) + optionally pair with the
+  **proactive attentiveness ping** (a deterministic responsiveness alternative; gate: auto-penalize vs alert+log).
+- **Dashboard tuning**: card copy · ~20 cascade lines · value-weights · colour thresholds · which cards per plan
+  (questionnaire built) · which preview-toggles to make functional · wire TWB's REAL live data in.
+
+### 📚 Older standing threads (unchanged)
+- Accountant P2 money matcher + Bakong · Stock lane AppSheet + GM↔stock cutover · marketing automation · AI
+  order-taker · WOC extraction · shadow informational-labeling (low value, cut-over HELD).
+
+---
+
 ## 🔬 Due-diligence audit (session 55, ultracode 44-agent) — confirmed findings to action
 > Full report: workflow `wf_7bb0f25d-3e6` + the session-55 block in `docs/BONUSES_AND_FINDINGS.md`.
 > Live core = sound; suite really green (1081p/2s). Priority order below.

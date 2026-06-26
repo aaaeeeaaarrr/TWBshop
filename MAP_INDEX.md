@@ -141,6 +141,8 @@
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/clarify.py` — Clarification escalation ladder — pure decision logic + text builders.
     · is_checking_phrase, decide_ladder_action, nudge_text, escalation_text
+- `gm_bot/comms.py` — gm_bot.comms — staff comms-responsiveness escalation (owner: 'the GM complains when staff ignore the group').
+    · find_unanswered, stage_for, nudge_text, escalation_text
 - `gm_bot/coverage.py` — Coverage engine (session 28) — pure logic, no DB/Telegram.
     · stations_for, window_target, _has_station, on_duty, shortfall, surplus, slot_surplus, slot_score
 - `gm_bot/events.py` — gm_events — append-only audit log for the GM/attendance bot (owner, 2026-06-21).
@@ -227,7 +229,7 @@
 - `ops_intelligence/importer.py` — One-time historical message importer — pulls all history from all chats into ops_messages.
     · _classify_media, run_import
 - `ops_intelligence/listener.py` — Telethon user-account listener — streams all Telegram messages into ops_messages.
-    · _classify_media, _sender_fields, _catch_up, _alert_owner, _note_processing_error, run
+    · _mentioned_ids, _classify_media, _sender_fields, _catch_up, _alert_owner, _note_processing_error, run
 - `ops_intelligence/price_extractor.py` — Reads supplier price list files (PDFs and photos) from pricelists/ and extracts
     · _date_from_filename, _normalize_date, _pdf_has_text_layer, _pdf_to_page_images, _process_pdf_as_pages, _process_file, run
 - `ops_intelligence/price_list_fetcher.py` — Downloads the most recent price list files (PDFs, docs, photos) from each supplier group.

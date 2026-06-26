@@ -19,6 +19,21 @@ CATCHUP_LOOKBACK_DAYS = 14
 CATCHUP_MAX_PER_CHAT = 3000
 
 
+def _mentioned_ids(msg) -> list:
+    """Telegram user ids @-mentioned via a TAP-mention (MessageEntityMentionName carries .user_id — it pings a
+    person even with no @username). A plain @username mention has no id here, so it's skipped. Best-effort —
+    never raises (a parse hiccup must not drop the message)."""
+    out = []
+    try:
+        for e in (getattr(msg, "entities", None) or []):
+            uid = getattr(e, "user_id", None)
+            if uid:
+                out.append(int(uid))
+    except Exception:
+        pass
+    return out
+
+
 def _classify_media(msg) -> str | None:
     if msg.photo:
         return "photo"
@@ -168,6 +183,7 @@ async def run() -> None:
             )
 
             sent_at = msg.date.replace(tzinfo=timezone.utc).isoformat() if msg.date else None
+            reply_to_msg_id = getattr(getattr(msg, "reply_to", None), "reply_to_msg_id", None)
 
             save_ops_message(
                 chat_id=event.chat_id,
@@ -178,6 +194,8 @@ async def run() -> None:
                 text=msg.text or "",
                 media_type=_classify_media(msg),
                 sent_at=sent_at,
+                reply_to_msg_id=reply_to_msg_id,
+                mentioned_ids=_mentioned_ids(msg),
             )
             logger.info("[%s] %s: %s", chat_title, sender_name or "?", (msg.text or "")[:80])
         except Exception:

@@ -177,6 +177,16 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   computer-tier (NO model cost), config-driven, with a 'would fire now' preview. The lean Fin-borrow: a simple
   front door (recipes) onto ONE {condition,action} engine; the custom builder is the advanced door (next), and
   the live SEND (adapter/gm dispatch) is the follow-up. Both doors compile to the same shape.
+- ✅ **comms-responsiveness brain (deterministic)** `[ship/sell]` (owner) — `gm_bot/comms.py`: detect a staffer
+  who was @-mentioned / replied-to and never answered within the window, matched by Telegram ID — not a text
+  guess — with a nudge→escalate ladder. Gated off; group MESSAGES only (calls are out of scope).
+- ⭐ **FINDING — we were DISCARDING structured signals the listener already receives** `[gotcha]` (owner caught it)
+  — ops_messages stored only name+text+time, so I'd planned a FUZZY text detector; the listener actually gets the
+  sender id, the @-mention ids (tap-mentions carry the user id), and reply-to per message. Capturing them (a tiny
+  listener change: 2 columns + 2 lines) makes "addressed + unanswered" a deterministic FACT, killing the
+  false-positive risk that made auto-complaining about staff dangerous. **Lesson: check what the source ALREADY
+  gives before settling for a heuristic.** (1-to-1 Telegram calls stay invisible — the listener isn't a party;
+  cellular calls need a phone app.)
 
 ---
 

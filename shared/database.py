@@ -359,9 +359,14 @@ def init_ops_db() -> None:
                     media_type  TEXT,
                     sent_at     TEXT,
                     recorded_at TEXT NOT NULL,
+                    reply_to_msg_id BIGINT,        -- the message this one replies to (comms-responsiveness)
+                    mentioned_ids   JSONB,         -- Telegram user ids @-mentioned (a tap-mention carries the id)
                     UNIQUE(chat_id, message_id)
                 )
             """)
+            # self-migrate (the table predates the comms-responsiveness fields)
+            cur.execute("ALTER TABLE ops_messages ADD COLUMN IF NOT EXISTS reply_to_msg_id BIGINT")
+            cur.execute("ALTER TABLE ops_messages ADD COLUMN IF NOT EXISTS mentioned_ids JSONB")
     logger.info("Ops DB ready")
 
 
@@ -374,18 +379,22 @@ def save_ops_message(
     text: str,
     media_type: str | None,
     sent_at: str | None,
+    reply_to_msg_id: int | None = None,
+    mentioned_ids: list | None = None,
 ) -> None:
+    import json as _json
     now = datetime.utcnow().isoformat()
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO ops_messages
                     (chat_id, message_id, chat_title, sender_id, sender_name,
-                     text, media_type, sent_at, recorded_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     text, media_type, sent_at, recorded_at, reply_to_msg_id, mentioned_ids)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chat_id, message_id) DO NOTHING
             """, (chat_id, message_id, chat_title, sender_id, sender_name,
-                  text, media_type, sent_at, now))
+                  text, media_type, sent_at, now, reply_to_msg_id,
+                  _json.dumps(mentioned_ids) if mentioned_ids else None))
 
 
 def dedup_keeper(ids: list[int], mids: list[int], prefer: set) -> int:
