@@ -243,8 +243,8 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
 - ✅ **2 MORE live-gm settings migrated — papers_grace_days + short_notice_days** `[ship/sell]` (owner) — the live
   AL/sick callers (`bot.py:3361/3873/4033`) now read `tenant_config` fresh (fail-safe), so the doctor's-paper window
   + the AL short-notice boundary are dashboard-tweakable instant-live. BEHAVIOR-PRESERVING (PROD: TWB leave
-  override=null → 2/7 = the constants) + staging-proven (13 tests). ⛔PARKED as a batch for the next gm quiet-window
-  deploy (already restarted the gm once today for grace_min — batch-discipline, don't serial-restart).
+  override=null → 2/7 = the constants) + staging-proven (13 tests). DEPLOYED-LIVE (8d79721, PP 22:40 quiet window),
+  behavior-VERIFIED on prod (effective 2/7) — 4 leave/verdict settings now instant-live. (ot_cap #5 = a careful pass.)
 - ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
   (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
   localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config

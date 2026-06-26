@@ -27,10 +27,10 @@ logic cut-over. The swap rule is the template:
    `late.py:8` REMOVED. Behavior-preserving (PROD: TWB override=`null` → effective 5). ⛔ owner: deploy the gm in a
    quiet window to flip it live; until then the running gm keeps the hardcoded 5 (unchanged).
 2. ✅ **DONE (with #1) — `attendance.verdict.early_bonus_min`** (=5) → same verdict path, same migration.
-3. ✅ **DONE (staging-proven, PARKED) — `attendance.leave.papers_grace_days`** (=2) → live callers `bot.py:3873/4033`
-   now read `attendance("twb")["leave"]` fresh (fail-safe). Behavior-preserving (PROD: TWB leave override=`null`→2).
-4. ✅ **DONE (staging-proven, PARKED) — `attendance.leave.short_notice_days`** (=7) → live caller `bot.py:3361` now
-   reads config (fail-safe). Behavior-preserving (PROD: null→7). #3+#4 = the parked batch to ship with the next gm.
+3. ✅ **DEPLOYED-LIVE (8d79721, PP 22:40) — `attendance.leave.papers_grace_days`** (=2) → live callers `bot.py:3873/4033`
+   read `attendance("twb")["leave"]` fresh (fail-safe). Behavior-VERIFIED on prod (override=`null`→effective 2).
+4. ✅ **DEPLOYED-LIVE (8d79721) — `attendance.leave.short_notice_days`** (=7) → live caller `bot.py:3361` reads config
+   (fail-safe). Behavior-VERIFIED on prod (null→effective 7). #1–#4 now all LIVE; only #5 (ot_cap, money path) left.
 5. **`attendance.ot.bank_cap_min`** (=14*60) → `gm_bot/ot.py:13` — the OT-bank ceiling.
 
 These five are the cleanest "tweakable instantly" wins a customer would actually want, each behavior-preserving.
