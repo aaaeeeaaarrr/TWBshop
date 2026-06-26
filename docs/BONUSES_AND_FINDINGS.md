@@ -240,6 +240,15 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   current" only holds if the live tenant has no conflicting override. Checked PROD first: TWB's verdict override is
   `null` → effective grace_min=5 == the constant → migration provably changes nothing. Always read the live config,
   never assume the default applies.
+- ✅ **2 MORE live-gm settings migrated — papers_grace_days + short_notice_days** `[ship/sell]` (owner) — the live
+  AL/sick callers (`bot.py:3361/3873/4033`) now read `tenant_config` fresh (fail-safe), so the doctor's-paper window
+  + the AL short-notice boundary are dashboard-tweakable instant-live. BEHAVIOR-PRESERVING (PROD: TWB leave
+  override=null → 2/7 = the constants) + staging-proven (13 tests). ⛔PARKED as a batch for the next gm quiet-window
+  deploy (already restarted the gm once today for grace_min — batch-discipline, don't serial-restart).
+- ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
+  (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
+  localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config
+  flows in at the call site), so the parity tests still guard them. The pattern generalizes cleanly past grace_min.
 
 ---
 

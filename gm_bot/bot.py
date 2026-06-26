@@ -3356,9 +3356,14 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         win = sl
         if req["kind"] == "hours" and req.get("hours_start"):
             win = (to_min(req["hours_end"]) - to_min(req["hours_start"])) % 1440 or sl
+        try:                                              # config-driven short-notice threshold (instant-live)
+            from core.tenant_config import attendance as _attc
+            _sn = int(_attc("twb").get("leave", {}).get("short_notice_days", alm.SHORT_NOTICE_DAYS))
+        except Exception:
+            _sn = alm.SHORT_NOTICE_DAYS
         points_map = {} if no_deduct else {
             d: win for d in days
-            if (_d.fromisoformat(d) - created).days < alm.SHORT_NOTICE_DAYS}
+            if (_d.fromisoformat(d) - created).days < _sn}
         superseded: list = []
         new_bal = al_approve_and_deduct(req["id"], total, deducted_map, points_map,
                                         superseded_out=superseded)
@@ -3870,7 +3875,12 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if days:
             # papers accepted → CANCEL the paperless-sick pay-back, but only within the 2-day window
             from gm_bot import sick as sk
-            within = not sk.papers_deadline_passed(case["the_date"], _today_pp())
+            try:                                          # config-driven papers-grace window (instant-live)
+                from core.tenant_config import attendance as _attc
+                _pg = int(_attc("twb").get("leave", {}).get("papers_grace_days", sk.PAPERS_GRACE_DAYS))
+            except Exception:
+                _pg = sk.PAPERS_GRACE_DAYS
+            within = not sk.papers_deadline_passed(case["the_date"], _today_pp(), grace=_pg)
             wiped = _wipe_sick_payback(case["staff_id"], case["the_date"].isoformat()) if within else False
             sick_set(case_id, status="papered", covered_days=days)
             await query.edit_message_text(query.message.text + ("\n\n✓ Covered %dd%s." % (
@@ -4030,7 +4040,12 @@ async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         uid = (staff.get("telegram_ids") or [None])[0]
         nm = staff.get("call_name") or staff["canonical_name"]
-        if sk.papers_deadline_passed(c["the_date"], today):
+        try:                                              # config-driven papers-grace window (instant-live)
+            from core.tenant_config import attendance as _attc
+            _pg = int(_attc("twb").get("leave", {}).get("papers_grace_days", sk.PAPERS_GRACE_DAYS))
+        except Exception:
+            _pg = sk.PAPERS_GRACE_DAYS
+        if sk.papers_deadline_passed(c["the_date"], today, grace=_pg):
             sick_set(c["id"], status="no_papers")   # window closed; the pay-back made at declaration stands
             continue
         await _att_send(context, uid, "Staff", nm, _SICK_RETURN_CHECK, kb=_sick_return_kb(c["id"]))
