@@ -35,7 +35,8 @@
   hardware) / Anchor-OPS (`ANCHOR_DIR`+`ANCHOR_HMAC_KEY` in secrets) · refresh the server GitHub PAT (so `--sync` works).
 
 ### 🎨 Owner-shaped — give me a steer + I build (designed, ready)
-- **Automations**: live dispatch (map who→a real Telegram target) · the custom builder (the advanced door).
+- **Automations**: live dispatch BUILT (owner-triggered "send now" + per-role targets, safe-by-default) —
+  remaining = a SCHEDULED auto-dispatch runner (always-on) + the custom builder (the advanced door).
 - **Comms**: the gm-job wiring above (decide window / ladder / groups / repeat-flag) + optionally pair with the
   **proactive attentiveness ping** (a deterministic responsiveness alternative; gate: auto-penalize vs alert+log).
 - **Dashboard tuning**: card copy · ~20 cascade lines · value-weights · colour thresholds · which cards per plan
@@ -116,10 +117,12 @@
 
 ## 🤖 Fin-inspired borrows (→ ledger; do leaner than Fin)
 - [ ] "Ask your business" (in flight, above).
-- [~] **Automations — recipes tier BUILT (s55)** — `core/automations.py` + `/automations`: 8 one-tap plain-words
-      recipes (condition → action) riding our existing detectors (insights.attention_feed + investigate),
-      config-driven (`automations.recipes`), with a "would fire now" preview. ⏳ Next: the custom builder (the
-      advanced door) + live SEND wiring (adapter/gm — it currently PREVIEWS what would fire, doesn't yet dispatch).
+- [~] **Automations — recipes tier + LIVE DISPATCH BUILT (s55)** — `core/automations.py` + `/automations`: 8
+      one-tap plain-words recipes (condition → action) riding our existing detectors, config-driven, with a
+      "would fire now" preview AND live dispatch — `dispatch()` SENDS each firing recipe to its configured target
+      via the tenant's bot, debounced (`automation_dispatches`); SAFE-by-default (blank target = no send); a
+      "Send pending alerts now" button. ⏳ Next: the custom builder (advanced door) + a SCHEDULED auto-dispatch
+      runner (today it's owner-triggered "send now"; a cron/job makes it always-on).
 - [ ] An **"optimize" view** + an outcome metric — "X% of approvals / checks / reorders handled automatically."
 
 ## 🔎 Investigation ideas still open

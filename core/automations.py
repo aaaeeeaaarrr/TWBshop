@@ -7,8 +7,11 @@ the EVALUATOR ('what would fire right now'). Channel-agnostic: the actual SEND i
 Both these one-tap recipes and a future custom builder compile to the SAME {condition, action} shape — recipes
 are the simple front door onto one engine; the builder is the advanced one. Start with recipes (covers most).
 """
+from datetime import datetime, timezone, timedelta
+
 from core.tenant_config import get_config, set_config
 from core import insights, investigate
+from shared.database import _db
 
 # Who-to-alert options (plain labels; the customer picks per recipe, with a sensible default).
 WHO = {"owner": "the owner", "manager": "the manager", "senior": "the senior on duty",
@@ -86,6 +89,69 @@ def evaluate(org_id) -> list:
             fires = r["src"][1](org_id)
         if fires:
             who_key = en[key].get("who") or r["who"]
-            out.append({"key": key, "label": recipe_label(key, who_key),
+            out.append({"key": key, "label": recipe_label(key, who_key), "who_key": who_key,
                         "who": WHO.get(who_key, WHO[r["who"]]), "fires": fires})
     return out
+
+
+# ── live dispatch — actually SEND the alerts (debounced; ONLY to a configured target = safe by default) ──
+DISPATCH_COOLDOWN_HOURS = 6        # don't re-alert the same recipe within this window (debounce)
+
+
+def targets(org_id) -> dict:
+    """who-role → the real Telegram chat/user id its alerts go to. The owner sets these; a recipe whose who
+    has NO target is never sent (no target = no alert), so dispatch is safe until the owner wires a target."""
+    return dict(get_config(org_id).get("automations", {}).get("targets", {}) or {})
+
+
+def set_target(org_id, who: str, chat_id) -> None:
+    if who in WHO:
+        set_config(org_id, {"automations": {"targets": {who: (str(chat_id).strip() or None)}}})
+
+
+def _sent_recently(org_id, recipe_key, now, hours) -> bool:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM automation_dispatches WHERE org_id=%s AND recipe_key=%s "
+                        "AND sent_at > %s LIMIT 1", (org_id, recipe_key, now - timedelta(hours=hours)))
+            return cur.fetchone() is not None
+
+
+def _record_sent(org_id, recipe_key, now) -> None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO automation_dispatches (org_id, recipe_key, sent_at) VALUES (%s,%s,%s)",
+                        (org_id, recipe_key, now))
+
+
+def dispatch(org_id, send_fn, now=None, cooldown_hours: int = DISPATCH_COOLDOWN_HOURS) -> list:
+    """Actually SEND each firing enabled recipe's alert to its configured target, ONCE per recipe per cooldown
+    (debounced). `send_fn(chat_id:int, text:str)` performs the send — injected (the tenant's bot for real, a
+    mock in tests). A recipe with NO configured target is skipped → SAFE by default. Returns the sent list."""
+    now = now or datetime.now(timezone.utc)
+    tg = targets(org_id)
+    out = []
+    for r in evaluate(org_id):
+        chat = tg.get(r["who_key"])
+        if not chat or _sent_recently(org_id, r["key"], now, cooldown_hours):
+            continue
+        text = "🤖 %s\n• %s" % (r["label"], "\n• ".join(r["fires"][:5]))
+        try:
+            send_fn(int(chat), text)
+        except Exception:
+            continue                                    # a send failure must not block the others / record it
+        _record_sent(org_id, r["key"], now)
+        out.append({"recipe": r["key"], "who_key": r["who_key"], "chat_id": chat})
+    return out
+
+
+def token_sender(bot_token: str):
+    """A send_fn that posts to a Telegram chat via a bot token (channel-agnostic Bot API). The bot must be IN
+    the target chat (or the user must have started it). The real send; tests inject a mock instead."""
+    import urllib.request
+    import urllib.parse
+
+    def _send(chat_id, text):
+        data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+        urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % bot_token, data=data, timeout=10)
+    return _send

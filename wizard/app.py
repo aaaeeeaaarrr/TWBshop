@@ -1355,15 +1355,29 @@ def render_automations(org_id: str) -> str:
                          % (escape(f["label"]), "".join("<li>%s</li>" % escape(x) for x in f["fires"]))
                          for f in fires)
                  if fires else "<p class='note'>Nothing would fire right now — all quiet. 👍</p>")
+    tg = au.targets(org_id)
+    trows = "".join("<tr><td style='padding:4px 8px'>%s</td><td><input name='target_%s' value='%s' "
+                    "placeholder='Telegram chat / user id' style='width:230px'></td></tr>"
+                    % (escape(lbl), w, escape(str(tg.get(w) or ""))) for w, lbl in au.WHO.items())
+    sent_note = ("<p class='note'>📤 <b>%s alert(s) sent.</b></p>" % escape(request.args.get("sent"))
+                 if request.args.get("sent") else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>⚡ Automations</h1>"
             "<p class='note'>Turn on a recipe and pick who to alert — plain words, one tap. The conditions run "
             "on your own data (no AI cost), and every alert is just a notification: nothing moves money by itself."
             "%s</p>"
             "<form method='post' action='/automations/save'>"
             "<table style='width:100%%;border-collapse:collapse' cellpadding='8'>%s</table>"
+            "<h4 style='margin:18px 0 4px'>Where alerts go</h4>"
+            "<p class='note'>Put the Telegram chat / user id for each role. <b>Blank = that role's alerts are "
+            "never sent</b> — so nothing goes out until you wire a target, and the bot must be in that chat.</p>"
+            "<table>%s</table>"
             "<div style='margin-top:12px'><button type='submit'>Save automations</button></div></form>"
+            "<form method='post' action='/automations/send' style='margin-top:10px'>"
+            "<button type='submit'>📤 Send pending alerts now</button> "
+            "<span class='note'>each firing recipe → its target, once per %dh</span></form>%s"
             "<h3 style='margin-top:22px'>🔮 Would fire now</h3>%s"
-            % (" &nbsp;<b>✓ saved</b>" if request.args.get("saved") == "1" else "", "".join(rows), fire_html))
+            % (" &nbsp;<b>✓ saved</b>" if request.args.get("saved") == "1" else "", "".join(rows), trows,
+               au.DISPATCH_COOLDOWN_HOURS, sent_note, fire_html))
     return _page("Automations", body)
 
 
@@ -1914,8 +1928,22 @@ def create_app(org_id: str = "twb") -> Flask:
         for key in au.RECIPES:
             au.set_recipe(org_id, key, key in on_keys, request.form.get("who_%s" % key))
             changes.append("%s=%s" % (key, "on" if key in on_keys else "off"))
+        for w in au.WHO:                                     # where each role's alerts go (blank = never sent)
+            au.set_target(org_id, w, request.form.get("target_%s" % w) or "")
         log_config_change(org_id, _current_user(), "automations.recipes", None, ", ".join(changes))
         return redirect("/automations?saved=1")
+
+    @app.post("/automations/send")
+    def automations_send():
+        # Live dispatch: send each firing enabled recipe to its CONFIGURED target (none configured → nothing
+        # sent), debounced. Sends via the tenant's bot (config.GM_BOT_TOKEN for TWB). Owner-triggered + audited.
+        from core import automations as au
+        import config as _cfg
+        token = getattr(_cfg, "GM_BOT_TOKEN", None) or ""
+        sent = au.dispatch(org_id, au.token_sender(token)) if token else []
+        log_config_change(org_id, _current_user(), "automations.dispatch", None,
+                          "sent %d: %s" % (len(sent), ", ".join(s["recipe"] for s in sent)))
+        return redirect("/automations?sent=%d" % len(sent))
 
     @app.get("/expertise")
     def expertise():

@@ -440,6 +440,12 @@ def init_core_db() -> None:
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_pay_run_period ON core_pay_runs (org_id, period)")
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_payslip_run_staff "
                         "ON core_payslips (org_id, run_id, staff_id)")
+            # automations live-dispatch — debounce log so a fired recipe alerts ONCE per cooldown, not per check.
+            cur.execute("""CREATE TABLE IF NOT EXISTS automation_dispatches (
+                id BIGSERIAL PRIMARY KEY, org_id TEXT NOT NULL, recipe_key TEXT NOT NULL,
+                sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_autom_dispatch "
+                        "ON automation_dispatches (org_id, recipe_key, sent_at)")
 
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:

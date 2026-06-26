@@ -187,6 +187,11 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   false-positive risk that made auto-complaining about staff dangerous. **Lesson: check what the source ALREADY
   gives before settling for a heuristic.** (1-to-1 Telegram calls stay invisible — the listener isn't a party;
   cellular calls need a phone app.)
+- ✅ **automations LIVE DISPATCH** `[ship/sell]` (owner) — `core.automations.dispatch` actually SENDS each firing
+  recipe to its configured Telegram target via the tenant's bot, debounced (`automation_dispatches`), SAFE-by-
+  default (blank target = no send); a "Send pending alerts now" button on /automations. Channel-agnostic (an
+  injected `send_fn` / bot-token), so it works for any tenant's bot. Turns the recipes from a preview into a
+  working automation. Next: a scheduled runner (always-on) so it fires without a tap.
 
 ---
 

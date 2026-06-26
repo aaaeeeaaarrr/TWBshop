@@ -70,7 +70,7 @@
 - `core/audit_anchor.py` — core.audit_anchor — Phase 1b: the external tamper-anchor for the audit chain (harvested from POSBusiness
     · _anchor_path, _sig, _head, anchor_head, _read_anchors, verify_anchors
 - `core/automations.py` — core.automations — the AUTOMATIONS recipes (lean Fin-borrow). A recipe = a plain-words {condition → action}
-    · _cash_short, _repeat, recipe_label, enabled_recipes, set_recipe, evaluate
+    · _cash_short, _repeat, recipe_label, enabled_recipes, set_recipe, evaluate, targets, set_target, _sent_recently, _record_sent, dispatch, token_sender
 - `core/channel.py` — core.channel — the channel-agnostic command spine (platform principle #1, docs/PLATFORM_VISION.md).
     · _verdict_settings, handle
 - `core/db.py` — core.db — the platform's multi-tenant schema + persistence (entity + event log).

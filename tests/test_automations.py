@@ -11,11 +11,13 @@ ORG = "test_autom"
 
 
 def _clean():
+    cdb.init_core_db()                                  # ensure the schema (incl. automation_dispatches) exists
     cdb.ensure_org(ORG, "T")
     with _db() as c:
         with c.cursor() as cur:
             cur.execute("UPDATE orgs SET config='{}' WHERE org_id=%s", (ORG,))
-            for t in ("core_sales", "core_stock_counts", "core_stock_items", "core_audit"):
+            for t in ("core_sales", "core_stock_counts", "core_stock_items", "core_audit",
+                      "automation_dispatches"):
                 cur.execute("DELETE FROM %s WHERE org_id=%%s" % t, (ORG,))
 
 
@@ -42,6 +44,27 @@ def test_evaluate_fires_low_stock_only_when_enabled_and_below_par():
         au.set_recipe(ORG, "low_stock", True, who="buyer")
         fired = au.evaluate(ORG)
         assert any(f["key"] == "low_stock" and f["who"] == "whoever buys stock" and f["fires"] for f in fired)
+    finally:
+        _clean()
+
+
+def test_dispatch_sends_to_target_then_debounces():
+    _clean()
+    try:
+        set_config(ORG, {"categories": {"stock": {"enabled": True}}})
+        iid = stock.add_item(ORG, "Milk", "L", par_level=10)
+        stock.record_count(ORG, iid, 2)                             # low stock fires
+        au.set_recipe(ORG, "low_stock", True, who="buyer")
+        calls = []
+
+        def send(c, t):
+            calls.append((c, t))
+
+        assert au.dispatch(ORG, send) == [] and calls == []        # no target → nothing sent (safe by default)
+        au.set_target(ORG, "buyer", 555)
+        sent = au.dispatch(ORG, send)
+        assert len(sent) == 1 and calls and calls[0][0] == 555      # sent once to the configured target
+        assert au.dispatch(ORG, send) == [] and len(calls) == 1    # within cooldown → debounced, no re-send
     finally:
         _clean()
 
