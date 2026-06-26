@@ -9,6 +9,20 @@
 
 ## Done (with proof)
 
+- **2026-06-26 — LIVE GM BOT RESTORED (server GM token fix; HIGH-RISK secrets + prod-restart, independent
+  before/after proof).** Incident: staff messaging the GM bot got NO menu. Root cause: the GM BotFather token was
+  rotated + updated in **dev** `secrets.py` but NEVER propagated to the **server** — the server's `secrets.py` still
+  held the OLD token (`getMe` → 401), so gm (running since Jun 23) was deaf to every `getUpdates`. The server's
+  GitHub PAT is ALSO dead, so `bootstrap.py --sync` couldn't pull from the `-secrets` repo. FIX: verified by
+  fingerprint that every live token was identical dev↔server EXCEPT `GM_BOT_TOKEN` (dev `cd905b3d…` valid, server
+  `41567ca5…` dead), copied the valid `secrets.py` dev→server over SSH (atomic temp+mv; token never in console) and
+  restarted `twbshop-gm`. PROOF (independent re-read): server `getMe` OK → @twb_gm_bot · new PID 1393968 (was
+  1255378) · active · no 401/InvalidToken in the new process · scheduler + Application started → polling resumed,
+  draining the queued staff backlog. Restart reloaded the CURRENT deploy (`d16070d`), NOT the parked session-55 code.
+  **⚠ OPEN FOLLOW-UPS (owner):** (a) run `python bootstrap.py --push-secrets` from dev so the `-secrets` REPO is
+  canonical too — otherwise a future `--sync` would re-pull the OLD token and re-break gm; (b) refresh the server's
+  GitHub PAT so `--sync` works again.
+
 - **2026-06-23 — AL APPROVAL RE-PING LADDER built + deployed (config-driven; the Heng-stuck class fixed) +
   HENG #434 AUTO-EXPIRED.** The daily audit flagged Heng's AL #434 pending 4 days — root cause: 1/2 senior
   approvals (Samphass yes, no 2nd) and the ladder had NO reminder/escalation (`senior_timers` was dead

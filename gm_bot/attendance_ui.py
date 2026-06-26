@@ -1835,27 +1835,32 @@ def _real_dayoff_dates(staff: dict, start: date, n_days: int = 21) -> list:
 
 def dayoff_partners(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     """WF5 partner-swap ENTRY — pick WHO to trade day-offs with FIRST (no arbitrary day). Candidates =
-    active TWB staff with a DIFFERENT day off (something to trade) and similar shift hours."""
-    ws = to_min(p.get("work_start"))
+    active TWB staff with a DIFFERENT day off (something to trade) and OVERLAPPING shift hours
+    (gm_bot.swap.partner_eligible: overlap ≥ half the shorter shift)."""
+    from gm_bot.swap import partner_eligible
+    try:                                   # the swap rule is config-driven (the dashboard knob); fail-safe to overlap/50%
+        from core.tenant_config import attendance as _att_cfg
+        _sch = (_att_cfg("twb") or {}).get("schedule", {})
+        _rule = _sch.get("swap_partner_rule", "overlap")
+        _frac = float(_sch.get("swap_overlap_pct", 50)) / 100.0
+        _win = int(_sch.get("swap_start_window_min", 180))
+    except Exception:
+        _rule, _frac, _win = "overlap", 0.5, 180
     my_off = (p.get("day_off") or "")[:3].title()
     cands = []
     for r in staff_all("active"):
-        if r["id"] == p["id"] or r.get("org") != "TWB" or r.get("canonical_name") == "Tyty":
-            continue
         if (r.get("day_off") or "")[:3].title() == my_off:
             continue   # same day off → nothing to trade
-        rs = to_min(r.get("work_start"))
-        if rs is None or ws is None:
-            continue
-        diff = min((rs - ws) % (24 * 60), (ws - rs) % (24 * 60))
-        if diff <= 180:  # starts within 3h of each other = "similar/close shift times"
+        # active TWB · not self/Tyty · shift compatible per the configured rule (default: overlap ≥ half shorter).
+        # ONE source of truth = gm_bot.swap.partner_eligible (was a duplicated inline rule).
+        if partner_eligible(p, r, to_min, rule=_rule, overlap_frac=_frac, start_window_min=_win):
             cands.append(r)
     rows = [_back_row("att:am")]
     rows += [[InlineKeyboardButton(staff_btn_label(c), callback_data="att:do:p:%d" % c["id"])]
              for c in staff_sort(cands)[:8]]
-    return _hdr(p, "Swap day off — pick WHO to trade with (a different day off, similar shift times). "
+    return _hdr(p, "Swap day off — pick WHO to trade with (a different day off, overlapping shift hours). "
                    "You'll then choose a date-pairing.\n"
-                   "ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្អូនចង់ប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនប្រហាក់ប្រហែល)។ "
+                   "ប្តូរថ្ងៃឈប់ — ជ្រើសអ្នកដែលប្អូនចង់ប្តូរជាមួយ (ថ្ងៃឈប់ខុសគ្នា, ម៉ោងវេនត្រួតគ្នា)។ "
                    "បន្ទាប់មក ប្អូននឹងជ្រើសគូថ្ងៃ។\n"
                    "Your day off · ថ្ងៃឈប់របស់ប្អូន៖ %s" % (p.get("day_off") or "?")), \
         InlineKeyboardMarkup(rows)

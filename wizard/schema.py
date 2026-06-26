@@ -146,6 +146,25 @@ DESCRIPTORS = {
     f"{_ATT}.schedule.min_rest_between_shifts_min": {
         "label": "Minimum rest between shifts (minutes)", "type": "int", "min": 0, "max": 1440, "unit": "min",
         "help": "Enforce a minimum gap between a checkout and the next check-in (0 = none)."},
+    f"{_ATT}.schedule.swap_partner_rule": {
+        "label": "Who staff can swap day-offs with", "type": "enum",
+        "help": "How the bot decides which co-workers appear in a staffer's swap list. Every swap still needs the "
+                "partner + seniors to approve — this only sets who can be PROPOSED.",
+        "options": [
+            ("overlap", "Overlapping shifts (recommended)",
+             "Anyone whose shift overlaps theirs by at least the % below — they mostly work the same hours, so "
+             "trading days barely changes coverage."),
+            ("start_or_end", "Similar start OR end", "Anyone whose shift STARTS or ENDS within the minutes below."),
+            ("start_window", "Similar start only", "Anyone whose shift STARTS within the minutes below (the original rule)."),
+        ],
+    },
+    f"{_ATT}.schedule.swap_overlap_pct": {
+        "label": "Swap: minimum shift overlap (%)", "type": "int", "min": 0, "max": 100, "unit": "%",
+        "help": "For the 'Overlapping shifts' rule: two shifts must overlap by at least this % of the SHORTER shift "
+                "to be swappable. 50 = share at least half their hours. Lower = more partners offered."},
+    f"{_ATT}.schedule.swap_start_window_min": {
+        "label": "Swap: start/end window (minutes)", "type": "int", "min": 0, "max": 720, "unit": "min",
+        "help": "For the 'Similar start' rules: how close (minutes) two shifts' start/end must be. 180 = 3 hours."},
     # ── Staff rules (industry limits TWB doesn't enforce yet) ──
     f"{_ATT}.staff_rules.max_consecutive_days": {
         "label": "Max consecutive working days", "type": "int", "min": 0, "max": 31, "unit": "days",

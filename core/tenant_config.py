@@ -96,6 +96,9 @@ DEFAULTS = {
             "schedule": {
                 "redefine_allowed": True,
                 "swap_allowed": True,
+                "swap_partner_rule": "overlap",     # who you can day-off-swap with: overlap | start_or_end | start_window
+                "swap_overlap_pct": 50,             # overlap rule: shifts must overlap ≥ this % of the SHORTER shift
+                "swap_start_window_min": 180,       # start_or_end / start_window rules: starts/ends within this many minutes
                 "dayoff_move_allowed": True,
                 "weekly_day_off": True,
                 "min_rest_between_shifts_min": 0,   # 0 = no minimum gap enforced (industry option)
