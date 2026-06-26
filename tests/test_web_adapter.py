@@ -15,3 +15,31 @@ def test_web_http_semantics():
     assert web.handle_request("POST", "/nonsense", {"config": {}})[0] == 400    # unknown command
     bad = web.handle_request("POST", "/verdict", {"when": "not-a-date", "start_dt": "x", "config": {}})
     assert bad[0] == 400 and "bad datetime" in bad[1]["error"]                  # bad input
+
+
+def test_body_org_id_is_rejected():
+    """WEB-ADAPTER (s55): the client may NOT choose the tenant — a body org_id is rejected (cross-tenant guard)."""
+    status, res = web.handle_request("POST", "/verdict",
+                                     {"when": "2026-06-20T23:12:00+00:00", "start_dt": "2026-06-20T23:00:00+00:00",
+                                      "config": {}, "org_id": "someone_else"})
+    assert status == 403 and "org_id" in res["error"]
+
+
+def test_serve_defaults_to_localhost():
+    """WEB-ADAPTER (s55): serve() must default to 127.0.0.1, never 0.0.0.0, until W3 auth exists."""
+    import inspect
+    assert inspect.signature(web.serve).parameters["host"].default == "127.0.0.1"
+
+
+def test_no_runner_wires_the_web_adapter():
+    """WEB-ADAPTER (s55): adapters.web is INERT — no run_*.py may wire serve() to a socket until W3 auth
+    exists. If you add a runner, add auth (server-side org_id + HTTPS + rate-limit) first, then update this."""
+    import os, glob
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    offenders = []
+    for f in glob.glob(os.path.join(root, "run_*.py")):
+        with open(f, encoding="utf-8") as fh:
+            txt = fh.read()
+        if "adapters.web" in txt or "adapters import web" in txt:
+            offenders.append(os.path.basename(f))
+    assert not offenders, "a runner wires the web adapter without W3 auth: %s" % offenders

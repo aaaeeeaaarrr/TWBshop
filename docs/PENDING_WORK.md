@@ -5,6 +5,46 @@
 > this is the index so nothing slips. Tick items here as they ship. (Also see `docs/ROADMAP.md`,
 > `docs/ACTIONS_LEDGER.md`, `docs/POSBUSINESS_HARVEST_PLAN.md`, `docs/BONUSES_AND_FINDINGS.md`.)
 
+## 🔬 Due-diligence audit (session 55, ultracode 44-agent) — confirmed findings to action
+> Full report: workflow `wf_7bb0f25d-3e6` + the session-55 block in `docs/BONUSES_AND_FINDINGS.md`.
+> Live core = sound; suite really green (1081p/2s). Priority order below.
+
+**🔴 Owner-gated (need YOU):**
+- [x] ✅ **GM bot token ROTATED** (owner, s55) — working-tree literal scrubbed + secret_guard regex flagged.
+- [ ] **ROTATE the GM bot token via BotFather** *(done — kept for history)* → update secrets.py → redeploy twbshop-gm. The live token was
+      in git history (`tests/test_log_redact.py` == `secrets.py`); working-tree literal already scrubbed, but
+      ONLY rotation closes the breach. **#1 priority.**
+- [ ] Quiet-window deploys (each prepared + proven on staging by me; the deploy is yours): own-sick race fix
+      (gm) · hire-token fix (hire) · init_core_db ordering + run_gm_bot try/except (gm boot).
+- [ ] B2B F2/F3/F4 fix session (with you, on the real ledger, at re-enable) — fix B2B_LANDMINE_FIX_PLAN's stale
+      `message_id`→`group_message_id` note first.
+- [ ] secret_guard.py:33 regex misses the bot-prefixed token form — the fix needs a `.claude/hooks/` edit
+      (guard-blocks me); you apply it (drop `\b` / add `(?:bot)?` + a regression case).
+
+**🟢 Autonomous / inert (I do on staging, never deployed):**
+- [x] Scrub the live-token literal from tests/test_log_redact.py (synthetic same-shape token). *(s55)*
+- [x] init_core_db: ALTER core_sales moved after its CREATE + run_gm_bot init wrapped try/except. *(s55, deploy gated)*
+- [x] **2a hardening (s55):** audit.write same-txn (caller cursor) ✓ · core_audit BIGSERIAL seq + UNIQUE(org_id,
+      previous_hash) + branch detection ✓ · ledger.py advisory-lock + FOR UPDATE + LEAST(cap) + log applied-delta ✓ ·
+      leave_ledger no-row sign fix + cancel symmetry ✓ *(CHECK>=0 deliberately declined, see findings)*.
+- [x] **2b refunds/voids (s55):** `pos.void_sale` one-txn (mark voided + re-increment stock + 'refund' drawer
+      event + same-txn audit; single-void; revenue excludes voided). *(abnormal cash_event detector → forensics.)*
+- [x] **Phase 3 / S2-S4 close (s55):** client_key idempotency + partial UNIQUE + ON CONFLICT on record_sale/
+      receive_purchase/add_expense/record_count · GREATEST(0,…) + CHECK(on_hand>=0) · UNIQUE(org,period) +
+      UNIQUE(run,staff) + claim-first run_payroll.
+- [x] **Forensics actor + voids/refunds log (s55):** actor column + threaded `_current_user` on cash_event/
+      close_shift/void refund · `investigate.voids_refunds_log` (the parked loss-prevention log, now real).
+      *(Remaining lower-value: also write stock/pos/expenses/payroll mutations to the tamper-evident chain.)*
+- [x] **adapters/web.py hardening (s55):** reject client-supplied org_id (403) · serve() defaults 127.0.0.1 · 1MB
+      body cap · import-guard test (no run_*.py may wire it without W3 auth).
+- [ ] **Shadow honesty (still open, lower priority):** label informational settle rows so the agree-rate
+      excludes never-compared rows + an import-parity-lock test for core.attendance.verdict vs gm_bot.checkin.
+      *(The bigger half — model the payback-slot ext-worked path for a REAL settle comparison — is harvest #5.
+      Cut-over is owner-gated/HELD anyway, so this doesn't block anything.)*
+- [x] **Test hardening (s55):** the 3 money guards self-provision a dedicated ex_staff test staffer — can't silently skip.
+- [x] **Map/docs (s55):** auto-discover PKG_DIRS + _PACKAGES from the filesystem (one source of truth) → MAP_INDEX
+      now 190 entries incl. core/wizard/adapters/telegram_bot; MAP.md gained adapters/ + telegram_bot/ pointers.
+
 ## 🔨 In flight / next up
 - [ ] **"Ask your business" assistant** — computer-tier NL router over our real reports/insights (no API cost) +
       ai-tier escalation behind the AI-power toggle. *(Building now — Fin-inspired, lean.)* → ledger.
@@ -40,7 +80,7 @@
 
 ## 🔎 Investigation ideas still open
 - [ ] **Cash-drawer over/short report** — now buildable (the till tracks variance per shift).
-- [ ] Voids / refunds log — unlocks after harvest 2b (needs the refund/void events).
+- [x] **Voids / refunds log (s55)** — `investigate.voids_refunds_log` (built on 2b void/refund + actor tracking).
 
 ## 🔐 Owner-gated decisions / activations (need YOU)
 - [ ] Validate the Telegram onboarding on a real BotFather bot (token → `run_onboard_demo.py`).

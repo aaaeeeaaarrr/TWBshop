@@ -34,6 +34,15 @@ def _shift(staff_id) -> int:
             return cur.fetchone()["shift_id"]
 
 
+def _shift_at(staff_id, start_dt, end_dt) -> int:
+    with _db() as c:
+        with c.cursor() as cur:
+            cur.execute("INSERT INTO shifts (org_id, staff_id, start_dt, end_dt, business_day) "
+                        "VALUES (%s,%s,%s,%s,%s) RETURNING shift_id",
+                        (ORG, staff_id, start_dt, end_dt, end_dt.date()))
+            return cur.fetchone()["shift_id"]
+
+
 def _seed_bank(staff_id, bal):
     with _db() as c:
         with c.cursor() as cur:
@@ -92,5 +101,48 @@ def test_reverse_settle_clean_inverse_idempotent():
         d = ledger.open_debt(ORG, 4)
         assert d and d["paid_min"] == 0                          # debt reopened, credit removed
         assert ledger.reverse_settle(ORG, sid)["reversed"] is False   # idempotent
+    finally:
+        _clean()
+
+
+def test_two_shifts_same_staff_bank_accumulates_to_cap_truthfully():
+    """LEDGER-CAP (s55): two of one staff's shifts each earning OT accumulate the bank to the cap ONCE —
+    never over-bank — and each settle records only the OT it actually banked (so reverse_settle stays
+    exact). Sequential here proves the math; the per-staff advisory lock makes the concurrent case behave
+    identically (read the OTHER's committed bank, not a stale one)."""
+    _setup()
+    try:
+        cap = ledger.BANK_CAP_MIN
+        s1 = _shift_at(5, datetime(2026, 6, 20, 23, 0, tzinfo=UTC), datetime(2026, 6, 21, 8, 0, tzinfo=UTC))
+        s2 = _shift_at(5, datetime(2026, 6, 21, 23, 0, tzinfo=UTC), datetime(2026, 6, 22, 8, 0, tzinfo=UTC))
+        r1 = ledger.settle_checkout(ORG, 5, s1, 240 + cap, 240)   # earns `cap` OT → banks the full cap
+        assert r1["ot_banked"] == cap and ledger.bank_balance(ORG, 5) == cap
+        r2 = ledger.settle_checkout(ORG, 5, s2, 240 + cap, 240)   # earns `cap` more, but 0 room left
+        assert r2["ot_banked"] == 0 and r2["ot_dropped"] == cap
+        assert ledger.bank_balance(ORG, 5) == cap                 # capped, not 2×cap
+    finally:
+        _clean()
+
+
+def test_concurrent_same_staff_settles_never_over_bank():
+    """Concurrency guard: two of one staff's shifts settling AT ONCE must not both bank from a stale read.
+    The per-staff advisory lock serializes them (+ LEAST caps structurally) → final bank == cap and the
+    recorded OT sums to exactly the room filled (not 2×, which would make reverse_settle over-refund)."""
+    import threading
+    _setup()
+    try:
+        cap = ledger.BANK_CAP_MIN
+        s1 = _shift_at(6, datetime(2026, 6, 20, 23, 0, tzinfo=UTC), datetime(2026, 6, 21, 8, 0, tzinfo=UTC))
+        s2 = _shift_at(6, datetime(2026, 6, 21, 23, 0, tzinfo=UTC), datetime(2026, 6, 22, 8, 0, tzinfo=UTC))
+        start = threading.Barrier(2)
+        out = {}
+        def go(name, sid):
+            start.wait()
+            out[name] = ledger.settle_checkout(ORG, 6, sid, 240 + cap, 240)
+        ts = [threading.Thread(target=go, args=(n, s)) for n, s in (("a", s1), ("b", s2))]
+        for t in ts: t.start()
+        for t in ts: t.join()
+        assert ledger.bank_balance(ORG, 6) == cap                          # never 2×cap (LEAST belt)
+        assert sum(out[k].get("ot_banked", 0) for k in out) == cap         # recorded truthfully (lock)
     finally:
         _clean()

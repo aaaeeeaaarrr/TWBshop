@@ -4,6 +4,124 @@
 > Every source file → its docstring + top-level symbols (capped; grep for the full set).
 > Complete-on-files by construction. Regenerate after any file add/move; the build fails if stale.
 
+## accountant/
+- `accountant/__init__.py` — Accountant TWB — finance / expense / payment lane (separate twbshop-accountant bot).
+- `accountant/bot.py` — accountant/bot.py — the Telegram shell for the accountant (P1 capture).
+    · _allowed, _rows_kb, _kb, _cand_kb, _card_text_kb, _send_card, _download, cmd_start, cmd_vendor, cmd_vendors, cmd_vrename, cmd_vmerge, cmd_vmergeundo, on_photo, _on_supplier_photo  …(+15, grep)
+- `accountant/capture.py` — accountant/capture.py — P1 capture pure logic (no Telegram, no DB, fully unit-testable).
+    · fmt_money, math_check, parse_amount_cents, did_you_mean, dym_rows, route, render_card, card_buttons, vendor_picker_buttons, channel_picker_buttons, candidate_card, candidate_buttons, lookalike_prompt, lookalike_buttons, receipt_pick_label
+- `accountant/db.py` — Accounting ledger — schema + data layer for the Accountant bot.
+    · to_usd_cents, init_accounting_db, vendor_link, vendor_by_group, _vnorm, _vendor_aliases, vendor_by_name, find_similar_vendors, add_vendor_alias, get_vendor, propose_vendor, confirm_vendor, list_unconfirmed_vendors, vendor_item_history, vendor_priors_for  …(+37, grep)
+
+## adapters/
+- `adapters/__init__.py` — adapters — the platform's CHANNELS. Each adapter translates a channel's native input into a neutral
+- `adapters/telegram_onboarding.py` — adapters.telegram_onboarding — the Telegram adapter for DISCOVER-CONFIRM staff onboarding
+    · _consent_required, _candidate_card, make_handlers, register
+- `adapters/telegram_provision.py` — adapters.telegram_provision — the AUTO-CONFIGURE half of guided BotFather setup.
+    · _verify_and_configure, provision
+- `adapters/web.py` — adapters.web — a WEB channel for the platform (the "web?" option in the onboarding wizard). Maps an
+    · handle_request, serve
+
+## b2b_bot/
+- `b2b_bot/__init__.py`
+- `b2b_bot/billing.py` — B2B billing — payment tracking and reminders.
+    · _unpaid_rows_with_price, get_unpaid_total, _unpaid_by_date, apply_payment, get_effective_balance, format_balance_for_group, get_all_outstanding_summary, send_daily_reminders, send_weekly_reminders, _build_cust_confirmation, _verification_keyboard, _send_owner_nudge, run_verification_nudge_tick, handle_payment_received, handle_payment_not_received  …(+7, grep)
+- `b2b_bot/bot.py` — B2B bot — handler registration and startup.
+    · _startup_summary_check, _job_b2b_pre_summary, _job_b2b_summary, _job_recurring_reminder_1, _job_recurring_reminder_2, _job_recurring_reminder_3, _job_mini_reminder, _job_dispatch_reminder_1, _job_dispatch_reminder_2, _job_dispatch_reminder_tick, _job_daily_payment_reminder, _job_weekly_payment_reminder, cmd_summary, main
+- `b2b_bot/cake_menu.py` — B2B cake & dessert menu — edit to add/remove items or update prices.
+    · cake_menu_list_text
+- `b2b_bot/customers.py` — B2B customer registry.
+    · clean_group_title, is_b2b_group, get_business_name
+- `b2b_bot/delivery.py` — Delivery cost estimation via Grab Express pricing + OSRM road distance.
+    · grab_express_cost, get_road_distance_meters, handle_location
+- `b2b_bot/dispatch_reminder.py` — B2B dispatch reminders — 1h pre-fulfillment nudge to owner with snooze buttons.
+    · _parse_fulfillment_dt, _mins_remaining, _build_text, _build_keyboard, _send_reminder, run_dispatch_reminder_tick, handle_dispatch_confirm, handle_dispatch_snooze
+- `b2b_bot/menu.py` — B2B bread menu — edit this file to add/remove items, change grams, prices, or attributes.
+    · menu_list_text
+- `b2b_bot/menu_flow.py` — Facade — re-exports from menu_keyboards and menu_handlers for backward compatibility.
+- `b2b_bot/menu_handlers.py` — B2B menu — command/callback handlers and cart-to-confirmation bridge.
+    · cmd_start, _delete_action_menu, send_quick_menu, maybe_send_menu_prompt, _session_summary, _delete_old_menu, _menu_state, handle_menu_command, handle_welcome, handle_qty_input, handle_menu_callback, _parse_cart_items, _show_recurring_preconfirm, _do_confirm
+- `b2b_bot/menu_keyboards.py` — B2B menu — in-memory cart state, category/item data, and keyboard builders.
+    · _format_time, _orders_locked, _save_cart, _restore_cart, _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label, _QtyPendingFilter, _bun_price, _price_label, _cart_block, _category_keyboard, _cake_cart_qty, _dessert_cart_qty  …(+15, grep)
+- `b2b_bot/order_handlers.py` — B2B order handlers — in-memory state, notifications, confirm helper, and Telegram handlers.
+    · _delivery_cost_for, maybe_prompt_location_pin, _notify_cake_order, _notify_urgent_bread_order, _notify_mini_order, _do_confirm_order, handle_group_message, _actor, handle_callback, handle_order_photo
+- `b2b_bot/order_parsing.py` — B2B order parsing — text/image matching, history resolution, and confirmation formatting.
+    · _strip_noise, _extract_grams, _match_bread, _match_cake, _extract_cake_spec, _parse_order, _combine_bread, _combine_cake, _merge_edit_bread, _merge_edit_cake, _split_mini_items, _mini_rejection_note, _ai_items_to_orders, _log_unmatched, _parse_order_ai  …(+11, grep)
+- `b2b_bot/orders.py` — Facade — re-exports from order_parsing and order_handlers for backward compatibility.
+- `b2b_bot/pricing.py` — Price calculation for B2B orders (breads + cakes).
+    · item_price, order_total, price_summary
+- `b2b_bot/recurring.py` — B2B recurring (Daily/Weekly) orders — day helpers, reminders, auto-skip.
+    · days_label, is_in_grace_period, send_recurring_reminders, auto_skip_unconfirmed
+- `b2b_bot/staff_commands.py` — Staff and owner commands: /markpaid, /balance, /history, /addaccount, /removeaccount, /commands.
+    · _is_owner, _is_authorized, _fmt_date, _method_label, _status_prefix, cmd_balance_enhanced, _reply_all_balances, callback_balance, cmd_markpaid, _start_markpaid, callback_markpaid_pick, callback_markpaid_date, callback_markpaid_full, callback_markpaid_custom, _ask_method  …(+19, grep)
+- `b2b_bot/summaries.py` — B2B nightly summary — production totals and per-customer breakdown.
+    · _cake_total_label, _cake_order_label, send_b2b_pre_summary, send_b2b_summary, send_b2b_mini_reminder, _sort_key, _build_dispatch_list, send_b2b_dispatch_reminder
+
+## core/
+- `core/__init__.py` — core — the new channel-agnostic, multi-tenant management PLATFORM (the product foundation).
+- `core/approvals.py` — core.approvals — the pure APPROVAL-LADDER rule (channel-agnostic, config-driven). For a still-PENDING
+    · reping_decision
+- `core/ask.py` — core.ask — "Ask your business": a natural-language question → a real answer over the tenant's OWN live data.
+    · _has, ask, _ai_answer
+- `core/attendance.py` — core.attendance — channel-agnostic CHECK-IN / CHECK-OUT commands.
+    · _emit_event, _bind_shift, verdict, check_in, check_out, recent_checkins, today_summary
+- `core/audit.py` — core.audit — tamper-evident, hash-chained audit log.
+    · _at_key, _canonical, write, _append, verify_chain, recent
+- `core/audit_anchor.py` — core.audit_anchor — Phase 1b: the external tamper-anchor for the audit chain (harvested from POSBusiness
+    · _anchor_path, _sig, _head, anchor_head, _read_anchors, verify_anchors
+- `core/channel.py` — core.channel — the channel-agnostic command spine (platform principle #1, docs/PLATFORM_VISION.md).
+    · _verdict_settings, handle
+- `core/db.py` — core.db — the platform's multi-tenant schema + persistence (entity + event log).
+    · _org_secret_cipher, init_core_db, log_config_change, recent_config_audit, ensure_org, set_org_secret, has_org_secret, get_org_secret, clear_org_secret, _hash_pw, _check_pw, create_user, verify_user, user_count
+- `core/derive.py` — core.derive — the SELF-DERIVING resolver: the core decides what a day is from its OWN state
+    · set_override, clear_overrides, _modifiers, resolve
+- `core/expenses.py` — core.expenses — a real, minimal expense log (the Accountant domain on the platform): record expenses by
+    · add_expense, list_expenses, expense_summary
+- `core/health.py` — core.health — read-only config health-check. Scans a tenant's config + setup for likely mistakes /
+    · config_health
+- `core/insights.py` — core.insights — a cross-domain 'needs attention' feed (read-only): one place that scans every ON domain for
+    · attention_feed
+- `core/investigate.py` — core.investigate — the Investigation / loss-prevention card: forensic queries that pinpoint WHEN something
+    · _g, who_present_on, who_in_window, unattended_activity, repeat_offenders, voids_refunds_log, item_timeline, activity_timeline
+- `core/leave.py` — core.leave — annual-leave deduction math (channel-agnostic, per-tenant config). The balance core:
+    · is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map
+- `core/leave_ledger.py` — core.leave_ledger — the atomic AL-balance mechanism (S1: deduct-at-approval ↔ refund-on-cancel).
+    · set_al_balance, al_balance, create_al_request, al_approve_and_deduct, al_cancel_and_refund
+- `core/ledger.py` — core.ledger — the platform's atomic money mechanism (the over-book/double-bank bug-class, cured by
+    · bank_balance, open_debt, add_debt, settle_checkout, buyback_spend, reverse_settle
+- `core/onboarding.py` — core.onboarding — the channel-agnostic onboarding wizard ENGINE (the "stupid-proof self-serve" front
+    · validate, apply
+- `core/onboarding_flow.py` — core.onboarding_flow — DISCOVER-CONFIRM staff onboarding (docs/ONBOARDING_DESIGN.md).
+    · record_seen_member, list_candidates, confirm_candidate, skip_candidate, record_consent, add_staff_manual, list_staff, remove_staff, ensure_checkin_token, staff_by_checkin_token, get_staff, update_staff, record_group, list_groups, set_group_role  …(+1, grep)
+- `core/payroll.py` — core.payroll — a real, minimal payroll (the HR/payroll domain on the platform): per-staff monthly salary →
+    · staff_with_salary, set_salary, run_payroll, list_pay_runs, payslips, latest_run
+- `core/points.py` — core.points — check-in points (channel-agnostic, per-tenant config). Parity with gm_bot.points.
+    · split_late, checkin_points, no_show_points, late_sick_points, points_for
+- `core/pos.py` — core.pos — a real, minimal point-of-sale (the POS domain on the platform): record sales → revenue, and
+    · record_sale, void_sale, recent_sales, sales_summary
+- `core/reports.py` — core.reports — read-only trends/analytics over the platform's own data (the "Reports" frontier capability;
+    · attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
+- `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
+    · resolve_day
+- `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
+    · worked_minutes, ot_earned, split_ot_pb, settle_shift
+- `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
+    · _record, compare_checkin, compare_settle, record_settle_info, mark_reconciled, _classify_checkin, _classify_settle, _classify_for, build_digest, comparison_stats, comparison_stats_by_kind, comparison_span, recent_mismatches
+- `core/shadow_hook.py` — core.shadow_hook — the SAFE bridge that runs the new platform core BESIDE the live bot.
+    · shadow_enabled, shadow_checkin, shadow_settle
+- `core/shifts.py` — core.shifts — the shift entity: materialize a real interval + resolve which shift an instant belongs to.
+    · shift_window, ensure_shift, shift_for_instant
+- `core/sick.py` — core.sick — own-sick outcome rule (channel-agnostic). The distinguishing fact is CHECK-IN:
+    · sick_outcome
+- `core/stock.py` — core.stock — a real, minimal inventory domain (org-scoped, channel-free): item catalog · par levels · stock
+    · add_item, list_items, stock_summary, add_price, item_prices, cheapest_overview, receive_purchase, stock_variance, set_par, deactivate_item, record_count, low_stock_items
+- `core/tenant_config.py` — core.tenant_config — the WIZARD'S DATA MODEL + per-tenant config (multi-tenancy).
+    · _approval, _deep_merge, _raw, get_config, raw_overrides, set_config, category, attendance, verdict_cfg, points_catalogue, approval_rule
+- `core/till.py` — core.till — POS shift / cash-drawer money model (harvested from POSBusiness `shift_service`, adapted to our
+    · _f, current_shift, open_shift, cash_event, _financials, shift_summary, zreport, close_shift
+- `core/whatif.py` — core.whatif — read-only "what would this config change DO?" previews. No writes; computes against the
+    · verdict_whatif
+
 ## gm_bot/
 - `gm_bot/al.py` — Annual-leave pure logic (session 28). No DB/Telegram.
     · back_at_work_date, is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map, al_span_label, approvals_needed, quorum_reached, quorum_rejected, senior_timers
@@ -70,62 +188,6 @@
 - `gm_bot/swap.py` — Day-off swap pure logic (session 28). No DB/Telegram.
     · within_7_days, is_own_dayoff, partner_eligible
 
-## accountant/
-- `accountant/__init__.py` — Accountant TWB — finance / expense / payment lane (separate twbshop-accountant bot).
-- `accountant/bot.py` — accountant/bot.py — the Telegram shell for the accountant (P1 capture).
-    · _allowed, _rows_kb, _kb, _cand_kb, _card_text_kb, _send_card, _download, cmd_start, cmd_vendor, cmd_vendors, cmd_vrename, cmd_vmerge, cmd_vmergeundo, on_photo, _on_supplier_photo  …(+15, grep)
-- `accountant/capture.py` — accountant/capture.py — P1 capture pure logic (no Telegram, no DB, fully unit-testable).
-    · fmt_money, math_check, parse_amount_cents, did_you_mean, dym_rows, route, render_card, card_buttons, vendor_picker_buttons, channel_picker_buttons, candidate_card, candidate_buttons, lookalike_prompt, lookalike_buttons, receipt_pick_label
-- `accountant/db.py` — Accounting ledger — schema + data layer for the Accountant bot.
-    · to_usd_cents, init_accounting_db, vendor_link, vendor_by_group, _vnorm, _vendor_aliases, vendor_by_name, find_similar_vendors, add_vendor_alias, get_vendor, propose_vendor, confirm_vendor, list_unconfirmed_vendors, vendor_item_history, vendor_priors_for  …(+37, grep)
-
-## stock/
-- `stock/__init__.py` — Stock lane — a HEADLESS worker (no chat bot).
-- `stock/catalog.py` — Stock catalog operations — seed `acc_items` and expose the read model.
-    · seed_catalog, _num, overview, low_stock, reorder_list
-- `stock/catalog_data.py` — Canonical stock catalog — the stock lane's owned seed data for `acc_items`.
-- `stock/db.py` — Stock-lane-owned schema + DB helpers — the count event log.
-    · init_stock_db, record_count_event, last_count_date, days_since_last_count, counts_on, pending_counts, mark_reconciled
-- `stock/order_brain.py` — Daily stock-order brain — pure logic, no DB/AI/Telegram.
-    · is_low, suggest_order_qty, build_order_list, format_order_message, no_sheet_decision, usage_trend
-- `stock/sync.py` — AppSheet <-> Postgres sync (stock lane worker).
-    · AppSheetClient, apply_count, reconcile_counts, apply_counts, pull_overview, run_sync
-
-## b2b_bot/
-- `b2b_bot/__init__.py`
-- `b2b_bot/billing.py` — B2B billing — payment tracking and reminders.
-    · _unpaid_rows_with_price, get_unpaid_total, _unpaid_by_date, apply_payment, get_effective_balance, format_balance_for_group, get_all_outstanding_summary, send_daily_reminders, send_weekly_reminders, _build_cust_confirmation, _verification_keyboard, _send_owner_nudge, run_verification_nudge_tick, handle_payment_received, handle_payment_not_received  …(+7, grep)
-- `b2b_bot/bot.py` — B2B bot — handler registration and startup.
-    · _startup_summary_check, _job_b2b_pre_summary, _job_b2b_summary, _job_recurring_reminder_1, _job_recurring_reminder_2, _job_recurring_reminder_3, _job_mini_reminder, _job_dispatch_reminder_1, _job_dispatch_reminder_2, _job_dispatch_reminder_tick, _job_daily_payment_reminder, _job_weekly_payment_reminder, cmd_summary, main
-- `b2b_bot/cake_menu.py` — B2B cake & dessert menu — edit to add/remove items or update prices.
-    · cake_menu_list_text
-- `b2b_bot/customers.py` — B2B customer registry.
-    · clean_group_title, is_b2b_group, get_business_name
-- `b2b_bot/delivery.py` — Delivery cost estimation via Grab Express pricing + OSRM road distance.
-    · grab_express_cost, get_road_distance_meters, handle_location
-- `b2b_bot/dispatch_reminder.py` — B2B dispatch reminders — 1h pre-fulfillment nudge to owner with snooze buttons.
-    · _parse_fulfillment_dt, _mins_remaining, _build_text, _build_keyboard, _send_reminder, run_dispatch_reminder_tick, handle_dispatch_confirm, handle_dispatch_snooze
-- `b2b_bot/menu.py` — B2B bread menu — edit this file to add/remove items, change grams, prices, or attributes.
-    · menu_list_text
-- `b2b_bot/menu_flow.py` — Facade — re-exports from menu_keyboards and menu_handlers for backward compatibility.
-- `b2b_bot/menu_handlers.py` — B2B menu — command/callback handlers and cart-to-confirmation bridge.
-    · cmd_start, _delete_action_menu, send_quick_menu, maybe_send_menu_prompt, _session_summary, _delete_old_menu, _menu_state, handle_menu_command, handle_welcome, handle_qty_input, handle_menu_callback, _parse_cart_items, _show_recurring_preconfirm, _do_confirm
-- `b2b_bot/menu_keyboards.py` — B2B menu — in-memory cart state, category/item data, and keyboard builders.
-    · _format_time, _orders_locked, _save_cart, _restore_cart, _get_cart_time, _get_cart_date, _get_cart_method, _delivery_date_label, _QtyPendingFilter, _bun_price, _price_label, _cart_block, _category_keyboard, _cake_cart_qty, _dessert_cart_qty  …(+15, grep)
-- `b2b_bot/order_handlers.py` — B2B order handlers — in-memory state, notifications, confirm helper, and Telegram handlers.
-    · _delivery_cost_for, maybe_prompt_location_pin, _notify_cake_order, _notify_urgent_bread_order, _notify_mini_order, _do_confirm_order, handle_group_message, _actor, handle_callback, handle_order_photo
-- `b2b_bot/order_parsing.py` — B2B order parsing — text/image matching, history resolution, and confirmation formatting.
-    · _strip_noise, _extract_grams, _match_bread, _match_cake, _extract_cake_spec, _parse_order, _combine_bread, _combine_cake, _merge_edit_bread, _merge_edit_cake, _split_mini_items, _mini_rejection_note, _ai_items_to_orders, _log_unmatched, _parse_order_ai  …(+11, grep)
-- `b2b_bot/orders.py` — Facade — re-exports from order_parsing and order_handlers for backward compatibility.
-- `b2b_bot/pricing.py` — Price calculation for B2B orders (breads + cakes).
-    · item_price, order_total, price_summary
-- `b2b_bot/recurring.py` — B2B recurring (Daily/Weekly) orders — day helpers, reminders, auto-skip.
-    · days_label, is_in_grace_period, send_recurring_reminders, auto_skip_unconfirmed
-- `b2b_bot/staff_commands.py` — Staff and owner commands: /markpaid, /balance, /history, /addaccount, /removeaccount, /commands.
-    · _is_owner, _is_authorized, _fmt_date, _method_label, _status_prefix, cmd_balance_enhanced, _reply_all_balances, callback_balance, cmd_markpaid, _start_markpaid, callback_markpaid_pick, callback_markpaid_date, callback_markpaid_full, callback_markpaid_custom, _ask_method  …(+19, grep)
-- `b2b_bot/summaries.py` — B2B nightly summary — production totals and per-customer breakdown.
-    · _cake_total_label, _cake_order_label, send_b2b_pre_summary, send_b2b_summary, send_b2b_mini_reminder, _sort_key, _build_dispatch_list, send_b2b_dispatch_reminder
-
 ## hire_bot/
 - `hire_bot/__init__.py`
 - `hire_bot/assessment_notify.py` — Owner notifications from assessment layer.
@@ -155,23 +217,7 @@
 - `hire_bot/scorer.py` — Scoring engine for the hiring bot.
     · _conn, _load_answers, _parse_answer, auto_grade, _score_d1_ranking, _build_triggers, detect_semantic_contradictions, draft_rubric_scores, build_risk_profile
 - `hire_bot/sessions.py` — Session management for the hiring bot.
-    · _conn, _hash, create_session, get_session_by_token, get_active_session, open_session, record_answer, upsert_partial_ranking, get_answered_question_ids, get_d1_partial_order, mark_abandoned, reopen_by_staff, complete_session, get_answered_part_e_ids, store_part_e_triggers  …(+2, grep)
-
-## shared/
-- `shared/ai_client.py` — Anthropic API client — Claude vision and text analysis for the bakery bot.
-    · _get_client, _encode, _parse_json_list, _parse_json, analyze_stock_sheet, analyze_compliance_photo, read_payment_amount, parse_b2b_order_text, interpret_unmatched_b2b_order, classify_b2b_image, extract_b2b_order_from_image, read_payment_amount_pdf, extract_price_list_image, extract_price_list_pdf, generate_proposals  …(+24, grep)
-- `shared/clock.py` — Phnom-Penh wall-clock helpers.
-    · pp_now, pp_today
-- `shared/database.py` — PostgreSQL database — all tables and queries.
-    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+301, grep)
-- `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
-    · make_error_handler
-- `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
-    · RedactTokenFilter, redact, install_log_hygiene
-- `shared/runtime_guard.py` — Runtime guard: refuse to start a live Telegram/Telethon poller off production.
-    · assert_polling_allowed
-- `shared/stock_shared.py` — Shared stock tables — the accountant <-> stock-lane seam (design §E7 / §E11).
-    · init_stock_shared_db, upsert_item, get_item, get_item_by_name, list_items, add_movement, on_hand, on_hand_all
+    · _conn, _hash, _mint_token, create_session, get_session_by_token, get_active_session, open_session, record_answer, upsert_partial_ranking, get_answered_question_ids, get_d1_partial_order, mark_abandoned, reopen_by_staff, complete_session, get_answered_part_e_ids  …(+3, grep)
 
 ## ops_intelligence/
 - `ops_intelligence/__init__.py`
@@ -203,7 +249,7 @@
 - `scripts/fix_long_payback.py` — Vetted data-fix (owner Jun 22): correct Long's #154 payback over-charge from the leave-early-sick bug.
     · _read, main
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
-    · _info, _entry, render, main
+    · pkg_dirs, _info, _entry, render, main
 - `scripts/integration_audit.py` — integration_audit.py - the INTEGRATOR's cross-lane sweep (what no single lane can see).
     · _root, _git, _map, _norm, _under, _owners, check_map_integrity, _commit_lane_dirs, check_cross_lane_commits, check_hub_only_hygiene, run_suite, audit, format_report
 - `scripts/lane_guard.py` — PreToolUse LANE GUARD (v4) — read any lane, write only your own + shared.
@@ -230,6 +276,63 @@
     · run, main, _q
 - `scripts/whatis.py` — whatis.py — one call, all map layers: "what's true + where to look" for a topic.
     · _matching_facts, _map_blocks, _index_lines, main
+
+## shared/
+- `shared/ai_client.py` — Anthropic API client — Claude vision and text analysis for the bakery bot.
+    · _get_client, _encode, _parse_json_list, _parse_json, analyze_stock_sheet, analyze_compliance_photo, read_payment_amount, parse_b2b_order_text, interpret_unmatched_b2b_order, classify_b2b_image, extract_b2b_order_from_image, read_payment_amount_pdf, extract_price_list_image, extract_price_list_pdf, generate_proposals  …(+24, grep)
+- `shared/clock.py` — Phnom-Penh wall-clock helpers.
+    · pp_now, pp_today
+- `shared/database.py` — PostgreSQL database — all tables and queries.
+    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+301, grep)
+- `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
+    · make_error_handler
+- `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
+    · RedactTokenFilter, redact, install_log_hygiene
+- `shared/runtime_guard.py` — Runtime guard: refuse to start a live Telegram/Telethon poller off production.
+    · assert_polling_allowed
+- `shared/stock_shared.py` — Shared stock tables — the accountant <-> stock-lane seam (design §E7 / §E11).
+    · init_stock_shared_db, upsert_item, get_item, get_item_by_name, list_items, add_movement, on_hand, on_hand_all
+
+## stock/
+- `stock/__init__.py` — Stock lane — a HEADLESS worker (no chat bot).
+- `stock/catalog.py` — Stock catalog operations — seed `acc_items` and expose the read model.
+    · seed_catalog, _num, overview, low_stock, reorder_list
+- `stock/catalog_data.py` — Canonical stock catalog — the stock lane's owned seed data for `acc_items`.
+- `stock/db.py` — Stock-lane-owned schema + DB helpers — the count event log.
+    · init_stock_db, record_count_event, last_count_date, days_since_last_count, counts_on, pending_counts, mark_reconciled
+- `stock/order_brain.py` — Daily stock-order brain — pure logic, no DB/AI/Telegram.
+    · is_low, suggest_order_qty, build_order_list, format_order_message, no_sheet_decision, usage_trend
+- `stock/sync.py` — AppSheet <-> Postgres sync (stock lane worker).
+    · AppSheetClient, apply_count, reconcile_counts, apply_counts, pull_overview, run_sync
+
+## telegram_bot/
+- `telegram_bot/bot.py` — Telegram bot entry point — handler registration and startup.
+    · start, unknown_command, _is_staff, cmd_summary, _job_daily_summary, _job_check_missing_photos, main
+- `telegram_bot/menu.py` — Menu items, aliases, and synonym tables.
+    · menu_list_text
+- `telegram_bot/orders.py` — Order intake, menu matching, and confirmation flow.
+    · _strip_noise, _parse_items, _log_unmatched, _format_order, handle_menu_command, handle_order_text, handle_callback
+- `telegram_bot/photos.py` — Photo receiving, storage, and AI analysis.
+    · analyze_photo, _save_photo_file, _notify_staff, handle_incoming_photo, handle_photo_type_callback
+- `telegram_bot/reminders.py` — Deadline checks and missing photo alerts.
+    · check_missing_photos
+- `telegram_bot/staff_monitor.py` — Staff message logging and AI monitoring.
+    · check_staff_message, handle_staff_message
+- `telegram_bot/summaries.py` — Production totals and per-customer fulfillment lists.
+    · send_production_summary, send_fulfillment_list
+
+## wizard/
+- `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
+- `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+54, grep)
+- `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
+- `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
+- `wizard/schema.py` — wizard.schema — the HUMAN layer: a plain-English descriptor for every editable setting (label, help,
+    · describe
+- `wizard/status.py` — wizard.status — the CUT-OVER STATUS of each config knob (the badge truth + the progress map).
+    · status_for, summary
+- `wizard/templates.py` — wizard.templates — industry STARTER TEMPLATES. Picking one pre-fills typical rules + skills for that
+    · apply_template
 
 ## (root entry points)
 - `run_accountant.py` — Entry point for the accountant bot. systemd: twbshop-accountant

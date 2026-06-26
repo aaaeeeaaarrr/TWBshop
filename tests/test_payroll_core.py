@@ -58,3 +58,20 @@ def test_payroll_page_and_reports(monkeypatch):
         assert "💼 Payroll" in c.get("/reports").get_data(as_text=True)               # multi-domain reports → 5
     finally:
         _clean()
+
+
+def test_rerun_payroll_is_idempotent():
+    """PAYROLL-IDEMP (s55): re-running the SAME period returns the existing run and creates NO duplicate run
+    or payslips (UNIQUE(org,period) + UNIQUE(run,staff))."""
+    _clean()
+    try:
+        a, b = _add_staff("Alice"), _add_staff("Bob")
+        payroll.set_salary(ORG, a, 300)
+        payroll.set_salary(ORG, b, 250)
+        r1 = payroll.run_payroll(ORG, "2026-06")
+        r2 = payroll.run_payroll(ORG, "2026-06")                                       # re-run (double-click)
+        assert r1 == r2                                                                # same run, not a 2nd
+        assert len(payroll.payslips(ORG, r1)) == 2                                     # still one slip per staffer
+        assert len(payroll.list_pay_runs(ORG)) == 1                                    # one run total, not two
+    finally:
+        _clean()

@@ -39,7 +39,7 @@ def _head(org_id):
             n = cur.fetchone()["n"]
             if not n:
                 return GENESIS_HASH, 0
-            cur.execute("SELECT entry_hash FROM core_audit WHERE org_id=%s ORDER BY at DESC, id DESC LIMIT 1",
+            cur.execute("SELECT entry_hash FROM core_audit WHERE org_id=%s ORDER BY seq DESC LIMIT 1",
                         (org_id,))
             return cur.fetchone()["entry_hash"], n
 

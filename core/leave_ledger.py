@@ -51,10 +51,17 @@ def al_approve_and_deduct(org_id, req_id) -> dict:
             row = cur.fetchone()
             if not row:
                 return {"applied": False, "reason": "not pending"}
+            # Deduct atomically. The no-row path seeds from an implicit ZERO and deducts (days_remaining
+            # = -total), so a first-ever AL approval DEDUCTS — it must never CREDIT. The conflict path
+            # subtracts the same total from the existing balance. (The insert value and the on-conflict
+            # delta are SEPARATE params — EXCLUDED.days_remaining would carry the wrong sign on the no-row
+            # path.) No CHECK>=0: AL over-draw is a caller-side approval gate, not a storage invariant
+            # (unlike core_ot_bank, where a negative balance is meaningless) — a negative balance here is a
+            # recoverable "took more than entitled" state, and refund (cancel) is its exact inverse.
             cur.execute("INSERT INTO core_al_balance (org_id, staff_id, days_remaining) VALUES (%s,%s,%s) "
                         "ON CONFLICT (org_id, staff_id) DO UPDATE SET "
-                        "days_remaining = core_al_balance.days_remaining - EXCLUDED.days_remaining, "
-                        "updated_at=NOW()", (org_id, row["staff_id"], row["total"]))
+                        "days_remaining = core_al_balance.days_remaining - %s, "
+                        "updated_at=NOW()", (org_id, row["staff_id"], -row["total"], row["total"]))
             return {"applied": True, "deducted": float(row["total"])}
 
 
@@ -69,6 +76,10 @@ def al_cancel_and_refund(org_id, req_id) -> dict:
             row = cur.fetchone()
             if not row:
                 return {"refunded": False, "reason": "not approved"}
-            cur.execute("UPDATE core_al_balance SET days_remaining = days_remaining + %s, updated_at=NOW() "
-                        "WHERE org_id=%s AND staff_id=%s", (row["total"], org_id, row["staff_id"]))
+            # Refund the EXACT frozen total — symmetric to approve (UPSERT, so a missing balance row is
+            # recreated as +total rather than silently no-op'd: the exact inverse of approve's -total).
+            cur.execute("INSERT INTO core_al_balance (org_id, staff_id, days_remaining) VALUES (%s,%s,%s) "
+                        "ON CONFLICT (org_id, staff_id) DO UPDATE SET "
+                        "days_remaining = core_al_balance.days_remaining + %s, "
+                        "updated_at=NOW()", (org_id, row["staff_id"], row["total"], row["total"]))
             return {"refunded": True, "refunded_days": float(row["total"])}

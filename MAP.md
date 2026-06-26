@@ -29,6 +29,10 @@
 - **Read-first:** `docs/WIZARD_DESIGN.md` · CLAUDE.md ▶▶ PRODUCT SECURITY & IP · the config model `core/tenant_config.py`
 - **⚠ Gotchas:** SECURITY — server-side only, binds 127.0.0.1 (reach via `ssh -L 8090:localhost:8090 twbshop`), read-only in Stage 1, NO secrets in any page · the badge truth = `wizard/status.py` (flip a prefix SHADOW→LIVE = the cut-over) · single-threaded (shared DB pool isn't thread-safe).
 
+## 🔌 ADAPTERS (`adapters/`) — channel bridges into the platform brain (thin; `core/` stays channel-free)
+- **Entry:** `adapters/web.py` (HTTP check-in / onboarding) · `adapters/telegram_onboarding.py` (staff-group discover-confirm) · `adapters/telegram_provision.py` (guided BotFather verify/auto-config)
+- **⚠ Gotchas:** an adapter translates a channel ↔ `core` commands/events — it holds NO rules · `adapters/web.py::serve` must bind localhost + derive `org_id` SERVER-SIDE (never from the request body) + auth/HTTPS/rate-limit before ANY exposure (W3) — INERT today (no runner imports it).
+
 ## Attendance — check-in / check-out / no-show  ·  ⚠ LIVE (real staff, payroll-adjacent)
 - **Entry:** `gm_bot/bot.py` (scheduler + location handler + jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout`
 - **Read-first:** `docs/ATTENDANCE_SYSTEM_DETAILED.md` · `docs/STATEFUL_MENU_PATTERNS.md` · grep `docs/HISTORY.md` sessions 31–42
@@ -68,7 +72,7 @@
 - **⚠ Gotchas:** PP-clock dates via `shared/clock.py` · b2b service is intentionally stopped at times — check before assuming live.
 
 ## Retail bot  ·  LIVE (customer-facing)
-- **Entry:** `run_bot.py` (original retail bot)
+- **Entry:** `run_bot.py` → `telegram_bot/bot.py` (menu · orders · photos · summaries · reminders · staff_monitor, all in `telegram_bot/`)
 - **⚠ Gotcha:** oldest subsystem; grep before editing. (Thin entry — enrich when next worked on.)
 
 ## Hiring intake + quiz + assessment bot

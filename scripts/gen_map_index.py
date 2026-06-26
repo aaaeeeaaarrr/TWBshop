@@ -20,8 +20,26 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "MAP_INDEX.md")
-PKG_DIRS = ["gm_bot", "accountant", "stock", "b2b_bot", "hire_bot", "shared", "ops_intelligence", "scripts"]
 SYM_CAP = 15
+# dirs that are NOT source-code packages (infra / build / docs / tests / venv). Everything else with a .py is.
+_EXCLUDE_DIRS = {".git", ".github", ".githooks", ".claude", "__pycache__", "venv", ".venv", "node_modules",
+                 "dist", "build", "logs", "docs", "tests", "archive", "audit_anchors", ".pytest_cache",
+                 ".idea", ".vscode"}
+
+
+def pkg_dirs() -> list:
+    """Top-level CODE packages = every ROOT dir (not excluded / not dot-prefixed) that contains a .py file.
+    Derived from the FILESYSTEM, not a hardcoded list, so a new package can never be silently omitted — the
+    very bug-class behind the old MAP_INDEX gap (a value hardcoded in the caller, not read from its source of
+    truth, here the filesystem). The integrity test imports THIS so the two can never disagree."""
+    out = []
+    for name in sorted(os.listdir(ROOT)):
+        p = os.path.join(ROOT, name)
+        if not os.path.isdir(p) or name.startswith(".") or name in _EXCLUDE_DIRS:
+            continue
+        if any(f.endswith(".py") for _r, _d, fs in os.walk(p) for f in fs):
+            out.append(name)
+    return out
 
 
 def _info(path: str):
@@ -53,7 +71,7 @@ def render() -> str:
          "> Every source file → its docstring + top-level symbols (capped; grep for the full set).",
          "> Complete-on-files by construction. Regenerate after any file add/move; the build fails if stale.",
          ""]
-    for d in PKG_DIRS:
+    for d in pkg_dirs():
         dp = os.path.join(ROOT, d)
         if not os.path.isdir(dp):
             continue

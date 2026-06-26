@@ -84,6 +84,29 @@ def repeat_offenders(org_id) -> list:
     return sorted([{"name": k, "count": v} for k, v in tally.items()], key=lambda x: -x["count"])
 
 
+def voids_refunds_log(org_id, days: int = 30, limit: int = 100) -> list:
+    """Voided sales + drawer refund/payout/negative cash events (the classic POS shrinkage vector), newest
+    first: [{when, what, amount, by}]. The 'who voided/refunded how much, when' log for a camera review."""
+    out = []
+    win = "(%s::text || ' days')::interval"
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT voided_at at, item_name nm, qty, unit_price, actor FROM core_sales "
+                        "WHERE org_id=%s AND voided_at IS NOT NULL AND voided_at >= NOW() - " + win,
+                        (org_id, days))
+            for r in cur.fetchall():
+                amt = float(r["qty"] or 0) * float(r["unit_price"] or 0)
+                out.append((r["at"], "❌ void %s x%s" % (r["nm"] or "?", _g(r["qty"])), amt, r["actor"] or "—"))
+            cur.execute("SELECT at, type, amount, note, actor FROM core_cash_events "
+                        "WHERE org_id=%s AND (type IN ('refund','payout') OR amount < 0) "
+                        "AND at >= NOW() - " + win, (org_id, days))
+            for r in cur.fetchall():
+                out.append((r["at"], "💸 %s %s" % (r["type"], r["note"] or ""), float(r["amount"] or 0),
+                            r["actor"] or "—"))
+    out.sort(key=lambda x: x[0], reverse=True)
+    return [{"when": str(w)[:16], "what": what, "amount": round(a, 2), "by": by} for (w, what, a, by) in out[:limit]]
+
+
 def item_timeline(org_id, item_id, limit: int = 50) -> list:
     """A per-item forensic timeline (counts + sales), newest first: [{kind, when, detail, by}] — when an item was
     last counted/sold and by whom."""

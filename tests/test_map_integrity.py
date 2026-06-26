@@ -16,12 +16,13 @@ verify those pointers resolve), so a stale hint is caught when you read the dest
 import os
 import re
 
+from scripts.gen_map_index import pkg_dirs   # ONE source of truth for "what is a code package" (filesystem-derived)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP = os.path.join(ROOT, "MAP.md")
 
 # `path` or `path::symbol`, path ending in a known extension.
 _TOKEN_RE = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|md|ps1|json|sh))(?:::([A-Za-z0-9_]+))?`")
-_PACKAGES = ("gm_bot", "accountant", "stock", "b2b_bot", "hire_bot", "shared", "ops_intelligence")
 
 
 def _map_text() -> str:
@@ -64,7 +65,8 @@ def test_every_symbol_anchor_resolves():
 
 
 def test_every_code_package_is_mapped():
+    """Every code package the generator indexes (filesystem-derived) must be mentioned in the curated MAP.md —
+    so Layer 1 can never silently omit a whole package (incl. core/wizard/adapters/telegram_bot)."""
     text = _map_text()
-    present = [d for d in _PACKAGES if os.path.isdir(os.path.join(ROOT, d))]
-    unmapped = [d for d in present if d not in text]
+    unmapped = [d for d in pkg_dirs() if d not in text]
     assert not unmapped, "code packages with no MAP.md entry — add them: %s" % unmapped

@@ -43,16 +43,19 @@ def open_shift(org_id, who=None, opening_float=0):
                 cur.execute("INSERT INTO core_shifts (org_id, who, opening_float, status) "
                             "VALUES (%s,%s,%s,'open') RETURNING shift_id", (org_id, who, opening_float or 0))
                 sid = cur.fetchone()["shift_id"]
-                cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount) "
-                            "VALUES (%s,%s,'open',%s)", (org_id, sid, opening_float or 0))
+                cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount, actor) "
+                            "VALUES (%s,%s,'open',%s,%s)", (org_id, sid, opening_float or 0, who))
+                # audit row in the SAME txn (commit-or-rollback together — no applied-but-unaudited window)
+                audit.write(org_id, who, "shift.opened", "shift", str(sid),
+                            {"opening_float": str(opening_float or 0)}, cur=cur)
     except psycopg2.errors.UniqueViolation:
         return None, "already_open"
-    audit.write(org_id, who, "shift.opened", "shift", str(sid), {"opening_float": str(opening_float or 0)})
     return current_shift(org_id), None
 
 
-def cash_event(org_id, event_type, amount, note=None):
-    """Record a mid-shift drawer event (drop/payout/refund/no_sale) on the open shift. Returns (event_id|None, err)."""
+def cash_event(org_id, event_type, amount, note=None, actor=None):
+    """Record a mid-shift drawer event (drop/payout/refund/no_sale) on the open shift. Returns (event_id|None,
+    err). `actor` = who actually performed it — stored + audited as the actor, NOT the shift opener (TILL-ACTOR)."""
     if event_type not in _USER_EVENTS:
         return None, "bad_event_type"
     s = current_shift(org_id)
@@ -60,12 +63,12 @@ def cash_event(org_id, event_type, amount, note=None):
         return None, "no_open_shift"
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount, note) "
-                        "VALUES (%s,%s,%s,%s,%s) RETURNING event_id",
-                        (org_id, s["shift_id"], event_type, amount, note))
+            cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount, note, actor) "
+                        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING event_id",
+                        (org_id, s["shift_id"], event_type, amount, note, actor))
             eid = cur.fetchone()["event_id"]
-    audit.write(org_id, s["who"], "cash_drawer.event", "cash_event", str(eid),
-                {"type": event_type, "amount": str(amount), "note": note})
+            audit.write(org_id, actor or s["who"], "cash_drawer.event", "cash_event", str(eid),
+                        {"type": event_type, "amount": str(amount), "note": note}, cur=cur)
     return eid, None
 
 
@@ -112,10 +115,10 @@ def zreport(org_id, shift_id):
     return z
 
 
-def close_shift(org_id, counted_cash, note=None):
+def close_shift(org_id, counted_cash, note=None, actor=None):
     """Close the open shift: variance-reason gate, then flip status FIRST (S2 idempotent), record the close cash
     event, audit, and return the Z-report. Returns (zreport|None, error). error may be a dict
-    {code:'variance_reason_required', variance, threshold, expected_cash}."""
+    {code:'variance_reason_required', variance, threshold, expected_cash}. `actor` = who closed it (TILL-ACTOR)."""
     s = current_shift(org_id)
     if not s:
         return None, "no_open_shift"
@@ -133,11 +136,11 @@ def close_shift(org_id, counted_cash, note=None):
                         "RETURNING shift_id", (counted, round(fin["expected_cash"], 2), variance, note, org_id, sid))
             if cur.fetchone() is None:
                 return None, "already_closed"                # a concurrent close won — idempotent, not double-counted
-            cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount, note) "
-                        "VALUES (%s,%s,'close',%s,%s)", (org_id, sid, counted, note))
-    audit.write(org_id, s["who"], "shift.closed", "shift", str(sid),
-                {"counted_cash": str(counted), "expected_cash": str(round(fin["expected_cash"], 2)),
-                 "variance": str(variance)})
+            cur.execute("INSERT INTO core_cash_events (org_id, shift_id, type, amount, note, actor) "
+                        "VALUES (%s,%s,'close',%s,%s,%s)", (org_id, sid, counted, note, actor))
+            audit.write(org_id, actor or s["who"], "shift.closed", "shift", str(sid),
+                        {"counted_cash": str(counted), "expected_cash": str(round(fin["expected_cash"], 2)),
+                         "variance": str(variance)}, cur=cur)
     z = dict(fin)
     z.update({"counted_cash": counted, "variance": variance, "note": note})
     return z, None

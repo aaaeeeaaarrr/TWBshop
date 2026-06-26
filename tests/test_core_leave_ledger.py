@@ -63,3 +63,38 @@ def test_refund_reads_frozen_total_not_recomputed():
         assert ll.al_balance(ORG, 2) == 5.0
     finally:
         _clean()
+
+
+def test_first_ever_approval_with_no_balance_row_deducts_not_credits():
+    """AL-SIGN regression (s55 audit): the FIRST AL action for a staffer with NO seeded balance row must
+    DEDUCT from an implicit zero (→ -total), never CREDIT (+total). Deduct↔refund must still net to zero."""
+    _setup()
+    try:
+        assert ll.al_balance(ORG, 3) == 0.0          # no row at all
+        req, total = ll.create_al_request(ORG, 3, ["2026-06-26", "2026-06-27"])  # 2 days, none off
+        assert total == 2.0
+        ll.al_approve_and_deduct(ORG, req)
+        assert ll.al_balance(ORG, 3) == -2.0         # deducted from implicit zero — NOT +2.0 (the bug)
+        ll.al_cancel_and_refund(ORG, req)
+        assert ll.al_balance(ORG, 3) == 0.0          # exact reversal back to zero
+    finally:
+        _clean()
+
+
+def test_cancel_recreates_a_missing_balance_row():
+    """Cancel symmetry: if the balance row is gone at cancel time, refund recreates it as +total (the
+    exact inverse of approve's -total), never a silent no-op that loses the refund."""
+    _setup()
+    try:
+        ll.set_al_balance(ORG, 4, 3.0)
+        req, total = ll.create_al_request(ORG, 4, ["2026-06-26"])   # 1 day
+        assert total == 1.0
+        ll.al_approve_and_deduct(ORG, req)
+        assert ll.al_balance(ORG, 4) == 2.0
+        with _db() as c:                              # someone deletes the row out from under us
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM core_al_balance WHERE org_id=%s AND staff_id=%s", (ORG, 4))
+        assert ll.al_cancel_and_refund(ORG, req)["refunded_days"] == 1.0
+        assert ll.al_balance(ORG, 4) == 1.0           # recreated at +total, not lost
+    finally:
+        _clean()

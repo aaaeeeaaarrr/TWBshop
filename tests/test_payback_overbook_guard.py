@@ -35,18 +35,18 @@ def _cleanup(sid):
 
 
 def _a_staff_id():
+    """Self-provision a dedicated test staffer (idempotent; kept ex_staff so it never shows in active sweeps)
+    so this money guard can NEVER silently skip on a fresh/empty staging DB (s55 GUARD-SKIP fix)."""
     with db._db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM staff_registry ORDER BY id LIMIT 1")
-            r = cur.fetchone()
-            return r["id"] if r else None
+            cur.execute("INSERT INTO staff_registry (canonical_name, status) "
+                        "VALUES ('__guard_test_staff__','ex_staff') "
+                        "ON CONFLICT (canonical_name) DO UPDATE SET status='ex_staff' RETURNING id")
+            return cur.fetchone()["id"]
 
 
 def test_payback_book_refuses_overbook():
-    sid = _a_staff_id()   # an existing staff (FK); only is_test rows are written + cleaned up
-    if sid is None:
-        import pytest
-        pytest.skip("no staff_registry rows on staging")
+    sid = _a_staff_id()   # a dedicated test staffer (FK); only is_test rows are written + cleaned up
     db.set_att_test(True)
     try:
         _cleanup(sid)

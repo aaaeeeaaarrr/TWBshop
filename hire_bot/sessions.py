@@ -13,9 +13,11 @@ Resume rules (enforce via attempt.resume_count):
   Completed                         → permanently locked
   Different Telegram account        → rejected (token_already_used)
 """
+import base64
 import hashlib
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -39,6 +41,12 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _mint_token() -> str:
+    """A URL-safe session token via os.urandom — NOT the stdlib `secrets` (the repo's secrets.py SHADOWS it,
+    so `secrets.token_urlsafe` AttributeErrors under run_hire_bot, fails-closed, and blocks ALL hiring intake)."""
+    return base64.urlsafe_b64encode(os.urandom(18)).rstrip(b"=").decode()
+
+
 # ── Session creation ─────────────────────────────────────────────────────────
 
 def create_session(candidate_name: str, created_by_staff_id: int) -> tuple[str, int]:
@@ -47,8 +55,7 @@ def create_session(candidate_name: str, created_by_staff_id: int) -> tuple[str, 
     Returns (plain_token, session_id).
     The plain token is returned ONCE and must not be stored — only the hash is in DB.
     """
-    import secrets as _sec
-    token = _sec.token_urlsafe(18)
+    token = _mint_token()
     token_hash = _hash(token)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRY_HOURS)
 

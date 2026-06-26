@@ -4165,6 +4165,8 @@ async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         age = (now - armed).total_seconds()
         uid = row["uid"]
         if age >= 1800:
+            if not flow_clear(uid):     # CLAIM the flow — if the typed reason already cleared it, that path
+                continue                 # is booking it; don't double-book the payback/sick case (SICK-RACE s55)
             fl = pend["flow"]
             try:
                 if fl == "sret_exp":
@@ -4186,8 +4188,7 @@ async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 # rej_exp: the decision already stood — silence just drops the explanation
             except Exception as e:
                 logger.error("reason auto-resolve failed (%s): %s", fl, e)
-            flow_clear(uid)
-            continue
+            continue                     # the flow was already cleared by the CLAIM above (flow_clear)
         n = int(pend.get("nudges", 0))
         if n < 2 and age >= 600 * (n + 1):
             try:
@@ -6407,9 +6408,9 @@ async def _private_text_router(update: Update, context: ContextTypes.DEFAULT_TYP
             active, expired = flow_load_or_expired(uid)
             if active and active.get("flow") == "att_pending":
                 pend = active.get("data") or {}
-                flow_clear(uid)
-                await _att_dispatch(update, context, pend, live=True)
-                return
+                if flow_clear(uid):                       # CLAIM — only dispatch/book if WE cleared the flow;
+                    await _att_dispatch(update, context, pend, live=True)   # if the 30-min auto-resolve already
+                return                                     # did, skip — no double-book (SICK-RACE s55)
             if expired and expired.get("flow") == "att_pending":
                 # F3/Law 6: they typed their reason AFTER the prompt expired. Don't let a cheerful
                 # fresh menu eat it — push an honest 'NOT CONFIRMED — TRY AGAIN' with what expired.

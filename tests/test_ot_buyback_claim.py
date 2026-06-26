@@ -7,11 +7,14 @@ import shared.database as db
 
 
 def _staff_id():
+    """Self-provision a dedicated test staffer (idempotent; ex_staff) so this money guard can NEVER silently
+    skip on a fresh/empty staging DB (s55 GUARD-SKIP fix)."""
     with db._db() as c:
         with c.cursor() as cur:
-            cur.execute("SELECT id FROM staff_registry ORDER BY id LIMIT 1")
-            r = cur.fetchone()
-            return r["id"] if r else None
+            cur.execute("INSERT INTO staff_registry (canonical_name, status) "
+                        "VALUES ('__guard_test_staff__','ex_staff') "
+                        "ON CONFLICT (canonical_name) DO UPDATE SET status='ex_staff' RETURNING id")
+            return cur.fetchone()["id"]
 
 
 def _set_bank(sid, bal):
@@ -37,9 +40,6 @@ def _cleanup(sid):
 
 def test_claim_spend_atomic_refuses_overspend_and_double_tap():
     sid = _staff_id()
-    if sid is None:
-        import pytest
-        pytest.skip("no staff_registry rows on staging")
     db.set_att_test(False)   # exercise the REAL atomic-debit path (staging DB)
     try:
         _set_bank(sid, 100)
@@ -60,9 +60,6 @@ def test_claim_spend_atomic_refuses_overspend_and_double_tap():
 
 def test_test_mode_never_mutates_real_bank():
     sid = _staff_id()
-    if sid is None:
-        import pytest
-        pytest.skip("no staff_registry rows on staging")
     db.set_att_test(False)
     try:
         _set_bank(sid, 100)

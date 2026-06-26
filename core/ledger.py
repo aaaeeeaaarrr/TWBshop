@@ -46,7 +46,10 @@ def add_debt(org_id, staff_id, owed_min) -> int:
 def settle_checkout(org_id, staff_id, shift_id, worked_min, normal_len_min,
                     bank_cap_min: int = BANK_CAP_MIN) -> dict:
     """Claim the shift (settle-once), compute OT/payback (core.settle), apply atomically. Idempotent:
-    a second call — or a crash-redelivered duplicate — claims nothing and moves no money."""
+    a second call — or a crash-redelivered duplicate — claims nothing and moves no money. A per-STAFF
+    advisory lock serializes the read→compute→apply, so two of one staff's shifts (split/overnight)
+    settling at once can't both read a stale bank/debt and over-bank or double-credit (LEDGER-CAP /
+    LEDGER-PHANTOM, s55 audit)."""
     with _db() as conn:
         with conn.cursor() as cur:
             # 1) ATOMIC CLAIM — exactly one settle per shift; a loser gets nothing (no double-bank).
@@ -54,28 +57,39 @@ def settle_checkout(org_id, staff_id, shift_id, worked_min, normal_len_min,
                         "RETURNING shift_id", (shift_id,))
             if not cur.fetchone():
                 return {"claimed": False, "reason": "already settled"}
+            # Serialize THIS staff's money moves for the txn — concurrent settles (different shifts, same
+            # person) now run one-at-a-time, so each reads the other's COMMITTED bank/debt, not a stale one
+            # (same proven lock-key the live system uses). FOR UPDATE row-locks the read rows too.
+            cur.execute("SELECT pg_advisory_xact_lock(911, %s)", (staff_id,))
             cur.execute("SELECT debt_id, owed_min, paid_min FROM core_payback_debts "
-                        "WHERE org_id=%s AND staff_id=%s AND status='open' ORDER BY debt_id LIMIT 1",
-                        (org_id, staff_id))
+                        "WHERE org_id=%s AND staff_id=%s AND status='open' ORDER BY debt_id LIMIT 1 "
+                        "FOR UPDATE", (org_id, staff_id))
             debt = cur.fetchone()
             pb_balance = (debt["owed_min"] - debt["paid_min"]) if debt else 0
-            cur.execute("SELECT balance_min FROM core_ot_bank WHERE org_id=%s AND staff_id=%s",
+            cur.execute("SELECT balance_min FROM core_ot_bank WHERE org_id=%s AND staff_id=%s FOR UPDATE",
                         (org_id, staff_id))
             br = cur.fetchone()
             bank = br["balance_min"] if br else 0
             # 2) compute (parity-proven math) — caps pb_cleared at the debt and ot_banked at bank room
             s = settle_shift(worked_min, normal_len_min, pb_balance, bank, bank_cap_min)
-            # 3) apply atomically; the CHECK constraints refuse any over-move structurally
+            # 3) apply atomically; the CHECK constraints refuse any over-move structurally.
+            pb_applied = 0
             if s["pb_cleared"] > 0 and debt:
                 cur.execute("UPDATE core_payback_debts SET paid_min = paid_min + %s, "
                             "status = CASE WHEN paid_min + %s >= owed_min THEN 'cleared' ELSE 'open' END "
-                            "WHERE debt_id=%s AND status='open'",
+                            "WHERE debt_id=%s AND status='open' RETURNING debt_id",
                             (s["pb_cleared"], s["pb_cleared"], debt["debt_id"]))
+                pb_applied = s["pb_cleared"] if cur.fetchone() else 0   # record ONLY what actually applied
             if s["ot_banked"] > 0:
+                # LEAST(cap, …) is a structural belt: the bank can never exceed the cap even if a future
+                # caller skips the lock. Under the lock the value is already within cap (this is a no-op).
                 cur.execute("INSERT INTO core_ot_bank (org_id, staff_id, balance_min) VALUES (%s,%s,%s) "
                             "ON CONFLICT (org_id, staff_id) DO UPDATE SET "
-                            "balance_min = core_ot_bank.balance_min + EXCLUDED.balance_min, updated_at=NOW()",
-                            (org_id, staff_id, s["ot_banked"]))
+                            "balance_min = LEAST(%s, core_ot_bank.balance_min + EXCLUDED.balance_min), "
+                            "updated_at=NOW()", (org_id, staff_id, s["ot_banked"], bank_cap_min))
+            # the event records the TRUE applied pb_cleared (not the pre-computed value) so reverse_settle
+            # can never un-credit a payment a concurrent settle had already cleared (S4 + S1).
+            s = {**s, "pb_cleared": pb_applied}
             detail = {"worked": worked_min, "debt_id": (debt["debt_id"] if debt else None), **s}
             cur.execute("INSERT INTO attendance_events (org_id, shift_id, staff_id, type, at, detail) "
                         "VALUES (%s,%s,%s,'settled',NOW(),%s)",

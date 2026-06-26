@@ -24,7 +24,7 @@ def test_write_chains_and_verifies():
         assert len(h1) == 64 and len(h2) == 64 and h1 != h2          # non-null, 64-char, distinct
         with _db() as c:
             with c.cursor() as cur:
-                cur.execute("SELECT entry_hash, previous_hash FROM core_audit WHERE org_id=%s ORDER BY at", (ORG,))
+                cur.execute("SELECT entry_hash, previous_hash FROM core_audit WHERE org_id=%s ORDER BY seq", (ORG,))
                 rows = cur.fetchall()
         assert rows[0]["previous_hash"] == audit.GENESIS_HASH        # genesis sentinel on the first row
         assert rows[1]["previous_hash"] == rows[0]["entry_hash"]     # row 2 links to row 1
@@ -91,5 +91,50 @@ def test_log_config_change_is_chained():
         log_config_change(ORG, "owner", "categories.stock.enabled", False, True)
         assert any(r["resource_id"] == "categories.stock.enabled" for r in audit.recent(ORG, 5))   # chained
         assert audit.verify_chain(ORG)["result"] == "PASS"
+    finally:
+        _clean(ORG)
+
+
+def test_same_txn_write_rolls_back_with_the_caller():
+    """AUDIT-TXN (s55): with a caller cursor, the audit row lives in the caller's transaction — if the caller
+    fails AFTER writing it, the audit row rolls back WITH the state change (no applied-but-unaudited, and no
+    audited-but-not-applied). A separately-committed audit row could never give this."""
+    _clean(ORG)
+    try:
+        try:
+            with _db() as c:
+                with c.cursor() as cur:
+                    audit.write(ORG, "owner", "x.do", "x", "1", {"a": 1}, cur=cur)
+                    raise RuntimeError("caller blows up after the audit write")
+        except RuntimeError:
+            pass
+        assert audit.verify_chain(ORG)["checked"] == 0          # rolled back together — nothing persisted
+    finally:
+        _clean(ORG)
+
+
+def test_fork_is_rejected_structurally():
+    """AUDIT-FORK (s55): a non-genesis previous_hash can be referenced by at most ONE row per org (DB-enforced
+    CAS) → the chain physically cannot fork, the gap the advisory lock alone couldn't prove."""
+    import psycopg2
+    _clean(ORG)
+    try:
+        audit.write(ORG, "o", "config.update", "config", "a", None)        # genesis
+        audit.write(ORG, "o", "config.update", "config", "b", None)        # previous_hash = row a's entry_hash
+        with _db() as c:
+            with c.cursor() as cur:
+                cur.execute("SELECT previous_hash FROM core_audit WHERE org_id=%s AND resource_id='b'", (ORG,))
+                prev_of_b = cur.fetchone()["previous_hash"]                 # = row a's entry_hash
+        raised = False
+        try:                                                                # a 2nd row off the same predecessor = a fork
+            with _db() as c:
+                with c.cursor() as cur:
+                    cur.execute("INSERT INTO core_audit (id, org_id, who, action, resource_type, resource_id, "
+                                "changes, at, previous_hash, entry_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,NOW(),%s,%s)",
+                                ("forged-id", ORG, "x", "a", "r", "c", None, prev_of_b, "f" * 64))
+        except psycopg2.errors.UniqueViolation:
+            raised = True
+        assert raised
+        assert audit.verify_chain(ORG)["result"] == "PASS"                  # the real chain is intact
     finally:
         _clean(ORG)

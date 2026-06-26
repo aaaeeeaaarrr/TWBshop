@@ -4759,10 +4759,16 @@ def flow_patch(uid: int, step: str | None = None, data_patch: dict | None = None
     return cur_state
 
 
-def flow_clear(uid: int) -> None:
+def flow_clear(uid: int):
+    """Delete the flow for a uid AND return it if a row was ACTUALLY deleted (None if already cleared) — so a
+    caller can use the delete as an ATOMIC CLAIM: exactly one of a racing typed-reason + 30-min auto-resolve
+    wins the delete and proceeds to book (the loser does nothing), so an own-sick can't be booked twice
+    (SICK-RACE, s55). Idempotent. Existing callers that ignore the return are unaffected."""
     with _db() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM gm_flow_state WHERE uid=%s", (uid,))
+            cur.execute("DELETE FROM gm_flow_state WHERE uid=%s RETURNING uid", (uid,))
+            r = cur.fetchone()
+            return r["uid"] if r else None
 
 
 def staff_bind_uid(staff_id: int, uid: int) -> None:

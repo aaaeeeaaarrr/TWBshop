@@ -276,6 +276,14 @@ def init_core_db() -> None:
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_org ON core_audit (org_id, at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_res ON core_audit (resource_type, resource_id)")
+            # monotonic per-row sequence, assigned under the per-org advisory lock → the ONE well-defined
+            # chain order (head-select + verify order by seq, not by wall-clock `at` which can tie or skew).
+            cur.execute("ALTER TABLE core_audit ADD COLUMN IF NOT EXISTS seq BIGSERIAL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_core_audit_seq ON core_audit (org_id, seq)")
+            # a non-genesis previous_hash may be referenced by AT MOST ONE row per org → the chain cannot
+            # FORK (a DB-enforced CAS — the backstop the advisory lock alone can't prove).
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_audit_prev ON core_audit "
+                        "(org_id, previous_hash) WHERE previous_hash <> '%s'" % ("0" * 64))
 
             # POS till / cash-drawer money model (harvested from POSBusiness shift_service, adapted to cash-only).
             cur.execute("""
@@ -308,7 +316,6 @@ def init_core_db() -> None:
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_cash_events_shift ON core_cash_events (org_id, shift_id)")
-            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS shift_id BIGINT")  # sale's cash → its open shift
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_stock_items (
@@ -375,6 +382,9 @@ def init_core_db() -> None:
                 )
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_org ON core_sales (org_id, sold_at DESC)")
+            # shift_id is added AFTER core_sales is created — a fresh/DR DB would crash the whole init
+            # (and crash-loop the live gm boot) if this ALTER ran before the CREATE above.
+            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS shift_id BIGINT")  # sale's cash → its open shift
 
             cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS monthly_salary NUMERIC DEFAULT 0")
             cur.execute("""
@@ -405,19 +415,45 @@ def init_core_db() -> None:
             cur.execute("ALTER TABLE core_stock_counts ADD COLUMN IF NOT EXISTS book_before NUMERIC")
             cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS actor TEXT")
             cur.execute("ALTER TABLE core_expenses ADD COLUMN IF NOT EXISTS actor TEXT")
+            cur.execute("ALTER TABLE core_cash_events ADD COLUMN IF NOT EXISTS actor TEXT")  # forensics: who moved the drawer
+
+            # ── s55 audit hardening: structural integrity for the platform domains ──────────────────────
+            # STOCK-NEG: on_hand can never go negative (a sale clamps the decrement at 0; this is the storage
+            # belt) so a later count's shrinkage variance can't be corrupted by a phantom-negative book value.
+            cur.execute("DO $$ BEGIN "
+                        "ALTER TABLE core_stock_items ADD CONSTRAINT chk_on_hand_nonneg CHECK (on_hand >= 0); "
+                        "EXCEPTION WHEN duplicate_object THEN NULL; END $$")
+            # DOMAIN-IDEMP: an optional client/idempotency key per mutation → a crash-redelivery or double-tap
+            # re-applies NOTHING (the offline-queue S2 cure). Partial-unique so existing keyless rows are free.
+            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS client_key TEXT")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_sales_ckey ON core_sales (org_id, client_key) "
+                        "WHERE client_key IS NOT NULL")
+            cur.execute("ALTER TABLE core_sales ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ")  # 2b: single-void marker
+            cur.execute("ALTER TABLE core_expenses ADD COLUMN IF NOT EXISTS client_key TEXT")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_expenses_ckey ON core_expenses (org_id, client_key) "
+                        "WHERE client_key IS NOT NULL")
+            cur.execute("ALTER TABLE core_stock_counts ADD COLUMN IF NOT EXISTS client_key TEXT")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_counts_ckey ON core_stock_counts (org_id, client_key) "
+                        "WHERE client_key IS NOT NULL")
+            # PAYROLL-IDEMP: one pay run per (org, period) and one payslip per (run, staff) → re-running a period
+            # (double-click / POST retry) returns the existing run and creates NO duplicate run or payslips.
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_pay_run_period ON core_pay_runs (org_id, period)")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_payslip_run_staff "
+                        "ON core_payslips (org_id, run_id, staff_id)")
 
 
 def log_config_change(org_id: str, who: str, path: str, old_val, new_val) -> None:
     """Append a who-changed-what-when row for a config edit (auditability) AND a tamper-evident hash-chained
-    mirror in core_audit (core.audit). The flat table stays the readable log; the chain adds tamper-evidence."""
+    mirror in core_audit (core.audit) — BOTH in the SAME transaction, so a config change can never commit while
+    its chained audit row is lost. The flat table stays the readable log; the chain adds tamper-evidence."""
     ov = None if old_val is None else str(old_val)[:200]
     nv = None if new_val is None else str(new_val)[:200]
+    from core import audit
     with _db() as conn:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO core_config_audit (org_id, who, path, old_val, new_val) "
                         "VALUES (%s,%s,%s,%s,%s)", (org_id, who or "?", path, ov, nv))
-    from core import audit                                     # hash-chained mirror (separate txn; additive)
-    audit.write(org_id, who or "?", "config.update", "config", path, {"old": ov, "new": nv})
+            audit.write(org_id, who or "?", "config.update", "config", path, {"old": ov, "new": nv}, cur=cur)
 
 
 def recent_config_audit(org_id: str, limit: int = 100) -> list:

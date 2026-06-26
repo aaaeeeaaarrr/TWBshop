@@ -3,7 +3,10 @@ import logging
 
 from shared.log_redact import REDACTED, RedactTokenFilter, install_log_hygiene, redact
 
-FAKE = "bot8827684951:AAGa9y-2wZYGAB21uXMqT8wwWH5wJ5c4q3U"
+# Synthetic, same SHAPE as a Telegram token (digits:35-chars) — the redaction test only needs the shape.
+# NEVER paste a real token here: a real one leaks into git history and must then be rotated via BotFather.
+# The real GM token lives ONLY in secrets.py.
+FAKE = "bot000000000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 
 def test_redact_pure():

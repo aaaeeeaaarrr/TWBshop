@@ -9,6 +9,150 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 
 ---
 
+## Session 55 — A-Z due-diligence audit (ultracode, 44-agent, read-only)
+Full report: workflow `wf_7bb0f25d-3e6`. Verdict: LIVE production core is sound + suite really green
+(1081p/2s); ONE CRITICAL credential to rotate; the rest are INERT platform fixes on the harvest.
+
+### 🎁 Bonuses
+- **Atomic-claim discipline is REAL where it matters** `[sell]` — att_check_in CAS · no_show ON CONFLICT
+  DO NOTHING RETURNING · shift_change_claim_settle CAS · ot_bank_claim_spend conditional CAS ·
+  al_approve_and_deduct advisory-lock + frozen map · payback_book single-txn chokepoint. "over-bank/
+  double-credit impossible by construction" is TRUE on the live path, not just claimed.
+- **One cheap primitive kills the live own-sick race AND any flow double-dispatch** `[idea]` — make
+  flow_clear a claim (`DELETE … WHERE uid=%s RETURNING uid`), dispatch only on a won delete. The project's
+  own flip-first cure, turning the flow dispatcher into a single-winner like check-in/settle.
+- **core/till.py is a reusable reference S2/S3/S4 implementation** `[ship]` — partial-unique atomic claim +
+  flip-status-first idempotent close + derived-not-stored expected_cash + every move hash-chained. Lift its
+  UNIQUE-as-claim / flip-first pattern straight into payroll/stock/dedup.
+- **DB-level CHECK constraints already refuse over-credit** `[sell]` — core_ot_bank balance>=0,
+  core_payback_debts paid<=owed. "storage-layer guarantees, not trust-the-caller" — extend to OT cap, AL
+  floor, on_hand>=0 to make the payroll-product claim fully true.
+- **Two-layer audit catches a DB-admin re-chain + anchor forgery** `[sell]` — "tamper-evidence the DB admin
+  themselves can't quietly defeat"; hashes NOT NULL from row 1 (better than the harvested source).
+- **Shadow-run = a paid de-risking offering** `[sell]` — double-wrapped try/except + own logger + own tables
+  + off-by-default + separate connection ⇒ it can NEVER roll back or block a live txn.
+- **core/* imports ZERO channel SDKs / legacy bot modules, build-guard-enforced** `[sell]` — the brain can be
+  lifted out cleanly; the rebuild-clean goal is enforced, not just claimed.
+- **Tenant isolation is consistently org_id-scoped across every core domain query** `[sell]` — no
+  cross-tenant leak found in the sweep; reinforced by the single-tenant-per-process wizard model.
+- **Turn the negative/abnormal cash_event hole into a feature** `[idea/sell]` — a "negative/abnormal
+  cash_event" detector feeds the existing shrinkage/investigation suite: a gate-bypass bug → a sell point.
+- **One auto-discovery change fixes the map-completeness gap AND both its guards** `[idea]` — the map tooling
+  itself recurs the signature bug-class (a value hardcoded in the caller, here PKG_DIRS, not derived from the
+  filesystem). Closing it makes "check the map before claiming a gap" trustworthy for the whole repo.
+- **The AL deduct/refund pair is a clean reusable S1 template** `[ship]` — deduct-at-approval + frozen per-day
+  map + ONE shared inverse reused by Cancel-AL and in-txn supersede. The model for porting OT/payback/POS-till
+  money paths to core/.
+- **Near-zero-cost lever: wire the already-rendered wizard knobs into core math** `[idea]` — ot.bank_cap_min +
+  leave.short_notice_days are display-only today; wiring them into core.settle/core.leave makes two settings
+  genuinely functional per-tenant AND kills a duplicate-constant drift class.
+- **One lock-key per actor across all balance-moving features** `[decision]` — the advisory-lock namespace
+  (911, staff_id) already serializes AL vs shift-change vs swap vs supersede; document it as a platform
+  invariant to harden every future multi-writer (S5) feature.
+- **conftest forces TWBSHOP_ENV=staging before the pool builds** `[ship]` — no test can mutate prod;
+  test_till.py + test_audit_chain.py are model harvest tests reusable as the re-test template for the rest.
+
+### 🔍 Findings (severity / where → fix)
+- ⭐⭐⭐ **SEC-01 (CRITICAL/live):** live GM bot token in `tests/test_log_redact.py:6` == `secrets.py:16`, in
+  git history (commit 89a2bd2) → **ROTATE via BotFather**; working-tree literal scrubbed to a synthetic
+  same-shape token (done s55). Deleting the line can't undo history.
+- **F4 (HIGH/b2b-disabled):** `_do_confirm` moves money before flipping request status → claim-first
+  `UPDATE … WHERE status IN('draft','pending') RETURNING`.
+- **F2 (HIGH/b2b-disabled):** `apply_payment` non-atomic (3 commits) + non-idempotent → one _db() txn +
+  idempotency key + Decimal/integer-cents.
+- **F3 (HIGH/b2b-disabled):** `b2b_payments` has no dedup UNIQUE (racy check-then-write) → partial UNIQUE on
+  file_unique_id/message_id + ON CONFLICT DO NOTHING.
+- **SICK-RACE (MED/live-gm):** own-sick auto-resolve vs typed-reason race doubles payback debt + dup
+  sick_case → flow_clear-as-claim. PARK deploy for owner quiet-window.
+- **HIRE-TOK (MED/live-hire):** `create_session` raises AttributeError on the secrets.py stdlib shadow
+  (sessions.py:50) → os.urandom token + a create_session test. PARK deploy.
+- **INIT-ORDER (MED→fixed-in-tree s55):** core/db.py ALTERed core_sales before CREATE (:311 vs :367) →
+  fresh/DR DB crash-loops the live gm boot. **Reordered + run_gm_bot init wrapped try/except** (deploy gated).
+- **LEDGER-CAP (MED/inert):** OT 14h cap enforced in caller from an unlocked read (ledger.py:62-78); two
+  same-staff shifts over-bank → FOR UPDATE + `SET balance=LEAST(cap, …)`.
+- **LEDGER-PHANTOM (MED/inert):** debt read not FOR UPDATE; concurrent settle logs phantom pb_cleared and
+  reverse_settle corrupts the winner's credit → log RETURNING delta only.
+- **AL-SIGN (MED/inert):** leave_ledger no-row UPSERT writes +total (credits) instead of −total on a first AL
+  approval; cancel asymmetric → insert 0-total + symmetric refund + CHECK>=0 (leave_ledger.py:54-57).
+- **AUDIT-FORK (MED/inert):** chain head ordered by pre-lock wall-clock `at` + random uuid (false FAIL +
+  genuine fork undetected) → BIGSERIAL seq under the lock + UNIQUE(org_id,previous_hash) + branch detection.
+- **AUDIT-TXN (MED/inert):** audit row written in a separate txn after the money/config commit; a missing row
+  is undetectable by verify_chain → thread a caller cursor into audit.write (same-txn).
+- **PAYROLL-IDEMP (MED/inert):** run_payroll non-idempotent, re-run double-creates payslips → UNIQUE(org_id,
+  period) + ON CONFLICT + UNIQUE(run_id,staff_id) + a re-run test.
+- **STOCK-NEG (MED/inert):** on_hand has no >=0 CHECK; record_sale subtracts blindly → negative stock corrupts
+  shrinkage/suspect output → CHECK(on_hand>=0) or guarded decrement.
+- **DOMAIN-IDEMP (MED/inert):** record_sale/receive_purchase/add_expense/record_count have no idempotency key
+  (the planned offline queue makes this real) → client_key + partial UNIQUE + ON CONFLICT (phase 3).
+- **WEB-ADAPTER (MED/inert):** adapters/web.py takes org_id from the request body + serve() binds 0.0.0.0 with
+  no auth → server-side org from authed session + reject body org_id + 127.0.0.1 default + import-guard test.
+- **GUARD-REGEX (MED/na):** secret_guard.py:33 token regex misses the bot-prefixed leak form (leading \b
+  blocks anchoring) → drop \b / add (?:bot)? + a regression case; align with log_redact.py:15. (owner-gated:
+  editing .claude/hooks/ is guard-blocked for me.)
+- **SHADOW-VACUOUS (MED/inert):** settle shadow agrees by construction (re-runs identical source on live
+  outputs; payback-slot never compared) → "settle 100% agree" is NOT a money cut-over signal → model the
+  payback-slot for real / label informational rows; parity-lock verdict.
+- **GUARD-SKIP (MED/inert):** over-book/double-bank/tail money guards pytest.skip on an empty staging
+  staff_registry → self-provision an is_test staff row so they can't silently skip.
+- **MAP-INCOMPLETE (MED/na):** MAP_INDEX/gen_map_index PKG_DIRS + test_map_integrity _PACKAGES omit
+  core/wizard/adapters/telegram_bot (~50 files incl. a LIVE retail-bot dir) while claiming "can never omit a
+  file" → auto-discover dirs containing .py; refresh MAP.md core/ section.
+- **TILL-ACTOR (LOW/inert):** cash events/closes audited as the shift opener not the actual actor → actor
+  param/column + thread _current_user (before any multi-cashier go-live).
+- **REFUND-ASYM (LOW/inert):** till refund reconciles the drawer but isn't symmetric with sale/stock (no void
+  → revenue overstated S4 + stock decremented S1) → void_sale/refund_sale one-txn resolver (phase 2b).
+
+### 🛠 BUILD — audit fixes shipped to staging (inert; live deploys PARKED for the owner)
+All on staging, each with a regression test; nothing deployed to a live bot. Live-service code is prepared +
+proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order · token rotation).
+- ✅ **leave_ledger AL-SIGN** `[ship]` — a first-ever AL approval now DEDUCTS from an implicit zero (was a
+  silent over-CREDIT); cancel made symmetric (recreates a missing row). *Decision:* declined a `CHECK>=0` on
+  core_al_balance — AL over-draw is a caller-side approval gate, not a storage invariant (unlike OT bank where
+  a negative balance is meaningless); a negative AL balance is a recoverable "took more than entitled" state.
+- ✅ **ledger over-bank + phantom credit** `[ship]` — a per-staff advisory lock (the live `911,staff_id`
+  pattern) serializes a staff's concurrent settles + `FOR UPDATE` + a `LEAST(cap,…)` structural belt; the
+  event records the ACTUALLY-applied payback (RETURNING) so reverse_settle can't un-credit a phantom. Proven
+  with a real threaded race test.
+- ✅ **audit chain same-txn + un-forkable** `[ship/sell]` — `audit.write(cur=…)` writes the chain row in the
+  caller's transaction (no applied-but-unaudited window); a `BIGSERIAL seq` (assigned under the lock) is the
+  one true order; a partial-UNIQUE(org_id, previous_hash) makes a fork physically impossible (DB-enforced CAS)
+  + verify_chain gained fork detection. The "tamper-evident money audit" claim is now airtight.
+- ✅ **2b void/refund** `[ship/sell]` — `pos.void_sale`: one txn marks the sale voided (single-void), gives the
+  stock back, fires a 'refund' drawer event so the till reconciles, same-txn audit; revenue excludes voided.
+- ✅ **offline-idempotency (S2) across the domains** `[ship]` — an optional client_key + partial-UNIQUE +
+  ON CONFLICT on record_sale / receive_purchase / add_expense / record_count → a crash-redelivery / double-tap
+  re-applies NOTHING (the offline-queue cure, ready for harvest Phase 3).
+- ✅ **STOCK-NEG + PAYROLL-IDEMP** `[ship]` — a sale clamps on_hand at 0 (`GREATEST`) + a `CHECK(on_hand>=0)`
+  belt → shrinkage math can't be corrupted; UNIQUE(org,period)+UNIQUE(run,staff) + claim-first run_payroll →
+  re-running a period creates no duplicate run/payslips.
+- ✅ **map completeness** `[ship]` — the generator + integrity test now DERIVE the package list from the
+  filesystem (one source of truth) → MAP_INDEX 190 entries incl. core/wizard/adapters/telegram_bot (was blind
+  to ~50 files incl. a live retail dir while claiming "can never omit a file").
+- ✅ **money-guard skip closed** `[ship]` — the over-book/double-bank/tail guards self-provision a dedicated
+  ex_staff test staffer → they can never silently skip on a fresh/empty staging DB.
+- ✅ **web adapter hardened** `[ship]` — rejects a client-supplied org_id (403, cross-tenant guard) · serve()
+  defaults to 127.0.0.1 · 1MB body cap · an import-guard test fails if a run_*.py wires it without W3 auth.
+- ✅ **TILL-ACTOR + voids/refunds log** `[ship/sell]` — cash events/closes now record the real actor (not the
+  shift opener); `investigate.voids_refunds_log` surfaces voided sales + refund/payout drawer events + who did
+  them = the parked loss-prevention "voids/refunds log", now real.
+- ✅ **own-sick double-book RACE closed (LIVE-prep, deploy PARKED)** `[ship]` — `flow_clear` is now an atomic
+  CLAIM (delete-and-return): exactly one of a racing typed-reason + the 30-min auto-resolve books the payback.
+- ✅ **hire-token break fixed (LIVE-prep, deploy PARKED)** `[ship]` — `create_session` mints via os.urandom,
+  not the stdlib `secrets` the repo's secrets.py shadows.
+
+### 🎁 New bonuses surfaced during the build
+- **flow_clear-as-claim is a one-line, reusable single-winner primitive** `[ship]` — `DELETE … RETURNING` turns
+  any flow dispatcher into a race-safe single-winner; the same shape can guard any future "two callers, one
+  effect" path (the project's flip-first cure generalized to the flow layer).
+- **The void→refund→audit chain is a sellable loss-prevention story** `[sell]` — every void gives stock back,
+  reconciles the drawer, AND writes a tamper-evident, actor-attributed audit row in one transaction; the
+  voids/refunds log reads straight off it. "Nobody can quietly void a sale" is now demonstrably true.
+- **Map tooling itself had the signature bug-class** `[gotcha]` — a hardcoded package list in the CALLER instead
+  of derived from the source of truth (the filesystem). Fixing it makes "check the map before claiming a gap"
+  trustworthy for the WHOLE repo, and is a clean example to cite when teaching the bug-class.
+
+---
+
 ## Session 53 — config-driven wizard · onboarding · channels · platform
 
 ### 🎁 Bonuses

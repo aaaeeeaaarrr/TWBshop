@@ -105,3 +105,31 @@ def test_stock_page_and_actions(monkeypatch):
         assert "⚠️" in c.get("/stock").get_data(as_text=True)            # shows in reorder
     finally:
         _clean()
+
+
+def test_record_count_idempotent_replay():
+    """DOMAIN-IDEMP (s55): the same client_key replays to the same count_id and doesn't re-set on_hand."""
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Rice", "kg", par_level=5)
+        c1 = stock.record_count(ORG, iid, 8, client_key="cnt-1")
+        c2 = stock.record_count(ORG, iid, 99, client_key="cnt-1")        # replay (even a different qty) → ignored
+        assert c1 == c2                                                  # same count row
+        assert float(stock.list_items(ORG)[0]["on_hand"]) == 8         # on_hand from the ORIGINAL count, not 99
+    finally:
+        _clean()
+
+
+def test_receive_purchase_idempotent_replay():
+    from core import expenses
+    _clean()
+    try:
+        iid = stock.add_item(ORG, "Sugar", "kg", par_level=5)
+        stock.record_count(ORG, iid, 2)
+        e1 = stock.receive_purchase(ORG, iid, 20, 30, "Sup A", client_key="rcv-1")
+        e2 = stock.receive_purchase(ORG, iid, 20, 30, "Sup A", client_key="rcv-1")    # replay
+        assert e1 == e2                                                  # same expense, not a 2nd
+        assert float(stock.list_items(ORG)[0]["on_hand"]) == 22        # restocked ONCE (2+20), not 42
+        assert expenses.expense_summary(ORG, 30)["total"] == 30.0      # expense logged ONCE
+    finally:
+        _clean()

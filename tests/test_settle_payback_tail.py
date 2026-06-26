@@ -16,11 +16,14 @@ CHECKIN = datetime.datetime(2026, 7, 1, 18, 58, tzinfo=finance.PP_TZ)       # 2 
 
 
 def _staff_id():
+    """Self-provision a dedicated test staffer (idempotent; ex_staff) so this money guard can NEVER silently
+    skip on a fresh/empty staging DB (s55 GUARD-SKIP fix)."""
     with db._db() as c:
         with c.cursor() as cur:
-            cur.execute("SELECT id FROM staff_registry ORDER BY id LIMIT 1")
-            r = cur.fetchone()
-            return r["id"] if r else None
+            cur.execute("INSERT INTO staff_registry (canonical_name, status) "
+                        "VALUES ('__guard_test_staff__','ex_staff') "
+                        "ON CONFLICT (canonical_name) DO UPDATE SET status='ex_staff' RETURNING id")
+            return cur.fetchone()["id"]
 
 
 def _cleanup(sid):
@@ -32,9 +35,6 @@ def _cleanup(sid):
 
 def test_worked_overnight_tail_credits_the_debt():
     sid = _staff_id()
-    if sid is None:
-        import pytest
-        pytest.skip("no staff_registry rows on staging")
     db.set_att_test(True)
     staff = {"id": sid, "canonical_name": "T", "call_name": "T",
              "work_start": "19:00", "work_end": "06:00", "day_off": "Mon"}

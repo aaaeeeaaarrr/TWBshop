@@ -2075,7 +2075,7 @@ def create_app(org_id: str = "twb") -> Flask:
             amt = float(request.form.get("amount"))
         except (TypeError, ValueError):
             return redirect("/till")
-        till.cash_event(org_id, request.form.get("type"), amt)
+        till.cash_event(org_id, request.form.get("type"), amt, actor=_current_user())
         return redirect("/till?saved=1")
 
     @app.post("/till/close")
@@ -2085,7 +2085,7 @@ def create_app(org_id: str = "twb") -> Flask:
             counted = float(request.form.get("counted_cash"))
         except (TypeError, ValueError):
             return redirect("/till")
-        z, err = till.close_shift(org_id, counted, request.form.get("note") or None)
+        z, err = till.close_shift(org_id, counted, request.form.get("note") or None, actor=_current_user())
         if isinstance(err, dict):                                  # variance-reason gate
             return redirect("/till?ve=1")
         if err:
