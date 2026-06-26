@@ -1798,7 +1798,13 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
             await msg.reply_text(ui._V_FAR)
         return True
     now_min = now_pp.hour * 60 + now_pp.minute
-    state, mins = ci.verdict(now_min, ws, True)
+    try:                                              # config-driven verdict (instant-live); fail-safe to the spec
+        from core.tenant_config import verdict_cfg
+        _vc = verdict_cfg("twb")
+        _g, _e = int(_vc.get("grace_min", ci.GRACE_MIN)), int(_vc.get("early_bonus_min", ci.EARLY_BONUS_MIN))
+    except Exception:
+        _g, _e = ci.GRACE_MIN, ci.EARLY_BONUS_MIN
+    state, mins = ci.verdict(now_min, ws, True, grace_min=_g, early_bonus_min=_e)
     # GRACE — a "late" verdict becomes a clean on-time check-in (no late points) when either:
     #  (a) GO-LIVE: the shift started before we flipped live (staff couldn't check in pre-live); or
     #  (b) COME-IN SICK: they have an open own-sick case for today and came in anyway — coming in must

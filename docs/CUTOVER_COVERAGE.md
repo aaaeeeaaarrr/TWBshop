@@ -22,9 +22,11 @@ logic cut-over. The swap rule is the template:
 5. **Consolidate duplicates** while you're there (see GRACE_MIN below).
 
 ## ▶ Migrate FIRST — highest value, lowest risk (default already == TWB's value)
-1. **`attendance.verdict.grace_min`** (=5) → `gm_bot/checkin.py:14` (+ **dup** `gm_bot/late.py:8`) — the lateness
-   grace window; highest-frequency check, pure lateness math. **Consolidate the two copies into the config read.**
-2. **`attendance.verdict.early_bonus_min`** (=5) → `gm_bot/checkin.py:15` — the early-arrival bonus threshold.
+1. ✅ **DONE (staging-proven, PARKED for deploy) — `attendance.verdict.grace_min`** (=5) → `gm_bot/checkin.py`
+   parameterized + the live caller `bot.py:1801` now reads `verdict_cfg("twb")` fresh (fail-safe). Dead dup in
+   `late.py:8` REMOVED. Behavior-preserving (PROD: TWB override=`null` → effective 5). ⛔ owner: deploy the gm in a
+   quiet window to flip it live; until then the running gm keeps the hardcoded 5 (unchanged).
+2. ✅ **DONE (with #1) — `attendance.verdict.early_bonus_min`** (=5) → same verdict path, same migration.
 3. **`attendance.leave.papers_grace_days`** (=2) → `gm_bot/sick.py:11` — doctor's-paper deadline; low blast radius.
 4. **`attendance.leave.short_notice_days`** (=7) → `gm_bot/al.py:12` — the <7-days AL penalty boundary.
 5. **`attendance.ot.bank_cap_min`** (=14*60) → `gm_bot/ot.py:13` — the OT-bank ceiling.

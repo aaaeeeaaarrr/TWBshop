@@ -228,6 +228,18 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   into a module cache → changing a question needs a hire-bot restart. NOT a dashboard-settings path (separate), but
   it's the one "needs a restart to pick up a change" spot found; if questions ever become wizard-tweakable, switch
   it to a fresh read.
+- ✅ **FIRST live-gm setting migrated to config — verdict grace_min + early_bonus_min** `[ship/sell]` (owner) — the
+  check-in verdict (`gm_bot/checkin.py`) is now config-parameterized and the LIVE caller (`bot.py:1801`) reads
+  `tenant_config.verdict_cfg("twb")` fresh per check-in (fail-safe to the spec) → a dashboard grace-period tweak is
+  instant-live with NO gm restart, joining the swap rule + AL ladder. BEHAVIOR-PRESERVING (default==current) +
+  staging-proven; PARKED for an owner quiet-window deploy (HIGH-RISK verdict path). The cut-over roadmap's win #1+#2.
+- ⭐ **FINDING — the GRACE_MIN "duplicate" was DEAD** `[gotcha]` — `late.py:8 GRACE_MIN=5` was defined but never
+  referenced (the real verdict grace lives in checkin.py); the "drift risk" was a phantom dead constant. Removed it
+  → the consolidation is real, the source is single.
+- ⭐ **FINDING — verify the LIVE tenant's config BEFORE a behavior-preserving migration** `[decision]` — "default ==
+  current" only holds if the live tenant has no conflicting override. Checked PROD first: TWB's verdict override is
+  `null` → effective grace_min=5 == the constant → migration provably changes nothing. Always read the live config,
+  never assume the default applies.
 
 ---
 

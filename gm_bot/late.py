@@ -5,7 +5,8 @@ debt is measured at arrival by location (in checkin/payback). Gated behind atten
 """
 from __future__ import annotations
 
-GRACE_MIN = 5
+# (GRACE_MIN lived here too and was DEAD — the verdict's grace is the single source in gm_bot/checkin.py,
+#  now config-driven via tenant_config.verdict_cfg. Removed to kill the drift risk.)
 
 
 def shift_len(ws_min: int, we_min: int) -> int:

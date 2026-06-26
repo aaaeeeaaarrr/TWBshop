@@ -49,16 +49,19 @@ def relative_minutes(now_min: int, shift_start_min: int) -> tuple[int, int]:
     return 0, rel                 # at/after the shift
 
 
-def verdict(now_min: int, shift_start_min: int, in_zone: bool) -> tuple[str, int]:
+def verdict(now_min: int, shift_start_min: int, in_zone: bool,
+            grace_min: int = GRACE_MIN, early_bonus_min: int = EARLY_BONUS_MIN) -> tuple[str, int]:
     """Classify a check-in attempt → (state, minutes).
     states: 'not_here' (outside zone) · 'early' (+points, minutes early) ·
-            'ontime' (within grace either side) · 'late' (minutes late, counts as payback)."""
+            'ontime' (within grace either side) · 'late' (minutes late, counts as payback).
+    grace_min / early_bonus_min default to the locked spec (5 / 5) and may be overridden per tenant
+    (config-driven, instant-live): the LIVE caller passes them from tenant_config; no override = unchanged."""
     if not in_zone:
         return "not_here", 0
     early, late = relative_minutes(now_min, shift_start_min)
-    if early >= EARLY_BONUS_MIN:
+    if early >= early_bonus_min:
         return "early", early
-    if late > GRACE_MIN:
+    if late > grace_min:
         return "late", late
     return "ontime", 0
 
