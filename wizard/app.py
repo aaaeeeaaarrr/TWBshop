@@ -809,8 +809,12 @@ def render_dashboard(org_id: str) -> str:
           "document.querySelectorAll('.dcard').forEach(function(e){e.style.display=(c==='all'||e.dataset.cat===c)?'':'none';});"
           "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
+    _wb = ("" if get_config(org_id).get("onboarding", {}).get("quiz_done") else
+           "<div class='box' style='background:#eff6ff;border-color:#bfdbfe'>👋 <b>New here?</b> "
+           "Answer a few quick questions and we'll set the right tools up for you — "
+           "<a href='/welcome'>start setup →</a> <span class='note'>(a minute · skippable)</span></div>")
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>"
+            "<h1>⚡ Your system</h1>" + _wb +
             "<form method='get' action='/ask' style='margin:8px 0'><input name='q' "
             "placeholder='💬 Ask your business… e.g. any shrinkage?' "
             "style='width:55%%;padding:7px;border:1px solid #cbd5e1;border-radius:8px'> "
@@ -1296,6 +1300,37 @@ def render_investigate(org_id: str) -> str:
             % (var_html, off_box, unatt_html, drawer_html, voids_html, escape(date_q), present_html,
                item_opts, tl_html, act_html))
     return _page("Investigate", body)
+
+
+def render_welcome(org_id: str) -> str:
+    """First-run questionnaire (packaging per client-type) — shows the next unanswered question (essentials
+    first), skippable any time. On finish it maps the answers → a starter package + enabled domains, then
+    hands off to the dashboard ('Customize your experience'). Config-only; everything stays tweakable."""
+    from wizard import onboarding_quiz as oq
+    ob = get_config(org_id).get("onboarding", {})
+    ans = oq.saved_answers(org_id)
+    q = oq.next_question(ans)
+    if ob.get("quiz_done") or q is None:
+        if not ob.get("quiz_done"):
+            oq.apply_quiz(org_id)
+        return redirect("/customer?welcome=1")
+    ess_total = sum(1 for x in oq.QUIZ if x["essential"])
+    ess_done = sum(1 for x in oq.QUIZ if x["essential"] and x["key"] in ans)
+    inp = "checkbox" if q["multi"] else "radio"
+    opts = "".join("<label style='display:block;padding:12px 14px;margin:6px 0;border:1px solid #e5e7eb;"
+                   "border-radius:10px;cursor:pointer'><input type='%s' name='v' value='%s'> &nbsp;%s</label>"
+                   % (inp, escape(o[0]), escape(o[1])) for o in q["options"])
+    body = ("<div class='box' style='max-width:560px;margin:6vh auto'>"
+            "<div class='note'>Quick setup · question %d</div><h1 style='margin:.2em 0'>%s</h1>%s"
+            "<form method='post' action='/welcome'><input type='hidden' name='key' value='%s'>%s"
+            "<div style='margin-top:14px'><button type='submit'>Next →</button> &nbsp; "
+            "<a href='/welcome/skip' class='note'>Skip the rest — use sensible defaults</a></div></form>"
+            "<p class='note' style='margin-top:14px'>%d of %d essentials answered · everything stays "
+            "tweakable later.</p></div>"
+            % (ess_done + 1, escape(q["q"]),
+               ("<p class='note'>Pick any that apply.</p>" if q["multi"] else ""),
+               escape(q["key"]), opts, ess_done, ess_total))
+    return _page("Welcome", body)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -1812,6 +1847,26 @@ def create_app(org_id: str = "twb") -> Flask:
     def customer_apply():
         apply_changes(org_id, request.form)
         return redirect("/customer/config?saved=1")
+
+    @app.get("/welcome")
+    def welcome():
+        return render_welcome(org_id)
+
+    @app.post("/welcome")
+    def welcome_answer():
+        from wizard import onboarding_quiz as oq
+        key = (request.form.get("key") or "").strip()
+        vals = request.form.getlist("v")
+        q = next((x for x in oq.QUIZ if x["key"] == key), None)
+        if q and vals:
+            oq.record_answer(org_id, key, vals if q["multi"] else vals[0])
+        return redirect("/welcome")
+
+    @app.get("/welcome/skip")
+    def welcome_skip():
+        from wizard import onboarding_quiz as oq
+        oq.apply_quiz(org_id)
+        return redirect("/customer?welcome=1")
 
     @app.get("/expertise")
     def expertise():
