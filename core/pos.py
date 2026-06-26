@@ -35,6 +35,8 @@ def record_sale(org_id, item_id, qty, unit_price, item_name=None, actor=None, cl
             if item_id:                                      # cross-domain: a sale reduces stock on-hand (≥ 0)
                 cur.execute("UPDATE core_stock_items SET on_hand = GREATEST(0, on_hand - %s) "
                             "WHERE org_id=%s AND item_id=%s", (qty, org_id, item_id))
+            audit.write(org_id, actor, "pos.sale", "sale", str(sid),
+                        {"item_id": item_id, "qty": str(qty), "unit_price": str(unit_price)}, cur=cur)
             return sid
 
 

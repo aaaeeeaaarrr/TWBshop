@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from shared.database import _db
+from core import audit
 
 
 def add_expense(org_id, amount, supplier=None, category=None, note=None, actor=None, client_key=None) -> int:
@@ -21,7 +22,10 @@ def add_expense(org_id, amount, supplier=None, category=None, note=None, actor=N
                 cur.execute("SELECT expense_id FROM core_expenses WHERE org_id=%s AND client_key=%s",
                             (org_id, client_key))
                 return cur.fetchone()["expense_id"]
-            return row["expense_id"]
+            eid = row["expense_id"]
+            audit.write(org_id, actor, "expense.add", "expense", str(eid),
+                        {"amount": str(amount), "supplier": supplier, "category": category}, cur=cur)
+            return eid
 
 
 def list_expenses(org_id, limit=50) -> list:

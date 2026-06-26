@@ -107,6 +107,22 @@ def voids_refunds_log(org_id, days: int = 30, limit: int = 100) -> list:
     return [{"when": str(w)[:16], "what": what, "amount": round(a, 2), "by": by} for (w, what, a, by) in out[:limit]]
 
 
+def cash_drawer_report(org_id, days: int = 30, limit: int = 100) -> list:
+    """Closed tills whose counted cash didn't match expected (over/short) — [{shift_id, who, when, expected,
+    counted, variance, note}], biggest |variance| first. The cash-drawer over/short loss-prevention view
+    (variance < 0 = short/missing; > 0 = over). Reads the till's own closed-shift variance."""
+    win = "(%s::text || ' days')::interval"
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT shift_id, who, closed_at, expected_cash, counted_cash, variance, note "
+                        "FROM core_shifts WHERE org_id=%s AND status='closed' AND closed_at >= NOW() - " + win + " "
+                        "AND variance IS NOT NULL AND ABS(variance) >= 0.01 "
+                        "ORDER BY ABS(variance) DESC LIMIT %s", (org_id, days, int(limit)))
+            return [{"shift_id": r["shift_id"], "who": r["who"], "when": str(r["closed_at"])[:16],
+                     "expected": float(r["expected_cash"] or 0), "counted": float(r["counted_cash"] or 0),
+                     "variance": float(r["variance"] or 0), "note": r["note"]} for r in cur.fetchall()]
+
+
 def item_timeline(org_id, item_id, limit: int = 50) -> list:
     """A per-item forensic timeline (counts + sales), newest first: [{kind, when, detail, by}] — when an item was
     last counted/sold and by whom."""

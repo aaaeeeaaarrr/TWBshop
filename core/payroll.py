@@ -2,6 +2,7 @@
 a pay run that snapshots a payslip per ACTIVE staffer. Org-scoped, channel-free, own tables (core_pay_runs /
 core_payslips + core_staff.monthly_salary). NOT TWB's live payroll. No model calls. Tables via init_core_db."""
 from shared.database import _db
+from core import audit
 
 
 def staff_with_salary(org_id) -> list:
@@ -19,7 +20,7 @@ def set_salary(org_id, staff_id, amount) -> None:
                         (amount or 0, org_id, staff_id))
 
 
-def run_payroll(org_id, period) -> int:
+def run_payroll(org_id, period, actor=None) -> int:
     """Create a pay run for `period`: a payslip per ACTIVE staffer at their monthly salary — one transaction.
     Idempotent per period (PAYROLL-IDEMP): a re-run (double-click / POST retry) returns the EXISTING run and
     creates NO duplicate run or payslips — UNIQUE(org_id, period) is the claim."""
@@ -40,6 +41,8 @@ def run_payroll(org_id, period) -> int:
                 cur.execute("INSERT INTO core_payslips (org_id, run_id, staff_id, staff_name, gross) "
                             "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (org_id, run_id, staff_id) DO NOTHING",
                             (org_id, rid, s["staff_id"], s["nm"], s["sal"]))
+            audit.write(org_id, actor, "payroll.run", "pay_run", str(rid),
+                        {"period": period, "total": str(total), "staff": len(staff)}, cur=cur)
             return rid
 
 

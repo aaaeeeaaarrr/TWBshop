@@ -123,3 +123,50 @@ def test_voids_refunds_log_and_actor():
                 cur.execute("DELETE FROM core_cash_events WHERE org_id=%s", (ORG,))
                 cur.execute("DELETE FROM core_shifts WHERE org_id=%s", (ORG,))
         _clean()
+
+
+def test_domain_mutations_are_hash_chain_audited():
+    """Domain→audit-chain (s55): platform domain mutations (sale/count/receive/expense) each write a
+    tamper-evident hash-chained audit row, and the chain stays valid."""
+    from core import audit, expenses
+    _clean()
+    with _db() as c:                                       # deterministic: clean this org's chain + expenses
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM core_audit WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_expenses WHERE org_id=%s", (ORG,))
+    try:
+        iid = stock.add_item(ORG, "Cup", "pcs", par_level=2)
+        stock.record_count(ORG, iid, 10, actor="a")
+        pos.record_sale(ORG, iid, 1, 2.0, actor="b")
+        stock.receive_purchase(ORG, iid, 5, 7.0, "Sup", actor="c")
+        expenses.add_expense(ORG, 5.0, supplier="X", category="misc", actor="d")
+        acts = {r["action"] for r in audit.recent(ORG, 20)}
+        assert {"stock.count", "pos.sale", "stock.receive", "expense.add"} <= acts
+        assert audit.verify_chain(ORG)["result"] == "PASS"
+    finally:
+        with _db() as c:
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM core_audit WHERE org_id=%s", (ORG,))
+                cur.execute("DELETE FROM core_expenses WHERE org_id=%s", (ORG,))
+        _clean()
+
+
+def test_cash_drawer_over_short_report():
+    """Investigation (s55): a closed till with a cash variance shows in the over/short report with the cashier."""
+    from core import investigate, till
+    _clean()
+    with _db() as c:
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM core_cash_events WHERE org_id=%s", (ORG,))
+            cur.execute("DELETE FROM core_shifts WHERE org_id=%s", (ORG,))
+    try:
+        till.open_shift(ORG, who="cashier", opening_float=50)
+        till.close_shift(ORG, 51, actor="mgr")                  # counted 51 vs expected 50 → +$1 over (under the $2 gate)
+        report = investigate.cash_drawer_report(ORG, 30)
+        assert any(abs(d["variance"] - 1.0) < 0.001 and d["who"] == "cashier" for d in report)
+    finally:
+        with _db() as c:
+            with c.cursor() as cur:
+                cur.execute("DELETE FROM core_cash_events WHERE org_id=%s", (ORG,))
+                cur.execute("DELETE FROM core_shifts WHERE org_id=%s", (ORG,))
+        _clean()

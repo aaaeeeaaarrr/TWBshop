@@ -1244,6 +1244,16 @@ def render_investigate(org_id: str) -> str:
                 "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
                 % "".join("<li><b>%s</b> — on shift for <b>%d</b> shortfall(s)</li>"
                           % (escape(o["name"]), o["count"]) for o in offenders)) if offenders else "")
+    drawer = investigate.cash_drawer_report(org_id)
+    drawer_html = ("".join(
+        "<tr><td>%s</td><td>%s</td><td style='color:%s'><b>%s$%.2f</b></td><td>$%.2f</td><td>%s</td></tr>"
+        % (escape(d["when"]), escape(d["who"] or "—"), ("#b91c1c" if d["variance"] < 0 else "#15803d"),
+           ("−" if d["variance"] < 0 else "+"), abs(d["variance"]), d["expected"], escape(d["note"] or ""))
+        for d in drawer) if drawer else "<tr><td colspan='5' class='note'>No closed tills with a variance. 👍</td></tr>")
+    voids = investigate.voids_refunds_log(org_id)
+    voids_html = ("".join("<tr><td>%s</td><td>%s</td><td>$%.2f</td><td>%s</td></tr>"
+                          % (escape(v["when"]), escape(v["what"]), v["amount"], escape(v["by"])) for v in voids)
+                  if voids else "<tr><td colspan='4' class='note'>No voids or refunds. 👍</td></tr>")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
             "<h1>🔎 Investigate</h1><p class='note'>Pinpoint when something happened and who was around — then "
             "check the camera at that minute. Cross-domain (attendance · stock · sales · expenses).</p>"
@@ -1258,6 +1268,18 @@ def render_investigate(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
             "%s</table></div>"
+            "<div class='box'><h3>💸 Cash drawer over/short</h3>"
+            "<p class='note'>Closed tills where the counted cash didn't match expected — short (red) = "
+            "missing, over (green). Biggest first; check the camera + who was on the drawer.</p>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>Closed</th><th>Cashier</th>"
+            "<th>Variance</th><th>Expected</th><th>Reason</th></tr>%s</table></div>"
+            "<div class='box'><h3>🧾 Voids / refunds</h3>"
+            "<p class='note'>Cancelled sales + cash refunds/payouts (a classic POS shrinkage vector) — "
+            "who voided/refunded, when, how much.</p>"
+            "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
+            "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th>"
+            "<th>Amount</th><th>By</th></tr>%s</table></div>"
             "<div class='box'><h3>Who was working on a day?</h3>"
             "<form method='get' action='/investigate'><input type='date' name='date' value='%s'> "
             "<button type='submit'>Show</button></form><ul style='list-style:none;padding-left:0'>%s</ul></div>"
@@ -1271,7 +1293,8 @@ def render_investigate(org_id: str) -> str:
             "<table style='width:100%%;border-collapse:collapse' cellpadding='6'>"
             "<tr style='text-align:left;border-bottom:1px solid #eee'><th>When</th><th>What</th><th>By</th></tr>"
             "%s</table></div>"
-            % (var_html, off_box, unatt_html, escape(date_q), present_html, item_opts, tl_html, act_html))
+            % (var_html, off_box, unatt_html, drawer_html, voids_html, escape(date_q), present_html,
+               item_opts, tl_html, act_html))
     return _page("Investigate", body)
 
 
@@ -2110,7 +2133,7 @@ def create_app(org_id: str = "twb") -> Flask:
     def payroll_run():
         from core import payroll
         period = (request.form.get("period") or "").strip() or "this period"
-        payroll.run_payroll(org_id, period)
+        payroll.run_payroll(org_id, period, actor=_current_user())
         return redirect("/payroll?saved=1")
 
     @app.get("/investigate")

@@ -32,15 +32,15 @@
 - [x] **Phase 3 / S2-S4 close (s55):** client_key idempotency + partial UNIQUE + ON CONFLICT on record_sale/
       receive_purchase/add_expense/record_count · GREATEST(0,…) + CHECK(on_hand>=0) · UNIQUE(org,period) +
       UNIQUE(run,staff) + claim-first run_payroll.
-- [x] **Forensics actor + voids/refunds log (s55):** actor column + threaded `_current_user` on cash_event/
-      close_shift/void refund · `investigate.voids_refunds_log` (the parked loss-prevention log, now real).
-      *(Remaining lower-value: also write stock/pos/expenses/payroll mutations to the tamper-evident chain.)*
+- [x] **Forensics + voids/refunds + cash-drawer + domain-audit (s55):** actor on cash_event/close_shift/void ·
+      `investigate.voids_refunds_log` + `cash_drawer_report` both surfaced on /investigate · stock/pos/expenses/
+      payroll mutations now write to the tamper-evident audit chain (verify_chain stays PASS).
 - [x] **adapters/web.py hardening (s55):** reject client-supplied org_id (403) · serve() defaults 127.0.0.1 · 1MB
       body cap · import-guard test (no run_*.py may wire it without W3 auth).
-- [ ] **Shadow honesty (still open, lower priority):** label informational settle rows so the agree-rate
-      excludes never-compared rows + an import-parity-lock test for core.attendance.verdict vs gm_bot.checkin.
-      *(The bigger half — model the payback-slot ext-worked path for a REAL settle comparison — is harvest #5.
-      Cut-over is owner-gated/HELD anyway, so this doesn't block anything.)*
+- [x] **Shadow honesty — parity-lock test (s55):** core.attendance.verdict == gm_bot.checkin.verdict locked
+      across the full minute grid (`tests/test_verdict_parity.py`) so the platform verdict can't silently drift.
+      ⏸ Still deferred (low value, cut-over HELD): labeling informational settle rows (gm-deploy-gated) + modeling
+      the payback-slot ext-worked path (= harvest #5).
 - [x] **Test hardening (s55):** the 3 money guards self-provision a dedicated ex_staff test staffer — can't silently skip.
 - [x] **Map/docs (s55):** auto-discover PKG_DIRS + _PACKAGES from the filesystem (one source of truth) → MAP_INDEX
       now 190 entries incl. core/wizard/adapters/telegram_bot; MAP.md gained adapters/ + telegram_bot/ pointers.
@@ -79,7 +79,7 @@
 - [ ] An **"optimize" view** + an outcome metric — "X% of approvals / checks / reorders handled automatically."
 
 ## 🔎 Investigation ideas still open
-- [ ] **Cash-drawer over/short report** — now buildable (the till tracks variance per shift).
+- [x] **Cash-drawer over/short report (s55)** — `investigate.cash_drawer_report` + a section on /investigate.
 - [x] **Voids / refunds log (s55)** — `investigate.voids_refunds_log` (built on 2b void/refund + actor tracking).
 
 ## 🔐 Owner-gated decisions / activations (need YOU)

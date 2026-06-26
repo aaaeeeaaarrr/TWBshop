@@ -2,6 +2,7 @@
 counts · low-stock reorder list. Shadow-style — its OWN tables (core_stock_items / core_stock_counts), NOT
 TWB's live stock (gm_bot/stock.py). No model calls. Tables created by core.db.init_core_db."""
 from shared.database import _db
+from core import audit
 
 
 def add_item(org_id, name, unit="unit", category=None, par_level=0, unit_cost=0) -> int:
@@ -79,6 +80,8 @@ def receive_purchase(org_id, item_id, qty, total_cost, supplier=None, actor=None
                 return cur.fetchone()["expense_id"]
             cur.execute("UPDATE core_stock_items SET on_hand = on_hand + %s WHERE org_id=%s AND item_id=%s",
                         (qty, org_id, item_id))
+            audit.write(org_id, actor, "stock.receive", "stock_item", str(item_id),
+                        {"qty": str(qty), "total_cost": str(total_cost), "supplier": supplier}, cur=cur)
             return row["expense_id"]
 
 
@@ -141,6 +144,8 @@ def record_count(org_id, item_id, qty, note=None, actor=None, client_key=None) -
             cid = row["count_id"]
             cur.execute("UPDATE core_stock_items SET on_hand=%s WHERE org_id=%s AND item_id=%s",
                         (qty, org_id, item_id))
+            audit.write(org_id, actor, "stock.count", "stock_item", str(item_id),
+                        {"counted": str(qty), "book_before": str(book)}, cur=cur)
             return cid
 
 

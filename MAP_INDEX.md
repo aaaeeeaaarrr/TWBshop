@@ -82,7 +82,7 @@
 - `core/insights.py` — core.insights — a cross-domain 'needs attention' feed (read-only): one place that scans every ON domain for
     · attention_feed
 - `core/investigate.py` — core.investigate — the Investigation / loss-prevention card: forensic queries that pinpoint WHEN something
-    · _g, who_present_on, who_in_window, unattended_activity, repeat_offenders, voids_refunds_log, item_timeline, activity_timeline
+    · _g, who_present_on, who_in_window, unattended_activity, repeat_offenders, voids_refunds_log, cash_drawer_report, item_timeline, activity_timeline
 - `core/leave.py` — core.leave — annual-leave deduction math (channel-agnostic, per-tenant config). The balance core:
     · is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map
 - `core/leave_ledger.py` — core.leave_ledger — the atomic AL-balance mechanism (S1: deduct-at-approval ↔ refund-on-cancel).
@@ -186,7 +186,7 @@
 - `gm_bot/stock_gateway.py` — C3 — staff stock-count gateway (GM bot).
     · appsheet_url, stock_enabled, gateway_message
 - `gm_bot/swap.py` — Day-off swap pure logic (session 28). No DB/Telegram.
-    · within_7_days, is_own_dayoff, partner_eligible
+    · within_7_days, is_own_dayoff, _shift_len, shift_overlap_min, shifts_compatible, partner_eligible
 
 ## hire_bot/
 - `hire_bot/__init__.py`

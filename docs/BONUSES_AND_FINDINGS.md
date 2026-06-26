@@ -151,6 +151,24 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   of derived from the source of truth (the filesystem). Fixing it makes "check the map before claiming a gap"
   trustworthy for the WHOLE repo, and is a clean example to cite when teaching the bug-class.
 
+### 🛠 s55 continuation (live swap fix + max-effort run: deferred bits + investigation)
+- ✅ **swap rule → overlap-based + config-driven** `[ship/sell]` — the day-off swap picker now matches by shift
+  OVERLAP (≥ half the shorter shift) instead of "starts within 3h", de-duplicated to ONE function, made a
+  config-driven setting (3 rule types + tweakable threshold in the customer config editor, gm reads it live,
+  fail-safe). Fixed a real owner case (Norin 13-23 ↔ Chomreun 09-21, 8h overlap but 4h apart at the start).
+- ✅ **verdict parity-lock** `[ship]` — a full-minute-grid test locks core.attendance.verdict == live
+  gm_bot.checkin.verdict, so the platform check-in verdict can't silently drift from live (shadow integrity).
+- ✅ **domain→audit-chain** `[ship/sell]` — sale/count/receive/expense/payroll mutations now each write a
+  tamper-evident hash-chained audit row (verify_chain stays PASS); "every move on the platform is
+  who-did-what-when, un-tamperable" is now true across ALL domains, not just the till.
+- ✅ **cash-drawer over/short + voids/refunds surfaced** `[ship/sell]` — `investigate.cash_drawer_report` + the
+  voids/refunds log now show on /investigate (the two classic POS shrinkage vectors), completing the
+  loss-prevention suite (shrinkage · suspects · after-hours · repeat-pattern · over/short · voids/refunds).
+- 🔍 **the GM-token incident → a standing lesson** `[gotcha]` — rotating a BotFather token in DEV secrets.py
+  doesn't reach the server (push-then-pull); the running bot also needs a restart to load it. The server's
+  GitHub PAT was dead too, so `--sync` failed — fixed by an SSH copy + restart. Diagnosis path: getMe(401) +
+  token-fingerprint dev-vs-server. (Full proof → docs/ACTIONS_LEDGER.md.)
+
 ---
 
 ## Session 53 — config-driven wizard · onboarding · channels · platform
