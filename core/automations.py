@@ -70,27 +70,73 @@ def set_recipe(org_id, key: str, on: bool, who: str = None) -> bool:
     return True
 
 
+def trigger_label(key) -> str:
+    """The condition half of a recipe's label — used as the custom-builder's trigger dropdown text."""
+    return RECIPES[key]["label"].split("→")[0].strip()
+
+
+# ── custom builder — the advanced door: a tenant composes its OWN named {trigger + who + message} ──────────
+def custom_automations(org_id) -> list:
+    """The tenant's hand-built automations: [{id, name, trigger (a RECIPES key), who, message}]."""
+    return list(get_config(org_id).get("automations", {}).get("custom", []) or [])
+
+
+def add_custom(org_id, name, trigger, who=None, message="") -> str:
+    """Append a custom automation. `trigger` must be a known trigger (a RECIPES key). Returns its new id (or '')."""
+    if trigger not in RECIPES:
+        return ""
+    customs = custom_automations(org_id)
+    cid = str(max([int(c["id"]) for c in customs if str(c.get("id", "")).isdigit()] + [0]) + 1)
+    customs.append({"id": cid, "name": (name or "").strip()[:60], "trigger": trigger,
+                    "who": who if who in WHO else RECIPES[trigger]["who"], "message": (message or "").strip()[:200]})
+    set_config(org_id, {"automations": {"custom": customs}})
+    return cid
+
+
+def remove_custom(org_id, cid) -> None:
+    set_config(org_id, {"automations": {"custom": [c for c in custom_automations(org_id)
+                                                   if str(c.get("id")) != str(cid)]}})
+
+
+def _fires_for(trigger_key, org_id, feed) -> list:
+    """The fires for a trigger (a RECIPES key) — reusing the shared attention feed for feed-based triggers."""
+    src = RECIPES[trigger_key]["src"]
+    if src[0] == "feed":
+        _, domain, marker = src
+        return [f["msg"] for f in feed if f["domain"] == domain and (marker is None or marker in f["msg"])]
+    return src[1](org_id)
+
+
 def evaluate(org_id) -> list:
-    """What the ENABLED recipes would do RIGHT NOW: [{key, label, who, fires:[msg,…]}] (only those that fire).
-    The attention feed is computed once and shared across the feed-based recipes."""
+    """What the ENABLED recipes + custom automations would do RIGHT NOW: [{key, label, who_key, who, fires}]
+    (only those that fire). The attention feed is computed once and shared across all feed-based triggers."""
     en = enabled_recipes(org_id)
-    active = [k for k in RECIPES if en.get(k, {}).get("enabled")]
-    if not active:
+    customs = custom_automations(org_id)
+    triggers = {k for k in RECIPES if en.get(k, {}).get("enabled")}
+    triggers |= {c["trigger"] for c in customs if c.get("trigger") in RECIPES}
+    if not triggers:
         return []
-    feed = insights.attention_feed(org_id) if any(RECIPES[k]["src"][0] == "feed" for k in active) else []
+    feed = insights.attention_feed(org_id) if any(RECIPES[k]["src"][0] == "feed" for k in triggers) else []
     out = []
-    for key in active:
-        r = RECIPES[key]
-        kind = r["src"][0]
-        if kind == "feed":
-            _, domain, marker = r["src"]
-            fires = [f["msg"] for f in feed if f["domain"] == domain and (marker is None or marker in f["msg"])]
-        else:
-            fires = r["src"][1](org_id)
+    for key in RECIPES:                                          # the curated recipes
+        if not en.get(key, {}).get("enabled"):
+            continue
+        fires = _fires_for(key, org_id, feed)
         if fires:
-            who_key = en[key].get("who") or r["who"]
+            who_key = en[key].get("who") or RECIPES[key]["who"]
             out.append({"key": key, "label": recipe_label(key, who_key), "who_key": who_key,
-                        "who": WHO.get(who_key, WHO[r["who"]]), "fires": fires})
+                        "who": WHO.get(who_key, WHO[RECIPES[key]["who"]]), "fires": fires})
+    for c in customs:                                            # the tenant's own builds (same engine)
+        if c.get("trigger") not in RECIPES:
+            continue
+        fires = _fires_for(c["trigger"], org_id, feed)
+        if fires:
+            who_key = c.get("who") if c.get("who") in WHO else RECIPES[c["trigger"]]["who"]
+            msg = (c.get("message") or "").strip()
+            out.append({"key": "custom:" + str(c.get("id")),
+                        "label": c.get("name") or ("Custom · " + trigger_label(c["trigger"])),
+                        "who_key": who_key, "who": WHO.get(who_key, WHO[RECIPES[c["trigger"]]["who"]]),
+                        "fires": ([msg] if msg else []) + fires})
     return out
 
 

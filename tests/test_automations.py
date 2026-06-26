@@ -101,6 +101,24 @@ def test_runner_tick_dispatches_only_opted_in(monkeypatch):
         _clean()
 
 
+def test_custom_automation_add_evaluate_remove():
+    _clean()
+    try:
+        set_config(ORG, {"categories": {"stock": {"enabled": True}}})
+        iid = stock.add_item(ORG, "Milk", "L", par_level=10)
+        stock.record_count(ORG, iid, 2)                                # low stock fires
+        cid = au.add_custom(ORG, "Buyer ping", "low_stock", "buyer", "Order milk!")
+        assert cid and len(au.custom_automations(ORG)) == 1
+        fired = au.evaluate(ORG)
+        cust = [f for f in fired if f["key"] == "custom:" + cid]
+        assert len(cust) == 1 and cust[0]["who_key"] == "buyer" and "Order milk!" in cust[0]["fires"][0]
+        assert au.add_custom(ORG, "bad", "not_a_trigger", "owner") == ""   # unknown trigger rejected
+        au.remove_custom(ORG, cid)
+        assert au.custom_automations(ORG) == []
+    finally:
+        _clean()
+
+
 def test_automations_page_toggle(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _clean()

@@ -1362,6 +1362,25 @@ def render_automations(org_id: str) -> str:
     auto_on = "checked" if au.auto_dispatch_enabled(org_id) else ""
     sent_note = ("<p class='note'>📤 <b>%s alert(s) sent.</b></p>" % escape(request.args.get("sent"))
                  if request.args.get("sent") else "")
+    customs = au.custom_automations(org_id)
+    clist = "".join("<li>%s <span class='note'>(%s → %s)</span> "
+                    "<form method='post' action='/automations/custom/remove' style='display:inline'>"
+                    "<input type='hidden' name='id' value='%s'><button class='note'>remove</button></form></li>"
+                    % (escape(c.get("name") or "?"),
+                       escape(au.trigger_label(c["trigger"]) if c.get("trigger") in au.RECIPES else "?"),
+                       escape(au.WHO.get(c.get("who"), c.get("who") or "")), escape(str(c.get("id"))))
+                    for c in customs)
+    trig_opts = "".join("<option value='%s'>%s</option>" % (k, escape(au.trigger_label(k))) for k in au.RECIPES)
+    who_opts2 = "".join("<option value='%s'>%s</option>" % (w, escape(lbl)) for w, lbl in au.WHO.items())
+    build_form = ("<h3 style='margin-top:22px'>🛠️ Build your own</h3>"
+                  "<p class='note'>Compose a custom alert — pick what triggers it, who to tell, and your own words.</p>"
+                  "<ul style='margin:.3em 0'>%s</ul>"
+                  "<form method='post' action='/automations/custom/add'>"
+                  "<input name='name' placeholder='name (e.g. Night shrink watch)' style='width:230px'> "
+                  "<select name='trigger'>%s</select> → alert <select name='who'>%s</select><br>"
+                  "<input name='message' placeholder='your message (optional)' style='width:60%%;margin-top:6px'> "
+                  "<button type='submit'>Add</button></form>"
+                  % (clist or "<li class='note'>none yet</li>", trig_opts, who_opts2))
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>⚡ Automations</h1>"
             "<p class='note'>Turn on a recipe and pick who to alert — plain words, one tap. The conditions run "
             "on your own data (no AI cost), and every alert is just a notification: nothing moves money by itself."
@@ -1378,10 +1397,10 @@ def render_automations(org_id: str) -> str:
             "<div style='margin-top:12px'><button type='submit'>Save automations</button></div></form>"
             "<form method='post' action='/automations/send' style='margin-top:10px'>"
             "<button type='submit'>📤 Send pending alerts now</button> "
-            "<span class='note'>each firing recipe → its target, once per %dh</span></form>%s"
+            "<span class='note'>each firing recipe → its target, once per %dh</span></form>%s%s"
             "<h3 style='margin-top:22px'>🔮 Would fire now</h3>%s"
             % (" &nbsp;<b>✓ saved</b>" if request.args.get("saved") == "1" else "", "".join(rows), trows,
-               auto_on, au.DISPATCH_COOLDOWN_HOURS, sent_note, fire_html))
+               auto_on, au.DISPATCH_COOLDOWN_HOURS, sent_note, build_form, fire_html))
     return _page("Automations", body)
 
 
@@ -1949,6 +1968,24 @@ def create_app(org_id: str = "twb") -> Flask:
         log_config_change(org_id, _current_user(), "automations.dispatch", None,
                           "sent %d: %s" % (len(sent), ", ".join(s["recipe"] for s in sent)))
         return redirect("/automations?sent=%d" % len(sent))
+
+    @app.post("/automations/custom/add")
+    def automations_custom_add():
+        from core import automations as au
+        name = (request.form.get("name") or "").strip()
+        trigger = request.form.get("trigger")
+        if name and trigger in au.RECIPES:
+            au.add_custom(org_id, name, trigger, request.form.get("who"), request.form.get("message") or "")
+            log_config_change(org_id, _current_user(), "automations.custom", None, "add: %s" % name)
+        return redirect("/automations")
+
+    @app.post("/automations/custom/remove")
+    def automations_custom_remove():
+        from core import automations as au
+        cid = request.form.get("id")
+        au.remove_custom(org_id, cid)
+        log_config_change(org_id, _current_user(), "automations.custom", None, "remove: %s" % cid)
+        return redirect("/automations")
 
     @app.get("/expertise")
     def expertise():

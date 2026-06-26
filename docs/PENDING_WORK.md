@@ -35,8 +35,8 @@
   hardware) / Anchor-OPS (`ANCHOR_DIR`+`ANCHOR_HMAC_KEY` in secrets) · refresh the server GitHub PAT (so `--sync` works).
 
 ### 🎨 Owner-shaped — give me a steer + I build (designed, ready)
-- **Automations**: live dispatch + the SCHEDULED runner BUILT (always-on, opt-in OFF by default + only to set
-  targets) — remaining = just the custom builder (the advanced door).
+- **Automations**: ✅ COMPLETE end-to-end — recipes · live dispatch · scheduled runner · custom builder (compose
+  your own {trigger+who+message}). Nothing left but optional polish.
 - **Comms**: the gm-job wiring above (decide window / ladder / groups / repeat-flag) + optionally pair with the
   **proactive attentiveness ping** (a deterministic responsiveness alternative; gate: auto-penalize vs alert+log).
 - **Dashboard tuning**: card copy · ~20 cascade lines · value-weights · colour thresholds · which cards per plan
@@ -117,13 +117,14 @@
 
 ## 🤖 Fin-inspired borrows (→ ledger; do leaner than Fin)
 - [ ] "Ask your business" (in flight, above).
-- [~] **Automations — recipes tier + LIVE DISPATCH BUILT (s55)** — `core/automations.py` + `/automations`: 8
+- [x] **Automations — COMPLETE (s55): recipes · live dispatch · scheduled runner · custom builder** — `core/automations.py` + `/automations`: 8
       one-tap plain-words recipes (condition → action) riding our existing detectors, config-driven, with a
       "would fire now" preview AND live dispatch — `dispatch()` SENDS each firing recipe to its configured target
       via the tenant's bot, debounced (`automation_dispatches`); SAFE-by-default (blank target = no send); a
       "Send pending alerts now" button + a SCHEDULED runner (`run_automations.py` + the `twbshop-automations`
       service: every 15 min auto-sends opted-in tenants' firing recipes — DOUBLY safe: opt-in OFF by default AND
-      only to set targets). ⏳ Next: just the custom builder (the advanced door).
+      only to set targets) + the CUSTOM BUILDER (compose your own named {trigger+who+message}; both doors compile
+      to one engine). ✅ Done end-to-end.
 - [ ] An **"optimize" view** + an outcome metric — "X% of approvals / checks / reorders handled automatically."
 
 ## 🔎 Investigation ideas still open

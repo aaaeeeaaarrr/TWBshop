@@ -200,6 +200,14 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   OWN service (vs a gm scheduler job) avoids a HIGH-RISK gm restart, keeps it channel-agnostic/multi-tenant, and
   means a runner bug can't take the live bot down. Same lesson as the wizard: isolate the new thing from the live
   money path.
+- ✅ **automations CUSTOM BUILDER** `[ship/sell]` (owner) — `/automations` "Build your own": a tenant composes a
+  named custom alert (pick a trigger + who + their own message); it evaluates + dispatches through the SAME engine
+  as the recipes (debounced, targets, the runner). Completes automations end-to-end.
+- ⭐ **FINDING — both doors, one engine** `[decision]` — recipes (one-tap) and the custom builder compile to the
+  SAME {trigger→who→message} shape, so the builder is a thin UI over the existing evaluate/dispatch, not a second
+  system. Honest scope: a "trigger" is one of our detector-backed conditions (not arbitrary raw-event rules) — the
+  freedom is naming + your own message + multiple-per-trigger, which covers the practical cases without a generic
+  rule engine to maintain.
 
 ---
 
