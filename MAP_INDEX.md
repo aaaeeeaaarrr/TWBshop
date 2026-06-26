@@ -70,7 +70,7 @@
 - `core/audit_anchor.py` — core.audit_anchor — Phase 1b: the external tamper-anchor for the audit chain (harvested from POSBusiness
     · _anchor_path, _sig, _head, anchor_head, _read_anchors, verify_anchors
 - `core/automations.py` — core.automations — the AUTOMATIONS recipes (lean Fin-borrow). A recipe = a plain-words {condition → action}
-    · _cash_short, _repeat, recipe_label, enabled_recipes, set_recipe, evaluate, targets, set_target, _sent_recently, _record_sent, dispatch, token_sender
+    · _cash_short, _repeat, recipe_label, enabled_recipes, set_recipe, evaluate, targets, set_target, _sent_recently, _record_sent, dispatch, token_sender, orgs_with_auto_dispatch, auto_dispatch_enabled, set_auto_dispatch
 - `core/channel.py` — core.channel — the channel-agnostic command spine (platform principle #1, docs/PLATFORM_VISION.md).
     · _verdict_settings, handle
 - `core/db.py` — core.db — the platform's multi-tenant schema + persistence (entity + event log).
@@ -342,6 +342,8 @@
 
 ## (root entry points)
 - `run_accountant.py` — Entry point for the accountant bot. systemd: twbshop-accountant
+- `run_automations.py` — run_automations.py — the scheduled auto-dispatch runner for automation recipes.
+    · _token_for, tick, main
 - `run_b2b_bot.py` — Entry point for the B2B orders bot.
 - `run_backfill_clarifications.py` — One-time script: scan TWB REPORT for already-sent clarification questions and
     · main

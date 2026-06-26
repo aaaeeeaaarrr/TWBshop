@@ -1359,6 +1359,7 @@ def render_automations(org_id: str) -> str:
     trows = "".join("<tr><td style='padding:4px 8px'>%s</td><td><input name='target_%s' value='%s' "
                     "placeholder='Telegram chat / user id' style='width:230px'></td></tr>"
                     % (escape(lbl), w, escape(str(tg.get(w) or ""))) for w, lbl in au.WHO.items())
+    auto_on = "checked" if au.auto_dispatch_enabled(org_id) else ""
     sent_note = ("<p class='note'>📤 <b>%s alert(s) sent.</b></p>" % escape(request.args.get("sent"))
                  if request.args.get("sent") else "")
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>⚡ Automations</h1>"
@@ -1371,13 +1372,16 @@ def render_automations(org_id: str) -> str:
             "<p class='note'>Put the Telegram chat / user id for each role. <b>Blank = that role's alerts are "
             "never sent</b> — so nothing goes out until you wire a target, and the bot must be in that chat.</p>"
             "<table>%s</table>"
+            "<label style='display:block;margin:12px 0'><input type='checkbox' name='auto_dispatch' %s> "
+            "&nbsp;🔄 <b>Auto-send on a schedule</b> — let the runner send these every ~15 min (still debounced, "
+            "still only to targets you've set). Off = send manually with the button below.</label>"
             "<div style='margin-top:12px'><button type='submit'>Save automations</button></div></form>"
             "<form method='post' action='/automations/send' style='margin-top:10px'>"
             "<button type='submit'>📤 Send pending alerts now</button> "
             "<span class='note'>each firing recipe → its target, once per %dh</span></form>%s"
             "<h3 style='margin-top:22px'>🔮 Would fire now</h3>%s"
             % (" &nbsp;<b>✓ saved</b>" if request.args.get("saved") == "1" else "", "".join(rows), trows,
-               au.DISPATCH_COOLDOWN_HOURS, sent_note, fire_html))
+               auto_on, au.DISPATCH_COOLDOWN_HOURS, sent_note, fire_html))
     return _page("Automations", body)
 
 
@@ -1930,6 +1934,7 @@ def create_app(org_id: str = "twb") -> Flask:
             changes.append("%s=%s" % (key, "on" if key in on_keys else "off"))
         for w in au.WHO:                                     # where each role's alerts go (blank = never sent)
             au.set_target(org_id, w, request.form.get("target_%s" % w) or "")
+        au.set_auto_dispatch(org_id, bool(request.form.get("auto_dispatch")))   # opt-in to the scheduled runner
         log_config_change(org_id, _current_user(), "automations.recipes", None, ", ".join(changes))
         return redirect("/automations?saved=1")
 

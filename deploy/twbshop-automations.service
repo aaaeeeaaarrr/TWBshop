@@ -1,0 +1,16 @@
+[Unit]
+Description=TWBshop automations auto-dispatch runner (sends firing recipes to configured targets)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/TWBshop
+Environment=TWBSHOP_ENV=prod
+# ExecStart python path: match the other twbshop-* units (the venv interpreter on the server).
+ExecStart=/root/TWBshop/venv/bin/python run_automations.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

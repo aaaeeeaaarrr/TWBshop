@@ -155,3 +155,21 @@ def token_sender(bot_token: str):
         data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
         urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % bot_token, data=data, timeout=10)
     return _send
+
+
+# ── scheduled always-on dispatch — opt-in per tenant (so the runner is inert until the owner turns it on) ──
+def orgs_with_auto_dispatch() -> list:
+    """org_ids that have EXPLICITLY turned on automations.auto_dispatch. The scheduled runner works only these,
+    so it's inert until an owner opts in — and even then sends only to configured targets (still safe)."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT org_id FROM orgs WHERE config->'automations'->>'auto_dispatch' = 'true'")
+            return [r["org_id"] for r in cur.fetchall()]
+
+
+def auto_dispatch_enabled(org_id) -> bool:
+    return bool(get_config(org_id).get("automations", {}).get("auto_dispatch"))
+
+
+def set_auto_dispatch(org_id, on: bool) -> None:
+    set_config(org_id, {"automations": {"auto_dispatch": bool(on)}})

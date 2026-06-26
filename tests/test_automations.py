@@ -69,6 +69,38 @@ def test_dispatch_sends_to_target_then_debounces():
         _clean()
 
 
+def test_auto_dispatch_opt_in_is_off_by_default():
+    _clean()
+    try:
+        assert ORG not in au.orgs_with_auto_dispatch()             # off by default → runner ignores it
+        assert au.auto_dispatch_enabled(ORG) is False
+        au.set_auto_dispatch(ORG, True)
+        assert au.auto_dispatch_enabled(ORG) is True and ORG in au.orgs_with_auto_dispatch()
+        au.set_auto_dispatch(ORG, False)
+        assert ORG not in au.orgs_with_auto_dispatch()
+    finally:
+        au.set_auto_dispatch(ORG, False)
+        _clean()
+
+
+def test_runner_tick_dispatches_only_opted_in(monkeypatch):
+    import run_automations as runner
+    _clean()
+    try:
+        calls = []
+        monkeypatch.setattr(runner.au, "dispatch", lambda org, send: (calls.append(org), [])[1])
+        monkeypatch.setattr(runner, "_token_for", lambda org: "tok")
+        runner.tick()
+        assert ORG not in calls                                     # not opted in → not dispatched
+        au.set_auto_dispatch(ORG, True)
+        calls.clear()
+        runner.tick()
+        assert ORG in calls                                        # opted in → the runner dispatches it
+    finally:
+        au.set_auto_dispatch(ORG, False)
+        _clean()
+
+
 def test_automations_page_toggle(monkeypatch):
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)
     _clean()

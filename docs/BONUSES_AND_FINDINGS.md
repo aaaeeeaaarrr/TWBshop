@@ -191,7 +191,15 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   recipe to its configured Telegram target via the tenant's bot, debounced (`automation_dispatches`), SAFE-by-
   default (blank target = no send); a "Send pending alerts now" button on /automations. Channel-agnostic (an
   injected `send_fn` / bot-token), so it works for any tenant's bot. Turns the recipes from a preview into a
-  working automation. Next: a scheduled runner (always-on) so it fires without a tap.
+  working automation.
+- ✅ **automations SCHEDULED RUNNER** `[ship]` (owner) — `run_automations.py` + the `twbshop-automations` systemd
+  service: every 15 min it auto-sends each OPTED-IN tenant's firing recipes to their targets. DOUBLY safe by
+  default (a tenant is worked only if it turned on `auto_dispatch` AND has targets set), debounced, and a
+  DEDICATED runner so it never touches the gm bot.
+- ⭐ **FINDING — a separate runner beats piggybacking the gm** `[decision]` — putting the periodic dispatch in its
+  OWN service (vs a gm scheduler job) avoids a HIGH-RISK gm restart, keeps it channel-agnostic/multi-tenant, and
+  means a runner bug can't take the live bot down. Same lesson as the wizard: isolate the new thing from the live
+  money path.
 
 ---
 
