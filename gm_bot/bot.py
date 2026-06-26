@@ -2539,7 +2539,12 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         new_bal = ot_bank_balance(staff["id"])
         banked = 0
         if ot_banked:
-            banked = min(ot_banked, ot_mod.cap_room(new_bal))   # respect 14h bank
+            try:                                          # config-driven OT bank cap (instant-live); fail-safe to 14h
+                from core.tenant_config import attendance as _attc
+                _cap = int(_attc("twb").get("ot", {}).get("bank_cap_min", ot_mod.BANK_CAP_MIN))
+            except Exception:
+                _cap = ot_mod.BANK_CAP_MIN
+            banked = min(ot_banked, ot_mod.cap_room(new_bal, _cap))   # respect the (config) bank cap
             if banked > 0:
                 new_bal = ot_bank_add(staff["id"], banked)      # post-add balance (test: computed)
         shift_change_set_banked(sc["id"], banked)
@@ -5669,7 +5674,12 @@ def _own_pbot_text(today_iso: str) -> str:
         bank = ot_bank_balance(s["id"])
         ext = ot_pending_extension_min(s["id"], today_iso)
         booked = min(ext, pb)
-        upcoming = min(max(0, ext - pb), ot_mod.cap_room(bank))
+        try:                                          # config-driven OT bank cap (instant-live); fail-safe to 14h
+            from core.tenant_config import attendance as _attc
+            _cap = int(_attc("twb").get("ot", {}).get("bank_cap_min", ot_mod.BANK_CAP_MIN))
+        except Exception:
+            _cap = ot_mod.BANK_CAP_MIN
+        upcoming = min(max(0, ext - pb), ot_mod.cap_room(bank, _cap))
         if not (pb or bank or upcoming):
             continue
         seg = []

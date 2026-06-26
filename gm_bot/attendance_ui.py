@@ -2366,7 +2366,12 @@ def my_screen(p: dict) -> tuple[str, InlineKeyboardMarkup]:
     from gm_bot import ot as ot_mod
     pending_ext = ot_pending_extension_min(p["id"], _today().isoformat())
     booked_min = min(pending_ext, debt_min)
-    upcoming_ot = min(max(0, pending_ext - debt_min), ot_mod.cap_room(bank_min))
+    try:                                          # config-driven OT bank cap (instant-live); fail-safe to 14h
+        from core.tenant_config import attendance as _attc
+        _cap = int(_attc("twb").get("ot", {}).get("bank_cap_min", ot_mod.BANK_CAP_MIN))
+    except Exception:
+        _cap = ot_mod.BANK_CAP_MIN
+    upcoming_ot = min(max(0, pending_ext - debt_min), ot_mod.cap_room(bank_min, _cap))
     debt_txt = _hm(debt_min) + ((" (%s booked · កក់រួច)" % _hm(booked_min)) if booked_min else "")
     bank_txt = _hm(bank_min) + ((" (%s upcoming · នឹងចូល)" % _hm(upcoming_ot)) if upcoming_ot else "")
     # upcoming approved AL/special dates

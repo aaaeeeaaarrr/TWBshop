@@ -13,9 +13,10 @@ from __future__ import annotations
 BANK_CAP_MIN = 14 * 60   # 14 hours
 
 
-def cap_room(current_bank_min: int) -> int:
-    """Minutes of OT still grantable before the 14h cap."""
-    return max(0, BANK_CAP_MIN - current_bank_min)
+def cap_room(current_bank_min: int, cap: int = BANK_CAP_MIN) -> int:
+    """Minutes of OT still bankable before the cap. `cap` defaults to the 14h spec and may be overridden per
+    tenant (config-driven, instant-live): the LIVE callers pass it from tenant_config; no override = 14h."""
+    return max(0, cap - current_bank_min)
 
 
 def grant_fits(current_bank_min: int, grant_min: int) -> bool:
