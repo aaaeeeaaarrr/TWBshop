@@ -208,6 +208,26 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   system. Honest scope: a "trigger" is one of our detector-backed conditions (not arbitrary raw-event rules) — the
   freedom is naming + your own message + multiple-per-trigger, which covers the practical cases without a generic
   rule engine to maintain.
+- ⭐ **DUE-DILIGENCE (instant-live settings) — mechanism SOLID, coverage PARTIAL** `[decision]` (owner asked "are
+  settings instantly live with no restart?") — `tenant_config.get_config` reads FRESH from the DB every call (no
+  cache anywhere — grep-verified), writes are an atomic single-row JSONB UPDATE, and the 2 live-gm paths wired to
+  config (swap rule `attendance_ui:1842` · AL re-ping ladder `bot.py:6105`) read fresh per check → a dashboard
+  tweak hits the LIVE bot with NO restart. So instant-live is REAL where wired. **Gap = coverage:** only those 2
+  live-gm paths + all of automations are config-driven; the REST of TWB's live behavior (verdict/OT/checkout/AL/
+  sick/points/schedule) is HARDCODED → a change there still needs a gm deploy. Closing it = the shadow→live
+  CUT-OVER (the platform vision, owner-gated). Honest "are we there yet": YES for the platform + the wired slice,
+  NOT YET for full live TWB.
+- ✅ **FIXED — set_config concurrent-write race** `[gotcha→fixed]` — was read-modify-write across TWO transactions
+  (a lost-update if two tweaks raced); now ONE transaction with `SELECT … FOR UPDATE` → writes serialize, no
+  clobber. Matters for the multi-user future (clients + staff both tweaking). Regression test added.
+- ⭐ **STANDING RULE for instant-live reliability** `[decision]` — every path that migrates to config-driven MUST
+  be **validate-on-write + fail-safe-on-read** (a bad/missing setting can never fault a live path — the swap rule
+  already fail-safes; the customer-editor apply already validates). Bake it in per-path so "instantly live" never
+  means "a typo breaks live."
+- 💡 **FINDING — hire_bot caches its quiz questions at startup** `[gotcha]` — `hire_bot/questions.py` loads them once
+  into a module cache → changing a question needs a hire-bot restart. NOT a dashboard-settings path (separate), but
+  it's the one "needs a restart to pick up a change" spot found; if questions ever become wizard-tweakable, switch
+  it to a fresh read.
 
 ---
 

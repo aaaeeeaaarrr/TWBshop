@@ -256,13 +256,20 @@ def raw_overrides(org_id) -> dict:
 
 
 def set_config(org_id, partial: dict = None, **kw) -> dict:
-    """Deep-merge `partial` (and/or top-level kwargs) into the tenant's stored overrides (what the wizard
-    does). Returns the new effective config."""
+    """Deep-merge `partial` (and/or top-level kwargs) into the tenant's stored overrides (what the wizard does).
+    The read-modify-write runs in ONE transaction with `SELECT … FOR UPDATE`, so two simultaneous tweaks
+    SERIALIZE and can't clobber each other (reliability: a setting never silently loses another's change).
+    Returns the new effective config."""
     over = dict(partial or {})
     over.update(kw)
-    new_raw = _deep_merge(_raw(org_id), over)
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT config FROM orgs WHERE org_id=%s FOR UPDATE", (org_id,))   # lock the row
+            r = cur.fetchone()
+            cur_raw = {}
+            if r and r["config"]:
+                cur_raw = r["config"] if isinstance(r["config"], dict) else json.loads(r["config"])
+            new_raw = _deep_merge(cur_raw, over)
             cur.execute("UPDATE orgs SET config=%s WHERE org_id=%s", (json.dumps(new_raw), org_id))
     return get_config(org_id)
 

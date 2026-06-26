@@ -41,6 +41,12 @@
   **proactive attentiveness ping** (a deterministic responsiveness alternative; gate: auto-penalize vs alert+log).
 - **Dashboard tuning**: card copy · ~20 cascade lines · value-weights · colour thresholds · which cards per plan
   (questionnaire built) · which preview-toggles to make functional · wire TWB's REAL live data in.
+- **Reliability — instant-live coverage** (owner due-diligence, s55): the config MECHANISM is instant-live (fresh
+  reads · atomic writes · `set_config` now `FOR UPDATE`-locked, race FIXED); the GAP is only 2 live-gm paths read
+  config (swap · AL re-ping) — the rest is hardcoded. Prioritized path-by-path migration plan →
+  **`docs/CUTOVER_COVERAGE.md`** (5 easiest behavior-preserving wins first: grace_min · early_bonus · papers_grace
+  · short_notice · ot_cap; + GRACE_MIN dup in checkin.py & late.py to consolidate). Each HIGH-RISK (payroll-
+  adjacent) → staging-prove default==current + quiet-window deploy. Owner-paced.
 
 ### 📚 Older standing threads (unchanged)
 - Accountant P2 money matcher + Bakong · Stock lane AppSheet + GM↔stock cutover · marketing automation · AI
