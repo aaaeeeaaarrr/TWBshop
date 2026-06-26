@@ -810,7 +810,12 @@ def render_dashboard(org_id: str) -> str:
           "document.querySelectorAll('.fpill').forEach(function(p){var on=p.dataset.cat===c;"
           "p.style.background=on?'#0c4a6e':'#fff';p.style.color=on?'#fff':'#111';});}</script>")
     body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
-            "<h1>⚡ Your system</h1>%s%s%s%s"
+            "<h1>⚡ Your system</h1>"
+            "<form method='get' action='/ask' style='margin:8px 0'><input name='q' "
+            "placeholder='💬 Ask your business… e.g. any shrinkage?' "
+            "style='width:55%%;padding:7px;border:1px solid #cbd5e1;border-radius:8px'> "
+            "<button type='submit'>Ask</button></form>"
+            "%s%s%s%s"
             "<div class='box'><b>%d%% set up</b> &nbsp;<span class='note'>plan: "
             "<a href='/packages'>%s</a> · <a href='/roadmap'>🗺️ all ideas</a> — locked cards need a higher "
             "plan</span>%s</div>%s"
@@ -819,6 +824,33 @@ def render_dashboard(org_id: str) -> str:
             % (filter_bar, live, attn_box, spotlight, pct, escape(d["package"].replace("_", " ").title()),
                big_bar, grid, js))
     return _page("Dashboard", body)
+
+
+def render_ask(org_id: str) -> str:
+    """💬 'Ask your business' — a natural-language question → a real answer over the tenant's own data
+    (core.ask: computer-tier router, AI-tier escalation behind the AI-power toggle). Fin-inspired, lean."""
+    from core import ask as askmod
+    q = (request.args.get("q") or "").strip()
+    res = askmod.ask(org_id, q) if q else None
+    askbox = ("<form method='get' action='/ask'><input name='q' value='%s' autofocus "
+              "placeholder='Ask your business… e.g. how many late this week?' "
+              "style='width:58%%;padding:8px;border:1px solid #cbd5e1;border-radius:8px'> "
+              "<button type='submit'>Ask</button></form>" % escape(q))
+    ansbox = ""
+    if res:
+        badge = {"computer": "⚙️ computer", "ai": "🤖 AI", "none": "—"}.get(res["tier"], "")
+        ansbox = ("<div class='box'><div class='note'>%s%s</div>"
+                  "<div style='font-size:16px;white-space:pre-line;margin-top:6px'>%s</div></div>"
+                  % (badge, (" · " + escape(res["source"])) if res.get("source") else "", escape(res["answer"])))
+    egs = ["how many late this week", "who is working today", "sales", "low stock", "any shrinkage",
+           "what needs attention", "spend this month", "last pay run", "stock value"]
+    tryrow = ("<div class='box'><h3>Try</h3><div class='note'>"
+              + " · ".join("<a href='/ask?q=%s'>%s</a>" % (e.replace(" ", "+"), e) for e in egs) + "</div></div>")
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
+            "<h1>💬 Ask your business</h1><p class='note'>Answered from YOUR live data — attendance · stock · "
+            "sales · expenses · payroll. Free-form questions use the model only if AI-power is on.</p>"
+            "<div class='box'>%s</div>%s%s" % (askbox, ansbox, tryrow))
+    return _page("Ask", body)
 
 
 def render_reports(org_id: str) -> str:
@@ -1931,6 +1963,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/reports")
     def reports():
         return render_reports(org_id)
+
+    @app.get("/ask")
+    def ask_page():
+        return render_ask(org_id)
 
     @app.get("/roadmap")
     def roadmap():

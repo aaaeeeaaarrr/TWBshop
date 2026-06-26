@@ -159,7 +159,7 @@
 
 ## shared/
 - `shared/ai_client.py` — Anthropic API client — Claude vision and text analysis for the bakery bot.
-    · _get_client, _encode, _parse_json_list, _parse_json, analyze_stock_sheet, analyze_compliance_photo, read_payment_amount, parse_b2b_order_text, interpret_unmatched_b2b_order, classify_b2b_image, extract_b2b_order_from_image, read_payment_amount_pdf, extract_price_list_image, extract_price_list_pdf, generate_proposals  …(+23, grep)
+    · _get_client, _encode, _parse_json_list, _parse_json, analyze_stock_sheet, analyze_compliance_photo, read_payment_amount, parse_b2b_order_text, interpret_unmatched_b2b_order, classify_b2b_image, extract_b2b_order_from_image, read_payment_amount_pdf, extract_price_list_image, extract_price_list_pdf, generate_proposals  …(+24, grep)
 - `shared/clock.py` — Phnom-Penh wall-clock helpers.
     · pp_now, pp_today
 - `shared/database.py` — PostgreSQL database — all tables and queries.

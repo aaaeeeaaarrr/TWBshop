@@ -611,6 +611,28 @@ async def gm_compose_reply(solution_intent: str, trigger_text: str,
         return solution_intent
 
 
+ASK_MODEL = "claude-haiku-4-5-20251001"
+
+
+async def ask_business(question: str, context: str) -> str:
+    """'Ask your business' AI tier — answer the owner's question USING ONLY the data snapshot provided (grounded,
+    not hallucinated). Lean (Haiku); falls back to a plain message when no API key (manual-review mode)."""
+    if not config.ANTHROPIC_API_KEY:
+        return "AI power is on, but no API key is set — add ANTHROPIC_API_KEY to enable model answers."
+    try:
+        resp = await _get_client().messages.create(
+            model=ASK_MODEL,
+            max_tokens=300,
+            system=("You answer a small-business owner's question USING ONLY the data snapshot provided. If the "
+                    "snapshot does not contain the answer, say so in one line. Be concise and concrete."),
+            messages=[{"role": "user", "content": "Data snapshot:\n%s\n\nQuestion: %s" % (context, question)}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        logger.error("ask_business failed: %s", exc)
+        return "AI tier is unavailable right now."
+
+
 # Meaning-based concern detection — one short staff message, called live per message.
 # Haiku: cheap and fast. Replaces the keyword waste/mistake scan in gm_bot/analyzer.py.
 GM_CONCERN_MODEL = "claude-haiku-4-5-20251001"

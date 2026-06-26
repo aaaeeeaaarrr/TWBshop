@@ -263,6 +263,20 @@ What emerged from the dashboard restructure, and how it sits vs what other servi
   `verify_audit_core` CLI. Adversarial pass → a **per-org advisory lock** (no fork under concurrency) + honest
   limits (JSON-safe changes; full re-chain needs the external **anchor = Phase 1b**). 6 tests. The harvest
   pattern is proven: reference an external design → adapt to our stack → re-prove with our own tests.
+- 🔍 **Fin.ai competitor read + lean borrow** `[sell/decision]` (owner asked) — Fin = Intercom's AI customer-support
+  *agent* (resolves support convos across chat/email/voice, grounded in docs, takes actions via "Procedures";
+  patented RAG; outcome-priced $0.99; ~65% resolution; **50+ updates/yr**). Different category from us (a *feature*
+  vs our *platform*), but the "simple front / deep back" framing is exactly our dashboard philosophy. **Our edge:**
+  AI grounded in LIVE OPS data (not docs), Telegram-native, whole back-office, lean. **Borrow leaner, ranked:**
+  ① "Ask your business" (NL over our real data — DONE below) · ② Automations (plain-words trigger→action, the
+  leaner "Procedures") · ③ an "optimize" view + an outcome metric ("X% handled automatically"). Don't chase their
+  breadth (big team, years) — borrow the *playbook*.
+- ✅ **"Ask your business" assistant — computer-tier + ai-tier** `[ship/sell]` — `core/ask.py`: a NL question →
+  a real answer over the tenant's OWN data (attendance · stock · sales · expenses · payroll · shrinkage · needs-
+  attention). COMPUTER tier = a keyword intent-router straight to the existing reports/insights functions (NO API
+  cost); unmatched questions stay off the model unless the tenant's AI-power is ai/mixed, then it escalates to
+  Haiku (`ai_client.ask_business`, grounded in a data snapshot). Dashboard ask-box + `/ask` page. The single
+  leanest Fin-borrow — the structured answers already existed, we just added the natural-language front door. 3 tests.
 - ✅ **HARVEST Phase 2a SHIPPED — POS till / cash-drawer money model** `[ship/sell]` — `core/till.py` (shifts ·
   cash drawer · Z-report) harvested from POSBusiness `shift_service`, adapted to cash-only, re-tested on real rows.
   **State-Integrity Laws proven:** S3 atomic one-open-shift claim (partial-unique `uq_one_open_shift` → 2nd open
