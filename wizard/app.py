@@ -833,29 +833,64 @@ def render_dashboard(org_id: str) -> str:
     return _page("Dashboard", body)
 
 
+def _change_card(org_id: str, change: dict) -> str:
+    """Confirm card for an ASK-TO-CHANGE intent. Nothing is written here — Apply POSTs to the audited
+    /presets/apply (the same path a preset-button tap uses); Cancel just goes back. Safe by construction:
+    a typed sentence has exactly the reach of tapping a preset."""
+    from core import presets as pr, policy as pol
+    already = pr.current_vibe(org_id, change["group"]) == change["vibe"]
+    note = " <span class='note'>— that's already your current setting</span>" if already else ""
+    polline = pol.GROUP_POLICY.get(change["group"], "")
+    return ("<div class='box' style='background:#f0f9ff;border-color:#bae6fd'>"
+            "<b>🎚️ Change a setting</b>"
+            "<div style='font-size:16px;margin:8px 0'>Set <b>%s</b> to <b>%s</b>?%s</div>"
+            "<div class='note'>That means: %s</div>"
+            "<div class='actions'>"
+            "<form method='post' action='/presets/apply' style='display:inline'>"
+            "<input type='hidden' name='group' value='%s'><input type='hidden' name='vibe' value='%s'>"
+            "<button type='submit'>✓ Apply this change</button></form> "
+            "<a href='/ask' class='btn'>Cancel</a> <a href='/presets' class='btn'>See all vibes</a></div>"
+            "%s</div>"
+            % (escape(change["group_label"]), escape(change["vibe"].title()), note,
+               escape(change["caption"] or "—"), escape(change["group"]), escape(change["vibe"]),
+               ('<div style="color:#94a3b8;font-size:12px;margin-top:8px">%s</div>' % escape(polline)) if polline else ""))
+
+
 def render_ask(org_id: str) -> str:
     """💬 'Ask your business' — a natural-language question → a real answer over the tenant's own data
-    (core.ask: computer-tier router, AI-tier escalation behind the AI-power toggle). Fin-inspired, lean."""
-    from core import ask as askmod
+    (core.ask: computer-tier router, AI-tier escalation behind the AI-power toggle). Fin-inspired, lean.
+    Also ASK-TO-CHANGE: an imperative like 'make lateness stricter' → a confirm card to apply a vibe preset
+    (core.ask_change parses; the customer confirms; the write goes through the audited /presets/apply)."""
+    from core import ask as askmod, ask_change
     q = (request.args.get("q") or "").strip()
-    res = askmod.ask(org_id, q) if q else None
+    change = ask_change.parse_change(q) if q else None
+    res = None if change else (askmod.ask(org_id, q) if q else None)   # change intent pre-empts the read answer
     askbox = ("<form method='get' action='/ask'><input name='q' value='%s' autofocus "
-              "placeholder='Ask your business… e.g. how many late this week?' "
+              "placeholder='Ask or change… e.g. make lateness stricter' "
               "style='width:58%%;padding:8px;border:1px solid #cbd5e1;border-radius:8px'> "
-              "<button type='submit'>Ask</button></form>" % escape(q))
-    ansbox = ""
-    if res:
+              "<button type='submit'>Go</button></form>" % escape(q))
+    if change:
+        ansbox = _change_card(org_id, change)
+    elif res:
         badge = {"computer": "⚙️ computer", "ai": "🤖 AI", "none": "—"}.get(res["tier"], "")
         ansbox = ("<div class='box'><div class='note'>%s%s</div>"
                   "<div style='font-size:16px;white-space:pre-line;margin-top:6px'>%s</div></div>"
                   % (badge, (" · " + escape(res["source"])) if res.get("source") else "", escape(res["answer"])))
+    else:
+        ansbox = ""
     egs = ["how many late this week", "who is working today", "sales", "low stock", "any shrinkage",
            "what needs attention", "spend this month", "last pay run", "stock value"]
+    changes = ["make lateness stricter", "relax the overtime cap", "make leave less strict",
+               "make chasing persistent"]
     tryrow = ("<div class='box'><h3>Try</h3><div class='note'>"
-              + " · ".join("<a href='/ask?q=%s'>%s</a>" % (e.replace(" ", "+"), e) for e in egs) + "</div></div>")
-    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
+              + " · ".join("<a href='/ask?q=%s'>%s</a>" % (e.replace(" ", "+"), e) for e in egs)
+              + "</div><h3>…or change a setting in words</h3><div class='note'>"
+              + " · ".join("<a href='/ask?q=%s'>%s</a>" % (e.replace(" ", "+"), e) for e in changes)
+              + "</div></div>")
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/presets'>🎚️ vibes</a></div>"
             "<h1>💬 Ask your business</h1><p class='note'>Answered from YOUR live data — attendance · stock · "
-            "sales · expenses · payroll. Free-form questions use the model only if AI-power is on.</p>"
+            "sales · expenses · payroll. Or just <b>say a change</b> (“make lateness stricter”) and confirm it. "
+            "Free-form questions use the model only if AI-power is on.</p>"
             "<div class='box'>%s</div>%s%s" % (askbox, ansbox, tryrow))
     return _page("Ask", body)
 

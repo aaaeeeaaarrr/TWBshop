@@ -49,14 +49,20 @@
   **`docs/CUTOVER_COVERAGE.md`** (5 easiest behavior-preserving wins first: grace_min · early_bonus · papers_grace
   · short_notice · ot_cap; + GRACE_MIN dup in checkin.py & late.py to consolidate). Each HIGH-RISK (payroll-
   adjacent) → staging-prove default==current + quiet-window deploy. Owner-paced.
-- **Dashboard tweakability rollout (s56, open-yet-lean) — DONE-so-far + NEXT:** model → `docs/TWEAKABILITY_DESIGN.md`.
+- **Dashboard tweakability rollout (s56→s57, open-yet-lean) — ✅ ROLLOUT COMPLETE:** model → `docs/TWEAKABILITY_DESIGN.md`.
   DONE+LIVE: **vibe presets** (`core/presets.py` + `/presets`, 5 live areas, captions) + **per-setting RESPONSIBILITY
   microcopy** (`core/policy.py` — a light-grey "your call, per your policy / local law" line; on /presets + the
-  editor for 12 attendance settings; a `/policy` terms page). **Decisions: country presets DROPPED (not lean);
-  terminology PARKED.** ⏳ NEXT (autonomous, safe, wizard-only — THE "keep going" resume): extend
-  `core.policy.SETTING_POLICY` to the OTHER domains' settings (stock · pos · hr_payroll · accountant — auto-render
-  via `wizard/app.py::_field_input`); then build **ASK-TO-CHANGE** (NL "make lateness stricter" → applies a config
-  tweak, on `core.ask`).
+  editor; a `/policy` terms page). **Decisions: country presets DROPPED (re-confirmed by owner 2026-06-27 + grep-verified
+  there are none — businesses own their own laws); terminology PARKED.**
+  **s57 (this resume) — DONE, wizard-only, suite green:** ① microcopy EXTENDED to **all 4 other domains** (stock · pos ·
+  hr_payroll · accountant) **+ attendance gaps completed** → `SETTING_POLICY` now ~58 entries (only `verdict.rounding`
+  deliberately omitted — one fixed option); 54 grey lines render on `/customer/config`; regression guard
+  `tests/test_policy.py::test_other_domains_every_setting_has_a_responsibility_line` enforces "cover them all".
+  ② **ASK-TO-CHANGE BUILT** (`core/ask_change.py` — a stateless NL parser "make lateness stricter" → a vibe-preset
+  proposal; safe-by-construction: only ever maps to an existing preset, ambiguous→None; the wizard `/ask` shows a
+  confirm card whose Apply POSTs to the **audited `/presets/apply`** — no new write primitive; 9 tests, a GET mutates
+  nothing). ⏳ Optional follow-ons (owner-gated): smarter group-disambiguation when no area is named; cover the
+  onboarding/connections plumbing settings too if wanted.
 
 ### 📚 Older standing threads (unchanged)
 - Accountant P2 money matcher + Bakong · Stock lane AppSheet + GM↔stock cutover · marketing automation · AI

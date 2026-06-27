@@ -29,3 +29,21 @@ def test_config_editor_shows_setting_policy(monkeypatch):
     c = create_app("twb").test_client()
     page = c.get("/customer/config").get_data(as_text=True)
     assert "Set the late-grace window to your policy" in page   # grace_min's responsibility line, in the editor
+
+
+def test_other_domains_every_setting_has_a_responsibility_line():
+    # The tweakability rollout: EVERY stock / pos / hr-payroll / accountant setting ships a responsibility
+    # one-liner. Guards "cover them all" — a future domain setting added without a line fails here.
+    from wizard import schema
+    for _label, paths in schema.EXTRA_DOMAIN_GROUPS:
+        for p in paths:
+            assert policy.setting_policy(p), p
+
+
+def test_config_editor_shows_other_domain_policy(monkeypatch):
+    # The new domains' responsibility lines actually render in the detailed editor (auto-wired via _field_input).
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    c = create_app("twb").test_client()
+    page = c.get("/customer/config").get_data(as_text=True)
+    assert "the purchasing call is yours" in page          # stock.supplier_price_compare
+    assert "compliance stay yours" in page                 # hr_payroll.enabled
