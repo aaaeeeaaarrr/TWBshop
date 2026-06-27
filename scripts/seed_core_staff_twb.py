@@ -24,6 +24,10 @@ REVERSIBLE:  DELETE FROM core_staff WHERE org_id='twb';
 RUN (prod):  cd /root/TWBshop && TWBSHOP_ENV=prod /root/venv/bin/python3 scripts/seed_core_staff_twb.py
 """
 import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # repo root → core/shared importable
 
 from core.db import init_core_db
 from shared.database import _db
