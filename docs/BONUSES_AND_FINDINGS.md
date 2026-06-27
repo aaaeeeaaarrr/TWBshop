@@ -63,6 +63,25 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - `[gotcha]` The auto-mode classifier **blocked the first prod seed** ("no explicit consent for this specific prod
   write") — correct: a user *question* ≠ consent to write prod staff records. Asked; owner chose "all 42 + extend".
 
+### s57 cont — autonomous safe-backlog run ("do what you can without me, 1 by 1")
+- `[ship]` **PII encryption-at-rest for `core_staff`** — the sensitive HR columns (national_id · passport · tax_id ·
+  social_security · address · bank_account) now encrypt at rest via the existing Fernet helper, gated on
+  `ORG_SECRET_KEY` (plaintext + warning until set — the same graceful model as the org-secret store). Write
+  encrypts, read decrypts transparently; a value the key can't decrypt fails safe (None). DATE `date_of_birth`
+  stays plaintext (a DATE column can't hold a cipher token). **Closes the W3 PII flag I raised** — it's now
+  build-complete, the owner just sets the key. (`core.onboarding_flow._pii_enc/_dec/_dec_row`; 2 tests.)
+- `[ship]` **ASK-TO-CHANGE "which area?" disambiguation** — `ask_change.needs_area()`: a clear change request with
+  no area named ("make it stricter") now prompts the areas + examples instead of silently falling through. (2 tests.)
+- `[ship]` **Responsibility microcopy "cover them all" finished** — added lines for the onboarding/connections
+  setup settings (consent + listener carry a genuine privacy-law angle); secrets render no line so they're
+  excluded; a guard test enforces coverage.
+- `[ship/sell]` **"What your system handled for you" outcome view** (`core/optimize.py` + `/optimize`) — an honest,
+  read-only automation-rate view (check-ins auto-classified · request types decided by the bot · issues
+  auto-surfaced · low-stock auto-flagged · alerts auto-sent), every number traced to a real query (no vanity
+  maths). A sellable "see the value" view; Fin-inspired, leaner. (3 tests.)
+- `[gotcha]` `core.db` exposes `_org_secret_cipher()` + `_ENC_PREFIX` — reuse them for any new at-rest
+  encryption (don't re-roll Fernet). No circular import: `core.db` doesn't import `core.onboarding_flow` at module level.
+
 ## Session 55 — A-Z due-diligence audit (ultracode, 44-agent, read-only)
 Full report: workflow `wf_7bb0f25d-3e6`. Verdict: LIVE production core is sound + suite really green
 (1081p/2s); ONE CRITICAL credential to rotate; the rest are INERT platform fixes on the harvest.

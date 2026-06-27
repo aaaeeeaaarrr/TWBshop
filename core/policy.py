@@ -92,6 +92,17 @@ SETTING_POLICY = {
     f"{_HR}.pay_cycle":                 "Your pay cycle is yours to set, per your contracts and local law.",
     f"{_HR}.payslips":                  "Whether you issue payslips is your policy, per your local requirements.",
     f"{_HR}.salary_owner_only":         "Keeping senior pay private is your call — set it to your confidentiality policy.",
+    # ── Onboarding / connections (setup & channels — mostly "your choice"; consent/listener carry a privacy angle) ──
+    "onboarding.auto_provision_bot":     "How your bot gets created is your choice — guided, or run on ours.",
+    "onboarding.listener_mode":          "How the bot reads your chats is your call — mind what you're comfortable monitoring.",
+    "onboarding.staff_entry":            "How you add staff is your preference — pick whatever's easiest for you.",
+    "onboarding.industry_template":      "Starting from a template is optional — it pre-fills sensible defaults you can change.",
+    "onboarding.staff_consent_required": "Asking staff to consent to tracking is your call — and may be required by your local privacy law.",
+    "connections.telegram.listener_enabled": "Running a listener that reads chats is your choice — mind staff privacy and local law.",
+    "connections.telegram.owner_chat_id":    "Where owner alerts are sent is yours to set.",
+    "connections.web.enabled":           "Offering a browser login is your choice — set it to how your people prefer to work.",
+    "connections.web.subdomain":         "Your web address is yours to choose.",
+    "connections.app.enabled":           "Offering a mobile app is your choice.",
 }
 
 

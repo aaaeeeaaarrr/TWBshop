@@ -40,6 +40,17 @@ def test_other_domains_every_setting_has_a_responsibility_line():
             assert policy.setting_policy(p), p
 
 
+def test_onboarding_connections_settings_have_lines():
+    # rollout now also covers the setup/channel settings (secrets render no line → excluded).
+    from wizard import schema
+    for _label, paths in (schema.ONBOARDING_GROUPS + schema.CONNECTIONS_GROUPS):
+        for p in paths:
+            d = schema.describe(p)
+            if d and d.get("type") == "secret":
+                continue
+            assert policy.setting_policy(p), p
+
+
 def test_config_editor_shows_other_domain_policy(monkeypatch):
     # The new domains' responsibility lines actually render in the detailed editor (auto-wired via _field_input).
     monkeypatch.setattr(wa, "auth_enabled", lambda: False)

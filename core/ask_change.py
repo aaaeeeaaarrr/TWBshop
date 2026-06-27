@@ -81,9 +81,22 @@ def parse_change(question):
     if not any(v in q for v in _CHANGE_VERBS):  # no imperative → treat as a question, never a silent write
         return None
     group = _group(q)
-    if group is None:                          # couldn't tell WHICH area → don't guess
+    if group is None:                          # couldn't tell WHICH area → don't guess (see needs_area)
         return None
     vibe = _DIRECTION_VIBE[group][direction]
     g = presets.ATTENDANCE_PRESETS[group]
     return {"group": group, "group_label": g["label"], "vibe": vibe,
             "caption": presets.vibe_caption(group, vibe)}
+
+
+def needs_area(question) -> bool:
+    """True when the phrase is clearly a CHANGE request (a change verb + a direction) but names no area — so the
+    caller can ask 'which area?' instead of silently falling through to a read answer."""
+    q = (question or "").lower().strip()
+    if not q:
+        return False
+    return (_direction(q) is not None and any(v in q for v in _CHANGE_VERBS) and _group(q) is None)
+
+
+# The areas a client can tweak in words (for the 'which area?' prompt) → label + an example phrase.
+AREAS = [(k, presets.ATTENDANCE_PRESETS[k]["label"]) for k in _DIRECTION_VIBE]

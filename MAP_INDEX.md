@@ -64,7 +64,7 @@
 - `core/ask.py` — core.ask — "Ask your business": a natural-language question → a real answer over the tenant's OWN live data.
     · _has, ask, _ai_answer
 - `core/ask_change.py` — core.ask_change — natural-language CONFIG TWEAKS: the write-side companion to core.ask (which only READS).
-    · _direction, _group, parse_change
+    · _direction, _group, parse_change, needs_area
 - `core/attendance.py` — core.attendance — channel-agnostic CHECK-IN / CHECK-OUT commands.
     · _emit_event, _bind_shift, verdict, check_in, check_out, recent_checkins, today_summary
 - `core/audit.py` — core.audit — tamper-evident, hash-chained audit log.
@@ -96,7 +96,9 @@
 - `core/onboarding.py` — core.onboarding — the channel-agnostic onboarding wizard ENGINE (the "stupid-proof self-serve" front
     · validate, apply
 - `core/onboarding_flow.py` — core.onboarding_flow — DISCOVER-CONFIRM staff onboarding (docs/ONBOARDING_DESIGN.md).
-    · record_seen_member, list_candidates, confirm_candidate, skip_candidate, record_consent, add_staff_manual, list_staff, remove_staff, ensure_checkin_token, staff_by_checkin_token, get_staff, update_staff, update_staff_profile, record_group, list_groups  …(+2, grep)
+    · _pii_enc, _pii_dec, _dec_row, record_seen_member, list_candidates, confirm_candidate, skip_candidate, record_consent, add_staff_manual, list_staff, remove_staff, ensure_checkin_token, staff_by_checkin_token, get_staff, update_staff  …(+5, grep)
+- `core/optimize.py` — core.optimize — the "what the system handled for you" outcome view (Fin-inspired, lean + HONEST).
+    · automation_summary, headline
 - `core/payroll.py` — core.payroll — a real, minimal payroll (the HR/payroll domain on the platform): per-staff monthly salary →
     · staff_with_salary, set_salary, run_payroll, list_pay_runs, payslips, latest_run
 - `core/points.py` — core.points — check-in points (channel-agnostic, per-tenant config). Parity with gm_bot.points.
@@ -336,7 +338,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+61, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+62, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

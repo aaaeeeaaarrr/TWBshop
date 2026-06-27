@@ -61,8 +61,8 @@
   ② **ASK-TO-CHANGE BUILT** (`core/ask_change.py` — a stateless NL parser "make lateness stricter" → a vibe-preset
   proposal; safe-by-construction: only ever maps to an existing preset, ambiguous→None; the wizard `/ask` shows a
   confirm card whose Apply POSTs to the **audited `/presets/apply`** — no new write primitive; 9 tests, a GET mutates
-  nothing). ⏳ Optional follow-ons (owner-gated): smarter group-disambiguation when no area is named; cover the
-  onboarding/connections plumbing settings too if wanted.
+  nothing). ✅ Follow-ons DONE (s57 autonomous): group-disambiguation ("make it stricter" → "which area?") +
+  onboarding/connections microcopy ("cover them all" finished, secrets excluded).
 
 ### 📚 Older standing threads (unchanged)
 - Accountant P2 money matcher + Bakong · Stock lane AppSheet + GM↔stock cutover · marketing automation · AI
@@ -147,7 +147,9 @@
       service: every 15 min auto-sends opted-in tenants' firing recipes — DOUBLY safe: opt-in OFF by default AND
       only to set targets) + the CUSTOM BUILDER (compose your own named {trigger+who+message}; both doors compile
       to one engine). ✅ Done end-to-end.
-- [ ] An **"optimize" view** + an outcome metric — "X% of approvals / checks / reorders handled automatically."
+- [x] **"What your system handled for you" view (s57)** — `core/optimize.py` + `/optimize`: honest automation-rate
+      outcomes (check-ins auto-classified · request types decided by the bot · issues auto-surfaced · low-stock
+      auto-flagged · alerts auto-sent), every number from a real query. Linked from the dashboard nav.
 
 ## 🔎 Investigation ideas still open
 - [x] **Cash-drawer over/short report (s55)** — `investigate.cash_drawer_report` + a section on /investigate.
@@ -158,7 +160,9 @@
 - [ ] Check-in cut-over — READY, but HELD in shadow by your call.
 - [ ] B2B re-enable — only after the F2/F3/F4 money fixes (`docs/B2B_LANDMINE_FIX_PLAN.md`); B2B stays disabled.
 - [ ] Company name decision (`docs/COMPANY_NAME_IDEAS.md`).
-- [ ] Public-exposure hardening (W3): `ORG_SECRET_KEY` + CSRF + login rate-limit + HTTPS before anything is public.
+- [ ] Public-exposure hardening (W3): set `ORG_SECRET_KEY` + CSRF + login rate-limit + HTTPS before anything is
+      public. *(s57: `core_staff` sensitive-PII column encryption is now BUILT + gated on `ORG_SECRET_KEY` — setting
+      the key activates it; `core_org_secrets` already encrypts the same way. CSRF/rate-limit/HTTPS still to do.)*
 
 ## 📚 Standing open loops (older threads — detail in ROADMAP / HISTORY)
 - [ ] Accountant bot — P2 HIGH-RISK money matcher + the staging walk + Bakong.

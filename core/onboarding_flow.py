@@ -10,6 +10,43 @@ import json
 import uuid
 
 from shared.database import _db
+from core.db import _org_secret_cipher, _ENC_PREFIX
+
+# Sensitive PII columns encrypted AT REST when ORG_SECRET_KEY is set (the W3 gate). TEXT columns only —
+# date_of_birth is a DATE column (can't hold a cipher token) + lower-risk, so it stays as-is. Until the key
+# is set: plaintext + the same one-time warning the org-secret store uses (graceful, no behaviour change).
+# Reads pass legacy plaintext values through untouched; a value the key can no longer decrypt fails safe (None).
+_SENSITIVE_PII = {"national_id", "passport_no", "tax_id", "social_security_no", "address", "bank_account"}
+
+
+def _pii_enc(value):
+    if value is None or value == "":
+        return value
+    c = _org_secret_cipher()
+    if not c:
+        return value                                      # no key → plaintext (W3 warning lives in init/docs)
+    return _ENC_PREFIX + c.encrypt(str(value).encode()).decode()
+
+
+def _pii_dec(value):
+    if not isinstance(value, str) or not value.startswith(_ENC_PREFIX):
+        return value                                      # legacy plaintext (or non-string) → as-is
+    c = _org_secret_cipher()
+    if not c:
+        return None                                       # encrypted but key gone → fail safe (never expose)
+    try:
+        return c.decrypt(value[len(_ENC_PREFIX):].encode()).decode()
+    except Exception:
+        return None
+
+
+def _dec_row(row):
+    """Decrypt the sensitive PII fields of a core_staff row dict (in place); returns it (or None)."""
+    if row:
+        for k in _SENSITIVE_PII:
+            if k in row:
+                row[k] = _pii_dec(row[k])
+    return row
 
 
 # ── discover (the bot feeds these) ───────────────────────────────────────────
@@ -102,7 +139,7 @@ def list_staff(org_id: str, status: str = "active") -> list[dict]:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM core_staff WHERE org_id=%s AND status=%s ORDER BY staff_id",
                         (org_id, status))
-            return [dict(r) for r in cur.fetchall()]
+            return [_dec_row(dict(r)) for r in cur.fetchall()]
 
 
 def remove_staff(org_id: str, staff_id: int) -> None:
@@ -139,7 +176,7 @@ def staff_by_checkin_token(token: str) -> dict | None:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM core_staff WHERE checkin_token=%s AND status='active'", (token,))
             r = cur.fetchone()
-            return dict(r) if r else None
+            return _dec_row(dict(r)) if r else None
 
 
 def get_staff(org_id: str, staff_id: int) -> dict | None:
@@ -147,7 +184,7 @@ def get_staff(org_id: str, staff_id: int) -> dict | None:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM core_staff WHERE org_id=%s AND staff_id=%s", (org_id, staff_id))
             r = cur.fetchone()
-            return dict(r) if r else None
+            return _dec_row(dict(r)) if r else None
 
 
 def update_staff(org_id: str, staff_id: int, name: str, call_name: str = None, role: str = None,
@@ -180,8 +217,11 @@ def update_staff_profile(org_id: str, staff_id: int, fields: dict) -> None:
     sets, vals = [], []
     for k in PROFILE_TEXT + PROFILE_DATE:
         if k in fields:
+            v = (fields.get(k) or "").strip() or None                 # '' → NULL (incl. dates)
+            if k in _SENSITIVE_PII:
+                v = _pii_enc(v)                                       # encrypt sensitive PII at rest (when keyed)
             sets.append("%s=%%s" % k)
-            vals.append(((fields.get(k) or "").strip() or None))      # '' → NULL (incl. dates)
+            vals.append(v)
     for k in PROFILE_BOOL:
         if k in fields:
             sets.append("%s=%%s" % k)

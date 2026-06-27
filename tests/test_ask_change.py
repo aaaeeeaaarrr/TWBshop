@@ -45,6 +45,22 @@ def test_every_proposed_vibe_is_a_real_preset():
         assert c["vibe"] in presets.ATTENDANCE_PRESETS[c["group"]]["vibes"]
 
 
+def test_needs_area_disambiguation():
+    # a clear change with NO area named → needs_area (the wizard asks "which area?"), not a silent change
+    assert ask_change.needs_area("make it stricter") is True
+    assert ask_change.needs_area("relax everything") is True
+    assert ask_change.parse_change("make it stricter") is None
+    assert ask_change.needs_area("make lateness stricter") is False   # area named → parse_change handles it
+    assert ask_change.needs_area("how many late this week") is False  # a question, not a change
+
+
+def test_wizard_asks_which_area(monkeypatch):
+    monkeypatch.setattr(wa, "auth_enabled", lambda: False)
+    c = create_app("twb").test_client()
+    page = c.get("/ask?q=make+it+stricter").get_data(as_text=True)
+    assert "Which area?" in page
+
+
 def test_questions_are_not_changes():
     # a QUESTION (no imperative) or an unscoped/empty phrase must NOT be read as a change → None (→ ask path).
     for phrase in ("how many late this week", "is lateness strict", "make a report on lateness",

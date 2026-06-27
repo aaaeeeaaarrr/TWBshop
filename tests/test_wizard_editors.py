@@ -155,6 +155,45 @@ def test_staff_profile_fields_saved():
         _clean()
 
 
+def test_pii_encrypted_at_rest(monkeypatch):
+    # With ORG_SECRET_KEY set, sensitive PII is stored encrypted but reads decrypt transparently.
+    from cryptography.fernet import Fernet
+    from core.onboarding_flow import add_staff_manual, get_staff, update_staff_profile
+    monkeypatch.setenv("ORG_SECRET_KEY", Fernet.generate_key().decode())
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Sec P")
+        update_staff_profile(ORG, sid, {"national_id": "ID-SECRET-123", "department": "Bakery"})
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT national_id, department FROM core_staff WHERE org_id=%s AND staff_id=%s",
+                            (ORG, sid))
+                raw = cur.fetchone()
+        assert raw["national_id"].startswith("enc:") and "ID-SECRET-123" not in raw["national_id"]   # encrypted
+        assert raw["department"] == "Bakery"                       # non-sensitive field NOT encrypted
+        assert get_staff(ORG, sid)["national_id"] == "ID-SECRET-123"   # read decrypts transparently
+    finally:
+        _clean()
+
+
+def test_pii_plaintext_without_key(monkeypatch):
+    # No key → graceful plaintext (today's behaviour; the W3 warning lives in the schema comment + docs).
+    from core.onboarding_flow import add_staff_manual, get_staff, update_staff_profile
+    monkeypatch.delenv("ORG_SECRET_KEY", raising=False)
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Plain P")
+        update_staff_profile(ORG, sid, {"national_id": "PLAIN-123"})
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT national_id FROM core_staff WHERE org_id=%s AND staff_id=%s", (ORG, sid))
+                raw = cur.fetchone()
+        assert raw["national_id"] == "PLAIN-123"
+        assert get_staff(ORG, sid)["national_id"] == "PLAIN-123"
+    finally:
+        _clean()
+
+
 def test_staff_bulk_import():
     c = _client()
     _clean()

@@ -881,7 +881,7 @@ def render_dashboard(org_id: str) -> str:
            "<div class='box' style='background:#eff6ff;border-color:#bfdbfe'>👋 <b>New here?</b> "
            "Answer a few quick questions and we'll set the right tools up for you — "
            "<a href='/welcome'>start setup →</a> <span class='note'>(a minute · skippable)</span></div>")
-    body = ("<div class='nav'><a href='/presets'>🎚️ set the vibe</a> · <a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/presets'>🎚️ set the vibe</a> · <a href='/optimize'>🚀 what we automate</a> · <a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>" + _wb +
             "<form method='get' action='/ask' style='margin:8px 0'><input name='q' "
             "placeholder='💬 Ask your business… e.g. any shrinkage?' "
@@ -929,13 +929,19 @@ def render_ask(org_id: str) -> str:
     from core import ask as askmod, ask_change
     q = (request.args.get("q") or "").strip()
     change = ask_change.parse_change(q) if q else None
-    res = None if change else (askmod.ask(org_id, q) if q else None)   # change intent pre-empts the read answer
+    ask_area = ask_change.needs_area(q) if (q and not change) else False
+    res = None if (change or ask_area) else (askmod.ask(org_id, q) if q else None)  # change intent pre-empts a read
     askbox = ("<form method='get' action='/ask'><input name='q' value='%s' autofocus "
               "placeholder='Ask or change… e.g. make lateness stricter' "
               "style='width:58%%;padding:8px;border:1px solid #cbd5e1;border-radius:8px'> "
               "<button type='submit'>Go</button></form>" % escape(q))
     if change:
         ansbox = _change_card(org_id, change)
+    elif ask_area:                                            # a clear change request, but no area named → ask
+        areas = " · ".join("<b>%s</b>" % escape(lbl) for _k, lbl in ask_change.AREAS)
+        ansbox = ("<div class='box' style='background:#fffbeb;border-color:#fde68a'><b>Which area?</b> "
+                  "I can tweak: %s. &nbsp;Try <a href='/ask?q=make+lateness+stricter'>make lateness stricter</a> "
+                  "or <a href='/ask?q=relax+the+overtime+cap'>relax the overtime cap</a>.</div>" % areas)
     elif res:
         badge = {"computer": "⚙️ computer", "ai": "🤖 AI", "none": "—"}.get(res["tier"], "")
         ansbox = ("<div class='box'><div class='note'>%s%s</div>"
@@ -958,6 +964,37 @@ def render_ask(org_id: str) -> str:
             "Free-form questions use the model only if AI-power is on.</p>"
             "<div class='box'>%s</div>%s%s" % (askbox, ansbox, tryrow))
     return _page("Ask", body)
+
+
+def render_optimize(org_id: str) -> str:
+    """🚀 'What the system handled for you' — per-area automation outcomes (read-only, honest counts)."""
+    from core import optimize
+    try:
+        days = int(request.args.get("days", 30))
+    except (TypeError, ValueError):
+        days = 30
+    if days not in (7, 14, 30):
+        days = 30
+    rows = optimize.automation_summary(org_id, days)
+    cards = ""
+    for a in rows:
+        frac = (a["auto"] / a["of"]) if a["of"] else (1.0 if a["auto"] else 0.0)
+        bar = ("<div style='background:#eef0f2;border-radius:6px;height:9px;margin:6px 0'>"
+               "<div style='background:%s;height:9px;border-radius:6px;width:%d%%'></div></div>"
+               % (_bar_color(frac), int(frac * 100)))
+        cards += ("<div class='box'><b>%s</b> &nbsp;<span class='note'>%d%%</span>%s<div class='note'>%s</div></div>"
+                  % (escape(a["area"]), int(frac * 100), bar, escape(a["label"])))
+    total = sum(a["auto"] for a in rows)
+    sel = " · ".join(("<b>%dd</b>" % d) if d == days else ("<a href='/optimize?days=%d'>%dd</a>" % (d, d))
+                     for d in (7, 14, 30))
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div>"
+            "<h1>🚀 What your system handled for you</h1>"
+            "<p class='note'>Real counts from your own data — the work the platform did automatically so your team "
+            "didn't have to. Period: %s.</p>"
+            "<div class='box' style='background:#ecfdf5;border-color:#a7f3d0'><b>%d</b> thing(s) handled "
+            "automatically in the last %d days.</div>%s"
+            % (sel, total, days, cards or "<div class='box'>No data yet — counts appear as your domains record activity.</div>"))
+    return _page("Optimize", body)
 
 
 def render_reports(org_id: str) -> str:
@@ -2328,6 +2365,10 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.get("/ask")
     def ask_page():
         return render_ask(org_id)
+
+    @app.get("/optimize")
+    def optimize_page():
+        return render_optimize(org_id)
 
     @app.get("/roadmap")
     def roadmap():
