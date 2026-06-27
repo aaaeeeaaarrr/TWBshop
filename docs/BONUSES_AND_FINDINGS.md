@@ -269,6 +269,15 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   transient/wrapper, so a "gm PID unchanged" bot-safety check is noisy (it raised one false "PID changed" alarm; the gm
   was stable, NR=0). Use `systemctl show twbshop-gm -p MainPID` (+ NRestarts + ActiveEnterTimestamp) as the authoritative
   bot-safety verification, not pgrep|head.
+- ✅ **PER-SETTING RESPONSIBILITY MICROCOPY — the lean alt to a click-agree wall** `[ship/sell/decision]` (owner) —
+  `core/policy.py`: a light-grey one-liner under each setting ("…is your call, per your policy / local law") on
+  `/presets` (per vibe group) + the detailed editor (12 attendance settings so far, auto-rendered by the generic
+  `_field_input` wiring) + a `/policy` terms page. Humans HATE 'I agree' modals; a contextual responsibility line
+  per setting covers us AND helps them, with zero friction.
+- ⭐ **DECISION — DROP country / labour-law presets** `[decision]` (owner) — companies know their own laws and own
+  that choice; a curated preset layer we'd maintain (and carry liability for) is the OPPOSITE of lean. We provide
+  the tool + enforce their config; they own the responsibility (hence the microcopy above). Terminology parked
+  (it's the quickest, do it later).
 - ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
   (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
   localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config
