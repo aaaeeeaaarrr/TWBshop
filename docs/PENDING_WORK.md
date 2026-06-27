@@ -49,6 +49,14 @@
   **`docs/CUTOVER_COVERAGE.md`** (5 easiest behavior-preserving wins first: grace_min · early_bonus · papers_grace
   · short_notice · ot_cap; + GRACE_MIN dup in checkin.py & late.py to consolidate). Each HIGH-RISK (payroll-
   adjacent) → staging-prove default==current + quiet-window deploy. Owner-paced.
+- **Dashboard tweakability rollout (s56, open-yet-lean) — DONE-so-far + NEXT:** model → `docs/TWEAKABILITY_DESIGN.md`.
+  DONE+LIVE: **vibe presets** (`core/presets.py` + `/presets`, 5 live areas, captions) + **per-setting RESPONSIBILITY
+  microcopy** (`core/policy.py` — a light-grey "your call, per your policy / local law" line; on /presets + the
+  editor for 12 attendance settings; a `/policy` terms page). **Decisions: country presets DROPPED (not lean);
+  terminology PARKED.** ⏳ NEXT (autonomous, safe, wizard-only — THE "keep going" resume): extend
+  `core.policy.SETTING_POLICY` to the OTHER domains' settings (stock · pos · hr_payroll · accountant — auto-render
+  via `wizard/app.py::_field_input`); then build **ASK-TO-CHANGE** (NL "make lateness stricter" → applies a config
+  tweak, on `core.ask`).
 
 ### 📚 Older standing threads (unchanged)
 - Accountant P2 money matcher + Bakong · Stock lane AppSheet + GM↔stock cutover · marketing automation · AI
