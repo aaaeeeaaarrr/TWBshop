@@ -178,6 +178,7 @@ def render_page(org_id: str = "twb") -> str:
 
 # ── CUSTOMER view (the product: friendly + editable draft) ────────────────────
 def _field_input(path: str, desc: dict, value, status: str, org_id: str) -> str:
+    from core import policy as pol
     t = desc["type"]
     editable = status in EDITABLE
     if t == "secret":
@@ -215,8 +216,10 @@ def _field_input(path: str, desc: dict, value, status: str, org_id: str) -> str:
         note = ' <span class="lock">live today (fixed) — your change applies at cut-over</span>'
     else:
         note = ""
-    return ('<div class="fld"><label><b>%s</b>%s</label><div>%s</div><div class="help">%s</div>%s</div>'
-            % (escape(desc["label"]), note, ctrl, escape(desc["help"]), hint))
+    _pol = pol.setting_policy(path)                  # light-grey per-setting responsibility line (grows over time)
+    pol_html = ('<div style="color:#94a3b8;font-size:12px;margin-top:2px">%s</div>' % escape(_pol)) if _pol else ""
+    return ('<div class="fld"><label><b>%s</b>%s</label><div>%s</div><div class="help">%s</div>%s%s</div>'
+            % (escape(desc["label"]), note, ctrl, escape(desc["help"]), hint, pol_html))
 
 
 def _render_groups(cfg: dict, groups, org_id: str) -> str:
