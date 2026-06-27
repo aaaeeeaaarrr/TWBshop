@@ -89,6 +89,28 @@ def apply_vibe(org_id, group_key: str, vibe: str):
     return knobs
 
 
+def _fmt_knob(k, v) -> str:
+    """A knob value in plain words (so a client SEES what a vibe does, no jargon)."""
+    if k == "bank_cap_min":
+        return "%sh OT cap" % (v // 60)
+    if k == "swap_partner_rule":
+        return str(v).replace("_", " ")
+    tmpl = {
+        "grace_min": "%s min grace", "early_bonus_min": "+%s min early", "short_notice_days": "%s-day notice",
+        "papers_grace_days": "%s-day papers", "swap_overlap_pct": "%s%% overlap",
+        "swap_start_window_min": "%s-min window", "reping_hours": "chase every %sh", "reping_max": "up to %s×",
+    }.get(k)
+    return (tmpl % v) if tmpl else ("%s %s" % (str(k).replace("_", " "), v))
+
+
+def vibe_caption(group_key: str, vibe: str) -> str:
+    """A one-line plain-words summary of what a vibe sets — for tooltips + 'Now: …' on the presets page."""
+    g = ATTENDANCE_PRESETS.get(group_key)
+    if not g or vibe not in g["vibes"]:
+        return ""
+    return " · ".join(_fmt_knob(k, v) for k, v in g["vibes"][vibe].items())
+
+
 def current_vibe(org_id, group_key: str):
     """Which vibe the tenant's current config matches ('strict'/'balanced'/… ), or 'custom' if it's hand-tuned."""
     g = ATTENDANCE_PRESETS.get(group_key)

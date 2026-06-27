@@ -265,6 +265,10 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   Global surfaces a business tweaks: thresholds · ladders · approvers · penalties/rewards · schedule+LABOUR-LAW
   (per country) · money/currency/tax · language/locale · terminology (rename AL→PTO…). Allow-but-guard the 'stupid'
   tweak (validate-on-write + fail-safe-on-read). **Lean = fewer DECISIONS per outcome, not fewer features.**
+- 💡 **FINDING — `pgrep -f run_gm_bot.py | head -1` ≠ the gm MainPID** `[gotcha]` — during/after a restart it can match a
+  transient/wrapper, so a "gm PID unchanged" bot-safety check is noisy (it raised one false "PID changed" alarm; the gm
+  was stable, NR=0). Use `systemctl show twbshop-gm -p MainPID` (+ NRestarts + ActiveEnterTimestamp) as the authoritative
+  bot-safety verification, not pgrep|head.
 - ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
   (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
   localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config

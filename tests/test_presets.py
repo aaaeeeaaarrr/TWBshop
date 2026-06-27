@@ -48,6 +48,13 @@ def test_apply_swaps_vibe_live_path():
         _reset()
 
 
+def test_vibe_caption_plain_words():
+    assert presets.vibe_caption("lateness", "strict") == "0 min grace · +3 min early"
+    assert presets.vibe_caption("overtime", "generous") == "20h OT cap"
+    assert presets.vibe_caption("swaps", "strict") == "start window · 120-min window"
+    assert presets.vibe_caption("approval_chase", "gentle") == "chase every 12h · up to 2×"
+
+
 def test_hand_tuned_reads_as_custom():
     _reset()
     try:

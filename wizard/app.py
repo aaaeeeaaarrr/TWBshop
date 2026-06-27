@@ -1407,30 +1407,41 @@ def render_automations(org_id: str) -> str:
 def render_presets(org_id: str) -> str:
     """🎚️ Vibe presets — one tap sets a whole area to a feeling (Strict/Balanced/Relaxed). The LEAN front door
     onto the granular knobs; 'Customize' opens the exact values. Broad control, tiny surface. (docs/TWEAKABILITY_DESIGN.md)"""
-    from core import presets as pr
+    from core import presets as pr, policy as pol
     groups = []
     for key, g in pr.ATTENDANCE_PRESETS.items():
         cur = pr.current_vibe(org_id, key)
         btns = "".join(
-            "<button name='vibe' value='%s' style='margin:3px;padding:8px 14px;border-radius:8px;cursor:pointer;"
-            "border:1px solid %s;%s'>%s</button>"
-            % (v, "#0d9488" if cur == v else "#cbd5e1",
+            "<button name='vibe' value='%s' title='%s' style='margin:3px;padding:8px 14px;border-radius:8px;"
+            "cursor:pointer;border:1px solid %s;%s'>%s</button>"
+            % (v, escape(pr.vibe_caption(key, v)), "#0d9488" if cur == v else "#cbd5e1",
                "background:#0d9488;color:#fff" if cur == v else "background:#fff", escape(v.title()))
             for v in g["vibes"])
         cust = " <span class='note'>· hand-tuned</span>" if cur == "custom" else ""
+        now = pr.vibe_caption(key, cur) if cur != "custom" else "your own values"
         groups.append(
             "<div class='box'><b>%s</b>%s"
             "<form method='post' action='/presets/apply' style='margin-top:6px'>"
             "<input type='hidden' name='group' value='%s'>%s</form>"
-            "<div class='note' style='margin-top:4px'>Want the exact numbers? <a href='/customer/config'>Customize ›</a></div></div>"
-            % (escape(g["label"]), cust, key, btns))
+            "<div class='note' style='margin-top:4px'>Now: %s · <a href='/customer/config'>Customize ›</a></div>"
+            "<div style='color:#94a3b8;font-size:.82em;margin-top:3px'>%s</div></div>"
+            % (escape(g["label"]), cust, key, btns, escape(now), escape(pol.GROUP_POLICY.get(key, ""))))
     saved = "<p class='note'>✓ updated — live now (no restart)</p>" if request.args.get("saved") == "1" else ""
     body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>🎚️ Set the vibe</h1>"
             "<p class='note'>One tap sets a whole area to a feeling — <b>Balanced = your current rules</b>. "
             "Strict tightens, Relaxed loosens. Every choice is live instantly, and <b>Customize</b> always opens "
             "the exact numbers. Lean on top, fully open underneath.</p>%s%s"
-            % (saved, "".join(groups)))
+            "<p style='color:#94a3b8;font-size:.82em;margin-top:16px'>%s <a href='/policy'>Terms &amp; responsibility ›</a></p>"
+            % (saved, "".join(groups), escape(pol.DISCLAIMER)))
     return _page("Presets", body)
+
+
+def render_policy(org_id: str) -> str:
+    """Our standing terms / responsibility note — the 'somewhere' a client reads the full disclaimer (owner
+    refines the copy). The lean per-setting one-liners (core.policy) carry it in-context; this is the home page."""
+    from core import policy as pol
+    paras = "".join("<p>%s</p>" % escape(p) for p in pol.POLICY_PAGE.split("\n\n"))
+    return _page("Terms", "<div class='nav'><a href='/customer'>← dashboard</a></div><h1>Terms & responsibility</h1>" + paras)
 
 
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
@@ -2027,6 +2038,10 @@ def create_app(org_id: str = "twb") -> Flask:
         if pr.apply_vibe(org_id, g, v) is not None:
             log_config_change(org_id, _current_user(), "preset.%s" % g, None, v)
         return redirect("/presets?saved=1")
+
+    @app.get("/policy")
+    def policy_page():
+        return render_policy(org_id)
 
     @app.get("/expertise")
     def expertise():
