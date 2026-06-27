@@ -105,6 +105,30 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - `[gotcha]` `core.db` exposes `_org_secret_cipher()` + `_ENC_PREFIX` — reuse them for any new at-rest
   encryption (don't re-roll Fernet). No circular import: `core.db` doesn't import `core.onboarding_flow` at module level.
 
+### s57 cont — SELF-HEALING + PARALLEL-SHADOW program (owner: "do all, alarms for everything, self-heal, nightly rounds")
+- `[decision/sell]` **The reliability MOAT, designed** → `docs/SELF_HEALING_AND_SHADOW_PROGRAM.md`. Cut TWB onto the
+  platform safely (flip-asap-fix-one-at-a-time, fully netted), then run **hundreds of parallel shadows** (config
+  matrix × real events, no live impact) so the whole dashboard config space is continuously validated. Phases:
+  0 safety foundation (Sentinel · reverse-shadow+instant-revert · invariant monitor) → 1 verdict-brain flip →
+  2 net+flip each aspect → 3 parallel-shadow harness (guardrail-mining · auto-tuned defaults · config-diff preview ·
+  risk-free-try) → 4 self-healing actions → 5 nightly rounds.
+- `[gotcha/decision]` **The shadow net goes DARK the instant you naively flip** (core becomes live → nothing to
+  compare). The safe flip = **reverse-shadow**: core authoritative + the OLD engine kept as the shadow OF core +
+  instant-revert flag. AND the net only catches what it compares (verdict today, NOT recording/points/payback) — so
+  extend the net to each aspect BEFORE flipping it. This is what makes "flip-and-fix" safe.
+- `[ship]` **Sentinel built (`core/sentinel.py`)** — Phase-0 brick ①: the universal liveness monitor (alarm for
+  ANYTHING stuck past its ladder SLA), org-scoped (TWB · shadows · clients alike), read-only, extensible detectors.
+  First detectors: **shadow-net-went-dark (critical — alarms if the safety net itself dies)** + malformed-check-in;
+  a detector that itself errors is reported (never-silently-swallow). 5 tests.
+- `[decision]` **Self-healing 4 laws:** land-safe (atomic+idempotent+fail-safe-read) · heal-if-unambiguous ·
+  freeze+alarm-if-risky · never-silently-swallow. Issue→kryptonite catalogue in the doc (crash · reboot · DB blip ·
+  half-write · double-tap · stuck debt/approval · dead shadow · missed job · config typo · balance drift · UNKNOWN
+  error → log+alarm+manual-review-queue). Even the unknown error lands safe+alarmed+queued.
+- `[sell/decision]` **Nightly rounds = 2 kinds:** deterministic SERVER cron (Sentinel sweep + heal-safe + digest DM,
+  prod access) + an intelligent nightly AGENT (own budget — reasons over the day, PREPARES+queues risky fixes for a
+  one-tap approve, runs the suite, updates guardrails). Neither moves money/payroll or deploys to prod autonomously.
+  The "more-than-token-limits" capacity = work happens while the owner sleeps; morning = "approve", not "investigate".
+
 ### s57 cont — B2B money-path fixes built + tested on staging (owner "go ahead")
 - `[ship]` **F2/F3/F4 B2B double-credit fixes — built on STAGING, tested, red-teamed** (B2B still disabled; prod
   apply + re-enable stay JOINT). **F4** claim-first (`claim_markpaid_request` CAS + `_do_confirm` claims before
