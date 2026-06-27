@@ -63,6 +63,29 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - `[gotcha]` The auto-mode classifier **blocked the first prod seed** ("no explicit consent for this specific prod
   write") — correct: a user *question* ≠ consent to write prod staff records. Asked; owner chose "all 42 + extend".
 
+### s57 cont — open-yet-lean comms ladder + check-in cut-over readiness (owner-directed)
+- `[ship]` **Comms-responsiveness ladder is now OPEN-yet-LEAN config** — the brain (`gm_bot/comms.py`) was a pure
+  deterministic detector with HARDCODED `NUDGE_MIN=30`/`ESCALATE_MIN=90`. Added `categories.attendance.comms` config
+  (enabled · nudge_after_min · escalate_after_min · escalate_to · max_nudges · only_during_shift · quiet_hours ·
+  **auto_penalize=False** · scope) + a **"Chasing slow replies" vibe preset** (Off/Gentle/Standard/Strict, `off`==default)
+  + 7 detailed knobs in the editor + responsibility microcopy. Demonstrates the philosophy: OPEN lives in the
+  engine (every knob), LEAN in the surface (one vibe tap; knobs on Customize). Still INERT — the gm-job wiring +
+  deploy is the joint go-live. (gm/bots untouched.)
+- `[decision/framework]` **OPEN-yet-LEAN, confirmed with the owner (2026-06-27):** a setting is one of two kinds —
+  **UNIVERSAL** (a mechanic every business does the same → no knob, keeps it lean: location-to-check-in, the
+  overnight shift-id model, "addressed + no reply = unanswered") vs **TWEAKABLE-BY-COMFORT** (culture/policy differs
+  → a knob, but behind a lean front door: sensible default + one-tap vibe + numbers only on Customize + a
+  responsibility line). Leanness comes from PRESENTATION, not from removing options → we can be fully open AND look
+  as lean as now.
+- `[finding]` **Check-in cut-over readiness — the 5 shadow disagreements investigated (read-only):** of 227 real
+  check-ins, agreement is **97.8%**; the **5 mismatches are ALL on ONE morning (2026-06-22 ~05:57–06:35 PP, the
+  06:00 overnight-shift boundary)** and all are "early/late by ≤5 min vs live=on_time" edges (4× early+1..5, 1×
+  late+4). **ZERO mismatches since 2026-06-23 → ~100% for the last ~4 days.** Likely cause = a boundary nuance in
+  which shift-start a 06:00 check-in is judged against (overnight) or a grace inclusive/exclusive edge — NOT a
+  verdict-logic bug (parity is locked by `test_verdict_parity.py`). So the cut-over is closer than "held
+  indefinitely"; the boundary cases are benign-looking + haven't recurred. (Worth confirming the exact cause before
+  the flip; settle shadow = 100%/9.)
+
 ### s57 cont — autonomous safe-backlog run ("do what you can without me, 1 by 1")
 - `[ship]` **PII encryption-at-rest for `core_staff`** — the sensitive HR columns (national_id · passport · tax_id ·
   social_security · address · bank_account) now encrypt at rest via the existing Fernet helper, gated on

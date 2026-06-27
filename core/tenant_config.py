@@ -127,6 +127,17 @@ DEFAULTS = {
                 "special_leave": _approval(),
                 "dayoff_move": _approval(),
             },
+            "comms": {                      # staff-responsiveness ladder — chase a slow replier. OFF by default
+                "enabled": False,           #   (it DMs real staff → opt in after a test-mode walk + the gm deploy).
+                "nudge_after_min": 30,      # addressed (@-mention / reply-to) + no reply this long → a gentle private DM
+                "escalate_after_min": 90,   # still no reply this long → flag the senior group (0 = never escalate)
+                "escalate_to": "supervisors",  # who hears it: supervisors | management | owner
+                "max_nudges": 1,            # gentle DMs before escalating
+                "only_during_shift": True,  # only chase while the staffer is on shift (no off-hours nudges)
+                "quiet_hours": "21:00-06:00",  # never nudge in this window
+                "auto_penalize": False,     # repeated misses NEVER auto-deduct points by default — alert + log only
+                "scope": "any_mention",     # any_mention (any @-mention / reply) | questions_only (only when asked a question)
+            },
         },
         # other domains — the accountant's real features modelled as config (still INERT; migrated as ported)
         "accountant": {

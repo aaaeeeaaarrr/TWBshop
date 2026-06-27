@@ -185,6 +185,30 @@ DESCRIPTORS = {
                 "for certain days/hours) in the staff screen, and the bot can use it to approve leave only when "
                 "coverage still holds.",
         "true": "ON — skill-coverage minimums are tracked/enforced.", "false": "OFF — no skill-coverage rules."},
+    # ── Comms — chasing slow replies (the responsiveness ladder; gm reads it at go-live, OFF until enabled) ──
+    f"{_ATT}.comms.enabled": {"label": "Chase slow replies", "type": "bool",
+        "help": "When a staffer is @-mentioned or replied-to in a work group and doesn't answer, the bot nudges "
+                "them (and can flag a senior). GROUP messages only — 1-to-1 calls are out of scope.",
+        "true": "ON — the bot chases unanswered messages.", "false": "OFF — no chasing (default)."},
+    f"{_ATT}.comms.nudge_after_min": {"label": "Nudge after (minutes)", "type": "int", "min": 0, "max": 480,
+        "unit": "min", "help": "How long an addressed message can go unanswered before a gentle private DM."},
+    f"{_ATT}.comms.escalate_after_min": {"label": "Escalate after (minutes)", "type": "int", "min": 0, "max": 1440,
+        "unit": "min", "help": "Still unanswered this long → flag the senior group. 0 = never escalate (nudge only)."},
+    f"{_ATT}.comms.escalate_to": {"label": "Escalate to", "type": "enum",
+        "help": "Who gets the escalation when a message stays unanswered.",
+        "options": [("supervisors", "Supervisors", "The supervisors group."),
+                    ("management", "Management", "The management group."),
+                    ("owner", "Owner only", "A private DM to you.")]},
+    f"{_ATT}.comms.only_during_shift": {"label": "Only chase on-shift", "type": "bool",
+        "help": "Only nudge a staffer while they're actually working.",
+        "true": "ON — no off-hours nudges.", "false": "OFF — chase any time."},
+    f"{_ATT}.comms.auto_penalize": {"label": "Auto-penalise repeated misses", "type": "bool",
+        "help": "Whether repeated ignored messages automatically deduct points.",
+        "true": "ON — repeated misses cost points (use with care).", "false": "OFF — alert + log only (recommended)."},
+    f"{_ATT}.comms.scope": {"label": "What counts as 'addressed'", "type": "enum",
+        "help": "Which messages start the clock.",
+        "options": [("any_mention", "Any mention / reply", "Any @-mention or a reply to their message."),
+                    ("questions_only", "Questions only", "Only when they're asked a question (a '?').")]},
     # ── Connections / onboarding (the wizard's plumbing) ──
     "connections.telegram.bot_token": {"label": "Telegram bot token", "type": "secret",
         "help": "The token from @BotFather for THIS tenant's bot. Stored encrypted; never shown."},
@@ -363,6 +387,9 @@ ATTENDANCE_GROUPS = [
                      f"{_ATT}.staff_rules.probation_days", f"{_ATT}.staff_rules.auto_clockout_grace_min"]),
     ("Expertise &amp; coverage", [f"{_ATT}.expertise.enabled"]),
     ("Points", [f"{_ATT}.points.enabled"]),
+    ("Responsiveness (chasing slow replies)", [f"{_ATT}.comms.enabled", f"{_ATT}.comms.nudge_after_min",
+        f"{_ATT}.comms.escalate_after_min", f"{_ATT}.comms.escalate_to", f"{_ATT}.comms.only_during_shift",
+        f"{_ATT}.comms.auto_penalize", f"{_ATT}.comms.scope"]),
 ]
 
 # The onboarding "Connections" screen — channels + tokens (tokens are SECRETS, rendered masked).

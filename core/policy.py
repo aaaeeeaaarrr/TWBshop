@@ -13,6 +13,7 @@ GROUP_POLICY = {
     "overtime":       "Your overtime cap and handling are yours to set, per your labour terms and local law.",
     "swaps":          "Who may swap shifts is your call — set it to match how you run coverage.",
     "approval_chase": "How hard the bot chases approvers is your preference — tune it to your team.",
+    "responsiveness": "How hard the bot chases a slow replier is your call — set it to your team's culture (and never auto-penalize unless you choose to).",
 }
 
 # per granular config path → its responsibility line (for the detailed editor; grows as settings are covered).
@@ -68,6 +69,14 @@ SETTING_POLICY = {
     # ── Attendance · expertise / points ──
     f"{_ATT}.expertise.enabled":        "Using skill-coverage minimums is your choice — a scheduling tool, your call.",
     f"{_ATT}.points.enabled":           "Using a points / score system is your choice — a management tool, not a legal one.",
+    # ── Attendance · comms (chasing slow replies) ──
+    f"{_ATT}.comms.enabled":            "Whether the bot chases slow replies is your call — it messages real staff, so set it to your culture.",
+    f"{_ATT}.comms.nudge_after_min":    "How long before a gentle nudge is yours to set — match your team's pace.",
+    f"{_ATT}.comms.escalate_after_min": "When (or whether) to flag a senior is your call — set 0 to never escalate.",
+    f"{_ATT}.comms.escalate_to":        "Who hears an escalation is yours to choose.",
+    f"{_ATT}.comms.only_during_shift":  "Whether to chase only on-shift is your preference — mind off-hours boundaries.",
+    f"{_ATT}.comms.auto_penalize":      "Auto-penalising repeated misses is your call — default is alert-only; points are a management tool, not a legal one.",
+    f"{_ATT}.comms.scope":              "Whether to chase every mention or only questions is your preference.",
     # ── Accountant ──
     f"{_ACC}.enabled":                  "Keeping your books here is your choice — your records and tax stay your responsibility.",
     f"{_ACC}.receipt_read.vendor_priors": "Letting past prices hint the reader is your preference — always check the figures that matter.",

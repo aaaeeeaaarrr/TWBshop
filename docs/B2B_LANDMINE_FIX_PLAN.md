@@ -56,5 +56,17 @@ Today `mark_b2b_orders_paid` + `mark_b2b_cake_orders_paid` + `set_b2b_customer_c
 - A second-opinion / red-team pass on the money logic before re-enable.
 - Then, and only then, the owner re-enables `twbshop-b2b`.
 
+## Prep done (s57, read-only on prod — makes the joint session fast)
+- **Step A is a NO-OP:** prod `b2b_payments` = **4 rows, 0 duplicates** (by `tg_file_unique_id`). So the UNIQUE
+  indexes (F3) can be added directly at re-enable — no by-hand dedup needed.
+- **Column name confirmed:** it's **`group_message_id`** (not `message_id`) — the F3 index B uses `group_message_id`.
+- **`b2b_markpaid_requests` shape:** `id · group_chat_id · business_name · amount · method · staff_user_id ·
+  staff_msg_id · owner_msg_id · status · covered_dates · created_at` → F4 `claim_markpaid_request` = `UPDATE …
+  SET status='approved' WHERE id=%s AND status IN ('draft','pending') RETURNING *`.
+- **F2 confirmed:** `apply_payment` (`b2b_bot/billing.py:91`) does 3 SEPARATE writes (`mark_b2b_orders_paid` +
+  `mark_b2b_cake_orders_paid` + `set_b2b_customer_credit`) → not atomic; + re-reads live unpaid each call →
+  double-applies if called twice. Fix = one txn (cursor-threaded) + idempotency via the claimed request id.
+
 ## Status
-Plan ready. Code unchanged (B2B disabled). Execute together at re-enable.
+Plan ready + prep done. Code unchanged (B2B disabled). The staging CODE build (F2/F3/F4 + tests + red-team) is
+safe-autonomous (B2B disabled, no live money); the prod INDEX application + the re-enable stay joint with the owner.

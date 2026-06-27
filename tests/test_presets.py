@@ -18,8 +18,9 @@ def _reset():
 def test_balanced_equals_defaults():
     _reset()
     try:
-        for g in presets.ATTENDANCE_PRESETS:                    # EVERY group's 'balanced' == the live defaults
-            assert presets.current_vibe(ORG, g) == "balanced", g
+        for g in presets.ATTENDANCE_PRESETS:                    # the DEFAULTS map to a recognised vibe (not 'custom')
+            expected = "off" if g == "responsiveness" else "balanced"   # comms is an opt-in feature → OFF by default
+            assert presets.current_vibe(ORG, g) == expected, g
     finally:
         _reset()
 

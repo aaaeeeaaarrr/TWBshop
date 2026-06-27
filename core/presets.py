@@ -58,6 +58,16 @@ ATTENDANCE_PRESETS = {
             "persistent": {"reping_hours": 3,  "reping_max": 6},
         },
     },
+    "responsiveness": {                           # the staff comms-chase ladder (gm reads it at go-live). 'off'
+        "label": "Chasing slow replies",          # == the DEFAULT (comms is OFF until the owner enables + deploys).
+        "path": "categories.attendance.comms",
+        "vibes": {
+            "off":      {"enabled": False},
+            "gentle":   {"enabled": True, "nudge_after_min": 60, "escalate_after_min": 0},
+            "balanced": {"enabled": True, "nudge_after_min": 30, "escalate_after_min": 90},
+            "strict":   {"enabled": True, "nudge_after_min": 15, "escalate_after_min": 45},
+        },
+    },
 }
 
 
@@ -95,10 +105,15 @@ def _fmt_knob(k, v) -> str:
         return "%sh OT cap" % (v // 60)
     if k == "swap_partner_rule":
         return str(v).replace("_", " ")
+    if k == "enabled":
+        return "on" if v else "off"
+    if k == "escalate_after_min":
+        return "no escalation" if not v else "escalate @ %sm" % v
     tmpl = {
         "grace_min": "%s min grace", "early_bonus_min": "+%s min early", "short_notice_days": "%s-day notice",
         "papers_grace_days": "%s-day papers", "swap_overlap_pct": "%s%% overlap",
         "swap_start_window_min": "%s-min window", "reping_hours": "chase every %sh", "reping_max": "up to %s×",
+        "nudge_after_min": "nudge @ %sm",
     }.get(k)
     return (tmpl % v) if tmpl else ("%s %s" % (str(k).replace("_", " "), v))
 
