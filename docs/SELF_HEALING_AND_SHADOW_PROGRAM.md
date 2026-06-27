@@ -51,6 +51,55 @@
 | Balance wrong | audit chain + /audit | auto-reconcile clear case | freeze + alarm |
 | Unknown new error | graceful-degrade | — | log + alarm + manual-review queue |
 
+## The crux — read this before ANY flip
+The single most important truth: **a naive flip turns the monitoring net OFF** — once core becomes live there is
+nothing left to compare it against, and the alarms go dark. So:
+1. **Reverse-shadow:** flip core authoritative, keep the OLD engine running as the shadow OF core, alarm on any
+   divergence, and a single flag flips authority back INSTANTLY.
+2. **The net only catches what it compares.** Today it compares the VERDICT (+ settle) — NOT the recording, points,
+   or payback writes. So extend the net to each aspect BEFORE flipping that aspect. "Flip one at a time" literally =
+   net it → flip it → watch → next.
+
+## Current state / readiness (2026-06-27)
+- There is **NO built "flip switch"** — the shadow only COMPARES; making core authoritative is a migration (re-wire
+  the live recording + every reader: points · payback · settle · payroll · watchdog), done in the phases above.
+- **Check-in verdict: core == live, 100% agreement since 2026-06-23** (227 compared; the only 5 mismatches were one
+  morning, 06-22, early-shadow teething where core under-applied grace and live was correct — none since). So Phase 1
+  (the verdict-brain flip) is **behaviorally a no-op = the safe first step.**
+- Settle shadow: 100% (9 compared). Shadow_run is ON; the Sentinel's first detector guards against it silently dying.
+
+## Flip ↔ parallel-shadows — separable but synergistic
+- The parallel-shadows vision does **NOT require** flipping TWB — they are read-only simulations fed by the real
+  event stream; they run regardless of who is authoritative.
+- BUT running TWB itself on core (the flip / dogfood) makes core **production-proven**, which is the credibility
+  behind "validated across hundreds of configs." flip = battle-tested engine; parallel shadows = exhaustively
+  validated config space — build both. And the parallel-shadow infra IS the dashboard's live-preview infra (one
+  build, two payoffs).
+
+## Bonuses (ALL taken — owner 2026-06-27)
+- **Auto-mine guardrails** — any config combo producing an impossible/extreme result → the dashboard auto-warns or
+  blocks it (clients can't foot-gun).
+- **Auto-tune defaults** — watch which combos produce the healthiest real outcomes → "shops like yours run best with grace = 7."
+- **Config-diff preview** (the killer dashboard feature) — a client nudges a setting → instant shadow delta ("this
+  would have flagged 3 more people late last month").
+- **Risk-free try** — a prospect runs combos against their OWN last month before committing.
+- **Invariant monitoring** — the net that scales to clients (who have no "old engine"): impossible-state alarms +
+  cross-config divergence + anomaly-vs-own-baseline.
+- **The moat / sales line:** *"every setting our dashboard allows is validated continuously against a real operating
+  business."* Synthetic-only competitors can't say that.
+
+## Caveats — from every angle (ours + different clients')
+- **"Flip then fix in prod" is a TWB-ONLY tolerance.** You own TWB; the stakes + the revert are yours. NEVER
+  fix-in-prod on a client's payroll → clients receive only the HARDENED result (proven on TWB + the parallel shadows
+  first). TWB's flip-and-fix is the canary that PROTECTS clients.
+- **Cost:** check-in is low-frequency + deterministic → hundreds of shadows are cheap. Keep each shadow computer-tier
+  (no model calls per shadow); for high-frequency / AI domains (POS, message analysis) cap the matrix + guard cost.
+- **Don't brute-force the combo space** (astronomically large) — run MEANINGFUL sets (presets × key axes +
+  client-picked + edge cases). Grow from a handful.
+- **Privacy:** a tenant's shadows run only on THAT tenant's own data — never one client's config against another's data.
+- **Lean discipline:** start with a few parallel configs on the existing replay; grow when real clients/configs justify it.
+
 ## Status
-Plan captured (2026-06-27). Phase 0 brick ① (Sentinel) — building now. Everything else sequenced above.
-HIGH-RISK live aspects (the flips) get staging proof + the net + a quiet-window deploy + instant-revert; never a blind switch.
+Plan captured (2026-06-27). Phase 0 brick ① (Sentinel) — ✅ BUILT + tested (`core/sentinel.py`, 5 tests). Everything
+else sequenced above. HIGH-RISK live aspects (the flips) get staging proof + the net + a quiet-window deploy +
+instant-revert; never a blind switch. Companion record: `docs/BONUSES_AND_FINDINGS.md` §s57.
