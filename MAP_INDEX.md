@@ -101,6 +101,8 @@
     · split_late, checkin_points, no_show_points, late_sick_points, points_for
 - `core/pos.py` — core.pos — a real, minimal point-of-sale (the POS domain on the platform): record sales → revenue, and
     · record_sale, void_sale, recent_sales, sales_summary
+- `core/presets.py` — core.presets — VIBE presets: one tap sets a CLUSTER of related knobs to a *feeling* (Strict / Balanced /
+    · _nested, _at, apply_vibe, current_vibe
 - `core/reports.py` — core.reports — read-only trends/analytics over the platform's own data (the "Reports" frontier capability;
     · attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 - `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
@@ -328,7 +330,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+56, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+57, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

@@ -254,6 +254,17 @@ proven but the DEPLOY is owner-gated (own-sick race · hire token · init-order 
   OT-rest REFUND (returns spent minutes on buyback-cancel, S1 — correctly uncapped); `grant_fits`/`duration_options`
   (pre-session-31 grant model) are vestigial/not-live. So the migration touches exactly one cap, behavior-preserving.
   Lesson: on the money path, ENUMERATE every writer before touching a cap — never assume a single call site.
+- ✅ **VIBE PRESETS — broad control, lean surface** `[ship/sell]` (owner direction) — `core/presets.py` + `/presets`:
+  one tap sets a whole area (Lateness / Leave / Overtime) to a feeling (Strict · Balanced · Relaxed), moving a
+  CLUSTER of knobs at once. 'Balanced' == the DEFAULTS (behaviour-preserving); 'custom' is auto-detected when
+  hand-tuned. The granular 'Customize' door stays open. First concrete embodiment of the open-yet-lean model.
+- ⭐ **DESIGN / DIRECTION — dashboard tweakability = OPEN for the world, LEAN by default** `[decision/sell]` (owner) —
+  full model → `docs/TWEAKABILITY_DESIGN.md`. The moat: rivals equate 'powerful' with 'lots of visible settings'
+  (overwhelming, needs a consultant); we put the breadth in curated PRESETS (country/industry/vibe) + progressive
+  disclosure ('Customize') + 'ask-to-change' search, so a client meets ~3 decisions not 300 yet nothing is locked.
+  Global surfaces a business tweaks: thresholds · ladders · approvers · penalties/rewards · schedule+LABOUR-LAW
+  (per country) · money/currency/tax · language/locale · terminology (rename AL→PTO…). Allow-but-guard the 'stupid'
+  tweak (validate-on-write + fail-safe-on-read). **Lean = fewer DECISIONS per outcome, not fewer features.**
 - ⭐ **FINDING — inline fail-safe config reads scale to the 7.5k-line gm** `[decision]` — rather than a shared helper
   (placement risk in a huge file), each caller got a self-contained `try: read config / except: constant` block:
   localized, reviewable, can't fault (a DB hiccup → the constant). The pure logic functions stayed UNTOUCHED (config

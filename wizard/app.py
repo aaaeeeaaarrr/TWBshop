@@ -813,7 +813,7 @@ def render_dashboard(org_id: str) -> str:
            "<div class='box' style='background:#eff6ff;border-color:#bfdbfe'>👋 <b>New here?</b> "
            "Answer a few quick questions and we'll set the right tools up for you — "
            "<a href='/welcome'>start setup →</a> <span class='note'>(a minute · skippable)</span></div>")
-    body = ("<div class='nav'><a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/presets'>🎚️ set the vibe</a> · <a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
             "<h1>⚡ Your system</h1>" + _wb +
             "<form method='get' action='/ask' style='margin:8px 0'><input name='q' "
             "placeholder='💬 Ask your business… e.g. any shrinkage?' "
@@ -1404,6 +1404,35 @@ def render_automations(org_id: str) -> str:
     return _page("Automations", body)
 
 
+def render_presets(org_id: str) -> str:
+    """🎚️ Vibe presets — one tap sets a whole area to a feeling (Strict/Balanced/Relaxed). The LEAN front door
+    onto the granular knobs; 'Customize' opens the exact values. Broad control, tiny surface. (docs/TWEAKABILITY_DESIGN.md)"""
+    from core import presets as pr
+    groups = []
+    for key, g in pr.ATTENDANCE_PRESETS.items():
+        cur = pr.current_vibe(org_id, key)
+        btns = "".join(
+            "<button name='vibe' value='%s' style='margin:3px;padding:8px 14px;border-radius:8px;cursor:pointer;"
+            "border:1px solid %s;%s'>%s</button>"
+            % (v, "#0d9488" if cur == v else "#cbd5e1",
+               "background:#0d9488;color:#fff" if cur == v else "background:#fff", escape(v.title()))
+            for v in g["vibes"])
+        cust = " <span class='note'>· hand-tuned</span>" if cur == "custom" else ""
+        groups.append(
+            "<div class='box'><b>%s</b>%s"
+            "<form method='post' action='/presets/apply' style='margin-top:6px'>"
+            "<input type='hidden' name='group' value='%s'>%s</form>"
+            "<div class='note' style='margin-top:4px'>Want the exact numbers? <a href='/customer/config'>Customize ›</a></div></div>"
+            % (escape(g["label"]), cust, key, btns))
+    saved = "<p class='note'>✓ updated — live now (no restart)</p>" if request.args.get("saved") == "1" else ""
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a></div><h1>🎚️ Set the vibe</h1>"
+            "<p class='note'>One tap sets a whole area to a feeling — <b>Balanced = your current rules</b>. "
+            "Strict tightens, Relaxed loosens. Every choice is live instantly, and <b>Customize</b> always opens "
+            "the exact numbers. Lean on top, fully open underneath.</p>%s%s"
+            % (saved, "".join(groups)))
+    return _page("Presets", body)
+
+
 # Card key → the module's master enable path (so a card's inside can turn the whole module on/off).
 _CARD_ENABLE = {
     "accountant": "categories.accountant.enabled", "stock": "categories.stock.enabled",
@@ -1986,6 +2015,18 @@ def create_app(org_id: str = "twb") -> Flask:
         au.remove_custom(org_id, cid)
         log_config_change(org_id, _current_user(), "automations.custom", None, "remove: %s" % cid)
         return redirect("/automations")
+
+    @app.get("/presets")
+    def presets_page():
+        return render_presets(org_id)
+
+    @app.post("/presets/apply")
+    def presets_apply():
+        from core import presets as pr
+        g, v = request.form.get("group"), request.form.get("vibe")
+        if pr.apply_vibe(org_id, g, v) is not None:
+            log_config_change(org_id, _current_user(), "preset.%s" % g, None, v)
+        return redirect("/presets?saved=1")
 
     @app.get("/expertise")
     def expertise():
