@@ -38,6 +38,31 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
   option — nothing to responsibly decide); the coverage guard scopes to `EXTRA_DOMAIN_GROUPS` so it needs no
   exclusion list.
 
+### s57 cont — real staff names + a UNIVERSAL employee record (owner-driven)
+- `[finding]` **Why the wizard showed "Staff #N" not names:** the platform is SHADOW — `attendance_events` are
+  mirrored from real check-ins keyed by the live `staff_registry` id, but `core_staff` (the platform's own
+  roster) was **empty (0 rows)** → `core/reports.py` falls back to `'Staff #'||id`. The real names live only in
+  the live `staff_registry` (42 people); they were never copied in (by design — shadow touches nothing live).
+- `[ship]` **Universal employee record (owner: "add real things companies worldwide have — Universal"):** extended
+  `core_staff` with ~33 standard HR fields — DOB · nationality · **national_id** · **passport** (+expiry) · gender ·
+  marital · contact (email/address/emergency) · employee_code · department · employment_type · start/end/probation
+  dates · work_location · manager · **tax_id · social-security · work-permit/visa** · contract (+on-file) ·
+  **indemnity (toggle + details)** · right-to-work · bank_account · notes · `custom_fields` JSONB (true
+  extensibility). All additive+nullable (via `init_core_db` ALTER-IF-NOT-EXISTS → applied on wizard restart).
+  The wizard staff editor is now a grouped HR form (Identity · Contact · Employment · Legal & compliance · Notes);
+  `core.onboarding_flow.update_staff_profile` writes via a WHITELIST (no arbitrary columns).
+- `[ship]` **Seed `scripts/seed_core_staff_twb.py`** — copies the live roster into core_staff (identity/employment
+  only, **NO salaries** — privacy), explicit `staff_id`=registry id so the report join lights up, sequence bumped,
+  idempotent, reversible. Active→'active', ex-staff→'removed' (name still resolves in history, not in the roster).
+- `[gotcha]` **`core_staff.staff_id` is a GLOBAL `BIGSERIAL` PK** (not per-org) — so the seed MUST insert explicit
+  ids = registry ids AND `setval` the sequence past them, or a later `add_staff_manual` collides. Verified the PK
+  space was empty before seeding.
+- `[gotcha/security]` The new HR columns include **sensitive PII** (national_id, passport, tax_id, social-security,
+  DOB, address, bank_account). Owner-only behind the localhost tunnel today; flagged 🔒 in the UI. **MUST be
+  encrypted-at-rest + access-scoped + audited before W3 / any public exposure** (added to the W3 list).
+- `[gotcha]` The auto-mode classifier **blocked the first prod seed** ("no explicit consent for this specific prod
+  write") — correct: a user *question* ≠ consent to write prod staff records. Asked; owner chose "all 42 + extend".
+
 ## Session 55 — A-Z due-diligence audit (ultracode, 44-agent, read-only)
 Full report: workflow `wf_7bb0f25d-3e6`. Verdict: LIVE production core is sound + suite really green
 (1081p/2s); ONE CRITICAL credential to rotate; the rest are INERT platform fixes on the harvest.

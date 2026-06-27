@@ -28,6 +28,7 @@ from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
 from core.reports import attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
+                                  update_staff_profile, PROFILE_TEXT, PROFILE_DATE, PROFILE_BOOL,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
                                   ensure_checkin_token, staff_by_checkin_token)
@@ -526,28 +527,92 @@ def render_staff(org_id: str) -> str:
     return _page("Staff", body)
 
 
+def _pf(label, name, value, typ="text", ph="", sensitive=False):
+    """One labelled profile field. `sensitive` marks PII (owner-only today; encrypt before public — W3)."""
+    lock = " <span style='color:#9333ea'>🔒</span>" if sensitive else ""
+    return ("<div style='margin:5px 0'><label style='display:inline-block;width:215px;color:#374151'>%s%s</label>"
+            "<input type='%s' name='%s' value='%s' placeholder='%s' style='width:250px'></div>"
+            % (escape(label), lock, typ, escape(name), escape("" if value is None else str(value)), escape(ph)))
+
+
+def _pf_bool(label, name, value):
+    return ("<div style='margin:5px 0'><label style='display:inline-block;width:215px;color:#374151'>%s</label>"
+            "<input type='checkbox' name='%s' %s></div>" % (escape(label), escape(name), "checked" if value else ""))
+
+
 def render_staff_edit(org_id: str, staff_id: int) -> str:
     s = get_staff(org_id, staff_id)
     if not s:
         return _page("Edit staff", "<div class='nav'><a href='/staff'>← staff</a></div><p>Not found.</p>")
     w = s.get("shift_windows") or []
     w0, w1 = (w[0] if len(w) > 0 else {}), (w[1] if len(w) > 1 else {})
-    body = (
-        "<div class='nav'><a href='/staff'>← staff</a></div><h1>✏️ Edit %s</h1>"
-        "<div class='box'><form method='post' action='/staff/update'>"
-        "<input type='hidden' name='staff_id' value='%d'>"
-        "Name <input type='text' name='name' value='%s'> "
+    g = s.get
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+    identity = (
+        "<h3>Identity</h3>"
+        "<div style='margin:5px 0'>Name <input type='text' name='name' value='%s'> "
         "Call-name <input type='text' name='call_name' value='%s' style='width:120px'> "
-        "Role <input type='text' name='role' value='%s' style='width:120px'> "
-        "<label style='font-weight:normal'><input type='checkbox' name='is_senior' %s> senior</label><br><br>"
-        "Skills (comma-separated) <input type='text' name='expertises' value='%s'><br><br>"
-        "Shift <input type='time' name='work_start' value='%s'> to <input type='time' name='work_end' value='%s'> "
-        "&nbsp; split <input type='time' name='split_start' value='%s'> to <input type='time' name='split_end' value='%s'>"
-        "<br><br><button type='submit'>Save</button> <a href='/staff' class='btn'>Cancel</a></form></div>"
-        % (escape(s.get("name", "")), s["staff_id"], escape(s.get("name", "")), escape(s.get("call_name") or ""),
-           escape(s.get("role") or ""), "checked" if s.get("is_senior") else "",
-           escape(", ".join(s.get("expertises") or [])), escape(w0.get("start", "")), escape(w0.get("end", "")),
-           escape(w1.get("start", "")), escape(w1.get("end", ""))))
+        "Role / title <input type='text' name='role' value='%s' style='width:150px'> "
+        "<label style='font-weight:normal'><input type='checkbox' name='is_senior' %s> senior</label></div>"
+        % (escape(g("name", "")), escape(g("call_name") or ""), escape(g("role") or ""),
+           "checked" if g("is_senior") else "")
+        + _pf("Employee code", "employee_code", g("employee_code"), ph="e.g. EMP-001")
+        + _pf("Date of birth", "date_of_birth", g("date_of_birth"), "date")
+        + _pf("Gender", "gender", g("gender"))
+        + _pf("Marital status", "marital_status", g("marital_status"))
+        + _pf("Nationality", "nationality", g("nationality"))
+        + _pf("National ID", "national_id", g("national_id"), sensitive=True)
+        + _pf("Passport no.", "passport_no", g("passport_no"), sensitive=True)
+        + _pf("Passport expiry", "passport_expiry", g("passport_expiry"), "date"))
+    contact = (
+        "<h3>Contact</h3>"
+        + _pf("Phone", "phone", g("phone"))
+        + _pf("Email", "email", g("email"))
+        + _pf("Home address", "address", g("address"), sensitive=True)
+        + _pf("Emergency contact", "emergency_contact_name", g("emergency_contact_name"))
+        + _pf("Emergency phone", "emergency_contact_phone", g("emergency_contact_phone"))
+        + _pf("Emergency relation", "emergency_contact_relation", g("emergency_contact_relation")))
+    employment = (
+        "<h3>Employment</h3>"
+        + _pf("Department / team", "department", g("department"))
+        + _pf("Employment type", "employment_type", g("employment_type"), ph="full_time · part_time · contract · casual")
+        + _pf("Work location / site", "work_location", g("work_location"))
+        + _pf("Start date", "start_date", g("start_date"), "date")
+        + _pf("Probation ends", "probation_end_date", g("probation_end_date"), "date")
+        + _pf("End date (if left)", "end_date", g("end_date"), "date")
+        + _pf("Weekly day off", "day_off", g("day_off"), ph="Mon")
+        + ("<div style='margin:5px 0'>Skills (comma-separated) "
+           "<input type='text' name='expertises' value='%s' style='width:300px'></div>"
+           % escape(", ".join(g("expertises") or [])))
+        + ("<div style='margin:5px 0'>Shift <input type='time' name='work_start' value='%s'> to "
+           "<input type='time' name='work_end' value='%s'> &nbsp; split "
+           "<input type='time' name='split_start' value='%s'> to <input type='time' name='split_end' value='%s'></div>"
+           % (escape(w0.get("start", "")), escape(w0.get("end", "")),
+              escape(w1.get("start", "")), escape(w1.get("end", "")))))
+    legal = (
+        "<h3>Legal &amp; compliance</h3>"
+        + _pf("Tax ID", "tax_id", g("tax_id"), sensitive=True)
+        + _pf("Social-security no.", "social_security_no", g("social_security_no"), sensitive=True)
+        + _pf("Work permit / visa no.", "work_permit_no", g("work_permit_no"))
+        + _pf("Work permit expiry", "work_permit_expiry", g("work_permit_expiry"), "date")
+        + _pf("Contract type", "contract_type", g("contract_type"), ph="permanent · fixed-term · …")
+        + _pf_bool("Contract on file", "contract_on_file", g("contract_on_file"))
+        + _pf_bool("Right-to-work verified", "right_to_work_verified", g("right_to_work_verified"))
+        + _pf_bool("Indemnity / bond", "indemnity_enabled", g("indemnity_enabled"))
+        + _pf("Indemnity details", "indemnity_details", g("indemnity_details"))
+        + _pf("Bank account (payroll)", "bank_account", g("bank_account"), sensitive=True))
+    notes = ("<h3>Notes</h3><textarea name='notes' rows='3' style='width:98%'>"
+             + escape(g("notes") or "") + "</textarea>")
+    body = (
+        "<div class='nav'><a href='/staff'>← staff</a></div><h1>✏️ %s</h1>%s"
+        "<p class='note'>The full employee record. <span style='color:#9333ea'>🔒</span> marks sensitive personal "
+        "data — owner-only behind your private tunnel today; it'll be encrypted + access-controlled before any "
+        "public access.</p>"
+        "<form method='post' action='/staff/update'><input type='hidden' name='staff_id' value='%d'>"
+        "<div class='box'>%s</div><div class='box'>%s</div><div class='box'>%s</div>"
+        "<div class='box'>%s</div><div class='box'>%s</div>"
+        "<div class='actions'><button type='submit'>Save</button> <a href='/staff' class='btn'>Cancel</a></div></form>"
+        % (escape(g("name", "")), saved, s["staff_id"], identity, contact, employment, legal, notes))
     return _page("Edit staff", body)
 
 
@@ -2171,6 +2236,11 @@ def create_app(org_id: str = "twb") -> Flask:
                          role=((request.form.get("role") or "").strip()[:40] or None),
                          is_senior=("is_senior" in request.form), expertises=exps,
                          shift_windows=_windows_from_form(request.form))
+            # universal HR-profile fields (the core whitelist decides what's writable — no arbitrary columns)
+            prof = {k: request.form.get(k) for k in (PROFILE_TEXT + PROFILE_DATE) if k in request.form}
+            prof.update({k: (k in request.form) for k in PROFILE_BOOL})
+            update_staff_profile(org_id, sid, prof)
+            return redirect("/staff/edit/%d?saved=1" % sid)
         return redirect("/staff")
 
     @app.get("/setup")

@@ -210,6 +210,25 @@ def init_core_db() -> None:
             cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS checkin_token TEXT")   # web check-in link
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_core_staff_token ON core_staff (checkin_token) "
                         "WHERE checkin_token IS NOT NULL")
+            # ── Universal employee-record fields (what HR systems worldwide capture) — additive + nullable,
+            #    so existing rows/flows are unaffected. ⚠ SENSITIVE PII (date_of_birth, national_id, passport_no,
+            #    tax_id, social_security_no, address, bank_account) MUST be encrypted-at-rest + access-scoped +
+            #    audited before ANY public/multi-user exposure (W3). Owner-only behind the localhost tunnel today.
+            for _col, _type in [
+                ("date_of_birth", "DATE"), ("nationality", "TEXT"), ("national_id", "TEXT"),
+                ("passport_no", "TEXT"), ("passport_expiry", "DATE"), ("gender", "TEXT"),
+                ("marital_status", "TEXT"), ("photo_url", "TEXT"), ("email", "TEXT"), ("phone", "TEXT"),
+                ("address", "TEXT"), ("emergency_contact_name", "TEXT"), ("emergency_contact_phone", "TEXT"),
+                ("emergency_contact_relation", "TEXT"), ("employee_code", "TEXT"), ("department", "TEXT"),
+                ("employment_type", "TEXT"), ("start_date", "DATE"), ("end_date", "DATE"),
+                ("work_location", "TEXT"), ("manager_id", "BIGINT"), ("probation_end_date", "DATE"),
+                ("tax_id", "TEXT"), ("social_security_no", "TEXT"), ("work_permit_no", "TEXT"),
+                ("work_permit_expiry", "DATE"), ("contract_type", "TEXT"),
+                ("contract_on_file", "BOOLEAN DEFAULT FALSE"), ("indemnity_enabled", "BOOLEAN DEFAULT FALSE"),
+                ("indemnity_details", "TEXT"), ("right_to_work_verified", "BOOLEAN DEFAULT FALSE"),
+                ("bank_account", "TEXT"), ("notes", "TEXT"), ("custom_fields", "JSONB DEFAULT '{}'"),
+            ]:
+                cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS %s %s" % (_col, _type))
             # Onboarding CANDIDATES — people the bot saw in a staff group, awaiting the owner's one-by-one confirm.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_onboarding_candidates (

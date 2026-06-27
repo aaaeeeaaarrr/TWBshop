@@ -130,6 +130,31 @@ def test_staff_edit_updates_fields():
         _clean()
 
 
+def test_staff_profile_fields_saved():
+    # The universal employee record: the edit form renders the HR fields and the route saves them to core_staff.
+    from core.onboarding_flow import add_staff_manual, get_staff
+    c = _client()
+    _clean()
+    try:
+        sid = add_staff_manual(ORG, "Profile P", role="baker")
+        body = c.get("/staff/edit/%d" % sid).get_data(as_text=True)
+        for label in ("National ID", "Passport no.", "Nationality", "Emergency contact", "Indemnity", "Tax ID"):
+            assert label in body, label
+        c.post("/staff/update", data={
+            "staff_id": str(sid), "name": "Profile P", "national_id": "012345678", "passport_no": "N1234567",
+            "nationality": "Cambodian", "department": "Bakery", "employment_type": "full_time",
+            "start_date": "2026-01-15", "emergency_contact_name": "Mom", "indemnity_enabled": "on", "tax_id": "TX-9",
+        })
+        s = get_staff(ORG, sid)
+        assert s["national_id"] == "012345678" and s["passport_no"] == "N1234567"
+        assert s["nationality"] == "Cambodian" and s["department"] == "Bakery"
+        assert str(s["start_date"]) == "2026-01-15"
+        assert s["indemnity_enabled"] is True and s["right_to_work_verified"] is False   # unchecked bool → False
+        assert s["emergency_contact_name"] == "Mom" and s["tax_id"] == "TX-9"
+    finally:
+        _clean()
+
+
 def test_staff_bulk_import():
     c = _client()
     _clean()

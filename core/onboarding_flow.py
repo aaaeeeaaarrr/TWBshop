@@ -161,6 +161,39 @@ def update_staff(org_id: str, staff_id: int, name: str, call_name: str = None, r
                          json.dumps(shift_windows or []), org_id, staff_id))
 
 
+# ── Universal employee-record (HR profile) fields — a whitelist so the dynamic UPDATE can NEVER touch an
+#    arbitrary column. (Identity name/call_name/role/is_senior/skills/hours stay in update_staff above.)
+PROFILE_TEXT = ["nationality", "national_id", "passport_no", "gender", "marital_status", "email", "phone",
+                "address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relation",
+                "employee_code", "department", "employment_type", "work_location", "tax_id",
+                "social_security_no", "work_permit_no", "contract_type", "indemnity_details", "bank_account",
+                "notes", "day_off"]
+PROFILE_DATE = ["date_of_birth", "passport_expiry", "start_date", "end_date", "probation_end_date",
+                "work_permit_expiry"]
+PROFILE_BOOL = ["contract_on_file", "indemnity_enabled", "right_to_work_verified"]
+PROFILE_FIELDS = PROFILE_TEXT + PROFILE_DATE + PROFILE_BOOL
+
+
+def update_staff_profile(org_id: str, staff_id: int, fields: dict) -> None:
+    """Set the whitelisted universal HR-profile fields on a core_staff row. Text/date: '' → NULL. Bool:
+    truthy → True. Unknown keys are ignored (no arbitrary columns can be written). Scoped to the org."""
+    sets, vals = [], []
+    for k in PROFILE_TEXT + PROFILE_DATE:
+        if k in fields:
+            sets.append("%s=%%s" % k)
+            vals.append(((fields.get(k) or "").strip() or None))      # '' → NULL (incl. dates)
+    for k in PROFILE_BOOL:
+        if k in fields:
+            sets.append("%s=%%s" % k)
+            vals.append(bool(fields.get(k)))
+    if not sets:
+        return
+    vals += [org_id, staff_id]
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE core_staff SET %s WHERE org_id=%%s AND staff_id=%%s" % ", ".join(sets), vals)
+
+
 # ── GROUPS the bot is in (auto-discovered) + their roles ──────────────────────
 GROUP_ROLES = ["staff", "suppliers", "management", "expenses", "reports"]
 
