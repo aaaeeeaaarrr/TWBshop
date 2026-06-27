@@ -16,10 +16,20 @@ GROUP_POLICY = {
 }
 
 # per granular config path → its responsibility line (for the detailed editor; grows as settings are covered).
+_ATT = "categories.attendance"
 SETTING_POLICY = {
-    "categories.attendance.verdict.grace_min":        "Set the late-grace window to your policy — you decide what's 'on time'.",
-    "categories.attendance.ot.bank_cap_min":          "Cap saved overtime to suit your labour terms and local law — your call.",
-    "categories.attendance.leave.short_notice_days":  "Define 'short notice' for leave to match your own rules.",
+    f"{_ATT}.verdict.grace_min":        "Set the late-grace window to your policy — you decide what counts as on time.",
+    f"{_ATT}.verdict.early_bonus_min":  "How early earns a bonus is your choice — set it to reward what you value.",
+    f"{_ATT}.ot.bank_cap_min":          "Cap saved overtime to suit your labour terms and local law — your call.",
+    f"{_ATT}.ot.disposition":           "What earned overtime becomes (bank / pay / convert) is your policy, per local law.",
+    f"{_ATT}.ot.rate_multiplier":       "Your overtime rate is yours to set, per your contracts and local law.",
+    f"{_ATT}.leave.short_notice_days":  "Define short notice for leave to match your own rules.",
+    f"{_ATT}.leave.papers_grace_days":  "The sick-paper deadline is yours to set — your sick-leave policy.",
+    f"{_ATT}.leave.al_annual_days":     "Annual-leave entitlement is yours to set, per contracts and local law.",
+    f"{_ATT}.leave.carry_over_unused":  "Whether unused leave carries over is your policy, per local law.",
+    f"{_ATT}.leave.sick.late_inform_penalty_points": "Any penalty for late sick-notice is your policy — set it fairly and lawfully.",
+    f"{_ATT}.checkin_requires_location": "Requiring location to check in is your call — mind your local privacy rules.",
+    f"{_ATT}.points.enabled":           "Using a points / score system is your choice — a management tool, not a legal one.",
 }
 
 
