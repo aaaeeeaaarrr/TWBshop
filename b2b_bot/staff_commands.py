@@ -21,7 +21,7 @@ from shared.database import (
     upsert_payment_account, remove_payment_account,
     get_b2b_payment_history, get_all_payment_history,
     get_all_b2b_customers,
-    save_markpaid_request, get_markpaid_request,
+    save_markpaid_request, get_markpaid_request, claim_markpaid_request,
     set_markpaid_amount, set_markpaid_method,
     set_markpaid_staff_msg, set_markpaid_owner_msg,
     set_markpaid_status,
@@ -308,9 +308,9 @@ async def callback_markpaid_confirm(update: Update, context) -> None:
 
 
 async def _do_confirm(bot, req_id: int) -> None:
-    req = get_markpaid_request(req_id)
-    if not req or req["status"] not in ("draft", "pending"):
-        return
+    req = claim_markpaid_request(req_id)   # F4: atomically claim (flip draft/pending → approved) BEFORE applying
+    if not req:
+        return                             # already claimed by a concurrent confirm tap → no double-credit
 
     amount = float(req["amount"])
     result = apply_payment(req["group_chat_id"], amount)

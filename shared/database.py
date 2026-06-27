@@ -338,6 +338,21 @@ def init_db() -> None:
                     created_at    TEXT    NOT NULL
                 )
             """)
+    # F3 (B2B money safety): partial UNIQUE indexes so a redelivered / double-handled payment can't
+    # double-insert. Each in its OWN txn + try/except so a pre-existing duplicate can NEVER break init_db
+    # (the core bots run it on startup); prod verified 0 dups before adding. F4 claim-first is the primary guard.
+    for _ix in (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_b2b_pay_fileuid ON b2b_payments (group_chat_id, tg_file_unique_id) "
+        "WHERE tg_file_unique_id IS NOT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_b2b_pay_msgid ON b2b_payments (group_chat_id, group_message_id) "
+        "WHERE group_message_id IS NOT NULL",
+    ):
+        try:
+            with _db() as _c:
+                with _c.cursor() as _cur:
+                    _cur.execute(_ix)
+        except Exception:
+            logger.warning("b2b payment dedup index skipped (pre-existing duplicates?) — F4 claim-first still guards")
     logger.info("Database ready")
 
 
@@ -1078,11 +1093,13 @@ def save_b2b_payment(
                 "INSERT INTO b2b_payments "
                 "(group_chat_id, business_name, amount, screenshot_path, group_message_id, "
                 "tg_file_unique_id, method, covered_dates, created_at, status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'applied') RETURNING id",
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'applied') "
+                "ON CONFLICT DO NOTHING RETURNING id",   # F3: a redelivered payment (same group+file/msg) no-ops
                 (group_chat_id, business_name, amount, screenshot_path, group_message_id,
                  tg_file_unique_id, method, covered_dates, now),
             )
-            return cur.fetchone()["id"]
+            row = cur.fetchone()
+            return row["id"] if row else None   # None = the payment was already recorded (dedup hit)
 
 
 def is_payment_already_processed(group_chat_id: int, message_id: int, file_unique_id: str | None = None) -> bool:
@@ -1177,6 +1194,23 @@ def set_b2b_customer_credit(group_chat_id: int, credit: float) -> None:
             )
 
 
+def apply_b2b_payment_writes(bread_ids: list[int], cake_ids: list[int],
+                             group_chat_id: int, new_credit: float) -> None:
+    """F2: the three money-moving writes of a B2B payment in ONE transaction (mark bread + cake orders paid +
+    set the leftover credit). All-or-nothing — a crash mid-apply can't leave a half-applied payment (some
+    orders paid, credit not updated). _db() commits on clean exit / rolls back on any exception."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            if bread_ids:
+                ph = ",".join(["%s"] * len(bread_ids))
+                cur.execute(f"UPDATE b2b_orders SET payment_status = 'paid' WHERE id IN ({ph})", bread_ids)
+            if cake_ids:
+                ph = ",".join(["%s"] * len(cake_ids))
+                cur.execute(f"UPDATE b2b_cake_orders SET payment_status = 'paid' WHERE id IN ({ph})", cake_ids)
+            cur.execute("UPDATE b2b_customers SET credit = %s WHERE group_chat_id = %s",
+                        (round(new_credit, 2), group_chat_id))
+
+
 # ─── Mark-paid requests ────────────────────────────────────────────────────────
 
 def save_markpaid_request(group_chat_id: int, business_name: str, staff_user_id: int) -> int:
@@ -1233,6 +1267,17 @@ def set_markpaid_status(request_id: int, status: str, covered_dates: str | None 
                 "UPDATE b2b_markpaid_requests SET status = %s, covered_dates = %s WHERE id = %s",
                 (status, covered_dates, request_id),
             )
+
+
+def claim_markpaid_request(request_id: int) -> dict | None:
+    """F4: ATOMICALLY claim a request for confirmation — flip draft/pending → approved and RETURN the row, or
+    None if it was already claimed (a concurrent confirm tap). Flip-status-FIRST (a CAS), so apply_payment
+    runs EXACTLY ONCE per request even under a double-tap. Replaces the old check-then-apply-then-flip."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE b2b_markpaid_requests SET status = 'approved' "
+                        "WHERE id = %s AND status IN ('draft', 'pending') RETURNING *", (request_id,))
+            return cur.fetchone()
 
 
 # ─── B2B recurring orders ─────────────────────────────────────────────────────

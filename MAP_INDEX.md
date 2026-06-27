@@ -297,7 +297,7 @@
 - `shared/clock.py` — Phnom-Penh wall-clock helpers.
     · pp_now, pp_today
 - `shared/database.py` — PostgreSQL database — all tables and queries.
-    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+301, grep)
+    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+303, grep)
 - `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
     · make_error_handler
 - `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).

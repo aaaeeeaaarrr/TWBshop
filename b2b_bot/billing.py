@@ -20,6 +20,7 @@ from shared.database import (
     get_groups_with_unpaid_on_date,
     mark_b2b_orders_paid,
     mark_b2b_cake_orders_paid,
+    apply_b2b_payment_writes,
     save_b2b_payment,
     is_payment_already_processed,
     get_valid_payment_accounts,
@@ -111,12 +112,8 @@ def apply_payment(group_chat_id: int, amount: float) -> dict:
         else:
             break
 
-    if bread_ids:
-        mark_b2b_orders_paid(bread_ids)
-    if cake_ids:
-        mark_b2b_cake_orders_paid(cake_ids)
-
-    set_b2b_customer_credit(group_chat_id, remaining)
+    # F2: the three money writes (mark bread + cake paid + set credit) commit ATOMICALLY in one txn.
+    apply_b2b_payment_writes(bread_ids, cake_ids, group_chat_id, remaining)
 
     return {
         "applied":     round(total_available - remaining, 2),
@@ -289,8 +286,11 @@ async def handle_payment_received(update, context) -> None:
 
     # Apply payment and update balance if amount known
     if rec["amount"] > 0:
-        save_b2b_payment(rec["group_chat_id"], rec["business_name"], rec["amount"], rec["file_path"] or "", rec["photo_msg_id"])
-        apply_payment(rec["group_chat_id"], rec["amount"])
+        # F3: the save is the structural CLAIM — only move money if the payment was NEWLY recorded (a
+        # redelivered / duplicate photo no-ops the save → we skip apply_payment → no double-credit).
+        if save_b2b_payment(rec["group_chat_id"], rec["business_name"], rec["amount"],
+                            rec["file_path"] or "", rec["photo_msg_id"]) is not None:
+            apply_payment(rec["group_chat_id"], rec["amount"])
         cust_msg = _build_cust_confirmation(rec["group_chat_id"], rec["amount"])
     else:
         cust_msg = "Thank you! Payment confirmed. ✓\nWe'll update your balance shortly."
@@ -507,8 +507,9 @@ async def _process_b2b_image(bot, chat_id: int, file_id: str, message_id: int, i
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        save_b2b_payment(chat_id, business, amount, file_path, message_id, file_unique_id)
-        apply_payment(chat_id, amount)
+        # F3: save is the structural claim — apply money only if NEWLY recorded (redelivery → no double-credit).
+        if save_b2b_payment(chat_id, business, amount, file_path, message_id, file_unique_id) is not None:
+            apply_payment(chat_id, amount)
         cust_msg = _build_cust_confirmation(chat_id, amount)
         await bot.send_message(chat_id, cust_msg, reply_to_message_id=message_id, parse_mode=ParseMode.HTML)
         if config.OWNER_TELEGRAM_ID:

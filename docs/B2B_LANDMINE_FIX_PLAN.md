@@ -67,6 +67,22 @@ Today `mark_b2b_orders_paid` + `mark_b2b_cake_orders_paid` + `set_b2b_customer_c
   `mark_b2b_cake_orders_paid` + `set_b2b_customer_credit`) → not atomic; + re-reads live unpaid each call →
   double-applies if called twice. Fix = one txn (cursor-threaded) + idempotency via the claimed request id.
 
-## Status
+## Status — ✅ STAGING CODE BUILT + TESTED + RED-TEAMED (s57; B2B still disabled; prod apply + re-enable stay JOINT)
+- **F4 claim-first** — `shared.database.claim_markpaid_request` (atomic CAS: draft/pending→approved RETURNING) +
+  `staff_commands._do_confirm` claims BEFORE applying → a double-tap claims once → `apply_payment` runs once.
+- **F3 dedup** — 2 partial UNIQUE indexes on `b2b_payments` (created **defensively** — own txn + try/except — in
+  `init_db`, prod verified 0-dups so safe to ride along on the next core-bot init) + `save_b2b_payment` is now
+  `ON CONFLICT DO NOTHING RETURNING id` (None on dup) + **both photo call-sites gate `apply_payment` on the
+  save-return** (the save is the structural claim → a redelivered photo never double-applies).
+- **F2 atomic** — `shared.database.apply_b2b_payment_writes` does the 3 money writes (bread paid · cake paid ·
+  credit) in ONE `_db()` txn; `billing.apply_payment` uses it → no half-applied payment.
+- **Tests:** `tests/test_b2b_billing_atomic.py` — claim-once · redelivery-dedups · atomic-writes (3 pass).
+- **Red-team note (deliberate, per State-Integrity S2):** claim-first means a crash *after* the claim leaves the
+  request **approved-but-unapplied** (visible + manually re-runnable) instead of the old **double-credit** — the
+  correct trade-off; F2 ensures the apply itself is all-or-nothing (never partial).
+- **⛔ Still JOINT with owner:** deploy a tag (the indexes auto-apply on the next core-bot init — safe) → confirm
+  on prod → re-enable `twbshop-b2b`. (Code is on `main`, NOT deployed; bots untouched.)
+
+## Status (original)
 Plan ready + prep done. Code unchanged (B2B disabled). The staging CODE build (F2/F3/F4 + tests + red-team) is
 safe-autonomous (B2B disabled, no live money); the prod INDEX application + the re-enable stay joint with the owner.

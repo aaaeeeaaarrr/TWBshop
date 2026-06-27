@@ -105,6 +105,21 @@ a trap to remember · `[needs-validate]` built but unproven · `[decision]` a ch
 - `[gotcha]` `core.db` exposes `_org_secret_cipher()` + `_ENC_PREFIX` — reuse them for any new at-rest
   encryption (don't re-roll Fernet). No circular import: `core.db` doesn't import `core.onboarding_flow` at module level.
 
+### s57 cont — B2B money-path fixes built + tested on staging (owner "go ahead")
+- `[ship]` **F2/F3/F4 B2B double-credit fixes — built on STAGING, tested, red-teamed** (B2B still disabled; prod
+  apply + re-enable stay JOINT). **F4** claim-first (`claim_markpaid_request` CAS + `_do_confirm` claims before
+  apply → double-tap applies once); **F3** 2 partial-UNIQUE indexes + `save_b2b_payment` ON CONFLICT + both photo
+  sites gate `apply_payment` on the save-claim (redelivery never double-applies); **F2** `apply_b2b_payment_writes`
+  = the 3 money writes in ONE txn. `tests/test_b2b_billing_atomic.py` (3 pass). → `docs/B2B_LANDMINE_FIX_PLAN.md`.
+- `[gotcha]` The `b2b_payments` schema is in the SHARED `init_db()` (the core bots run it) — so a B2B index change
+  rides along on ANY core-bot deploy. Made index creation **defensive** (own txn + try/except) + verified prod
+  0-dups, so it can't break `init_db`. Lesson: a "B2B-only" schema change isn't isolated if it's in `init_db`.
+- `[gotcha]` The real double-credit on the PHOTO path wasn't the `save` — it was that `apply_payment` was called
+  SEPARATELY right after `save_b2b_payment`, so dedup-ing the save alone still double-applied. Fix = gate
+  `apply_payment` on the save-return (the save IS the claim). The claim/CAS must guard the MONEY call, not just the record.
+- `[decision]` Claim-first (flip status FIRST) accepts a rare "approved-but-unapplied" on a crash (visible,
+  re-runnable) to kill the double-credit — the correct State-Integrity S2 trade-off; F2 makes the apply atomic so it's never partial.
+
 ## Session 55 — A-Z due-diligence audit (ultracode, 44-agent, read-only)
 Full report: workflow `wf_7bb0f25d-3e6`. Verdict: LIVE production core is sound + suite really green
 (1081p/2s); ONE CRITICAL credential to rotate; the rest are INERT platform fixes on the harvest.
