@@ -156,6 +156,12 @@
   (booking→missed + redefine→cancelled, NO balance change, idempotent, test-isolated) + a daily 07:05 gm
   job `_payback_noshow_reaper_job`; 2 staging tests (no-show reaped / worked-slot left alone). Deploying with
   the gm batch (G1+B2); will reap THYDA #81/#287 — I'll run it once on prod post-deploy with before/after proof.
+  **✅ DONE — DEPLOYED + THYDA FIXED + AUDIT CLEAN 2026-06-28 (tag `session-58-gm-reaper-sentinel-20260628`=`47b0f87`;
+  gm PID 1496581 NR=0; daily 07:05 reaper job live).** Ran the reaper once on prod (dry-run first: only #81
+  matched, no check-in → no-show). BEFORE: debt #158 1261/0/open · booking #81 booked · redefine #287 approved.
+  AFTER (independent re-read): debt #158 **1261/0/open UNCHANGED (no balance moved)** · booking #81 **missed** ·
+  redefine #287 **cancelled**. `run_audit` = **0 problems** (the 2 THYDA flags gone). The 360 reserved minutes
+  are freed to re-book. RESOLVED.
 - **2026-06-28 — CHENDA/FANG payback off-by-one for OVERNIGHT shifts (live attendance UI; DIAGNOSED, fix NOT
   built/deployed).** Staff report: late on the 27th (Sat 21:00→06:00 shift), want to pay back the 28th (Sun)
   morning → picking "28th" doesn't give that slot; only the button labeled "27th" books the Sun-28 morning
