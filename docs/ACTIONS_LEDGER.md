@@ -134,7 +134,36 @@
 
 ## Open (not yet done)
 
-- **★ SESSION-53 OPEN-LOOP ANCHOR (pre-compact 2026-06-23) — the single list so nothing is lost. Detail in the named docs.**
+- **2026-06-28 — CHENDA/FANG payback off-by-one for OVERNIGHT shifts (live attendance UI; DIAGNOSED, fix NOT
+  built/deployed).** Staff report: late on the 27th (Sat 21:00→06:00 shift), want to pay back the 28th (Sun)
+  morning → picking "28th" doesn't give that slot; only the button labeled "27th" books the Sun-28 morning
+  tail. ROOT CAUSE (read-only code trace, not a data corruption): `bot.py::_payback_slot_keyboard` (~1600-1608)
+  labels the OFFER buttons with the shift-START calendar date and never calls the existing overnight-aware
+  helper `_slot_when_label` (added Jun 21 for this exact class, but only wired into other surfaces). The slot
+  BINDING + settle math are correct (overnight-safe); this is a label/"cover-every-surface" gap. FIX (lean,
+  LOW-risk, money path untouched): route the offer-button text through `_slot_when_label` so an overnight
+  morning tail reads "Sat 27/06 shift → Sun 6:00am". → staging-prove the rendered labels + that each button
+  books the intended physical morning + regression test, then quiet-window tag deploy + verify. Owner go +
+  window pending. NO data fix appears needed (binding was already correct) — confirm on staging there are no
+  mis-filed historical payback rows.
+  **✅ UPDATE (2026-06-28, s58):** FIX BUILT — `bot.py::_pb_offer_label` routes the after-slot through
+  `_slot_when_label` (before/day-off/day-worker labels unchanged; callback/binding/settle untouched). Guard
+  `tests/test_pb_offer_label.py` (4). Staging-proven (full suite 1174p/2s; map regenerated). **Deploy = by
+  tag, batched with A2, in a quiet window, on owner go + prod-verify.** Not yet deployed.
+- **2026-06-28 — HENG "GM shows no menu" at ~01:35 PP (live gm bot; DIAGNOSED transient, no fix-deploy yet).**
+  Sick staffer messaged GM to go home, got no menu. ROOT CAUSE (read-only server logs): a Telegram
+  Bad-Gateway burst (17:49 UTC) + outbound network timeouts (18:29 UTC) coincide exactly with his window
+  (01:26-01:35 PP = 18:26-18:35 UTC); NOT the token (no 401), NOT logic. Bot healthy now (active, NRestarts=0,
+  `[SHADOW] check-in AGREE` 03:52 UTC = staff interactions working). NOT a data change. ACTION: (a) owner to
+  confirm a staffer now gets the menu (I can't tap Telegram); (b) build the RESILIENCE fix — retry/backoff on
+  staff-facing sends so a transient blip doesn't silently drop a menu, + alarm on a send-failure burst (owner
+  DM in minutes, not a 9am screenshot). Staging-build → quiet-window deploy.
+  **✅ UPDATE (2026-06-28, s58):** FIX BUILT in `bot.py` — `_att_send` (the single staff-send chokepoint) now
+  retries transient Telegram errors (NetworkError incl. Bad Gateway + RetryAfter) with backoff via
+  `_send_once_retrying`, and a BURST of live failures DMs the owner once (cooldown'd) via
+  `_note_staff_send_failure` (`(copy to Claude)`, to be auto-mirrored by B1). Success path unchanged (additive
+  on failure only). Guard `tests/test_send_resilience.py` (8). Staging-proven. **Deploy batched with A1, on
+  owner go + quiet window.** Owner still to confirm staff get the menu now (bot is healthy).
   - **CURRENT BUILD = the config-driven WIZARD platform** ("the system IS its config"; every edit from now is a
     config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** · **2 ✅ AL re-ping ladder**
     (deployed) · **3 ⏳ wire full attendance menu into the shadow** (3a ✅ settle/money path deployed; 3b = points +

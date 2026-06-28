@@ -14,6 +14,7 @@ from telegram.ext import (
     Application, CallbackQueryHandler, CommandHandler,
     ContextTypes, ConversationHandler, MessageHandler, filters,
 )
+from telegram.error import NetworkError, RetryAfter
 
 import config
 from config import resolve_staff_name
@@ -1421,12 +1422,102 @@ def _job_gate(live_only: bool = False) -> bool:
     return _attendance_live() if live_only else _att_active()
 
 
+# ---- A2 (session 58): staff-send resilience + outage burst-alarm --------------------------------
+# The Heng class (2026-06-28): a transient Telegram Bad-Gateway/timeout made _att_send fail SILENTLY,
+# so a sick staffer's menu never arrived and nobody knew until a morning screenshot. So _att_send now
+# (a) retries transient network errors with short backoff, and (b) if a BURST of live staff sends
+# fails, DMs the owner ONCE (the outage signal), routed "(copy to Claude)" until B1's alarm-sink
+# automates it. Additive on the FAILURE path only — the success path is unchanged (first try returns).
+_SEND_FAILS: list[float] = []        # monotonic timestamps of recent transient staff-send failures
+_SEND_FAIL_ALARMED_AT: float = 0.0   # last time we DM'd the owner about a send-failure burst
+
+
+def _send_fail_should_alarm(fail_times, now: float, last_alarm: float, *,
+                            window_s: int = 300, threshold: int = 3, cooldown_s: int = 900) -> bool:
+    """Pure (unit-testable): alarm when >= `threshold` failures fall within the last `window_s` AND we
+    haven't already alarmed within `cooldown_s`. The caller records/prunes the list + fires the DM."""
+    recent = [t for t in fail_times if now - t <= window_s]
+    if len(recent) < threshold:
+        return False
+    return last_alarm <= 0.0 or (now - last_alarm) >= cooldown_s   # last_alarm<=0 = never alarmed
+
+
+async def _send_once_retrying(context, target, body, kb=None, parse_mode=None, *, attempts: int = 3):
+    """Send via the bot, retrying ONLY on transient Telegram errors (NetworkError — incl. 'Bad Gateway'
+    and timeouts — and RetryAfter flood-control) with short backoff. Returns (msg_or_None, transient):
+    `transient` is True only when every attempt hit a transient error (the outage signal). A
+    non-transient error (Forbidden/BadRequest/…) returns (None, False) — no retry, not an outage.
+    Never raises."""
+    transient = False
+    for i in range(attempts):
+        try:
+            return await context.bot.send_message(target, body, reply_markup=kb,
+                                                  parse_mode=parse_mode), False
+        except RetryAfter as e:
+            transient = True
+            if i == attempts - 1:
+                logger.error("att_send to %s flood-limited, gave up: %s", target, e)
+                break
+            await asyncio.sleep(min(getattr(e, "retry_after", 1) + 0.5, 5.0))
+        except NetworkError as e:
+            transient = True
+            if i == attempts - 1:
+                logger.error("att_send to %s transient send failure, gave up: %s", target, e)
+                break
+            await asyncio.sleep(0.5 * (i + 1))
+        except Exception as e:
+            logger.error("att_send to %s failed (non-transient): %s", target, e)
+            return None, False
+    return None, transient
+
+
+async def _alarm(context, kind: str, body: str, severity: str = "warn") -> None:
+    """THE chokepoint for proactive owner ALARMS (B1). Persist to the gm_alarms sink FIRST (durable +
+    Claude-readable via scripts/alarms.py), THEN best-effort single-shot DM the owner — so an alarm
+    survives a failed Telegram send AND reaches Claude/the B3 nightly agent even if the owner misses it.
+    Single-shot (no retry) so the alarm path never adds outage latency; the sink already has it. Never
+    raises into a live flow. severity: info | warn | money (money = balance/impossible-state, page-worthy)."""
+    from gm_bot import alarms
+    aid = alarms.log_alarm(kind, body, severity=severity, is_test=_att_test_mode())
+    try:
+        dm = body if len(body) <= 4000 else (body[:3900] + "\n…(truncated — full alarm in the sink)")
+        msg, _ = await _send_once_retrying(context, config.OWNER_TELEGRAM_ID, dm, attempts=1)
+        if msg is not None:
+            alarms.mark_delivered(aid)
+    except Exception:
+        pass
+
+
+async def _note_staff_send_failure(context, target, role: str) -> None:
+    """Record a transient LIVE staff-send failure; if a burst just formed, DM the owner ONCE
+    (cooldown'd). alarmed_at is set BEFORE the DM so a failing alarm can't pile up on the hot path —
+    B1's durable sink will carry it even if this Telegram DM doesn't land. Never raises."""
+    global _SEND_FAIL_ALARMED_AT
+    try:
+        now = time.monotonic()
+        _SEND_FAILS.append(now)
+        while _SEND_FAILS and now - _SEND_FAILS[0] > 600:
+            _SEND_FAILS.pop(0)
+        if not _send_fail_should_alarm(_SEND_FAILS, now, _SEND_FAIL_ALARMED_AT):
+            return
+        _SEND_FAIL_ALARMED_AT = now
+        n = len([t for t in _SEND_FAILS if now - t <= 300])
+        await _alarm(context, "send_failure",
+                     "🚨 GM send-resilience: %d staff message(s) failed to send in ~5 min — likely a "
+                     "Telegram/network outage, so staff may not be getting menus/prompts right now." % n,
+                     severity="warn")
+    except Exception:
+        pass
+
+
 async def _att_send(context, to_uid, role: str, to_name: str, text: str,
                     kb=None, group: bool = False, parse_mode: str | None = None):
     """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
     - test mode: deliver to the OWNER, labeled [→ role: name], buttons kept functional so the
       owner taps as that role.
-    - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True)."""
+    - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True).
+    Transient Telegram errors are retried with backoff; a BURST of live failures alarms the owner
+    (A2, session 58 — the Heng silent-drop class)."""
     from gm_bot.attendance import strip_khmer
     if _att_test_mode():
         # everything routes to the OWNER in test → English-only by default. /testkhmer on keeps the
@@ -1434,22 +1525,17 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
         prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
         full = prefix + text
         body = full if gm_get_state("att_test_khmer") == "true" else strip_khmer(full)
-        try:
-            return await context.bot.send_message(config.OWNER_TELEGRAM_ID, body,
-                                                  reply_markup=kb, parse_mode=parse_mode)
-        except Exception as e:
-            logger.error("att_send(test) failed: %s", e)
-            return None
+        msg, _ = await _send_once_retrying(context, config.OWNER_TELEGRAM_ID, body, kb, parse_mode)
+        return msg
     target = config.SUPERVISORS_CHAT_ID if group else to_uid
     if not target:
         return None
     # the owner reads English only; staff/groups get the full bilingual text
     body = strip_khmer(text) if target == config.OWNER_TELEGRAM_ID else text
-    try:
-        return await context.bot.send_message(target, body, reply_markup=kb, parse_mode=parse_mode)
-    except Exception as e:
-        logger.error("att_send to %s failed: %s", target, e)
-        return None
+    msg, transient = await _send_once_retrying(context, target, body, kb, parse_mode)
+    if msg is None and transient:
+        await _note_staff_send_failure(context, target, role)
+    return msg
 
 
 async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1598,12 +1684,7 @@ def _payback_slot_keyboard(staff: dict, balance: int):
     cand.sort(key=lambda c: (-c[0], c[1], c[2]))
     rows = []
     for sc, d, s_min, e_min, mins, label in cand[:8]:
-        if label == "dayoff":
-            txt = "🛌 %s %s-%s · day off" % (d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min))
-        else:
-            txt = "%s %s %s-%s%s" % (("🌅" if label == "before" else "🌙"),
-                                     d.strftime("%a %d/%m"), _fmt_min(s_min), _fmt_min(e_min),
-                                     " ⚠" if sc >= 2 else "")
+        txt = _pb_offer_label(staff, label, d.isoformat(), s_min, e_min, sc)
         rows.append([InlineKeyboardButton(
             txt, callback_data="att:pb:book:%s:%d:%d:%d" % (d.isoformat(), s_min, e_min, mins))])
     # partial options — 1h/2h/3h (owner)
@@ -1636,6 +1717,25 @@ def _slot_when_label(staff: dict, slot_date_iso: str, s_min: int, e_min: int) ->
         nxt = d + _td(days=1)
         return "%s shift → %s %s" % (d.strftime("%a %d/%m"), nxt.strftime("%a"), times)
     return "%s %s" % (d.strftime("%a %d/%m"), times)
+
+
+def _pb_offer_label(staff: dict, label: str, slot_date_iso: str, s_min: int, e_min: int, sc: int) -> str:
+    """Button text for a payback OFFER slot. The AFTER (post-shift) slot of an OVERNIGHT worker is a
+    next-calendar-MORNING tail — Chenda/Fang, Jun 28: 'pay back tomorrow (28th) morning' showed
+    labeled with the shift-START date (Sat 27), so staff thought the 28th 'didn't record'. Route the
+    after-slot through _slot_when_label so it reads 'Sat 27/06 shift → Sun 6:00am-…'. BEFORE slots sit
+    just before shift start (same calendar day — a night worker's 20:30 must NOT be flagged as next
+    morning) and day-off slots keep their own wording, so both stay the plain 'Sat 27/06 …' label.
+    Label-only: the slot still binds to the shift date and settles identically (no money-path change)."""
+    from datetime import date as _d
+    times = "%s-%s" % (_fmt_min(s_min), _fmt_min(e_min))
+    warn = " ⚠" if sc >= 2 else ""
+    if label == "after":
+        return "🌙 %s%s" % (_slot_when_label(staff, slot_date_iso, s_min, e_min), warn)
+    d = _d.fromisoformat(slot_date_iso)
+    if label == "dayoff":
+        return "🛌 %s %s · day off" % (d.strftime("%a %d/%m"), times)
+    return "🌅 %s %s%s" % (d.strftime("%a %d/%m"), times, warn)
 
 
 def _return_when_label(staff: dict, when: "date | None" = None) -> str:
@@ -6022,21 +6122,14 @@ async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     new, cleared, cur_json = _watchdog_delta(gm_get_state("live_watchdog_last"), problems)
     still_open = len(set(problems))
     if new:
-        body = ("🚨 LIVE WATCHDOG — %d new data inconsistency(ies) just appeared in the REAL ledger "
-                "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in new)
-        for i in range(0, len(body), 3500):
-            try:
-                await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
-            except Exception:
-                break
+        body = ("🚨 LIVE WATCHDOG — %d new data inconsistency(ies) just appeared in the REAL ledger:\n\n"
+                % len(new)) + "\n".join("• " + p for p in new)
+        await _alarm(context, "watchdog", body, severity="money")
     elif cleared:
-        try:
-            await context.bot.send_message(
-                config.OWNER_TELEGRAM_ID,
-                "✅ Live watchdog: %d issue(s) cleared%s." %
-                (len(cleared), "" if not still_open else " (%d still open)" % still_open))
-        except Exception:
-            pass
+        await _alarm(context, "watchdog_cleared",
+                     "✅ Live watchdog: %d issue(s) cleared%s." %
+                     (len(cleared), "" if not still_open else " (%d still open)" % still_open),
+                     severity="info")
     gm_set_state("live_watchdog_last", cur_json)
 
 

@@ -137,6 +137,8 @@
 ## gm_bot/
 - `gm_bot/al.py` — Annual-leave pure logic (session 28). No DB/Telegram.
     · back_at_work_date, is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map, al_span_label, approvals_needed, quorum_reached, quorum_rejected, senior_timers
+- `gm_bot/alarms.py` — gm_bot.alarms — the durable ALARM SINK + mirror-to-Claude (B1, session 58, 2026-06-28).
+    · init_alarms_db, log_alarm, mark_delivered, ack_alarm, recent_alarms, open_alarms
 - `gm_bot/analyzer.py` — Scans ops_messages for operational concerns and saves them to gm_concerns.
     · _matches_rules, _extract_low_stock_items, _analyze_photo, _detect_attendance_concerns, _keyword_text_concerns, _worth_checking, _semantic_concern_dict, _semantic_text_concerns, _semantic_enabled, detect_text_concerns, analyze_live_message, _detect_low_stock_concerns, run_analysis
 - `gm_bot/attendance.py` — Private-DM attendance system — pure logic, no DB/AI/Telegram.
@@ -146,7 +148,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+213, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+218, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/clarify.py` — Clarification escalation ladder — pure decision logic + text builders.
@@ -248,6 +250,8 @@
     · compare, summary, cheapest, report
 
 ## scripts/
+- `scripts/alarms.py` — Read the GM alarm sink (B1, session 58) — so Claude / the B3 nightly agent can see EVERY alarm the
+    · main
 - `scripts/anchor_audit.py` — Anchor every org's audit-chain HEAD to the external anchor file (core.audit_anchor). Run on a schedule
     · _orgs, main
 - `scripts/facts.py` — facts.py — the truth registry: one home per machine-knowable fact, + its lineage.

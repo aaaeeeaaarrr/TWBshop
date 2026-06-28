@@ -864,3 +864,56 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 ### 📌 Owner decisions still open (for review)
 - Company **name** (shortlist in `docs/COMPANY_NAME_IDEAS.md`) · **cut over** check-in · **B2B re-enable** ·
   set **`ORG_SECRET_KEY`** · public hosting + W3.
+
+## Session 58 — two live issues + the flip/self-healing strategy (2026-06-28)
+
+### 🔍 Findings
+- **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure
+  payback logic (`gm_bot/payback.py` slot_windows/redefine_window) is overnight-safe and the booking BINDING
+  is correct (callback keys the slot to the shift-start date, which is how settle credits). The Jun-21 helper
+  `bot.py::_slot_when_label` ALREADY disambiguates an overnight morning tail ("Sat 27/06 shift → Sun 6:00am"),
+  but it was never wired into the OFFER buttons — `_payback_slot_keyboard` (bot.py ~1600-1608) builds the
+  label inline with the shift-START calendar date. So a 21:00→06:00 worker sees the Sun-28 morning slot
+  labeled "Sat 27" and concludes "the 28th doesn't record." Fix = route the offer buttons through the
+  existing helper (label-only, money path untouched). Lesson: a single-tenant fix applied to one surface
+  leaves the others wrong — exactly the plumbing fragility the channel-agnostic `core/` rebuild removes by
+  construction (interval-only time + shift-id → no calendar/shift-date drift anywhere).
+- **Heng "no menu" = a transient Telegram Bad-Gateway/network blip, not the token, not logic.** Server
+  evidence: Bad-Gateway burst 17:49 UTC + outbound timeouts 18:29 UTC — Heng's 01:26-01:35 PP messages map
+  to 18:26-18:35 UTC, dead inside that window; zero token/401/Bad-Gateway errors after 19:00 UTC; gm
+  active/NRestarts=0; a `[SHADOW] check-in AGREE` at 03:52 UTC proves staff interactions work now. The real
+  gap it exposes: staff-facing sends have no visible retry/backoff and the failure only logs ERROR — a 1am
+  blip silently ate a sick staffer's menu, surfaced only by a 9am screenshot. → resilience + alarm gap.
+- **The check-in cut-over fixes NEITHER live bug.** Heng = bot plumbing/network (engine-independent);
+  Chenda = the PAYBACK path = self-healing Phase 2, not the check-in VERDICT = Phase 1 (payback isn't
+  ported/netted yet). So "flip to fix" only pays off per-path, once that path is netted. Rule that falls out:
+  separate **DATA fixes** (apply regardless of engine — bad rows don't un-write) from **CODE fixes** (where
+  the path is netted in core, fix-forward there instead of twice).
+
+### 🎁 Bonuses
+- **Fix-bake-off on replay (owner idea, worth building, NOT built).** When a bug appears: generate N candidate
+  fixes → run each against the REAL historical event stream (replay) → score (fixes the case + no regressions
+  + sane across the most cases) → keep the winner, discard low-coverage fixes. Pairs with multi-agent (spawn N
+  fix-agents in isolated worktrees, replay-score, pick best). Lean first step: make "replay a proposed fix vs
+  ALL historical cases, report regressions" a standard pre-deploy gate. The replay-scorer it needs (per path:
+  payback/points/settle) IS the cut-over's per-path net — one build, two payoffs.
+- **Nightly read-only "morning report" agent = the safe first step to Phase-5 self-healing.** A scheduled
+  cloud agent (no terminal) that sweeps logs + /audit + Sentinel + the shadow digest and DMs "here's what
+  happened / what I'd fix" — zero write access — before any auto-prepare-fix. Then graduate to PREPARE+queue
+  (vetted script + staging proof, one-tap approve); never auto-move money/payroll or auto-deploy.
+- **Alarm the staff-facing send-failure burst** (the Heng class): "N sends failed in M min" → owner DM, so a
+  network blip is known in minutes, not via a morning screenshot. A natural new Sentinel/invariant detector.
+
+### 🛠 s58 build progress (2026-06-28)
+- **A1 SHIPPED-to-staging** — `bot.py::_pb_offer_label` fixes the Chenda overnight payback offer-label
+  (after-slot → real next morning); 4 tests; full suite 1183p/2s. Deploy batched, owner-go pending.
+- **A2 SHIPPED-to-staging** — `_att_send` retries transient Telegram errors + burst-alarms an outage (Heng
+  silent-drop class); 8 tests; the A2 test caught a real "never alarmed" edge in my own code (fixed the
+  function, not the test — the guard works).
+- **B1a SHIPPED-to-staging** — `gm_bot/alarms.py` durable alarm sink (`gm_alarms` table) + `scripts/alarms.py`
+  reader, so EVERY GM alarm is persisted (survives a failed Telegram DM) and Claude/the nightly agent can
+  read it (owner's "alarms reach you too" ask). Wired `init_alarms_db()` into gm startup. 5 tests.
+- **FINDING (reusable):** Windows console = cp1252; GM alarm bodies are bilingual (Khmer/emoji) → any reader
+  script must `sys.stdout.reconfigure(encoding="utf-8")` or it crashes. Caught by the B1a reader smoke-test.
+- **NOTE (schema):** `init_alarms_db()` adds the `gm_alarms` table on gm startup (additive, idempotent) — the
+  one schema change in this batch; created on prod at the next gm deploy.

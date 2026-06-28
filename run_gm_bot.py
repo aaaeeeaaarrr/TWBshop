@@ -46,6 +46,8 @@ init_staff_registry_db()
 init_attendance_db()      # adds the gender column (among others)
 from gm_bot.events import init_events_db
 init_events_db()          # append-only gm_events audit log (forensics: pushes/clicks/sick/points/FYI)
+from gm_bot.alarms import init_alarms_db
+init_alarms_db()          # B1: durable alarm sink — every proactive owner-alarm persists here + is Claude-readable
 from core.db import init_core_db, ensure_org
 try:
     init_core_db()        # NEW platform tables (shadow-run, additive, inert until gm_state shadow_run=on)
