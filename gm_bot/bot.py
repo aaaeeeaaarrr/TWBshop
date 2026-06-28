@@ -6133,6 +6133,59 @@ async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     gm_set_state("live_watchdog_last", cur_json)
 
 
+async def _payback_noshow_reaper_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily FALLBACK no-show payback reaper (s58). The 07:00 session-closer only closes open SESSIONS;
+    a payback slot booked but NEVER checked-in (a no-show) has no session, so without this it dangles
+    'booked' + its redefine dangles 'approved' forever (the audit re-flags it daily; the stuck minutes
+    also reserve part of the debt, blocking re-booking — exactly THYDA's #81/#287). This flips a genuine
+    no-show booking->missed + redefine->cancelled (NO balance change — nothing worked, nothing to credit).
+    A WORKED-but-unsettled slot (a check-in exists) is left ALONE. Live rows only; idempotent; SILENT."""
+    if not _attendance_live():
+        return
+    from shared.database import reap_noshow_payback_bookings
+    try:
+        today = datetime.now(finance.PP_TZ).date().isoformat()
+        n = reap_noshow_payback_bookings(today)
+        if n:
+            logger.info("payback no-show reaper: reaped %d slot(s)", n)
+            _gm_log("payback_noshow_reaped", detail={"count": n})
+    except Exception as e:
+        logger.error("payback no-show reaper failed: %s", e)
+
+
+def _sentinel_new_alarms(found, prev_json):
+    """Pure: (sweep() alarms, prior 'sentinel_last' JSON) -> (new_alarms, current_json). Dedupe key =
+    flow:key, so a persistent issue alarms ONCE (not every sweep). Testable without the async job."""
+    import json
+    prev = set(json.loads(prev_json or "[]"))
+    cur = {}
+    for a in found:
+        cur["%s:%s" % (a.get("flow"), a.get("key"))] = a
+    new = [cur[k] for k in cur if k not in prev]
+    return new, json.dumps(sorted(cur.keys()))
+
+
+async def _sentinel_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Run the universal Sentinel (core/sentinel.py — stuck flows / impossible states / the shadow-net
+    ITSELF) every 30 min and route NEW alarms to the alarm sink + owner DM (via _alarm), de-duped against
+    the prior sweep so a persistent issue alarms once. The proactive complement to the /audit watchdog
+    (which the live watchdog already routes). Read-only detection; no balance path touched. No-op in test."""
+    if _att_test_mode():
+        return
+    from core import sentinel
+    from shared.database import gm_get_state, gm_set_state
+    try:
+        found = sentinel.sweep("twb")
+    except Exception as e:
+        logger.error("sentinel sweep failed: %s", e)
+        return
+    new, cur_json = _sentinel_new_alarms(found, gm_get_state("sentinel_last"))
+    for a in new:
+        sev = {"critical": "money", "warn": "warn"}.get(a.get("severity"), "info")
+        await _alarm(context, "sentinel:%s" % a.get("flow"), "🛰 Sentinel — %s" % a.get("detail"), severity=sev)
+    gm_set_state("sentinel_last", cur_json)
+
+
 async def _session_closer_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Daily FALLBACK end-of-shift closer (go-live hardening, Jun 19). Auto-checkout only fires when the
     live-share is still ON + IN-ZONE at shift end; staff routinely stop sharing early, so a checked-in
@@ -7892,6 +7945,14 @@ def build_app() -> Application:
     app.job_queue.run_daily(_session_closer_job,
                             time=__import__("datetime").time(hour=0, minute=0),
                             name="gm_session_closer")
+    # fallback no-show payback reaper: daily 07:05 PP (00:05 UTC), just after the session-closer — reaps a
+    # payback slot booked-but-never-worked so it stops dangling + frees the debt to re-book (THYDA #81/#287).
+    app.job_queue.run_daily(_payback_noshow_reaper_job,
+                            time=__import__("datetime").time(hour=0, minute=5),
+                            name="gm_payback_reaper")
+    # universal Sentinel sweep: every 30 min — stuck flows / impossible states / the shadow-net-itself ->
+    # NEW alarms routed to the sink + owner (de-duped). The proactive complement to the /audit watchdog.
+    app.job_queue.run_repeating(_sentinel_sweep_job, interval=1800, first=120, name="gm_sentinel_sweep")
     # nightly SHADOW digest → DM the owner at 21:45 PP (14:45 UTC), after the evening check-in wave.
     # Carries over unresolved mismatches (a missed night combines into the next). No-op while shadow off.
     app.job_queue.run_daily(_shadow_digest_job,

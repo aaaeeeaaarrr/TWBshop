@@ -3498,6 +3498,50 @@ def payback_booking_mark_done(staff_id: int, slot_date: str) -> None:
                         (staff_id, slot_date, _ATT_TEST))
 
 
+def payback_booking_mark_missed(staff_id: int, slot_date: str) -> None:
+    """A NO-SHOW payback slot (slot day passed, never checked in): flip the booking 'booked'->'missed'
+    AND its payback-slot redefine 'approved'->'cancelled' so neither dangles (the audit's stale-booking +
+    never-settled laws go quiet) and the reserved minutes free up for re-booking. NO balance change —
+    nothing was worked, so there is nothing to credit. The no-show TWIN of payback_booking_mark_done.
+    Idempotent (only a still-'booked'/'approved' row flips) + test-isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE payback_bookings SET status='missed'
+                           WHERE staff_id=%s AND slot_date=%s AND status='booked' AND is_test=%s""",
+                        (staff_id, slot_date, _ATT_TEST))
+            cur.execute("""UPDATE shift_changes SET status='cancelled'
+                           WHERE staff_id=%s AND when_date=%s AND reason='payback slot'
+                                 AND status='approved' AND is_test=%s""",
+                        (staff_id, slot_date, _ATT_TEST))
+
+
+def payback_bookings_passed_booked(today_iso: str) -> list[dict]:
+    """Payback bookings still 'booked' whose slot day has fully passed (< today) — candidates for the
+    no-show reaper. The caller marks 'missed' ONLY when there is no check-in that day (a genuine
+    no-show); a worked-but-unsettled slot is left alone. Test-isolated."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id, debt_id, staff_id, slot_date, minutes FROM payback_bookings
+                           WHERE status='booked' AND slot_date < %s AND is_test=%s
+                           ORDER BY slot_date""", (today_iso, _ATT_TEST))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def reap_noshow_payback_bookings(today_iso: str) -> int:
+    """Reap genuine NO-SHOW payback slots: for each 'booked' booking whose slot day passed, if there is
+    NO check-in that day, flip booking->missed + redefine->cancelled (payback_booking_mark_missed). A
+    worked (checked-in) slot is SKIPPED — that's a settle issue, not a no-show, and is left to flag.
+    Returns the count reaped. Idempotent + test-isolated. No balance moves anywhere."""
+    n = 0
+    for b in payback_bookings_passed_booked(today_iso):
+        sess = att_get_session(b["staff_id"], str(b["slot_date"]))
+        if sess and sess.get("checked_in_at"):
+            continue
+        payback_booking_mark_missed(b["staff_id"], str(b["slot_date"]))
+        n += 1
+    return n
+
+
 def shift_change_claim_settle(change_id: int) -> bool:
     """Atomic idempotency claim for OT banking. Flips approved->done in ONE conditional UPDATE and
     returns True only if THIS caller made the flip (the row was still 'approved'). Every other

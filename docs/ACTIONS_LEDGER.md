@@ -152,6 +152,10 @@
   (next, owner-go, staging-proven): (a) a "missed payback slot" reaper (slot-day passed + no check-in →
   booking `missed` + resolve the redefine, idempotent) ; (b) one-off correction #81→missed / #287→resolved
   for Thyda (frees 360 to re-book). Same class as the s51 payback housekeeping.
+  **✅ REAPER BUILT (s58, G1):** `reap_noshow_payback_bookings(today)` + `payback_booking_mark_missed`
+  (booking→missed + redefine→cancelled, NO balance change, idempotent, test-isolated) + a daily 07:05 gm
+  job `_payback_noshow_reaper_job`; 2 staging tests (no-show reaped / worked-slot left alone). Deploying with
+  the gm batch (G1+B2); will reap THYDA #81/#287 — I'll run it once on prod post-deploy with before/after proof.
 - **2026-06-28 — CHENDA/FANG payback off-by-one for OVERNIGHT shifts (live attendance UI; DIAGNOSED, fix NOT
   built/deployed).** Staff report: late on the 27th (Sat 21:00→06:00 shift), want to pay back the 28th (Sun)
   morning → picking "28th" doesn't give that slot; only the button labeled "27th" books the Sun-28 morning
