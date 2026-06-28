@@ -103,6 +103,8 @@
     · _pii_enc, _pii_dec, _dec_row, record_seen_member, list_candidates, confirm_candidate, skip_candidate, record_consent, add_staff_manual, list_staff, remove_staff, ensure_checkin_token, staff_by_checkin_token, get_staff, update_staff  …(+5, grep)
 - `core/optimize.py` — core.optimize — the "what the system handled for you" outcome view (Fin-inspired, lean + HONEST).
     · automation_summary, headline
+- `core/parallel_shadow.py` — core.parallel_shadow — run the SAME real check-in history through SEVERAL configs at once (a lean,
+    · verdict_matrix, summary_lines
 - `core/payroll.py` — core.payroll — a real, minimal payroll (the HR/payroll domain on the platform): per-staff monthly salary →
     · staff_with_salary, set_salary, run_payroll, list_pay_runs, payslips, latest_run
 - `core/points.py` — core.points — check-in points (channel-agnostic, per-tenant config). Parity with gm_bot.points.
@@ -258,6 +260,8 @@
     · main
 - `scripts/anchor_audit.py` — Anchor every org's audit-chain HEAD to the external anchor file (core.audit_anchor). Run on a schedule
     · _orgs, main
+- `scripts/config_diff.py` — Config-diff preview (E, lean) — run the org's recent REAL check-ins through a few grace values at once
+    · main
 - `scripts/facts.py` — facts.py — the truth registry: one home per machine-knowable fact, + its lineage.
     · load, _save, _read_literal, derive, _render, reconcile, _bad_pointers, append_lineage, lineage_for, set_fact, explain
 - `scripts/fetch_report_receipts.py` — Download photo media from a chat using the read-only ops_listener session.
