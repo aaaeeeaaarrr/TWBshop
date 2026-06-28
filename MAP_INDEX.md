@@ -280,6 +280,8 @@
     · _git, worktrees, lane_board, service_health, anomalies, issues, fmt, _token, notify, main
 - `scripts/monitor_bot.py` — monitor_bot.py — interactive owner-only dashboard over @TWB_Monitor_bot.
     · _owner, _fmt_lanes, _fmt_services, cmd_start, cmd_board, cmd_health, cmd_issues, _is_repo_event, _read_events, _ev_line, cmd_crossings, cmd_audit, _events_tick, _watch_tick, _on_start  …(+1, grep)
+- `scripts/morning_report.py` — Morning report (B3 generator) — a READ-ONLY digest of the platform's overnight state, so Claude / the
+    · build_report, main
 - `scripts/ocr_catalogue.py` — Batch-classify every archived report photo with the PRODUCTION OCR function
     · classify, run
 - `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.

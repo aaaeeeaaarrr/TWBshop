@@ -4408,9 +4408,8 @@ async def _missing_mid_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "mid" for r in rows):
-            await context.bot.send_message(
-                chat_id=config.OWNER_TELEGRAM_ID,
-                text="⏰ No midday report in TWB REPORT for %s yet (17:30)." % day)
+            await _alarm(context, "no_mid_report",
+                         "⏰ No midday report in TWB REPORT for %s yet (17:30)." % day, severity="warn")
     except Exception as e:
         logger.error("missing-mid check failed: %s", e)
 
@@ -4421,10 +4420,10 @@ async def _missing_final_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "final" for r in rows):
-            await context.bot.send_message(
-                chat_id=config.OWNER_TELEGRAM_ID,
-                text="🚨 No FINAL report stored for business day %s (checked 06:30). "
-                     "The day's books are missing — staff didn't post, or collection is down." % day)
+            await _alarm(context, "no_final_report",
+                         "🚨 No FINAL report stored for business day %s (checked 06:30). "
+                         "The day's books are missing — staff didn't post, or collection is down." % day,
+                         severity="money")
     except Exception as e:
         logger.error("missing-final check failed: %s", e)
 
@@ -6039,23 +6038,14 @@ async def _auto_audit_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         problems, _stats = run_audit(datetime.now(finance.PP_TZ).date(), test_rows=False)
     except Exception as e:
         logger.error("auto-audit failed to run: %s", e)
-        try:
-            await context.bot.send_message(config.OWNER_TELEGRAM_ID,
-                                           "⚠ Daily auto-audit FAILED to run: %s" % e)
-        except Exception:
-            pass
+        await _alarm(context, "audit_failed", "⚠ Daily auto-audit FAILED to run: %s" % e, severity="warn")
         return
     if not problems:
         logger.info("auto-audit: clean")
         return
-    body = ("❌ DAILY AUTO-AUDIT — %d problem(s) in the REAL data. Copy this message to Claude:\n\n"
+    body = ("❌ DAILY AUTO-AUDIT — %d problem(s) in the REAL data:\n\n"
             % len(problems)) + "\n".join("• " + p for p in problems)
-    for i in range(0, len(body), 3500):
-        try:
-            await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
-        except Exception as e:
-            logger.error("auto-audit DM failed: %s", e)
-            break
+    await _alarm(context, "daily_audit", body, severity="money")
 
 
 async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
