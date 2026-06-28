@@ -79,6 +79,8 @@
     · _org_secret_cipher, init_core_db, log_config_change, recent_config_audit, ensure_org, set_org_secret, has_org_secret, get_org_secret, clear_org_secret, _hash_pw, _check_pw, create_user, verify_user, user_count
 - `core/derive.py` — core.derive — the SELF-DERIVING resolver: the core decides what a day is from its OWN state
     · set_override, clear_overrides, _modifiers, resolve
+- `core/exceptions.py` — core.exceptions — per-staff EXCEPTIONS / overrides (F1, session 58, 2026-06-28).
+    · _clean_exceptions, get_exceptions, set_exceptions, apply_preset, is_exempt, approver_for, summary
 - `core/expenses.py` — core.expenses — a real, minimal expense log (the Accountant domain on the platform): record expenses by
     · add_expense, list_expenses, expense_summary
 - `core/health.py` — core.health — read-only config health-check. Scans a tenant's config + setup for likely mistakes /
@@ -344,7 +346,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+62, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+64, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

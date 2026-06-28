@@ -227,6 +227,7 @@ def init_core_db() -> None:
                 ("contract_on_file", "BOOLEAN DEFAULT FALSE"), ("indemnity_enabled", "BOOLEAN DEFAULT FALSE"),
                 ("indemnity_details", "TEXT"), ("right_to_work_verified", "BOOLEAN DEFAULT FALSE"),
                 ("bank_account", "TEXT"), ("notes", "TEXT"), ("custom_fields", "JSONB DEFAULT '{}'"),
+                ("exceptions", "JSONB DEFAULT '{}'"),   # F1 (s58): per-staff exceptions/overrides (core.exceptions)
             ]:
                 cur.execute("ALTER TABLE core_staff ADD COLUMN IF NOT EXISTS %s %s" % (_col, _type))
             # Onboarding CANDIDATES — people the bot saw in a staff group, awaiting the owner's one-by-one confirm.

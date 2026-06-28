@@ -27,6 +27,7 @@ from core.whatif import verdict_whatif
 from core.health import config_health
 from core.shadow import comparison_stats, comparison_stats_by_kind, recent_mismatches, comparison_span
 from core.reports import attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
+from core import exceptions as exc
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
                                   update_staff_profile, PROFILE_TEXT, PROFILE_DATE, PROFILE_BOOL,
                                   list_groups, set_group_role, GROUP_ROLES,
@@ -491,12 +492,14 @@ def render_staff(org_id: str) -> str:
     staff = list_staff(org_id)
     rows = "".join(
         "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-        "<td><a href='/staff/edit/%d' class='btn'>edit</a> <a href='/staff/link/%d' class='btn'>link</a> "
+        "<td><a href='/staff/edit/%d' class='btn'>edit</a> "
+        "<a href='/staff/exceptions/%d' class='btn'>⚙ exceptions%s</a> "
+        "<a href='/staff/link/%d' class='btn'>link</a> "
         "<form method='post' action='/staff/del' style='display:inline'>"
         "<input type='hidden' name='staff_id' value='%d'><button class='btn'>remove</button></form></td></tr>"
         % (escape(s.get("name", "")), escape(s.get("role") or ""), "senior" if s.get("is_senior") else "",
            escape(", ".join(s.get("expertises") or [])), escape(_windows_str(s.get("shift_windows"))),
-           s["staff_id"], s["staff_id"], s["staff_id"])
+           s["staff_id"], s["staff_id"], _exc_badge(org_id, s["staff_id"]), s["staff_id"], s["staff_id"])
         for s in staff) or ("<tr><td colspan='6' class='note'>No staff yet — the bot can <b>discover</b> them "
                             "from your staff group (it stages whoever posts), or add one below / paste a list.</td></tr>")
     body = (
@@ -614,6 +617,86 @@ def render_staff_edit(org_id: str, staff_id: int) -> str:
         "<div class='actions'><button type='submit'>Save</button> <a href='/staff' class='btn'>Cancel</a></div></form>"
         % (escape(g("name", "")), saved, s["staff_id"], identity, contact, employment, legal, notes))
     return _page("Edit staff", body)
+
+
+def _exc_badge(org_id: str, staff_id: int) -> str:
+    """Lean staff-row suffix: ' (N)' only when this staffer has exceptions set, else '' (nothing in the face)."""
+    try:
+        e = exc.get_exceptions(org_id, staff_id)
+        n = sum(1 for k in e if not k.startswith("_") and k != "notes")
+        return (" (%d)" % n) if n else ""
+    except Exception:
+        return ""
+
+
+def render_staff_exceptions(org_id: str, staff_id: int) -> str:
+    """The per-staff Exceptions page (F1): an employment-type preset (one tap = a sensible bundle) + grouped
+    toggles (tracking exemptions · notifications · pay-back/leave behaviour) + approval-routing pickers.
+    INERT — saved as config; the live bot doesn't read it yet (wiring each rule is a later cut-over step)."""
+    s = get_staff(org_id, staff_id)
+    if not s:
+        return _page("Exceptions", "<div class='nav'><a href='/staff'>← staff</a></div><p>Not found.</p>")
+    cur = exc.get_exceptions(org_id, staff_id)
+    nm = s.get("call_name") or s.get("name") or ("Staff #%d" % staff_id)
+    saved = "<div class='saved'>✓ Saved.</div>" if request.args.get("saved") else ""
+
+    # 1) employment-type preset — one tap sets a sensible bundle (its own small form)
+    opts = "".join("<option value='%s'%s>%s</option>" % (
+        escape(k), " selected" if cur.get("_preset") == k else "", escape(exc.PRESET_LABELS[k]))
+        for k in exc.PRESETS)
+    preset_form = (
+        "<div class='box'><h3>Starting point</h3>"
+        "<p class='note'>Pick an employment type to set a sensible bundle in one tap — then fine-tune below. "
+        "Default is a normal staffer (no exceptions).</p>"
+        "<form method='post' action='/staff/exceptions/preset'>"
+        "<input type='hidden' name='staff_id' value='" + str(staff_id) + "'>"
+        "<select name='preset'>" + opts + "</select> "
+        "<button type='submit'>Apply starting point</button></form></div>")
+
+    # 2) grouped toggles
+    groups_html = ""
+    for grp in exc.EXCEPTION_GROUPS:
+        toggles = ""
+        for (k, lbl, hlp) in grp["toggles"]:
+            toggles += (
+                "<div style='margin:7px 0'><label><input type='checkbox' name='" + escape(k) + "' "
+                + ("checked" if cur.get(k) else "") + "> <b>" + escape(lbl) + "</b></label>"
+                "<div class='note' style='margin-left:24px'>" + escape(hlp) + "</div></div>")
+        groups_html += ("<div class='box'><h3>" + escape(grp["label"]) + "</h3><p class='note'>"
+                        + escape(grp["help"]) + "</p>" + toggles + "</div>")
+
+    # 3) approval routing — a staff picker per request type
+    others = [o for o in list_staff(org_id) if o["staff_id"] != staff_id]
+    appr = "<div class='box'><h3>Approval routing</h3>"
+    for (k, lbl, hlp) in exc.APPROVAL_FIELDS:
+        picks = "<option value=''>— normal approval ladder —</option>"
+        for o in others:
+            picks += ("<option value='" + str(o["staff_id"]) + "'"
+                      + (" selected" if cur.get(k) == o["staff_id"] else "") + ">"
+                      + escape(o.get("call_name") or o.get("name") or ("#%d" % o["staff_id"])) + "</option>")
+        appr += ("<div style='margin:7px 0'><label style='display:inline-block;width:215px'>" + escape(lbl)
+                 + "</label><select name='" + escape(k) + "'>" + picks + "</select>"
+                 "<div class='note'>" + escape(hlp) + "</div></div>")
+    appr += "</div>"
+
+    notes = ("<div class='box'><h3>Notes</h3><textarea name='notes' rows='2' style='width:98%'>"
+             + escape(cur.get("notes") or "") + "</textarea></div>")
+
+    save_form = (
+        "<form method='post' action='/staff/exceptions/save'>"
+        "<input type='hidden' name='staff_id' value='" + str(staff_id) + "'>"
+        "<input type='hidden' name='_preset' value='" + escape(cur.get("_preset") or "") + "'>"
+        + groups_html + appr + notes
+        + "<div class='actions'><button type='submit'>Save exceptions</button> "
+        "<a href='/staff' class='btn'>Cancel</a></div></form>")
+
+    body = (
+        "<div class='nav'><a href='/staff'>← staff</a></div>"
+        "<h1>⚙ Exceptions — " + escape(nm) + "</h1>" + saved
+        + "<p class='note'>Per-person overrides. Most staff need none. <b>Inert for now</b> — saved as config; "
+        "it does not change the live bot until each rule is wired in (a later, deliberate step).</p>"
+        + preset_form + save_form)
+    return _page("Exceptions — " + nm, body)
 
 
 # ── SETUP checklist — the "where am I" view that ties onboarding together ─────
@@ -2279,6 +2362,28 @@ def create_app(org_id: str = "twb") -> Flask:
             update_staff_profile(org_id, sid, prof)
             return redirect("/staff/edit/%d?saved=1" % sid)
         return redirect("/staff")
+
+    @app.get("/staff/exceptions/<int:sid>")
+    def staff_exceptions(sid):
+        return render_staff_exceptions(org_id, sid)
+
+    @app.post("/staff/exceptions/preset")
+    def staff_exceptions_preset():
+        sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
+        preset = request.form.get("preset")
+        if sid > 0 and preset in exc.PRESETS:
+            exc.set_exceptions(org_id, sid, exc.apply_preset(preset))
+            log_config_change(org_id, _current_user(), "staff.exceptions.preset", None, "#%d=%s" % (sid, preset))
+        return redirect("/staff/exceptions/%d?saved=1" % sid)
+
+    @app.post("/staff/exceptions/save")
+    def staff_exceptions_save():
+        sid = _int(request.form.get("staff_id"), 1, 10 ** 12, -1)
+        if sid > 0:
+            stored = exc.set_exceptions(org_id, sid, request.form)
+            log_config_change(org_id, _current_user(), "staff.exceptions", None,
+                              "#%d: %s" % (sid, ", ".join(sorted(k for k in stored if not k.startswith("_"))) or "cleared"))
+        return redirect("/staff/exceptions/%d?saved=1" % sid)
 
     @app.get("/setup")
     def setup():

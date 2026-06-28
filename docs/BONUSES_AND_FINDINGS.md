@@ -917,3 +917,17 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   script must `sys.stdout.reconfigure(encoding="utf-8")` or it crashes. Caught by the B1a reader smoke-test.
 - **NOTE (schema):** `init_alarms_db()` adds the `gm_alarms` table on gm startup (additive, idempotent) — the
   one schema change in this batch; created on prod at the next gm deploy.
+- **✅ A1+A2+B1 DEPLOYED + VERIFIED LIVE (tag `708baaa`, gm PID 1480629 NR=0, gm_alarms live, suite 1190p).**
+- **THYDA payback flag — investigated read-only: NO money wrong; a real stale-status GAP.** A no-show payback
+  slot (booked but never checked-in) is never reaped — the 07:00 closer only closes open SESSIONS, so the
+  booking dangles `booked` + the redefine dangles `approved` forever (watchdog noise) AND the stuck minutes
+  reserve part of the debt, blocking re-booking. FIX (next): a "missed payback slot" reaper. → ACTIONS_LEDGER.
+- **🎁 F1 — per-staff EXCEPTIONS (foundation built, INERT).** Generalises the hard-coded "Tyty/Delis are
+  special" exclusions in the live gm bot into clean per-staff config (`core_staff.exceptions` JSONB +
+  `core/exceptions.py`): grouped toggles (tracking exemptions · notifications/visibility) + approval-routing
+  overrides + employment-type PRESETS (standard/part-time/freelancer/salaried-no-clock/vip-exempt). LEAN: one
+  "Exceptions" button per staff row (a tiny `⚙ N` badge only when set — nothing in the face for normal staff);
+  a preset sets a bundle in one tap, then fine-tune. Models Tyty (vip_exempt) + Thyda (no_supervisor_posts +
+  AL-approver=Tyty) + freelancers exactly. 7 tests. **⚠ INERT — the live bot still hard-codes Tyty; wiring each
+  toggle into the live nudge/group-post/approval paths is a later deliberate cut-over step.** Insight: this is
+  the *config-driven* version of exclusions the platform vision wants — no more per-staff code.

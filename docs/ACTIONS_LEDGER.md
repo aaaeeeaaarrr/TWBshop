@@ -134,6 +134,24 @@
 
 ## Open (not yet done)
 
+- **2026-06-28 — THYDA (id 34) unsettled payback from 2026-06-26 (HIGH-RISK money; SURFACED by the s58
+  deploy verification; PRE-EXISTING — NOT caused by the deploy; read-only only, NOT fixed).** The live
+  watchdog state (`live_watchdog_last`) holds 2 linked problems: **slot #287** (2026-06-26) "approved but
+  never settled — the worked time may not have credited the debt" + **booking #81** (2026-06-26) "passed but
+  still 'booked' (neither done nor missed)". The watchdog has flagged these since ~06-26 (owner may have
+  missed the DM — exactly why B1's sink now exists). NEXT: read-only prod investigation (did THYDA work the
+  06-26 slot? did the debt credit? is the booking genuinely stuck vs a display artifact like the Jun-21
+  overnight-tail cases?) → if a real miss, a vetted before/after fix on staging then prod. Do NOT auto-fix
+  (payback/money = HIGH-RISK, owner-aware first).
+  **✅ INVESTIGATED read-only 2026-06-28 — NO MONEY WRONG; a stale-status GAP (not urgent).** Thyda (id 34,
+  works 12:00–00:00). Debt #158 = 1261 owed / 0 paid (paperless-sick from 06-21), correctly uncredited.
+  Booking #81 (debt 158, 06-26 06:00–12:00, 360 min) is stuck `booked` + redefine #287 (06-26 06:00–24:00)
+  dangles `approved` because **she never checked in on 06-26** (no session) → the 07:00 fallback closer only
+  closes open SESSIONS, so a NO-SHOW payback slot is never reaped → dangles + the watchdog re-flags daily.
+  Side-effect: the stuck 360 min reserves part of the debt, partially blocking re-booking those 360. FIX
+  (next, owner-go, staging-proven): (a) a "missed payback slot" reaper (slot-day passed + no check-in →
+  booking `missed` + resolve the redefine, idempotent) ; (b) one-off correction #81→missed / #287→resolved
+  for Thyda (frees 360 to re-book). Same class as the s51 payback housekeeping.
 - **2026-06-28 — CHENDA/FANG payback off-by-one for OVERNIGHT shifts (live attendance UI; DIAGNOSED, fix NOT
   built/deployed).** Staff report: late on the 27th (Sat 21:00→06:00 shift), want to pay back the 28th (Sun)
   morning → picking "28th" doesn't give that slot; only the button labeled "27th" books the Sun-28 morning
@@ -149,7 +167,9 @@
   **✅ UPDATE (2026-06-28, s58):** FIX BUILT — `bot.py::_pb_offer_label` routes the after-slot through
   `_slot_when_label` (before/day-off/day-worker labels unchanged; callback/binding/settle untouched). Guard
   `tests/test_pb_offer_label.py` (4). Staging-proven (full suite 1174p/2s; map regenerated). **Deploy = by
-  tag, batched with A2, in a quiet window, on owner go + prod-verify.** Not yet deployed.
+  tag, batched with A2, in a quiet window, on owner go + prod-verify.** **✅ DEPLOYED + VERIFIED LIVE
+  2026-06-28 (tag `session-58-fixes-alarm-sink-20260628`=`708baaa`; gm PID 1480629 NR=0; gm_alarms live;
+  suite 1190p) — RESOLVED.** Owner eyeball pending: a night-shift payback now shows the right morning date.
 - **2026-06-28 — HENG "GM shows no menu" at ~01:35 PP (live gm bot; DIAGNOSED transient, no fix-deploy yet).**
   Sick staffer messaged GM to go home, got no menu. ROOT CAUSE (read-only server logs): a Telegram
   Bad-Gateway burst (17:49 UTC) + outbound network timeouts (18:29 UTC) coincide exactly with his window
@@ -164,6 +184,8 @@
   `_note_staff_send_failure` (`(copy to Claude)`, to be auto-mirrored by B1). Success path unchanged (additive
   on failure only). Guard `tests/test_send_resilience.py` (8). Staging-proven. **Deploy batched with A1, on
   owner go + quiet window.** Owner still to confirm staff get the menu now (bot is healthy).
+  **✅ DEPLOYED + VERIFIED LIVE 2026-06-28 (tag `708baaa`) — RESOLVED (transient-retry + outage burst-alarm
+  live, routed through the new B1 alarm sink).** Owner check pending: confirm a staffer now gets the menu.
   - **CURRENT BUILD = the config-driven WIZARD platform** ("the system IS its config"; every edit from now is a
     config setting + `core` reads it; TWB = tenant #1). LINEUP: **1 ✅ config spine** · **2 ✅ AL re-ping ladder**
     (deployed) · **3 ⏳ wire full attendance menu into the shadow** (3a ✅ settle/money path deployed; 3b = points +
