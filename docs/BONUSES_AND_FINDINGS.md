@@ -931,3 +931,24 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   AL-approver=Tyty) + freelancers exactly. 7 tests. **⚠ INERT — the live bot still hard-codes Tyty; wiring each
   toggle into the live nudge/group-post/approval paths is a later deliberate cut-over step.** Insight: this is
   the *config-driven* version of exclusions the platform vision wants — no more per-staff code.
+- **🛡 SELF-HEALING / PROACTIVE layer built this run (owner: "intercept future problems + automated
+  fixes/alarms BEFORE they happen"):**
+  • **C1 instant-revert net** (`core/flip.py`) — per-(org,path) authority flag (default OFF = today's
+    behaviour); when ON, core decides + the OLD engine shadows it + it **AUTO-REVERTS itself** on divergence
+    (a misbehaving flip un-flips). INERT until C2 wires `decide()` into a live path (owner-gated). 6 tests.
+  • **3 proactive Sentinel detectors** → the sink (owner + Claude) via B2's 30-min sweep, de-duped:
+    `detect_flip_divergence` (a wobbling flip caught BEFORE auto-revert) · `detect_config_health` (a foot-gun
+    config caught BEFORE it makes a wrong verdict/payroll — reuses core.health) · (+ existing shadow-stalled,
+    malformed-checkin). 3 tests.
+  • **E config-diff / parallel-shadow (lean)** (`core/parallel_shadow.py` + `scripts/config_diff.py`) — real
+    check-ins through a few grace values at once = the dashboard's config-diff preview + the Phase-3 seed.
+    Reuses core.whatif. 2 tests.
+  • **B3 morning-report generator** (`scripts/morning_report.py`) — read-only overnight digest (audit +
+    Sentinel + open alarm-sink incl. UNDELIVERED + shadow) for the nightly agent / me.
+  With G1 (no-show reaper auto-heal) + the session-closer + the AL re-ping ladder (auto-expire) + the live
+  watchdog + the B1 sink, the self-healing Phases 0–1 are substantially in place. **PROACTIVE ideas still
+  open (future detectors / auto-heal):** impossible/negative-balance invariant · stuck-approval-beyond-ladder
+  · missed-scheduled-job heartbeat + auto-catch-up · per-path flip nets for points/payback/settle (D2).
+  **D1 fix-bake-off:** the check-in replay-scorer already exists (`scripts/replay_checkins.py`); the
+  "N candidate fixes → score on real history → pick best" is a PROCESS I can run on-demand via replay +
+  multi-agent; a generic per-path scorer is future (pairs with the per-path flips).
