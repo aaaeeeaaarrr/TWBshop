@@ -84,12 +84,26 @@ def detect_flip_divergence(org_id: str, now: datetime) -> list:
         return []   # no flip table / none authoritative → nothing to watch (flip is inert by default)
 
 
+def detect_config_health(org_id: str, now: datetime) -> list:
+    """PROACTIVE: a dangerous CONFIG (a foot-gun setting) flagged BEFORE it produces a wrong verdict or
+    payroll — reuses core.health.config_health, routing only the 'warn' (likely-wrong) items, not the 'info'
+    heads-up. The dashboard's tweakability lets a client set a bad value; this catches it via the sink (→
+    owner + Claude), not only on the /health page they might never open."""
+    try:
+        from core.health import config_health
+        return [_alarm("config", "%s:%s" % (org_id, msg[:48]), WARN, msg)
+                for level, msg in config_health(org_id) if level == "warn"]
+    except Exception:
+        return []
+
+
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
 # stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only.
 DETECTORS = [
     ("shadow_stalled", detect_shadow_stalled),
     ("malformed_checkin", detect_malformed_checkin),
     ("flip_divergence", detect_flip_divergence),
+    ("config_health", detect_config_health),
 ]
 
 

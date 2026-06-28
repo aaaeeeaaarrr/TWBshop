@@ -118,7 +118,7 @@
 - `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
     · resolve_day
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
-    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, sweep, summary_line
+    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
     · worked_minutes, ot_earned, split_ot_pb, settle_shift
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
