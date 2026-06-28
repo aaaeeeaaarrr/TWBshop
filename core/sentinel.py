@@ -61,11 +61,35 @@ def detect_malformed_checkin(org_id: str, now: datetime) -> list:
     return [_alarm("attendance", org_id, WARN, "%d recent check-in event(s) missing a verdict state" % n)] if n else []
 
 
+def detect_flip_divergence(org_id: str, now: datetime) -> list:
+    """PROACTIVE: a path that's been FLIPPED to core (authoritative) but is starting to disagree with the
+    old engine — alarm EARLY, before the auto-revert threshold trips, so a misbehaving cut-over is caught
+    the moment it wobbles (not only once it un-flips itself). No-op while no flip is active (the default)."""
+    try:
+        from core import flip
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT path FROM core_flip WHERE org_id=%s AND authoritative=TRUE", (org_id,))
+                paths = [r["path"] for r in cur.fetchall()]
+        out = []
+        for p in paths:
+            total, dis = flip.recent_divergence(org_id, p)
+            if dis > 0:
+                sev = CRITICAL if flip.should_auto_revert(total, dis) else WARN
+                out.append(_alarm("flip", "%s:%s" % (org_id, p), sev,
+                                  "core is authoritative for '%s' but diverging from the old engine (%d/%d) "
+                                  "— review before/at auto-revert" % (p, dis, total)))
+        return out
+    except Exception:
+        return []   # no flip table / none authoritative → nothing to watch (flip is inert by default)
+
+
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
 # stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only.
 DETECTORS = [
     ("shadow_stalled", detect_shadow_stalled),
     ("malformed_checkin", detect_malformed_checkin),
+    ("flip_divergence", detect_flip_divergence),
 ]
 
 

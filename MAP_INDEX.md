@@ -83,6 +83,8 @@
     · _clean_exceptions, get_exceptions, set_exceptions, apply_preset, is_exempt, approver_for, summary
 - `core/expenses.py` — core.expenses — a real, minimal expense log (the Accountant domain on the platform): record expenses by
     · add_expense, list_expenses, expense_summary
+- `core/flip.py` — core.flip — the instant-revert NET for cutting a path over to the core engine (C1, self-healing program).
+    · init_flip_db, is_authoritative, set_authoritative, record_divergence, recent_divergence, should_auto_revert, decide
 - `core/health.py` — core.health — read-only config health-check. Scans a tenant's config + setup for likely mistakes /
     · config_health
 - `core/insights.py` — core.insights — a cross-domain 'needs attention' feed (read-only): one place that scans every ON domain for
@@ -116,7 +118,7 @@
 - `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
     · resolve_day
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
-    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, sweep, summary_line
+    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
     · worked_minutes, ot_earned, split_ot_pb, settle_shift
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
