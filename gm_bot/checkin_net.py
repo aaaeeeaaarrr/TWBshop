@@ -63,3 +63,18 @@ def points_via_net(state, late_min, early_min, declare_offset_min, live_events, 
         return chosen, reverted
     except Exception:
         return live_events, False
+
+
+def settle_via_net(core_vals, live_vals, org_id: str = "twb"):
+    """D2 (settle cut-over): route the checkout settle decision (pb_cleared, ot_banked) through
+    core.flip.decide for (org_id, 'settle'). Returns (vals, auto_reverted). FLAG OFF (the default) →
+    (live_vals, False) byte-identical to today. FLAG ON → core's values (parity: core.settle.settle_shift
+    for a normal day + settle_payback_slot for a payback slot), auto-reverting on divergence. Fail-safe:
+    ANY error → live_vals. The caller computes both (pb_cleared, ot_banked) tuples (core's PURELY, no side
+    effects) and applies the CHOSEN one, so OFF is byte-identical by construction."""
+    try:
+        from core import flip
+        chosen, reverted = flip.decide(org_id, "settle", core_vals, live_vals)
+        return chosen, reverted
+    except Exception:
+        return live_vals, False

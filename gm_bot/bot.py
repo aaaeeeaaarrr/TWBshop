@@ -2715,6 +2715,25 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
             ot_banked = 0   # a payback slot repays debt ONLY — it can never mint OT (owner, Jun 11)
         else:
             ot_banked, pb_cleared, _new = ot_mod.settle_shift(worked, sc["normal_len"], pb)
+        # D2 SETTLE cut-over net (flag-off no-op): route the computed (pb_cleared, ot_banked) through
+        # core.flip 'settle'. FLAG OFF (default) = live's values, byte-identical (the core compute below is
+        # PURE / side-effect-free, so OFF can't change anything); FLAG ON = core's (parity: #5
+        # settle_payback_slot for a slot, core.settle.settle_shift for a normal day; auto-reverts on divergence).
+        try:
+            from gm_bot.checkin_net import settle_via_net
+            from core import settle as _cset
+            if (sc.get("reason") or "") == "payback slot":
+                _co = _cset.settle_payback_slot(int(ext_worked or 0), int(pb))
+            else:
+                _co = _cset.settle_shift(int(worked), int(sc["normal_len"] or 0), int(pb),
+                                         bank_min=0, bank_cap_min=10**9)   # uncapped → live caps separately below
+            (pb_cleared, ot_banked), _settle_rev = settle_via_net((_co["pb_cleared"], _co["ot_banked"]),
+                                                                  (pb_cleared, ot_banked))
+            if _settle_rev:
+                logger.warning("[FLIP] settle cut-over AUTO-REVERTED for staff %s — see core_flip_log "
+                               "(Sentinel detect_flip_divergence also alarms)", staff.get("id"))
+        except Exception:
+            pass
         if pb_cleared and debt:
             payback_credit(debt["id"], pb_cleared)   # extension worked clears the debt first
         new_bal = ot_bank_balance(staff["id"])

@@ -955,6 +955,17 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   measured directly against the window so a LATE arrival on the normal portion can't eat the repayment, and it
   can NEVER bank OT (owner). This is why `core.settle.settle_shift` (the OT path) couldn't score it — a separate
   model was needed.
+- `[ship]` **D2 `settle` cut-over net WIRED flag-off** (staged) — the highest-money path (OT-banking +
+  payback-clearing). `gm_bot/checkin_net.py::settle_via_net` + `_settle_redefined_shift` computes core's
+  (pb_cleared, ot_banked) PURELY (settle_payback_slot for a slot / core.settle.settle_shift for a normal day)
+  → routes through `core.flip.decide('twb','settle')` → applies the chosen. FLAG OFF = byte-identical BY
+  CONSTRUCTION (pure core compute + decide-returns-live + apply-the-chosen); FLAG ON = core owns settle
+  (parity-locked, auto-reverts; the SYNC settle path logs the revert + the Sentinel detect_flip_divergence
+  alarms — no async _alarm in a sync fn). 4 tests. ▶▶ **All attendance/payroll cut-over paths now have nets**
+  (verdict flipped-live · points/settle flag-off) — the whole brain is flippable to core one path at a time.
+- `[gotcha]` **A flag-off net route is byte-identical ONLY if the alternative (core) compute has no side
+  effects.** For settle, core's compute (settle_payback_slot / settle_shift) is pure, so computing it to feed
+  `decide` can't change anything while OFF — that's what makes wiring the money path safe-by-construction.
 - `[decision]` **D1 replay-scorer is LOW value, D2 flips directly.** The money-math (`core.points`/`settle`/`ledger`)
   is already parity-locked + the flip-net already supports points/payback/settle, so D2 wires each path through the
   net flag-off (like C2) and the owner flips — no separate replay/scoring step needed. points = lowest-value D2 path

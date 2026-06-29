@@ -82,6 +82,11 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 > gap that blocked the settle cut-over. The settle shadow now COMPARES payback slots (was 'informational'),
 > staged. So `settle` is now flippable for ALL settle types; D2-settle = route settle through the net flag-off
 > (like points) once the shadow confirms slot agreement on real checkouts.
+> **✅ D2-settle net WIRED flag-off 2026-06-29 (staged):** `gm_bot/checkin_net.py::settle_via_net` +
+> `_settle_redefined_shift` computes core's (pb_cleared, ot_banked) PURELY → routes through
+> `core.flip.decide('twb','settle')` → applies the chosen. FLAG OFF = byte-identical by construction; FLAG ON
+> = core owns settle (auto-reverts; sync path logs the revert + Sentinel detect_flip_divergence alarms). 4
+> tests. Flip owner-gated, after the #5 shadow confirms slot agreement: `set_authoritative('twb','settle',True)`.
 - **D1:** generalize the replay-scorer (`scripts/replay_checkins.py` is the check-in one) to score points/payback/settle candidates on real history (the per-path net for D2 + the fix-bake-off).
 - **D2:** net + flip each, 1-by-1: recording → points → payback → settle. Each: per-path net (D1) → staging before/after on a real row → flag-off deploy → flip → watch. Auto-reverts on divergence.
 
