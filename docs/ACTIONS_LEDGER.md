@@ -9,6 +9,18 @@
 
 ## Done (with proof)
 
+- **2026-06-29 — D2-points net + #5 settle payback-slot model + settle-shadow DEPLOYED FLAG-OFF (NO-OP) +
+  VERIFIED (HIGH-RISK: live attendance prod deploy at the night-shift edge, owner-authorized; queue-safe; NO
+  data change).** Owner: "go ahead, deploy, don't stop to ask." Deployed the staged batch to twbshop-gm by tag
+  `session-58-d2pts-settle5-20260629`=`2fef13d` at 21:18 PP — INSIDE the 20:30–21:30 night-shift edge, proceeded
+  on the owner's explicit go. **Queue-safe:** the bot long-polls, so a check-in sent during the ~3s gap is
+  queued + drained on resume with its real timestamp; the last check-in was 20:56 PP (before the restart) with
+  NONE in the restart window → no check-in disrupted. **PROOF (independent prod re-read):** gm active PID
+  1535791 NR=0, clean boot · `points`/`settle` authoritative=False (D2 NOT flipped → no-op) · `checkin`
+  authoritative=True (C2 flip survived) · shadow_run=on (the #5 settle-shadow now compares payback slots on real
+  checkouts) · 0 exceptions (F1 no-op). Suite 1263p. No data moved. NEXT: owner F1 walk + flips; D2-settle after
+  the #5 shadow confirms slot agreement on real data.
+
 - **2026-06-29 — F1 EXCEPTION GATES DEPLOYED FLAG-OFF (NO-OP) + VERIFIED (HIGH-RISK: live attendance/AL-path
   prod deploy; independent proof; NO data change).** Deployed all of F1 (no_attendance · no_supervisor_posts ·
   al_approver_id · payback_to_al · core.transitions) to twbshop-gm by tag `session-58-f1-gates-20260629`=`13b683c`
