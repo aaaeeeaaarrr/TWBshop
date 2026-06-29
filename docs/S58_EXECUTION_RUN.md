@@ -47,6 +47,18 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 - `no_nudges` → guard the nudge/reminder sends · `no_supervisor_posts` → guard the Supervisors-group post · `no_management_posts` → guard the Management post · `no_attendance`/`no_lateness`/`no_payback`/`no_al`/`no_ot`/`no_points` → guard the respective compute/record · `payback_to_al` → in the payback-debt path, deduct AL instead of booking payback · `*_approver_id` → override the approval routing.
 - Owner's live set first: **Tyty** = vip_exempt (all) · **Thyda** = `no_supervisor_posts` + `payback_to_al` + AL-approver=Tyty (keeps points).
 
+> **⚠ `payback_to_al` DESIGN + OPEN OWNER DECISION (investigated 2026-06-29; NOT built — HIGH-RISK leave/money).**
+> At each `payback_add_debt` site (late = `late` min · leave-early-sick = `_remaining` min · paperless-sick =
+> full-shift min · the test site) — if `payback_to_al` → call `al_deduct(staff_id, AL_days)` INSTEAD of
+> `payback_add_debt(...)`, write a `transitions.note` (old='payback debt N min', new='AL −X days'), and do NOT
+> create the debt. **Reversal (S1):** `_wipe_sick_payback` (papers accepted within window) must REFUND the
+> EXACT AL deducted (store the deducted amount on the sick case / a record) instead of crediting a debt.
+> **🔴 BLOCKING — the minutes→AL conversion rule is an OWNER POLICY decision (don't guess; wrong = wrong leave
+> balance):** (a) minutes ÷ that staffer's scheduled shift length (a full missed shift = 1.0 AL; 302/540 ≈
+> 0.56) · (b) minutes ÷ a standard work-day (e.g. 480) · (c) flat 1 AL day per sick occurrence (ignore the
+> minutes) · (d) rounded to the nearest 0.5 AL. Build in a FRESH pass once decided, with a self-red-team +
+> real before/after proof on a staging row (al_left moves correctly, the papers-refund reverses it exactly).
+
 ## D1 then D2 — money-path flips (HIGH-RISK; D1 first)
 - **D1:** generalize the replay-scorer (`scripts/replay_checkins.py` is the check-in one) to score points/payback/settle candidates on real history (the per-path net for D2 + the fix-bake-off).
 - **D2:** net + flip each, 1-by-1: recording → points → payback → settle. Each: per-path net (D1) → staging before/after on a real row → flag-off deploy → flip → watch. Auto-reverts on divergence.
