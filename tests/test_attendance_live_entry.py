@@ -2752,12 +2752,18 @@ def test_dead_tap_visibility(monkeypatch):
         data = "legacy:button"
         async def answer(self): pass
         async def edit_message_text(self, t, **k): edits.append(t)
-    kbs, alarms = [], []
+    kbs = []
     class _Q2(_Q):
         async def edit_message_text(self, t, reply_markup=None, **k):
             edits.append(t); kbs.append(reply_markup)
     class _OwnerBot:
-        async def send_message(self, chat_id, text, **k): alarms.append(text)
+        async def send_message(self, chat_id, text, **k): pass
+    # the dead-button alert is a BUILDER alarm → it now routes via _alarm (Monitor bot + sink), NOT the
+    # client GM bot (client/builder separation; owner caught the leak 2026-06-30). Capture the _alarm call.
+    alarms = []
+    async def _cap_alarm(context, kind, body, severity="warn"):
+        alarms.append((kind, body))
+    monkeypatch.setattr(bot, "_alarm", _cap_alarm)
     bot._DEAD_TAP_LAST_DM = 0.0
     upd = types.SimpleNamespace(callback_query=_Q2(),
                                 effective_user=types.SimpleNamespace(id=999))
@@ -2768,8 +2774,9 @@ def test_dead_tap_visibility(monkeypatch):
     # recovery button (owner): the collapse carries Open-menu
     assert any(kb and any("Open menu" in b.text for row in kb.inline_keyboard for b in row)
                for kb in kbs)
-    # instant alarm with the time + the button (throttled after the first)
-    assert len(alarms) == 1 and "12:57" in alarms[0] and "legacy:button" in alarms[0]
+    # instant alarm via _alarm → MONITOR (not the GM bot), with the time + the button (throttled after first)
+    assert len(alarms) == 1 and alarms[0][0] == "dead_button" \
+        and "12:57" in alarms[0][1] and "legacy:button" in alarms[0][1]
     asyncio.run(bot._expired_button_callback(upd, types.SimpleNamespace(bot=_OwnerBot())))
     assert len(alarms) == 1
 

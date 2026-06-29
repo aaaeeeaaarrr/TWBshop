@@ -955,6 +955,14 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   measured directly against the window so a LATE arrival on the normal portion can't eat the repayment, and it
   can NEVER bank OT (owner). This is why `core.settle.settle_shift` (the OT path) couldn't score it — a separate
   model was needed.
+- `[gotcha]` **Client/builder LEAK — owner caught it (2026-06-30).** The nightly **[SHADOW] digest**
+  (`_shadow_digest_job`, 21:45) + the **dead-button** alert were still DM'ing the owner via the CLIENT GM bot,
+  not the Monitor — a builder/system message on the client bot (violates the separation law). The s58
+  "alarms → Monitor" move covered the `_alarm()`-routed alarms but NOT these two SEPARATE sends. **Lesson:
+  "route alarms to Monitor" ≠ "route EVERY system send to Monitor" — audit ALL direct owner-DMs, not just the
+  alarm chokepoint.** Fixed: shadow digest → `_monitor_send_sync`; dead-button → `_alarm`. The 4 client-ops
+  DMs (no-show · AL-accrual · pay-restore · AL-escalation) correctly STAY on GM (owner-as-client-manager).
+  Also a reminder to me: don't overstate ("everything goes via X") — verify the full set before claiming it.
 - `[ship]` **D2 `settle` cut-over net WIRED flag-off** (staged) — the highest-money path (OT-banking +
   payback-clearing). `gm_bot/checkin_net.py::settle_via_net` + `_settle_redefined_shift` computes core's
   (pb_cleared, ot_banked) PURELY (settle_payback_slot for a slot / core.settle.settle_shift for a normal day)

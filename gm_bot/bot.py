@@ -1350,10 +1350,12 @@ async def _dead_tap_alarm(context, data: str, uid: int | None) -> None:
         who = ((s.get("call_name") or s["canonical_name"]) if s
                else ("owner" if uid == config.OWNER_TELEGRAM_ID else str(uid)))
     try:
-        await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+        # A dead button is a UI/code-handler BUG = a BUILDER concern → route via the Monitor + sink (_alarm),
+        # not the client GM bot (client/builder separation law).
+        await _alarm(context, "dead_button",
             "🔘 Dead button at %s — %s tapped '%.40s' and nothing could handle it.\n"
             "(recorded for the daily audit; more in the next 30 min are logged only)"
-            % (_now_pp().strftime("%H:%M"), who, data or "?"))
+            % (_now_pp().strftime("%H:%M"), who, data or "?"), severity="warn")
     except Exception:
         pass
 
@@ -6458,7 +6460,9 @@ async def _shadow_digest_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         from core.shadow import build_digest
         d = build_digest("twb")
-        await context.bot.send_message(config.OWNER_TELEGRAM_ID, "📊 [SHADOW] nightly review\n\n" + d["text"])
+        # The shadow digest is a BUILDER/SYSTEM report (cut-over readiness) — route to the MONITOR bot,
+        # NOT the client GM bot (client/builder separation law). Sync send in a thread so the loop never blocks.
+        await asyncio.to_thread(_monitor_send_sync, "📊 [SHADOW] nightly review\n\n" + d["text"])
     except Exception:
         logger.exception("[SHADOW] nightly digest failed (live unaffected)")
 
