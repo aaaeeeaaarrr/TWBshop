@@ -1913,6 +1913,21 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     except Exception:
         _g, _e = ci.GRACE_MIN, ci.EARLY_BONUS_MIN
     state, mins = ci.verdict(now_min, ws, True, grace_min=_g, early_bonus_min=_e)
+    # C2 CUT-OVER NET (owner-gated flip): route the RAW verdict through core.flip so the new platform
+    # engine can become authoritative one flag at a time, with instant auto-revert. FLAG OFF (the
+    # default) → byte-identical to today; FLAG ON → core's parity verdict wins while it agrees, else the
+    # net auto-reverts to the old engine. Grace / points / payback below act on the chosen verdict. See
+    # gm_bot/checkin_net.py for the safety guarantees + the line-by-line parity note.
+    from gm_bot.checkin_net import verdict_via_net
+    state, mins, _flip_reverted = verdict_via_net(now_pp, shift_date, ws, _g, _e, state, mins)
+    if _flip_reverted:
+        try:
+            await _alarm(context, "flip",
+                         "🚨 check-in cut-over AUTO-REVERTED — core's verdict diverged from the live "
+                         "engine past the safety threshold; authority is back on the old engine (no harm "
+                         "done, it reverted itself). Review core_flip_log.", severity="money")
+        except Exception:
+            pass
     # GRACE — a "late" verdict becomes a clean on-time check-in (no late points) when either:
     #  (a) GO-LIVE: the shift started before we flipped live (staff couldn't check in pre-live); or
     #  (b) COME-IN SICK: they have an open own-sick case for today and came in anyway — coming in must

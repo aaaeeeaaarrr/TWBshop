@@ -157,6 +157,8 @@
     · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+222, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
+- `gm_bot/checkin_net.py` — gm_bot.checkin_net — the C2 cut-over BRIDGE: the live check-in verdict routed through core.flip's
+    · verdict_via_net
 - `gm_bot/clarify.py` — Clarification escalation ladder — pure decision logic + text builders.
     · is_checking_phrase, decide_ladder_action, nudge_text, escalation_text
 - `gm_bot/comms.py` — gm_bot.comms — staff comms-responsiveness escalation (owner: 'the GM complains when staff ignore the group').

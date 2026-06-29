@@ -55,6 +55,11 @@ try:
 except Exception:
     # The platform layer is INERT/shadow — a schema/init error here must NEVER block the LIVE gm boot.
     logging.getLogger(__name__).exception("init_core_db/ensure_org failed — continuing without the platform layer")
+from core.flip import init_flip_db
+try:
+    init_flip_db()        # C2: instant-revert net authority + divergence-log tables (additive; inert until a flip)
+except Exception:
+    logging.getLogger(__name__).exception("init_flip_db failed — flip net inert (decide() fail-safes to live)")
 from shared.database import seed_staff_genders
 seed_staff_genders()      # fill the gender column from the owner roster (idempotent; logs unmatched)
 from shared.database import points_seed_catalogue, set_att_test, gm_get_state
