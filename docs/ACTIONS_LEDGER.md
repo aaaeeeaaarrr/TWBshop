@@ -9,6 +9,19 @@
 
 ## Done (with proof)
 
+- **2026-06-29 — C2 FLIP DONE: core engine is now AUTHORITATIVE for live check-in verdicts (HIGH-RISK: live
+  payroll/attendance cut-over; owner go; independent before/after proof).** After the flag-OFF deploy below was
+  verified a no-op, owner chose "Flip now". Ran `core.flip.set_authoritative('twb','checkin',True,'C2 cut-over
+  2026-06-29 owner go')` on prod (~12:06 PP, quiet window; NO restart — `decide()` reads the flag live).
+  **PROOF:** BEFORE (read-only) `is_authoritative('twb','checkin')`=False, 0 divergence rows → FLIP committed →
+  AFTER (independent separate process) `is_authoritative`=**True**; `core_flip` row authoritative=True reason
+  recorded updated_at 05:15:31 UTC; gm still active. Verdict math parity-proven == live for TWB's 5/5 config, so
+  expected zero behaviour change. **SAFETY NET:** auto-reverts to the old engine on sustained divergence
+  (`should_auto_revert` ≥10 samples >10%) + Sentinel `detect_flip_divergence` (WARN before revert) + `_alarm→Monitor`
+  on auto-revert. **▶ INSTANT MANUAL REVERT:** `core.flip.set_authoritative('twb','checkin',False)`. Empirical
+  real-check-in agreement accrues in `core_flip_log` over today's waves (first ~14:00 PP). shadow_run still on
+  (harmless; retire-able). NEXT in the s58 list: F1 exceptions live-wiring (per toggle).
+
 - **2026-06-29 — C2 CHECK-IN CUT-OVER NET DEPLOYED FLAG-OFF + VERIFIED NO-OP (HIGH-RISK: live attendance/payroll
   path; prod deploy; independent post-settlement proof).** The first payroll cut-over wiring (S58 execution-run
   step C2, steps 1–4). Built `gm_bot/checkin_net.py::verdict_via_net` routing the live check-in verdict

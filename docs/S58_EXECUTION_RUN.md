@@ -9,7 +9,7 @@
 > gm PID 1519626 NR=0, clean boot; `is_authoritative('twb','checkin')`=False = byte-identical no-op; suite
 > 1223p/2s). Built `gm_bot/checkin_net.py::verdict_via_net` (routes the RAW verdict through the net; grace /
 > points / payback stay live) + `init_flip_db` at startup + 7 tests; verified parity line-by-line == live for
-> TWB 5/5. **REMAINING = step 5, THE FLIP (owner go).**
+> TWB 5/5. **✅ step 5 THE FLIP DONE 2026-06-29 ~12:06 PP (owner go)** — `set_authoritative('twb','checkin',True)`; independent re-read authoritative=True; no restart; gm active. **INSTANT REVERT: `core.flip.set_authoritative('twb','checkin',False)`.** Watch `core_flip_log` agreement over today's check-in waves.
 **Edit:** `gm_bot/bot.py` live check-in, ~line 1907 where `state, mins = ci.verdict(now_min, ws, True, grace_min=_g, early_bonus_min=_e)`.
 1. Compute core's verdict alongside live's (bridge signatures; `core.attendance.verdict(when_dt, start_dt, tz, grace, early)` — the shadow_hook already does this bridge, reuse it).
 2. Route through the net: `state = flip.decide("twb", "checkin", core_state, state)[0]` (FLAG OFF → returns live `state` → byte-identical; a botched core_state is ignored while off).
