@@ -133,6 +133,17 @@ def quorum_rejected(approvals: list[str], needed: int = APPROVALS_NEEDED) -> boo
     return len([a for a in approvals if a == "not_approve"]) >= needed
 
 
+def payback_to_al_days(owed_minutes: int, shift_len_min: int) -> float:
+    """Convert owed pay-back MINUTES → AL DAYS deducted, for the `payback_to_al` exception (owner rule
+    2026-06-29: proportional to the staffer's OWN scheduled shift — a full missed shift = 1.0 AL day).
+    PURE (no DB). Rounded to 2dp (the AL balance supports fractions, e.g. 0.3). Fail-safe: an unknown /
+    non-positive shift length → 0.0 (never deduct a garbage amount). Used by the live payback_to_al wiring
+    AND its exact reverse on papers-accept, so both sides derive the same number."""
+    if not shift_len_min or int(shift_len_min) <= 0:
+        return 0.0
+    return round(max(0, int(owed_minutes)) / float(int(shift_len_min)), 2)
+
+
 def senior_timers(now, al_start):
     """Dynamic nudge/escalate offsets — scale to time-until-the-AL-starts so the decision
     always lands before it begins. Returns (nudge_after_sec, escalate_after_sec)."""

@@ -53,11 +53,15 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 > `payback_add_debt(...)`, write a `transitions.note` (old='payback debt N min', new='AL −X days'), and do NOT
 > create the debt. **Reversal (S1):** `_wipe_sick_payback` (papers accepted within window) must REFUND the
 > EXACT AL deducted (store the deducted amount on the sick case / a record) instead of crediting a debt.
-> **🔴 BLOCKING — the minutes→AL conversion rule is an OWNER POLICY decision (don't guess; wrong = wrong leave
-> balance):** (a) minutes ÷ that staffer's scheduled shift length (a full missed shift = 1.0 AL; 302/540 ≈
-> 0.56) · (b) minutes ÷ a standard work-day (e.g. 480) · (c) flat 1 AL day per sick occurrence (ignore the
-> minutes) · (d) rounded to the nearest 0.5 AL. Build in a FRESH pass once decided, with a self-red-team +
-> real before/after proof on a staging row (al_left moves correctly, the papers-refund reverses it exactly).
+> **✅ CONVERSION RULE DECIDED (owner 2026-06-29): minutes ÷ that staffer's OWN scheduled shift length** (a
+> full missed shift = 1.0 AL; 302/540 ≈ 0.56). **✅ BUILT + TESTED: the PURE converter `gm_bot.al.payback_to_al_days(owed_minutes, shift_len_min)`** (proportional, 2dp, fail-safe on a bad shift; 3 tests).
+> **REMAINING (HIGH-RISK balance-write — fresh focused pass + self-red-team + staging before/after proof):**
+> (1) wire the 3 live sites — `if payback_to_al: al_deduct(staff, payback_to_al_days(min, shift_len))` +
+> `transitions.note` + SKIP `payback_add_debt`; (2) **exact reversal** for the SICK sites — store the deducted
+> AL on the sick case (additive `al_deducted` column), and `_wipe_sick_payback` (papers accepted) refunds it
+> via `al_adjust_balance(+amt)` + clears it (idempotent); the LATE-arrival site has NO reversal (the deduction
+> stands, like the debt would have). Prove on a staging row: al_left moves by the exact fraction + the
+> papers-refund reverses it exactly + no double-deduct. Default {}/no-`payback_to_al` on prod → no-op.
 
 ## D1 then D2 — money-path flips (HIGH-RISK; D1 first)
 - **D1:** generalize the replay-scorer (`scripts/replay_checkins.py` is the check-in one) to score points/payback/settle candidates on real history (the per-path net for D2 + the fix-bake-off).
