@@ -19,7 +19,10 @@
   expected zero behaviour change. **SAFETY NET:** auto-reverts to the old engine on sustained divergence
   (`should_auto_revert` ≥10 samples >10%) + Sentinel `detect_flip_divergence` (WARN before revert) + `_alarm→Monitor`
   on auto-revert. **▶ INSTANT MANUAL REVERT:** `core.flip.set_authoritative('twb','checkin',False)`. Empirical
-  real-check-in agreement accrues in `core_flip_log` over today's waves (first ~14:00 PP). shadow_run still on
+  real-check-in agreement is **CONFIRMED 2026-06-29 14:46 PP: `core_flip_log` = 119 verdict computations / 0 disagreements** —
+  core decided every real post-flip check-in identically to the old engine (proven live no-op; `[SHADOW]
+  check-in AGREE` corroborates). (Net logs per location-PING not per check-in → the log grows fast;
+  auto-revert reads the last 50 so it's unaffected — a retention/sampling tidy is a deferred minor item.) shadow_run still on
   (harmless; retire-able). NEXT in the s58 list: F1 exceptions live-wiring (per toggle).
 
 - **2026-06-29 — C2 CHECK-IN CUT-OVER NET DEPLOYED FLAG-OFF + VERIFIED NO-OP (HIGH-RISK: live attendance/payroll

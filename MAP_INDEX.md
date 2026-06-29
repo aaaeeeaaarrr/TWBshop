@@ -167,6 +167,8 @@
     · stations_for, window_target, _has_station, on_duty, shortfall, surplus, slot_surplus, slot_score
 - `gm_bot/events.py` — gm_events — append-only audit log for the GM/attendance bot (owner, 2026-06-21).
     · init_events_db, log_event, recent_events
+- `gm_bot/exceptions_live.py` — gm_bot.exceptions_live — F1: the LIVE bridge that reads per-staff EXCEPTIONS (core/exceptions.py) at
+    · exceptions_of, exempt, approver
 - `gm_bot/finance.py` — REPORT-group daily-books parser.
     · _parse_number, _alias_list, _match_field, is_daily_report, parse_report_text, looks_like_report_attempt, lost_exceeds, business_day_for, classify_report, recompute, format_correction, parse_full
 - `gm_bot/flow.py` — Flow-state engine — the foundation under every real attendance ladder (H1, session 28).

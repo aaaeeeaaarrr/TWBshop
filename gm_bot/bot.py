@@ -1552,7 +1552,8 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     checked in (T0/T+5) / checked out. State + sessions in DB so restarts are safe."""
     if not _job_gate(live_only=True):
         return
-    from gm_bot import attendance_ui as ui, checkin as ci
+    from gm_bot import attendance_ui as ui, checkin as ci, exceptions_live
+    from core.exceptions import is_exempt
     now_pp = _now_pp()
     now_min = now_pp.hour * 60 + now_pp.minute
     try:
@@ -1572,6 +1573,12 @@ async def _checkin_scheduler_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         staff = next((s for s in staff_all("active")
                       if (s.get("call_name") or s["canonical_name"]) == name), None)
         if not staff or not (staff.get("telegram_ids") or []):
+            continue
+        # F1 EXCEPTIONS — don't prompt a staffer not expected to clock in, or set to no-nudges / quiet
+        # (default {} = a normal staffer → prompted exactly as today). Generalises the hard-coded
+        # Tyty/Delis skip in compute_day_events.
+        _exc = exceptions_live.exceptions_of(staff["id"])
+        if is_exempt(_exc, "no_attendance") or is_exempt(_exc, "no_nudges") or is_exempt(_exc, "quiet"):
             continue
         uid = staff["telegram_ids"][0]
         sess = att_get_session(staff["id"], sd)
@@ -1866,7 +1873,7 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if update.edited_message:   # live-share lifecycle update (movement/stop) — record silently
         pass
     loc = msg.location
-    from gm_bot import attendance as att, checkin as ci, attendance_ui as ui
+    from gm_bot import attendance as att, checkin as ci, attendance_ui as ui, exceptions_live
     in_zone = att.in_work_zone(loc.latitude, loc.longitude)
     # Judge by the TELEGRAM-STAMPED time, not processing time: if the bot was down/restarting,
     # queued updates arrive late — a punctual staffer must never be marked late (and a stale ping
@@ -1904,6 +1911,12 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if not in_zone:
         if not update.edited_message:
             await msg.reply_text(ui._V_FAR)
+        return True
+    # F1 EXCEPTIONS (per-staff overrides; default {} = a normal staffer → unchanged). `no_attendance` =
+    # this person isn't expected to clock in (owner-family / salaried): the location ping is logged
+    # above, but skip the verdict / check-in / points / payback entirely. Generalises the hard-coded
+    # Tyty/Delis skip that already exists in the scheduler + no-show sweep.
+    if exceptions_live.exempt(staff["id"], "no_attendance"):
         return True
     now_min = now_pp.hour * 60 + now_pp.minute
     try:                                              # config-driven verdict (instant-live); fail-safe to the spec
@@ -4111,10 +4124,13 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     approved leave/sick = no-show → record + points event + owner note (1 day's pay, owner-gated)."""
     if not _job_gate(live_only=True):
         return
-    from gm_bot import attendance_ui as ui
+    from gm_bot import attendance_ui as ui, exceptions_live
     yday = (_today_pp() - timedelta(days=1))
     for p in staff_all("active"):
-        if p.get("org") != "TWB" or p["canonical_name"] == "Tyty":
+        # F1 EXCEPTIONS — generalises the hard-coded Tyty skip: a `no_attendance` staffer (not expected
+        # to clock in) is never flagged a no-show. Default {} = normal staffer → flagged exactly as today.
+        if (p.get("org") != "TWB" or p["canonical_name"] == "Tyty"
+                or exceptions_live.exempt(p["id"], "no_attendance")):
             continue
         nm = p.get("call_name") or p["canonical_name"]
         # Scheduled to START a shift on yday? Ask the ONE resolver DIRECTLY — NOT compute_day_events,

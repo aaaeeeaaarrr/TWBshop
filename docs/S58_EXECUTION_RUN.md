@@ -19,6 +19,14 @@
 6. Revert anytime: `set_authoritative("twb","checkin",False)`.
 
 ## F1 — exceptions live-wiring (per toggle, each its own gate)
+> **⚙ STATUS 2026-06-29 — STARTED (staging, NOT deployed).** Foundation `gm_bot/exceptions_live.py`
+> (fail-safe; default {} = unchanged) + 4 tests. **`no_attendance` gate WIRED** at the check-in handler
+> (`_handle_staff_location`) + scheduler + no-show sweep (generalises the hard-coded Tyty skip). Prod has
+> **0 exceptions set** → deploying the wiring is a no-op; SETTING Tyty/Thyda's exceptions is the
+> owner-gated flip (with a test-mode walk). **DEFERRED (own passes, all mapped):** no_supervisor_posts
+> (27 sites) · no_points/no_lateness (needs audit-invariant handling: zero late-min when exempt) ·
+> no_payback (3 sites) · payback_to_al (HIGH-RISK leave reroute, 2nd-opinion) · al/leave/swap approver
+> overrides (NEW routing build) · no_al/no_ot.
 Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1 (each staging-proven, default=no-change):
 - `no_nudges` → guard the nudge/reminder sends · `no_supervisor_posts` → guard the Supervisors-group post · `no_management_posts` → guard the Management post · `no_attendance`/`no_lateness`/`no_payback`/`no_al`/`no_ot`/`no_points` → guard the respective compute/record · `payback_to_al` → in the payback-debt path, deduct AL instead of booking payback · `*_approver_id` → override the approval routing.
 - Owner's live set first: **Tyty** = vip_exempt (all) · **Thyda** = `no_supervisor_posts` + `payback_to_al` + AL-approver=Tyty (keeps points).

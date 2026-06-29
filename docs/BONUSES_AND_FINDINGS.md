@@ -886,6 +886,24 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[sell]` **"Flip the payroll brain without fear", demonstrated on a LIVE path** — core becomes authoritative one
   flag at a time, byte-identical until proven, with auto-revert on divergence + an instant manual revert + a
   proactive Sentinel `detect_flip_divergence` belt + an `_alarm→Monitor` DM. The cut-over safety story made real.
+- `[ship]` **C2 CONFIRMED on real check-ins** — by 14:46 PP `core_flip_log` = **119 verdict computations,
+  0 disagreements**: the core engine decided every real post-flip check-in identically to the old engine.
+  Live no-op proven on PRODUCTION data, not just by parity analysis.
+- `[gotcha]` **The flip net logs per location-PING, not per check-in** — `verdict_via_net` runs on every
+  in-zone location update (live shares heartbeat every few min), so `core_flip_log` grew 119 rows in a
+  ~20-min wave. Harmless (auto-revert reads the last 50; repeat-ping verdicts are discarded since
+  `first`=False) but the table grows fast → a retention/sampling tidy is a deferred minor item.
+- `[ship]` **F1 started — `no_attendance` gate live-wired (staging, NOT deployed)** — `gm_bot/exceptions_live.py`
+  (fail-safe bridge, 4 tests) + the gate at the check-in handler + scheduler + no-show sweep, generalising
+  the hard-coded Tyty skip. Default {} (0 exceptions on prod) = no-op → deploying changes nothing; SETTING
+  an exception is the flip.
+- `[gotcha]` **F1 `no_points`/`no_lateness` can't just skip `points_record`** — the `/audit` invariant
+  couples late-points to the session's late minutes, so skipping late points while the session still
+  stores late minutes would trip a FALSE audit flag. Correct fix = zero the late minutes when exempt
+  (treat as on-time for penalties). Deferred to a focused pass.
+- `[decision]` **F1 deferred gates** (own passes, mapped): no_supervisor_posts (27 sites) · payback_to_al
+  (HIGH-RISK leave reroute, second-opinion) · al/leave/swap approver overrides (new routing build) ·
+  no_al/no_ot · the audit-coupled no_points/no_lateness.
 
 ### 🔍 Findings
 - **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure
