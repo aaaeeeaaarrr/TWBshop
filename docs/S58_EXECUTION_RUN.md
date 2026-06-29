@@ -26,7 +26,11 @@
 6. Revert anytime: `set_authoritative("twb","checkin",False)`.
 
 ## F1 — exceptions live-wiring (per toggle, each its own gate)
-> **⚙ STATUS 2026-06-29 — STARTED (staging, NOT deployed).** Foundation `gm_bot/exceptions_live.py`
+> **⚙ STATUS 2026-06-29 — ✅ ALL F1 GATES DEPLOYED FLAG-OFF (NO-OP) + VERIFIED LIVE** (tag
+> `session-58-f1-gates-20260629`=`13b683c`; gm NR=0, clean boot; `core_transitions` + `sick_cases.al_deducted`
+> created on prod; **0 exceptions set → byte-identical no-op**; C2 flip intact; suite 1251p). **TO GO LIVE
+> (owner-only):** set Tyty/Thyda exceptions + a TEST-MODE WALK → confirm. History of the build below.
+> Foundation `gm_bot/exceptions_live.py`
 > (fail-safe; default {} = unchanged) + 4 tests. **`no_attendance` gate WIRED** at the check-in handler
 > (`_handle_staff_location`) + scheduler + no-show sweep (generalises the hard-coded Tyty skip). Prod has
 > **0 exceptions set** → deploying the wiring is a no-op; SETTING Tyty/Thyda's exceptions is the

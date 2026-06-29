@@ -9,6 +9,16 @@
 
 ## Done (with proof)
 
+- **2026-06-29 — F1 EXCEPTION GATES DEPLOYED FLAG-OFF (NO-OP) + VERIFIED (HIGH-RISK: live attendance/AL-path
+  prod deploy; independent proof; NO data change).** Deployed all of F1 (no_attendance · no_supervisor_posts ·
+  al_approver_id · payback_to_al · core.transitions) to twbshop-gm by tag `session-58-f1-gates-20260629`=`13b683c`
+  in the 19:21-PP quiet window; only gm restarted (retail/b2b/listener/hire/wizard untouched). **PROOF
+  (independent prod re-read):** gm active PID 1532634 NR=0, clean boot (Scheduler+Application, no traceback/401)
+  · `core_transitions` table + `sick_cases.al_deducted` column created on prod (additive) · **0 staff have
+  exceptions set → byte-identical no-op (no behaviour change for anyone)** · C2 check-in flip still
+  authoritative=True (survived the restart). Suite 1251p. **TO GO LIVE (owner-only):** set Tyty/Thyda exceptions
+  + a test-mode walk → confirm. No data moved (a no-op deploy).
+
 - **2026-06-29 — C2 FLIP DONE: core engine is now AUTHORITATIVE for live check-in verdicts (HIGH-RISK: live
   payroll/attendance cut-over; owner go; independent before/after proof).** After the flag-OFF deploy below was
   verified a no-op, owner chose "Flip now". Ran `core.flip.set_authoritative('twb','checkin',True,'C2 cut-over
