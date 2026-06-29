@@ -907,10 +907,23 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   no-show · own-sick · late-reason · reason-nudge · AL-approved · payback-booked); 4 gate tests. Suppresses in
   test mode too, so a test-mode walk faithfully shows the exemption. The clean pattern for "suppress an output
   about an entity" = one chokepoint gate + a per-call subject id (not N scattered guards).
-- `[decision]` **F1 STILL deferred** (own passes): the RARE no_supervisor_posts sites (death/birth leave ·
-  supersession announces ×8 · OT-rest · swap · family-status · callout — finish before Thyda go-live) ·
-  payback_to_al (HIGH-RISK leave reroute, second-opinion) · al/leave/swap approver overrides (new routing) ·
-  no_al/no_ot · the audit-coupled no_points/no_lateness.
+- `[ship]` **F1 `al_approver_id` WIRED** (Thyda's "AL approved only by Tyty") — `_approvers_for(staff_id, kind)`
+  routes the AL card to the override approver (or the senior ladder; self/unreachable → ladder) at all 3 AL sites
+  (cards · recap · re-ping); the PURE `_al_authz()` makes the override approver the SOLE decider with quorum=1
+  (else ladder + normal quorum); the callback's `is_senior` gate was relaxed so a NON-senior override approver
+  can still decide. 6 tests. **GOTCHA found:** it's NOT a routing swap — the approval callback `is_senior` gate
+  + the `approvals_needed` quorum both had to become override-aware, else the override approver couldn't approve
+  / a 2nd senior would still be required.
+- `[ship]` **`core/transitions.py` — universal OLD-vs-NEW cut-over comparison log (OWNER LAW 2026-06-29:**
+  "keep older data in notes, that way you can compare everything if the transitions went well, not only AL,
+  every tiny bit of transition"). `note(org, kind, key, old, new, matched, detail)` → `core_transitions`,
+  append-only + best-effort; `summary()` = the one-glance "did it go well?". Generalises the check-in flip's
+  `core_flip_log` (119/0) to EVERY transition. al_approver_id writes routing + decision notes; `init_transitions_db`
+  at gm startup; 3 tests. **NEXT: retrofit the F1 exemption gates to log would-have-happened vs suppressed.**
+- `[decision]` **F1 STILL deferred** (own passes): payback_to_al (HIGH-RISK leave reroute, second-opinion) ·
+  leave/swap approver overrides · the RARE no_supervisor_posts sites (death/birth leave · supersession announces
+  ×8 · OT-rest · swap · family-status · callout — finish before Thyda go-live) · no_al/no_ot · the audit-coupled
+  no_points/no_lateness · the F1-gate transition-note retrofit.
 
 ### 🔍 Findings
 - **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure

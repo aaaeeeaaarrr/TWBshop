@@ -41,6 +41,21 @@ def test_supervisor_post_suppressed_for_exempt_subject(monkeypatch):
     assert msg is None and fb.calls == 0          # suppressed before any send
 
 
+def test_suppressed_post_writes_a_transition_note(monkeypatch):
+    """Owner law: a suppressed post still records an OLD-vs-NEW note so the transition is provable."""
+    org = _setup(monkeypatch)
+    sid = add_staff_manual(org, name="Thyda")
+    ex.set_exceptions(org, sid, {"no_supervisor_posts": True})
+    from core import transitions
+    transitions.init_transitions_db()
+    marker = "MARKER_suppost_%d" % sid                 # unique per run (sid increments) → no accumulation hit
+    asyncio.run(bot._att_send(_ctx(_FakeBot()), None, "Supervisors group", "", marker,
+                              group=True, subject_staff_id=sid))
+    # the note lands under the LIVE tenant 'twb' (the gate hardcodes it), carrying the suppressed text
+    rows = transitions.recent("twb", "exempt:no_supervisor_posts", n=100)
+    assert any(r["old_val"] == marker and r["new_val"] == "suppressed" for r in rows)
+
+
 def test_supervisor_post_sent_for_normal_subject(monkeypatch):
     org = _setup(monkeypatch)
     sid = add_staff_manual(org, name="Normal")

@@ -4,6 +4,13 @@
 > quality degrades on a long session (s58 already leaked test DMs from fatigue). Fresh context = sharp.
 > Everything below is net-ready; this is execution, not investigation. Do 1-by-1; gate + verify each.
 
+> **▶▶ TRANSITION-COMPARISON LAW (owner, 2026-06-29):** keep OLD-vs-NEW data recorded for EVERY transition
+> (not only AL — every tiny bit), so each cut-over is provable by comparison, never trusted on its word.
+> Mechanism: `core/transitions.py::note(org, kind, key, old, new, matched, detail)` → `core_transitions`
+> (+ `core_flip_log` for flipped paths). Each gate/reroute writes a note; `transitions.summary()` answers
+> "did it go well?". C2 = `core_flip_log` (119/0); al_approver_id writes routing + decision notes; the F1
+> exemption gates = retrofit to log would-have-happened vs suppressed. Memory: keep-transition-comparison-data.
+
 ## C2 — check-in verdict cut-over (the safe first flip; net-ready)
 > **✅ STATUS 2026-06-29 — steps 1–4 DONE + VERIFIED LIVE** (tag `session-58-c2-checkin-net-20260629`=`340f017`;
 > gm PID 1519626 NR=0, clean boot; `is_authoritative('twb','checkin')`=False = byte-identical no-op; suite

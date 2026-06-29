@@ -1536,6 +1536,13 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
             from gm_bot import exceptions_live
             _ex_key = "no_management_posts" if "Management" in (role or "") else "no_supervisor_posts"
             if exceptions_live.exempt(subject_staff_id, _ex_key):
+                try:    # transition log (owner law): record WHAT we're suppressing, for old-vs-new compare
+                    from core import transitions
+                    transitions.note("twb", "exempt:%s" % _ex_key, subject_staff_id,
+                                     old=(text or "")[:200], new="suppressed",
+                                     detail="%s group post" % role)
+                except Exception:
+                    pass
                 return None
         except Exception:
             pass
@@ -1930,6 +1937,14 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     # above, but skip the verdict / check-in / points / payback entirely. Generalises the hard-coded
     # Tyty/Delis skip that already exists in the scheduler + no-show sweep.
     if exceptions_live.exempt(staff["id"], "no_attendance"):
+        try:    # transition log (owner law): record the OLD path's verdict we're now SKIPPING (old-vs-new)
+            from core import transitions
+            _ost, _omn = ci.verdict(now_pp.hour * 60 + now_pp.minute, ws, True)
+            transitions.note("twb", "exempt:no_attendance", staff["id"],
+                             old="would record check-in (verdict=%s, mins=%d)" % (_ost, _omn),
+                             new="skipped — not tracked", detail=str(shift_date))
+        except Exception:
+            pass
         return True
     now_min = now_pp.hour * 60 + now_pp.minute
     try:                                              # config-driven verdict (instant-live); fail-safe to the spec
@@ -3134,6 +3149,33 @@ def _seniors(exclude_staff_id: int | None = None) -> list[dict]:
             and (s.get("telegram_ids") or [])]   # TWB seniors only — attendance never mixes locations
 
 
+def _approvers_for(staff_id: int, kind: str = "al") -> list[dict]:
+    """Who decides this staffer's request. Default = the senior ladder (excluding them). F1: if they have
+    an approver OVERRIDE exception (al/leave/swap_approver_id) pointing to a reachable OTHER active staffer,
+    route ONLY to that one person. Fail-safe (override missing / unreachable / pointing at self) → the ladder."""
+    try:
+        from gm_bot import exceptions_live
+        ov = exceptions_live.approver(staff_id, kind)
+        if ov:
+            who = next((s for s in staff_all("active")
+                        if s["id"] == ov and s["id"] != staff_id and (s.get("telegram_ids") or [])), None)
+            if who:
+                return [who]
+    except Exception:
+        pass
+    return _seniors(exclude_staff_id=staff_id)
+
+
+def _al_authz(sen_id: int, sen_is_senior: bool, requester_is_senior: bool, override_approver_id) -> tuple:
+    """PURE: (authorized, needed) for an AL decision by sen_id. F1: an al_approver_id override means ONLY
+    that approver may decide and ONE approval finalises; otherwise any senior with the normal quorum
+    (2, or 1 if the requester is a senior). The caller enforces can't-approve-own BEFORE this."""
+    from gm_bot import al as alm
+    if override_approver_id:
+        return (sen_id == override_approver_id), 1
+    return bool(sen_is_senior), alm.approvals_needed(bool(requester_is_senior))
+
+
 def _al_availability_lines(requester: dict, days: list[str],
                            hours_start: str | None = None, hours_end: str | None = None) -> str:
     """Per AL day: who works the AL HOURS that day — the requester's full shift, or for an hours-AL
@@ -3260,7 +3302,20 @@ async def submit_al_request(context, requester: dict, kind: str, days: list[str]
     # the hours window for an hours-AL. Coverage ("Working those hours") opens via the Show toggle.
     req = al_get_request(req_id)
     cards = context.bot_data.setdefault("al_cards", {}).setdefault(req_id, [])
-    for sen in _seniors(exclude_staff_id=requester["id"]):
+    approvers = _approvers_for(requester["id"], "al")
+    # F1 + transition log (owner law: keep old-vs-new for every cut-over): when routing is OVERRIDDEN to a
+    # single approver, record who the OLD senior-ladder path would have notified vs the NEW override.
+    try:
+        from gm_bot import exceptions_live
+        if exceptions_live.approver(requester["id"], "al"):
+            from core import transitions
+            transitions.note("twb", "route:al_approver", req_id,
+                             old=[s["id"] for s in _seniors(exclude_staff_id=requester["id"])],
+                             new=[a["id"] for a in approvers],
+                             detail="AL #%s approval routed to the al_approver_id override" % req_id)
+    except Exception:
+        pass
+    for sen in approvers:
         # senior id encoded so a test-mode tap (by the owner) is attributed to THIS senior
         uid = (sen.get("telegram_ids") or [None])[0]
         body, kb = _al_card(req, requester, audience="senior", sen_id=sen["id"], show_cov=False)
@@ -3310,7 +3365,7 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         sen = staff_get_by_uid(update.effective_user.id)
         actor_uid = update.effective_user.id
-    if not sen or not sen.get("is_senior"):
+    if not sen:
         return
     req = al_get_request(int(req_s))
     if not req or req["status"] != "pending":
@@ -3321,7 +3376,28 @@ async def _al_approval_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
     from gm_bot import al as alm
     requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
-    needed = alm.approvals_needed(bool(requester and requester.get("is_senior")))
+    # F1 al_approver_id: an approver OVERRIDE means ONLY that person may decide (one approval finalises);
+    # otherwise the normal senior ladder + quorum. Authorize HERE (after req is known) — the is_senior gate
+    # that used to sit above moved into this check so a NON-senior override approver can still decide.
+    from gm_bot import exceptions_live
+    _ov = exceptions_live.approver(req["staff_id"], "al")
+    authorized, needed = _al_authz(sen["id"], bool(sen.get("is_senior")),
+                                   bool(requester and requester.get("is_senior")), _ov)
+    if not authorized:
+        if _ov:
+            await query.answer("Only the assigned approver can decide this AL · "
+                               "មានតែអ្នកអនុម័តដែលបានកំណត់អាចសម្រេចបាន", show_alert=True)
+        return
+    if _ov:   # transition note (owner law): this AL is decided via the override, not the senior ladder
+        try:
+            from core import transitions
+            transitions.note("twb", "route:al_approver", int(req_s),
+                             old="senior-ladder quorum=%d" % alm.approvals_needed(
+                                 bool(requester and requester.get("is_senior"))),
+                             new="override approver %s decided=%s (quorum=1)" % (_ov, decision),
+                             detail="AL #%s decided via al_approver_id override" % req_s)
+        except Exception:
+            pass
     decisions = al_add_approval(int(req_s), sen["id"], actor_uid, decision)
     await query.edit_message_text(query.message.text + "\n\n✓ You voted: %s" % decision)
     if decision == "not_approve":
@@ -3548,7 +3624,7 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
         except Exception:
             pass
     if not edited:   # card refs lost (e.g. a restart) → one recap so seniors still see the outcome
-        for sen in _seniors(exclude_staff_id=req["staff_id"]):
+        for sen in _approvers_for(req["staff_id"], "al"):
             b, k = _al_card(req2, requester, audience="senior", sen_id=sen["id"], show_cov=False)
             await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                             sen.get("call_name") or sen["canonical_name"], b, kb=k, parse_mode="HTML")
@@ -6346,7 +6422,7 @@ async def _al_reping_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 existing = {p["senior_uid"]: p for p in al_pings_for(req["id"])}
                 ping_no, sent = pings_done + 1, 0
                 requester = next((s for s in staff_all("active") if s["id"] == req["staff_id"]), None)
-                for sen in _seniors(exclude_staff_id=req["staff_id"]):
+                for sen in _approvers_for(req["staff_id"], "al"):
                     uid = (sen.get("telegram_ids") or [None])[0]
                     if not uid or uid in responded:          # skip no-uid + anyone who already decided
                         continue

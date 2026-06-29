@@ -60,6 +60,11 @@ try:
     init_flip_db()        # C2: instant-revert net authority + divergence-log tables (additive; inert until a flip)
 except Exception:
     logging.getLogger(__name__).exception("init_flip_db failed — flip net inert (decide() fail-safes to live)")
+from core.transitions import init_transitions_db
+try:
+    init_transitions_db()  # owner law: OLD-vs-NEW comparison log for every cut-over (additive; written by gates)
+except Exception:
+    logging.getLogger(__name__).exception("init_transitions_db failed — transition notes off (best-effort)")
 from shared.database import seed_staff_genders
 seed_staff_genders()      # fill the gender column from the owner roster (idempotent; logs unmatched)
 from shared.database import points_seed_catalogue, set_att_test, gm_get_state
