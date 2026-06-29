@@ -181,6 +181,30 @@ Preview anytime without changing anything: `scripts/checkpoint.ps1 -DryRun`. Sta
 
 ---
 
+## Pre-/clear & Pre-/compact — leave nothing to the ants (standing rule, owner 2026-06-29)
+
+Whenever I JUDGE it's the right time to **/clear** or **/compact**, AUTO-run this checklist FIRST (leave
+nothing behind), then in ONE message say **"✅ Ready to /clear"** (or **/compact**) + the proof + the
+**EXACT command to type after** to continue:
+1. Commit ALL changes (code + docs), clear messages.
+2. pull --rebase → push; VERIFY clean: `git status` empty · `git log origin/main..HEAD` empty · local==origin SHA.
+3. Update **Current Status** + the **▶▶ RESUME HERE** pointer to the true state + next step.
+4. Every pending/parked/in-flight item + open real-data instruction is in the durable docs
+   (`docs/PENDING_WORK.md` / `docs/ACTIONS_LEDGER.md` / the design doc) — nothing living only in chat.
+5. If code was deployed: verify LIVE (server HEAD==origin · service active · running code carries it).
+6. Run freshness guards if files changed (`scripts/gen_map_index.py`, etc.).
+
+**What to type after:** /clear → an explicit re-entry command (the docs carry state; e.g. "run the s58
+execution list" / "what's next"). /compact → usually "continue" / "keep going".
+**/clear vs /compact:** /clear at a clean milestone, or before HIGH-RISK / precision / unrelated work
+(fresh = sharpest). /compact mid-task when the thread must continue WITH its history.
+**HONEST — NOT literal-100%:** the harness can AUTO-compact without giving me a turn, so the real
+guarantee is **CONTINUOUS persistence** (commit + push + doc AS I work — Rule 3 "files are truth") so any
+instant is already safe; the checklist is the belt, continuous-persistence the suspenders. Never claim
+zero-fault 100%.
+
+---
+
 ## Operational Instructions — never drop a real-data change
 
 Real-data instructions (clear/adjust **payback**, deduct/add **AL**, change a **balance**, **staff
