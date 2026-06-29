@@ -154,7 +154,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+221, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+222, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/clarify.py` — Clarification escalation ladder — pure decision logic + text builders.
@@ -285,9 +285,9 @@
 - `scripts/monitor.py` — monitor.py - read-only lanes + service watcher (v1).
     · _git, worktrees, lane_board, service_health, anomalies, issues, fmt, _token, notify, main
 - `scripts/monitor_bot.py` — monitor_bot.py — interactive owner-only dashboard over @TWB_Monitor_bot.
-    · _owner, _fmt_lanes, _fmt_services, cmd_start, cmd_board, cmd_health, cmd_issues, _is_repo_event, _read_events, _ev_line, cmd_crossings, cmd_audit, _events_tick, _watch_tick, _on_start  …(+1, grep)
+    · _owner, _fmt_lanes, _fmt_services, cmd_start, cmd_alarms, cmd_board, cmd_health, cmd_issues, _is_repo_event, _read_events, _ev_line, cmd_crossings, cmd_audit, _events_tick, _watch_tick  …(+2, grep)
 - `scripts/morning_report.py` — Morning report (B3 generator) — a READ-ONLY digest of the platform's overnight state, so Claude / the
-    · build_report, main
+    · build_report, _send_to_owner, main
 - `scripts/ocr_catalogue.py` — Batch-classify every archived report photo with the PRODUCTION OCR function
     · classify, run
 - `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.
