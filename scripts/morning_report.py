@@ -70,9 +70,40 @@ def build_report(org_id: str = "twb") -> str:
     return "\n".join(out)
 
 
+def _send_to_owner(text: str) -> bool:
+    """Best-effort DM the digest to the owner via the gm bot (the nightly cron's --send). A standalone HTTP
+    POST so it needs no async/PTB; truncates to Telegram's limit; never raises. Reads the token from config
+    (does NOT write secrets)."""
+    import json as _json
+    import urllib.parse
+    import urllib.request
+    try:
+        import config
+        token = getattr(config, "GM_BOT_TOKEN", None)
+        owner = getattr(config, "OWNER_TELEGRAM_ID", None)
+        if not token or not owner:
+            print("(--send: no GM_BOT_TOKEN / OWNER_TELEGRAM_ID set)")
+            return False
+        body = text if len(text) <= 4000 else (text[:3950] + "\n…(truncated — run morning_report.py for full)")
+        data = urllib.parse.urlencode({"chat_id": owner, "text": body}).encode()
+        with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % token,
+                                    data=data, timeout=20) as r:
+            ok = _json.load(r).get("ok")
+        print("(--send: delivered to owner)" if ok else "(--send: Telegram returned not-ok)")
+        return bool(ok)
+    except Exception as e:
+        print("(--send failed: %s)" % e)
+        return False
+
+
 def main() -> int:
-    org = sys.argv[1] if len(sys.argv) > 1 else "twb"
-    print(build_report(org))
+    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    org = args[0] if args else "twb"
+    report = build_report(org)
+    print(report)
+    if "--send" in flags:
+        _send_to_owner(report)        # the nightly cron uses this; without --send it's just read-only print
     return 0
 
 
