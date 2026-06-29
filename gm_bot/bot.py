@@ -1984,10 +1984,13 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
     if first:
         _gm_log("checkin", staff["id"], detail={"date": shift_date, "state": state,
                                                 "late": late, "early": early})
-        # record raw points events (values derived later — owner-tuned; nothing connected yet)
+        # record raw points events (values derived later — owner-tuned). Built as a LIST, then routed
+        # through the D2 POINTS cut-over net (core.flip 'points'): FLAG OFF (default) = exactly live's
+        # events (byte-identical); FLAG ON = core.points owns them (parity-locked, auto-reverts on divergence).
         try:
+            off = None
             if state == "early":
-                points_record(staff["id"], "early_arrival", 1, shift_date)
+                _live_pts = [("early_arrival", 1)]
             elif state == "late":
                 # the DECLARATION TIME splits the minutes (owner, Jun 11): already-late minutes
                 # before declaring stay −2/min; minutes after the declaration are −1/min;
@@ -1995,16 +1998,27 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
                 from shared.database import late_declared_at
                 from gm_bot.points import split_late
                 dec = late_declared_at(staff["id"], shift_date)
-                off = None
                 if dec is not None:
                     sd0 = datetime.fromisoformat(str(shift_date)).replace(
                         tzinfo=finance.PP_TZ) + timedelta(minutes=ws)
                     off = int((dec.astimezone(finance.PP_TZ) - sd0).total_seconds() // 60)
                 un_min, inf_min = split_late(late, off)
-                if un_min:
-                    points_record(staff["id"], "late_uninformed", un_min, shift_date)
-                if inf_min:
-                    points_record(staff["id"], "late_informed", inf_min, shift_date)
+                _live_pts = ([("late_uninformed", un_min)] if un_min else []) \
+                    + ([("late_informed", inf_min)] if inf_min else [])
+            else:
+                _live_pts = []
+            from gm_bot.checkin_net import points_via_net
+            _pts, _pts_reverted = points_via_net(state, late, early, off, _live_pts)
+            if _pts_reverted:
+                try:
+                    await _alarm(context, "flip", "🚨 points cut-over AUTO-REVERTED — core's points diverged "
+                                 "from the live engine; authority is back on the old engine. Review core_flip_log.",
+                                 severity="money")
+                except Exception:
+                    pass
+            for _cause, _qty in _pts:
+                if _qty:
+                    points_record(staff["id"], _cause, _qty, shift_date)
         except Exception:
             pass
     if first and not update.edited_message:

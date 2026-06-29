@@ -47,3 +47,19 @@ def verdict_via_net(now_dt, shift_date, ws: int, grace_min: int, early_bonus_min
         return state, mins, reverted
     except Exception:
         return live_state, live_mins, False
+
+
+def points_via_net(state, late_min, early_min, declare_offset_min, live_events, org_id: str = "twb"):
+    """D2 (points cut-over): route the check-in POINTS events through core.flip.decide for (org_id,
+    'points'). Returns (events, auto_reverted). FLAG OFF (the default) → (live_events, False) byte-identical
+    to today. FLAG ON → core.points.checkin_points (parity-locked to gm_bot.points) is authoritative, with
+    auto-revert on divergence. Fail-safe: ANY error → live_events. `live_events` / the result are a list of
+    (cause, quantity) for points_record. core's vocab matches live ('early'/'late'/'ontime' → [] for ontime)."""
+    try:
+        from core import flip
+        from core.points import checkin_points
+        core_events = checkin_points(state, int(late_min or 0), int(early_min or 0), declare_offset_min)
+        chosen, reverted = flip.decide(org_id, "points", core_events, live_events)
+        return chosen, reverted
+    except Exception:
+        return live_events, False

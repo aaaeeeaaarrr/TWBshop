@@ -70,6 +70,13 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 > papers-refund reverses it exactly + no double-deduct. Default {}/no-`payback_to_al` on prod → no-op.
 
 ## D1 then D2 — money-path flips (HIGH-RISK; D1 first)
+> **⚙ STATUS 2026-06-29 — D2 `points` net WIRED FLAG-OFF (staged, NOT deployed).** `gm_bot/checkin_net.py::points_via_net`
+> routes the check-in points events through `core.flip.decide('twb','points',…)` (parallel to C2); the bot.py
+> points block builds the events list → routes → records the chosen list (+ auto-revert alarm). FLAG OFF =
+> byte-identical; FLAG ON = core.points owns points (parity-locked). 6 tests. Owner flip: `set_authoritative('twb','points',True)`.
+> **Note: D1 (the replay-scorer) is LOW value** — the money-math (`core.points`/`settle`/`ledger`) is already
+> parity-locked + the flip-net already supports those paths, so D2 can flip each directly (net auto-reverts).
+> points = lowest-value path (parity + derives from the flipped verdict); payback/settle = higher-value, more complex.
 - **D1:** generalize the replay-scorer (`scripts/replay_checkins.py` is the check-in one) to score points/payback/settle candidates on real history (the per-path net for D2 + the fix-bake-off).
 - **D2:** net + flip each, 1-by-1: recording → points → payback → settle. Each: per-path net (D1) → staging before/after on a real row → flag-off deploy → flip → watch. Auto-reverts on divergence.
 

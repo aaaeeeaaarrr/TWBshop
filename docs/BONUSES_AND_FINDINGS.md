@@ -940,6 +940,14 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[decision]` **F1 STILL deferred** (own passes): leave/swap approver overrides · rare no_supervisor_posts sites
   (death/birth · supersession ×8 · OT-rest · swap · family-status · callout) · no_al/no_ot · audit-coupled
   no_points/no_lateness · the F1-gate transition-note retrofit. (al_approver_id + payback_to_al now DONE.)
+- `[ship]` **D2 `points` cut-over net WIRED FLAG-OFF** (staged) — `gm_bot/checkin_net.py::points_via_net` routes
+  the check-in points events through `core.flip.decide('twb','points',…)`, parallel to C2; the bot.py points block
+  builds the event LIST → routes → records the chosen list. FLAG OFF = byte-identical; FLAG ON = core.points owns
+  points (parity-locked, auto-reverts). 6 tests. The flip is owner-gated (`set_authoritative('twb','points',True)`).
+- `[decision]` **D1 replay-scorer is LOW value, D2 flips directly.** The money-math (`core.points`/`settle`/`ledger`)
+  is already parity-locked + the flip-net already supports points/payback/settle, so D2 wires each path through the
+  net flag-off (like C2) and the owner flips — no separate replay/scoring step needed. points = lowest-value D2 path
+  (parity + derives from the already-flipped verdict); payback/settle = higher-value but more complex/HIGH-RISK.
 
 ### 🔍 Findings
 - **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure
