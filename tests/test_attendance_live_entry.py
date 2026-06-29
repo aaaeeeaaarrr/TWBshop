@@ -475,7 +475,7 @@ def test_al_finalize_edits_cards_in_place(monkeypatch):
                         g.__setitem__("status", "approved") or 5)
     monkeypatch.setattr(bot, "_seniors", lambda exclude_staff_id=None: [])
 
-    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None, **k):
         roles.append(role)
 
     monkeypatch.setattr(bot, "_att_send", _send)
@@ -530,7 +530,7 @@ def test_swap_apply_edits_senior_cards(monkeypatch):
         {"id": 2, "canonical_name": "Par", "call_name": "Par", "telegram_ids": [22]}])
     monkeypatch.setattr(bot, "dayoff_set_override", lambda *a, **k: None)
 
-    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None, **k):
         roles.append(role)
 
     monkeypatch.setattr(bot, "_att_send", _send)
@@ -616,7 +616,7 @@ def test_hours_al_shows_time_in_verdict_and_reminder(monkeypatch):
 
     monkeypatch.setattr(bot, "al_approve_and_deduct", _approve)
 
-    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None):
+    async def _send(ctx, to_uid, role, to_name, text, kb=None, group=False, parse_mode=None, **k):
         texts.append((role, text))
 
     monkeypatch.setattr(bot, "_att_send", _send)

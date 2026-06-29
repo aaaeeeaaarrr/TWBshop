@@ -901,8 +901,15 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   couples late-points to the session's late minutes, so skipping late points while the session still
   stores late minutes would trip a FALSE audit flag. Correct fix = zero the late minutes when exempt
   (treat as on-time for penalties). Deferred to a focused pass.
-- `[decision]` **F1 deferred gates** (own passes, mapped): no_supervisor_posts (27 sites) · payback_to_al
-  (HIGH-RISK leave reroute, second-opinion) · al/leave/swap approver overrides (new routing build) ·
+- `[ship]` **F1 no_supervisor_posts MECHANISM + 10 main sites** — the gate lives in ONE place (`_att_send`,
+  the send chokepoint): a GROUP post that passes `subject_staff_id` is suppressed if that staffer is exempt;
+  the ~90 other `_att_send` calls (subject=None) are untouched. Converted Thyda's day-to-day posts (sick ×4 ·
+  no-show · own-sick · late-reason · reason-nudge · AL-approved · payback-booked); 4 gate tests. Suppresses in
+  test mode too, so a test-mode walk faithfully shows the exemption. The clean pattern for "suppress an output
+  about an entity" = one chokepoint gate + a per-call subject id (not N scattered guards).
+- `[decision]` **F1 STILL deferred** (own passes): the RARE no_supervisor_posts sites (death/birth leave ·
+  supersession announces ×8 · OT-rest · swap · family-status · callout — finish before Thyda go-live) ·
+  payback_to_al (HIGH-RISK leave reroute, second-opinion) · al/leave/swap approver overrides (new routing) ·
   no_al/no_ot · the audit-coupled no_points/no_lateness.
 
 ### 🔍 Findings

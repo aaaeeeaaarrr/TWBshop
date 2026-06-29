@@ -1519,13 +1519,26 @@ async def _note_staff_send_failure(context, target, role: str) -> None:
 
 
 async def _att_send(context, to_uid, role: str, to_name: str, text: str,
-                    kb=None, group: bool = False, parse_mode: str | None = None):
+                    kb=None, group: bool = False, parse_mode: str | None = None,
+                    subject_staff_id=None):
     """THE single outbound chokepoint for attendance messages (rule: test == prod, route only).
     - test mode: deliver to the OWNER, labeled [→ role: name], buttons kept functional so the
       owner taps as that role.
     - live: deliver to the real recipient (to_uid, or the Supervisors group when group=True).
     Transient Telegram errors are retried with backoff; a BURST of live failures alarms the owner
-    (A2, session 58 — the Heng silent-drop class)."""
+    (A2, session 58 — the Heng silent-drop class).
+
+    F1 EXCEPTIONS: pass `subject_staff_id` for a GROUP post ABOUT one staffer → the post is SUPPRESSED
+    (in test AND live) if they're exempt (no_supervisor_posts, or no_management_posts for a Management
+    post). subject_staff_id=None — the default at every un-converted call site — posts exactly as today."""
+    if group and subject_staff_id is not None:
+        try:
+            from gm_bot import exceptions_live
+            _ex_key = "no_management_posts" if "Management" in (role or "") else "no_supervisor_posts"
+            if exceptions_live.exempt(subject_staff_id, _ex_key):
+                return None
+        except Exception:
+            pass
     from gm_bot.attendance import strip_khmer
     if _att_test_mode():
         # everything routes to the OWNER in test → English-only by default. /testkhmer on keeps the
@@ -3574,7 +3587,8 @@ async def _al_finalize(context, req: dict, approved: bool) -> None:
             if (new_bal is not None and new_bal < 0) else ""
         await _att_send(context, None, "Supervisors group", "",
             "%s on leave: %s.\nReason: %s\nNormal day off: %s\nBack at work: %s.%s"
-            % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True)
+            % (name, span_note, req.get("reason") or "—", day_off, back, warn), group=True,
+            subject_staff_id=requester["id"])
         # schedule model: if this AL stood down a senior shift-redefine, tell that senior + supervisors
         # so coverage is re-arranged by a human (never a silent revoke). For an A2 move OR a day-off SWAP
         # the AL COEXISTS (owner, Jun 15: AL never cancels a trade — the partner already gave/took their
@@ -3720,7 +3734,7 @@ async def _payback_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         # plain Supervisors notice
         await _att_send(context, None, "Supervisors group", "",
             "%s pays back %s." % (staff.get("call_name") or staff["canonical_name"], when),
-            group=True)
+            group=True, subject_staff_id=staff["id"])
 
 
 async def _payback_ladder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3978,7 +3992,7 @@ async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s is well enough to return TOMORROW — %s.\n"
             "FYI: %s នឹងវិលត្រឡប់មកធ្វើការវិញនៅថ្ងៃស្អែក — %s។"
-            % (nm, when, nm, when), group=True)
+            % (nm, when, nm, when), group=True, subject_staff_id=case["staff_id"])
     elif action == "no":
         # owner (Jun 11): no one-tap stay-out — the reason is typed and the Supervisors read it
         _arm_sick_explain(context, update, "sret_exp", case_id, case["staff_id"])
@@ -3993,7 +4007,7 @@ async def _sick_return_callback(update: Update, context: ContextTypes.DEFAULT_TY
                                       % (_fmt_min(m), _fmt_min(m)))
         await _att_send(context, None, "Supervisors group", "",
             "FYI: %s is coming in TODAY at %s.\nFYI: %s នឹងមកធ្វើការថ្ងៃនេះ ម៉ោង %s។"
-            % (nm, _fmt_min(m), nm, _fmt_min(m)), group=True)
+            % (nm, _fmt_min(m), nm, _fmt_min(m)), group=True, subject_staff_id=case["staff_id"])
 
 
 async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4032,7 +4046,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 "រក្សាទុករួច ✓ — ថ្ងៃឈឺរបស់អ្នកបានបញ្ជាក់ហើយ។ សូមឱ្យឆាប់ជាសះស្បើយ 🤍")
             await _att_send(context, None, "Supervisors group", "",
                 "FYI: %s is on covered sick leave for %d day(s).\nFYI: %s សុំច្បាប់ឈឺមានឯកសារ %d ថ្ងៃ។"
-                % (nm0, days, nm0, days), group=True)
+                % (nm0, days, nm0, days), group=True, subject_staff_id=case["staff_id"])
         else:
             # no cover — the pay-back created at declaration just stands (don't spell it out to them)
             sick_set(case_id, status="provisional")
@@ -4066,7 +4080,7 @@ async def _sick_paper_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await _att_send(context, None, "Supervisors group", "",
             "%s is coming on LIGHT DUTY today — please give easy/seated work only.\n"
             "%s នឹងមកធ្វើ LIGHT DUTY ថ្ងៃនេះ — សូមឱ្យធ្វើតែការងារងាយៗ/អង្គុយប៉ុណ្ណោះ។"
-            % (_ldn, _ldn), group=True)
+            % (_ldn, _ldn), group=True, subject_staff_id=case["staff_id"])
     elif sub == "rest":
         await query.edit_message_text("Get well 🤍 rest today.\nសូមឱ្យឆាប់ជាសះស្បើយ 🤍 សម្រាកថ្ងៃនេះ។")
 
@@ -4166,7 +4180,8 @@ async def _no_show_sweep_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 pass
             await _att_send(context, None, "Supervisors group", "",   # informational (decided next morning)
                 "🚫 No-show: %s did not come for %s's shift.\n🚫 អវត្តមាន៖ %s មិនបានមកធ្វើការវេន %s។"
-                % (nm, yday.strftime("%a %d/%m"), nm, yday.strftime("%a %d/%m")), group=True)
+                % (nm, yday.strftime("%a %d/%m"), nm, yday.strftime("%a %d/%m")), group=True,
+                subject_staff_id=p["id"])
 
 
 async def _sick_papers_deadline_job(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4282,7 +4297,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
     _snm = persona.get("call_name") or persona["canonical_name"]
     await _att_send(context, None, "Supervisors group", "",
         "FYI: %s is out sick today.\nFYI: %s សុំច្បាប់ឈឺថ្ងៃនេះ។\nReason · មូលហេតុ៖ %s"
-        % (_snm, _snm, reason), group=True)
+        % (_snm, _snm, reason), group=True, subject_staff_id=persona["id"])
     _gm_log("sick_filed", persona.get("id"), detail={"date": date_iso, "reason": reason,
                                                       "late_mins": _late_inform_mins})
     # LATE INFORMING (owner, Jun 16): own-sick reported within 30 min of shift start / after it = −15,
@@ -4344,7 +4359,7 @@ async def _reason_nudge_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                             "FYI: %s is still resting — NOT back tomorrow.\n"
                             "FYI: %s នៅតែសម្រាក — ស្អែកមិនទាន់មកធ្វើការទេ។\n"
                             "Reason · មូលហេតុ៖ %s"
-                            % (nm, nm, marker), group=True)
+                            % (nm, nm, marker), group=True, subject_staff_id=stf["id"])
                 elif fl == "sick_me":
                     persona = next((s for s in staff_all("active")
                                     if s["id"] == pend.get("persona_id")), None)
@@ -6985,7 +7000,7 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
             late_set_reason(persona["id"], today, reason)
             await _att_send(context, None, "Supervisors group", "",
                 "Reason from %s (late ~%s today) · មូលហេតុពី %s៖ %s"
-                % (nm, _hm(mins), nm, reason), group=True)
+                % (nm, _hm(mins), nm, reason), group=True, subject_staff_id=persona["id"])
         else:
             # legacy path (not declared-first): full heads-up carrying the reason
             late_declare(persona["id"], today, (ws + mins) if ws is not None else mins, reason)
