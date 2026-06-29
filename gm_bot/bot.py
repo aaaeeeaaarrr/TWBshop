@@ -1472,28 +1472,11 @@ async def _send_once_retrying(context, target, body, kb=None, parse_mode=None, *
 
 
 def _monitor_send_sync(text: str) -> bool:
-    """Deliver a builder/monitoring alarm via the MONITOR bot (NOT the client-facing GM bot) → owner. A
-    direct HTTP POST using MONITOR_BOT_TOKEN, so it works even when the Monitor bot isn't polling. Runs in a
-    thread (see _alarm) so the GM event loop never blocks. Never raises. (TWB = client #1: its GM bot is the
-    client's bot and must not DM us, the builder, its plumbing alarms — those belong on the Monitor bot +
-    the sink. owner direction, s58.)"""
-    import json as _json
-    import urllib.parse
-    import urllib.request
-    try:
-        from secrets import MONITOR_BOT_TOKEN
-    except Exception:
-        MONITOR_BOT_TOKEN = ""
-    if not MONITOR_BOT_TOKEN or not config.OWNER_TELEGRAM_ID:
-        return False
-    try:
-        body = text if len(text) <= 4000 else (text[:3950] + "\n…(full in the alarm sink)")
-        data = urllib.parse.urlencode({"chat_id": config.OWNER_TELEGRAM_ID, "text": body}).encode()
-        with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % MONITOR_BOT_TOKEN,
-                                    data=data, timeout=15) as r:
-            return bool(_json.load(r).get("ok"))
-    except Exception:
-        return False
+    """Deliver a builder/monitoring alarm via the MONITOR bot (not the client GM bot) → owner. Delegates to
+    the ONE shared source (shared.monitor_notify) so every bot's builder-alarms use one channel. Runs in a
+    thread (see _alarm) so the GM event loop never blocks. Never raises."""
+    from shared.monitor_notify import notify_monitor
+    return notify_monitor(text)
 
 
 async def _alarm(context, kind: str, body: str, severity: str = "warn") -> None:
@@ -4433,8 +4416,9 @@ async def _missing_mid_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "mid" for r in rows):
-            await _alarm(context, "no_mid_report",
-                         "⏰ No midday report in TWB REPORT for %s yet (17:30)." % day, severity="warn")
+            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor
+            await _send_once_retrying(context, config.OWNER_TELEGRAM_ID,
+                                      "⏰ No midday report in TWB REPORT for %s yet (17:30)." % day)
     except Exception as e:
         logger.error("missing-mid check failed: %s", e)
 
@@ -4445,10 +4429,10 @@ async def _missing_final_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "final" for r in rows):
-            await _alarm(context, "no_final_report",
-                         "🚨 No FINAL report stored for business day %s (checked 06:30). "
-                         "The day's books are missing — staff didn't post, or collection is down." % day,
-                         severity="money")
+            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor
+            await _send_once_retrying(context, config.OWNER_TELEGRAM_ID,
+                                      "🚨 No FINAL report stored for business day %s (checked 06:30). "
+                                      "The day's books are missing — staff didn't post, or collection is down." % day)
     except Exception as e:
         logger.error("missing-final check failed: %s", e)
 

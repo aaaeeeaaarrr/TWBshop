@@ -318,6 +318,8 @@
     · make_error_handler
 - `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
     · RedactTokenFilter, redact, install_log_hygiene
+- `shared/monitor_notify.py` — shared.monitor_notify — deliver a BUILDER/system alarm to the owner via the MONITOR bot (NOT a client
+    · notify_monitor
 - `shared/runtime_guard.py` — Runtime guard: refuse to start a live Telegram/Telethon poller off production.
     · assert_polling_allowed
 - `shared/stock_shared.py` — Shared stock tables — the accountant <-> stock-lane seam (design §E7 / §E11).

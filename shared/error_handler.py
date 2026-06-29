@@ -9,6 +9,7 @@ What it does on any unhandled handler exception:
 - a throttled ⚠ DM to the owner (one per bot per 30 min; the log keeps every occurrence),
 - best-effort answer on the callback so the user's button never just spins.
 """
+import asyncio
 import logging
 import time
 
@@ -20,6 +21,7 @@ except Exception:  # keep this shared handler import-safe across PTB versions
     Conflict = ()  # isinstance(err, ()) is always False → the 409 branch stays inert
 
 import config
+from shared.monitor_notify import notify_monitor   # builder/system alarms go via the MONITOR bot, not a client bot
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +50,11 @@ def make_error_handler(bot_name: str):
             ckey = bot_name + ":conflict"
             if time.time() - _last_dm.get(ckey, 0.0) >= _THROTTLE_S:
                 _last_dm[ckey] = time.time()
-                try:
-                    await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+                if not await asyncio.to_thread(notify_monitor,
                         "🚨 %s bot: 409 CONFLICT — a SECOND process is polling this token.\n"
                         "A stray/dev poller is stealing live updates (lost check-ins/orders). "
-                        "Stop it now, or check for a duplicate service." % bot_name)
-                except Exception as e:
-                    logger.error("[%s] conflict-alert DM failed: %s", bot_name, e)
+                        "Stop it now, or check for a duplicate service." % bot_name):
+                    logger.error("[%s] conflict-alert: monitor delivery failed", bot_name)
             return
         logger.error("[%s] UNHANDLED in handler: %s", bot_name, err, exc_info=err)
         try:
@@ -75,11 +75,9 @@ def make_error_handler(bot_name: str):
                     where = " (message: %.40s)" % update.effective_message.text
         except Exception:
             pass
-        try:
-            await context.bot.send_message(config.OWNER_TELEGRAM_ID,
+        if not await asyncio.to_thread(notify_monitor,
                 "⚠ %s bot: a flow crashed%s\n%s: %.200s\n(full traceback in the server log; "
                 "more crashes in the next 30 min are logged but not re-sent)"
-                % (bot_name, where, type(err).__name__, err))
-        except Exception as e:
-            logger.error("[%s] error-handler DM failed: %s", bot_name, e)
+                % (bot_name, where, type(err).__name__, err)):
+            logger.error("[%s] error-handler: monitor delivery failed", bot_name)
     return _handler

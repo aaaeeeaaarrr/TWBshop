@@ -2076,41 +2076,41 @@ def test_owner_al_and_salary_views(monkeypatch):
 
 
 def test_global_error_handler(monkeypatch):
-    """The shared catch-all (every bot): logs, answers the spinning button, DMs the owner once
-    per bot per 30 min — and never raises itself, even when every send fails."""
+    """The shared catch-all (every bot): logs, answers the spinning button, and routes the crash to the
+    owner via the MONITOR bot (H1 — builder alarms leave through the Monitor, not a client bot), once per
+    bot per 30 min — and never raises itself, even when delivery fails."""
     from telegram import Update
     from shared import error_handler as eh
     eh._last_dm.clear()
     sent, answered = [], []
+    monkeypatch.setattr(eh, "notify_monitor", lambda text: (sent.append(text) or True))
 
     class _Q:
         data = "att:something"
         async def answer(self, *a, **k):
             answered.append(a)
 
-    class _Bot:
-        async def send_message(self, chat_id, text, **k):
-            sent.append(text)
-
     upd = Update(update_id=1)                       # PTB Update is frozen → bypass for the test
     object.__setattr__(upd, "callback_query", _Q())
-    ctx = types.SimpleNamespace(error=RuntimeError("boom"), bot=_Bot())
+    ctx = types.SimpleNamespace(error=RuntimeError("boom"), bot=None)
     h = eh.make_error_handler("TestBot")
     asyncio.run(h(upd, ctx))
     assert answered, "callback must be answered so the button doesn't spin"
     assert len(sent) == 1 and "TestBot bot: a flow crashed" in sent[0] and "boom" in sent[0]
     asyncio.run(h(upd, ctx))        # second crash within 30 min → logged, NOT re-sent
     assert len(sent) == 1
-    # a totally broken context (no bot) must never raise out of the handler
+    # delivery failure (Monitor unreachable) must never raise out of the handler
     eh._last_dm.clear()
+    monkeypatch.setattr(eh, "notify_monitor", lambda text: False)
     asyncio.run(h(None, types.SimpleNamespace(error=ValueError("x"), bot=None)))
 
-    # "Message is not modified" (double-tap) = benign no-op: answered quietly, NO owner DM
+    # "Message is not modified" (double-tap) = benign no-op: answered quietly, NO owner alarm
     eh._last_dm.clear()
     sent.clear(); answered.clear()
+    monkeypatch.setattr(eh, "notify_monitor", lambda text: (sent.append(text) or True))
     ctx2 = types.SimpleNamespace(
         error=RuntimeError("BadRequest: Message is not modified: specified new message..."),
-        bot=_Bot())
+        bot=None)
     asyncio.run(h(upd, ctx2))
     assert sent == [] and answered            # silent to the owner, smooth for the user
 
