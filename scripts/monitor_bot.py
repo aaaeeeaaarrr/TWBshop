@@ -89,8 +89,31 @@ async def cmd_start(update, context):
         "/health — the services\n"
         "/issues — what needs you, with the fix\n"
         "/crossings — recent cross-lane edits\n"
-        "/audit — integrator cross-lane sweep (map + no-cross-lane)\n\n"
+        "/audit — integrator cross-lane sweep (map + no-cross-lane)\n"
+        "/alarms — system-health alarms (watchdog / sentinel / send-resilience / config) — moved here off the client GM bot\n\n"
         "I DM you on a service-down OR a cross-lane edit. Silence = healthy.")
+
+
+async def cmd_alarms(update, context):
+    """The SYSTEM-HEALTH alarms (watchdog / sentinel / send-resilience / config-health / audit) — moved off
+    the client-facing GM bot to here, the builder's oversight. Reads the durable alarm sink (gm_alarms)."""
+    if not _owner(update):
+        return
+    try:
+        from gm_bot import alarms
+        rows = alarms.open_alarms()
+    except Exception as e:
+        await update.message.reply_text("alarms unavailable: %s" % e)
+        return
+    if not rows:
+        await update.message.reply_text("🟢 No open system alarms.")
+        return
+    lines = ["🔔 OPEN SYSTEM ALARMS (%d):" % len(rows)]
+    for a in rows[:20]:
+        flag = "" if a["delivered"] else " ⚠undelivered"
+        lines.append("#%d [%s] %s%s — %s" % (a["id"], a["severity"], a["kind"], flag,
+                                             (a["body"] or "").replace("\n", " ")[:90]))
+    await update.message.reply_text("\n".join(lines)[:4000])
 
 
 async def cmd_board(update, context):
@@ -237,6 +260,7 @@ def build_application(token):
     app.add_handler(CommandHandler("issues", cmd_issues))
     app.add_handler(CommandHandler("crossings", cmd_crossings))
     app.add_handler(CommandHandler("audit", cmd_audit))
+    app.add_handler(CommandHandler("alarms", cmd_alarms))
     app.add_error_handler(make_error_handler("Monitor"))   # crashes are never silent
     app.job_queue.run_repeating(_watch_tick, interval=300, first=15)
     app.job_queue.run_repeating(_events_tick, interval=60, first=20)   # cross-lane edit alerts

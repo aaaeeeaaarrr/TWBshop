@@ -31,21 +31,19 @@ def _find(kind, body):
             if r["kind"] == kind and r["body"] == body]
 
 
-def test_alarm_persists_and_marks_delivered(monkeypatch):
-    monkeypatch.setattr(bot.asyncio, "sleep", _noop)
+def test_alarm_persists_and_marks_delivered_via_monitor(monkeypatch):
     alarms.init_alarms_db()
-    ctx = types.SimpleNamespace(bot=_FakeBot(["MSG"]))
-    body = "🚨 chokepoint test — delivered path (ឈឺ emoji-safe)"
-    asyncio.run(bot._alarm(ctx, "utest_delivered", body, severity="warn"))
+    monkeypatch.setattr(bot, "_monitor_send_sync", lambda text: True)   # the MONITOR bot delivers it
+    body = "🚨 chokepoint test — delivered via Monitor bot (ឈឺ emoji-safe)"
+    asyncio.run(bot._alarm(types.SimpleNamespace(bot=None), "utest_delivered", body, severity="warn"))
     got = _find("utest_delivered", body)
     assert got and got[0]["delivered"] is True
 
 
-def test_alarm_persists_even_when_dm_fails(monkeypatch):
-    monkeypatch.setattr(bot.asyncio, "sleep", _noop)
+def test_alarm_persists_even_when_delivery_fails(monkeypatch):
     alarms.init_alarms_db()
-    ctx = types.SimpleNamespace(bot=_FakeBot([NetworkError("down")]))   # _alarm DMs single-shot
-    body = "🚨 chokepoint test — DM failed but the sink keeps the alarm"
-    asyncio.run(bot._alarm(ctx, "utest_undelivered", body, severity="money"))
+    monkeypatch.setattr(bot, "_monitor_send_sync", lambda text: False)  # Monitor send fails
+    body = "🚨 chokepoint test — delivery failed but the sink keeps the alarm"
+    asyncio.run(bot._alarm(types.SimpleNamespace(bot=None), "utest_undelivered", body, severity="money"))
     got = _find("utest_undelivered", body)
     assert got and got[0]["delivered"] is False and got[0]["severity"] == "money"

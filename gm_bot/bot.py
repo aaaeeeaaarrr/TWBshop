@@ -1471,18 +1471,43 @@ async def _send_once_retrying(context, target, body, kb=None, parse_mode=None, *
     return None, transient
 
 
+def _monitor_send_sync(text: str) -> bool:
+    """Deliver a builder/monitoring alarm via the MONITOR bot (NOT the client-facing GM bot) → owner. A
+    direct HTTP POST using MONITOR_BOT_TOKEN, so it works even when the Monitor bot isn't polling. Runs in a
+    thread (see _alarm) so the GM event loop never blocks. Never raises. (TWB = client #1: its GM bot is the
+    client's bot and must not DM us, the builder, its plumbing alarms — those belong on the Monitor bot +
+    the sink. owner direction, s58.)"""
+    import json as _json
+    import urllib.parse
+    import urllib.request
+    try:
+        from secrets import MONITOR_BOT_TOKEN
+    except Exception:
+        MONITOR_BOT_TOKEN = ""
+    if not MONITOR_BOT_TOKEN or not config.OWNER_TELEGRAM_ID:
+        return False
+    try:
+        body = text if len(text) <= 4000 else (text[:3950] + "\n…(full in the alarm sink)")
+        data = urllib.parse.urlencode({"chat_id": config.OWNER_TELEGRAM_ID, "text": body}).encode()
+        with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % MONITOR_BOT_TOKEN,
+                                    data=data, timeout=15) as r:
+            return bool(_json.load(r).get("ok"))
+    except Exception:
+        return False
+
+
 async def _alarm(context, kind: str, body: str, severity: str = "warn") -> None:
-    """THE chokepoint for proactive owner ALARMS (B1). Persist to the gm_alarms sink FIRST (durable +
-    Claude-readable via scripts/alarms.py), THEN best-effort single-shot DM the owner — so an alarm
-    survives a failed Telegram send AND reaches Claude/the B3 nightly agent even if the owner misses it.
-    Single-shot (no retry) so the alarm path never adds outage latency; the sink already has it. Never
-    raises into a live flow. severity: info | warn | money (money = balance/impossible-state, page-worthy)."""
+    """THE chokepoint for proactive SYSTEM/builder alarms. Persist to the gm_alarms sink FIRST (durable +
+    Claude-readable via scripts/alarms.py), THEN deliver via the MONITOR bot — the builder's cross-client
+    oversight channel — NOT the client-facing GM bot (TWB is client #1; its GM bot must not DM the builder
+    its plumbing alarms). The send runs in a thread so the GM event loop never blocks; it works even when the
+    Monitor bot isn't polling; and the SINK keeps the alarm even if delivery fails. Never raises into a live
+    flow. severity: info | warn | money. (`context` kept for call-site compatibility; delivery no longer uses
+    the GM bot.)"""
     from gm_bot import alarms
     aid = alarms.log_alarm(kind, body, severity=severity, is_test=_att_test_mode())
     try:
-        dm = body if len(body) <= 4000 else (body[:3900] + "\n…(truncated — full alarm in the sink)")
-        msg, _ = await _send_once_retrying(context, config.OWNER_TELEGRAM_ID, dm, attempts=1)
-        if msg is not None:
+        if await asyncio.to_thread(_monitor_send_sync, body):
             alarms.mark_delivered(aid)
     except Exception:
         pass
