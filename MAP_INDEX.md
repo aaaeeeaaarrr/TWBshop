@@ -144,7 +144,7 @@
 - `gm_bot/al.py` — Annual-leave pure logic (session 28). No DB/Telegram.
     · back_at_work_date, is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map, al_span_label, approvals_needed, quorum_reached, quorum_rejected, senior_timers
 - `gm_bot/alarms.py` — gm_bot.alarms — the durable ALARM SINK + mirror-to-Claude (B1, session 58, 2026-06-28).
-    · init_alarms_db, log_alarm, mark_delivered, ack_alarm, recent_alarms, open_alarms
+    · init_alarms_db, log_alarm, mark_delivered, ack_alarm, ack_open_of_kinds, recent_alarms, open_alarms
 - `gm_bot/analyzer.py` — Scans ops_messages for operational concerns and saves them to gm_concerns.
     · _matches_rules, _extract_low_stock_items, _analyze_photo, _detect_attendance_concerns, _keyword_text_concerns, _worth_checking, _semantic_concern_dict, _semantic_text_concerns, _semantic_enabled, detect_text_concerns, analyze_live_message, _detect_low_stock_concerns, run_analysis
 - `gm_bot/attendance.py` — Private-DM attendance system — pure logic, no DB/AI/Telegram.

@@ -42,3 +42,14 @@ def test_severity_filter():
     money = alarms.log_alarm("money_kind", "balance off", severity="money", is_test=True)
     rows = alarms.recent_alarms(limit=50, include_test=True, severity="money")
     assert any(r["id"] == money for r in rows) and all(r["severity"] == "money" for r in rows)
+
+
+def test_ack_open_of_kinds_self_closes_resolved_alarms():
+    alarms.init_alarms_db()
+    a1 = alarms.log_alarm("watchdog", "integrity x1", is_test=True)
+    a2 = alarms.log_alarm("watchdog", "integrity x2", is_test=True)
+    a3 = alarms.log_alarm("send_failure", "outage", is_test=True)   # a different kind — must NOT be acked
+    assert alarms.ack_open_of_kinds(["watchdog"], include_test=True) >= 2
+    rows = {r["id"]: r for r in alarms.recent_alarms(limit=100, include_test=True)}
+    assert rows[a1]["acked"] and rows[a2]["acked"]                  # resolved integrity alarms self-closed
+    assert not rows[a3]["acked"]                                    # unrelated kind untouched

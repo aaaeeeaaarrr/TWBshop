@@ -75,6 +75,24 @@ def ack_alarm(alarm_id) -> None:
         logger.exception("ack_alarm failed (non-fatal): id=%s", alarm_id)
 
 
+def ack_open_of_kinds(kinds, include_test=False) -> int:
+    """Auto-ACK all OPEN (unacked) alarms whose kind is in `kinds` — to SELF-CLOSE integrity alarms once
+    the underlying issue is verifiably resolved (e.g. the audit/watchdog is clean again), so the open-alarm
+    list always reflects the REAL current state, never stale entries. Returns the count acked. BEST-EFFORT."""
+    if not kinds:
+        return 0
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                sql = ("UPDATE gm_alarms SET acked=TRUE WHERE acked=FALSE AND kind = ANY(%s)"
+                       + ("" if include_test else " AND is_test=FALSE") + " RETURNING id")
+                cur.execute(sql, (list(kinds),))
+                return len(cur.fetchall())
+    except Exception:
+        logger.exception("ack_open_of_kinds failed (non-fatal)")
+        return 0
+
+
 def recent_alarms(limit=50, include_test=False, severity=None) -> list:
     """Recent alarms, newest first (for scripts/alarms.py + the B3 nightly agent)."""
     where, params = [], []

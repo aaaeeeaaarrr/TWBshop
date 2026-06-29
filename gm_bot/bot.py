@@ -6129,6 +6129,9 @@ async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                      "✅ Live watchdog: %d issue(s) cleared%s." %
                      (len(cleared), "" if not still_open else " (%d still open)" % still_open),
                      severity="info")
+    if still_open == 0:    # data is clean → SELF-CLOSE the integrity alarms in the sink (auto-ack)
+        from gm_bot import alarms
+        alarms.ack_open_of_kinds(["watchdog", "daily_audit", "audit_failed"])
     gm_set_state("live_watchdog_last", cur_json)
 
 

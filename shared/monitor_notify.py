@@ -7,6 +7,7 @@ A direct Telegram API POST — no PTB/async needed — so it works from sync cod
 isn't polling. NEVER raises. Callers in an async context should run it via asyncio.to_thread (it does a
 short blocking HTTP POST)."""
 import json
+import os
 import urllib.parse
 import urllib.request
 
@@ -14,7 +15,12 @@ import config
 
 
 def notify_monitor(text: str) -> bool:
-    """POST `text` to the owner via the Monitor bot. Returns True on delivery, False otherwise. Never raises."""
+    """POST `text` to the owner via the Monitor bot. Returns True on delivery, False otherwise. Never raises.
+    Sends ONLY from the live (prod) environment — never from tests/staging/dev — so a test that exercises an
+    alarm path can't message the owner a real DM (the s58 test-leakage bug: a couple of test runs POSTed real
+    'DAVY audit' / 'TestBot crashed' DMs before this guard)."""
+    if os.environ.get("TWBSHOP_ENV") != "prod":
+        return False
     try:
         from secrets import MONITOR_BOT_TOKEN
     except Exception:
