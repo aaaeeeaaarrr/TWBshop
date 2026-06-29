@@ -31,7 +31,11 @@
 > supersession announces ×8 · OT-rest · swap · family-status · callout — finish before Thyda go-live) ·
 > no_points/no_lateness (needs audit-invariant handling: zero late-min when exempt) · no_payback (3 sites) ·
 > payback_to_al (HIGH-RISK leave reroute, 2nd-opinion) · al/leave/swap approver overrides (NEW routing
-> build) · no_al/no_ot.
+> build — ⚠ NOT a pure routing swap, design found 2026-06-29: routing the AL card to an override approver
+> also needs the approval CALLBACK's `is_senior` gate (`bot.py`~3313) + the `approvals_needed` QUORUM to
+> be override-aware so ONE override approver is the SOLE approver, keeping the can't-approve-own guard;
+> plan = a `_approvers_for(staff_id, kind)` helper at the 3 AL routing sites [cards · recap · re-ping]
+> + the callback/quorum tweaks) · no_al/no_ot.
 Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1 (each staging-proven, default=no-change):
 - `no_nudges` → guard the nudge/reminder sends · `no_supervisor_posts` → guard the Supervisors-group post · `no_management_posts` → guard the Management post · `no_attendance`/`no_lateness`/`no_payback`/`no_al`/`no_ot`/`no_points` → guard the respective compute/record · `payback_to_al` → in the payback-debt path, deduct AL instead of booking payback · `*_approver_id` → override the approval routing.
 - Owner's live set first: **Tyty** = vip_exempt (all) · **Thyda** = `no_supervisor_posts` + `payback_to_al` + AL-approver=Tyty (keeps points).
