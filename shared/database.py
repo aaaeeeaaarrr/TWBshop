@@ -2467,9 +2467,11 @@ def init_attendance_db() -> None:
                     status      TEXT DEFAULT 'open',  -- open|provisional|papered|cleared|no_papers
                     papers_seen BOOLEAN DEFAULT FALSE,
                     covered_days INTEGER,
+                    al_deducted NUMERIC DEFAULT 0,   -- F1 payback_to_al: AL days deducted for this sick (exact papers-refund)
                     created_at  TIMESTAMPTZ DEFAULT NOW()
                 );
                 CREATE INDEX IF NOT EXISTS idx_sick_open ON sick_cases (status);
+                ALTER TABLE sick_cases ADD COLUMN IF NOT EXISTS al_deducted NUMERIC DEFAULT 0;
                 -- session 28: Give-OT time bank
                 CREATE TABLE IF NOT EXISTS ot_bank (
                     staff_id    INTEGER PRIMARY KEY REFERENCES staff_registry(id),
@@ -3150,7 +3152,7 @@ def sick_get(case_id: int) -> dict | None:
 
 
 def sick_set(case_id: int, status: str | None = None, papers_seen: bool | None = None,
-             covered_days: int | None = None) -> None:
+             covered_days: int | None = None, al_deducted: float | None = None) -> None:
     with _db() as conn:
         with conn.cursor() as cur:
             if status is not None:
@@ -3159,6 +3161,28 @@ def sick_set(case_id: int, status: str | None = None, papers_seen: bool | None =
                 cur.execute("UPDATE sick_cases SET papers_seen=%s WHERE id=%s", (papers_seen, case_id))
             if covered_days is not None:
                 cur.execute("UPDATE sick_cases SET covered_days=%s WHERE id=%s", (covered_days, case_id))
+            if al_deducted is not None:
+                cur.execute("UPDATE sick_cases SET al_deducted=%s WHERE id=%s", (al_deducted, case_id))
+
+
+def sick_refund_al_for_date(staff_id: int, date_iso: str) -> float:
+    """F1 payback_to_al REVERSAL (papers accepted within window): refund + clear any AL deducted on this
+    staffer's sick case(s) for the date. Returns the total AL refunded (0.0 if none). ATOMIC (read +
+    refund + clear in one txn) + IDEMPOTENT (clears al_deducted, so a re-call refunds 0 — no double
+    refund). Test-mode-safe: in att-test mode the deduction was display-only (al_deducted stays 0) → 0."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(SUM(al_deducted),0) AS amt FROM sick_cases "
+                        "WHERE staff_id=%s AND the_date=%s AND COALESCE(al_deducted,0) > 0",
+                        (staff_id, date_iso))
+            amt = float(cur.fetchone()["amt"] or 0)
+            if amt <= 0:
+                return 0.0
+            cur.execute("UPDATE staff_registry SET al_left=COALESCE(al_left,0)+%s, updated_at=NOW() WHERE id=%s",
+                        (amt, staff_id))
+            cur.execute("UPDATE sick_cases SET al_deducted=0 WHERE staff_id=%s AND the_date=%s",
+                        (staff_id, date_iso))
+            return amt
 
 
 def sick_provisional_open() -> list[dict]:
@@ -4017,6 +4041,30 @@ def al_deduct(staff_id: int, amount: float) -> float:
             cur.execute("UPDATE staff_registry SET al_left = COALESCE(al_left,0)-%s, updated_at=NOW() "
                         "WHERE id=%s RETURNING al_left", (amount, staff_id))
             r = cur.fetchone()
+            return float(r["al_left"]) if r else 0.0
+
+
+def al_deduct_for_sick(staff_id: int, amount: float, case_id=None) -> float:
+    """F1 payback_to_al: ATOMICally deduct `amount` AL days AND record it on the sick case (case_id) in ONE
+    transaction, so the deduction and its reversal-record can never get out of sync — a partial would either
+    double-charge (deduct + a debt on fall-back) or mint (a stored amount never deducted). The caller
+    (gm_bot._payback_or_al) only falls back to a pay-back debt when this RAISES (atomic rollback → nothing
+    happened → safe). Test-mode-safe: in att-test mode NOTHING is written (display-only), so al_deducted
+    stays 0 and the papers-refund can't mint. Returns the new al_left (a display value in test mode)."""
+    if _ATT_TEST:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COALESCE(al_left,0) AS b FROM staff_registry WHERE id=%s", (staff_id,))
+                r = cur.fetchone()
+                return (float(r["b"]) - float(amount)) if r else 0.0
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE staff_registry SET al_left = COALESCE(al_left,0)-%s, updated_at=NOW() "
+                        "WHERE id=%s RETURNING al_left", (amount, staff_id))
+            r = cur.fetchone()
+            if case_id is not None:
+                cur.execute("UPDATE sick_cases SET al_deducted = COALESCE(al_deducted,0)+%s WHERE id=%s",
+                            (amount, case_id))
             return float(r["al_left"]) if r else 0.0
 
 

@@ -920,10 +920,26 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   append-only + best-effort; `summary()` = the one-glance "did it go well?". Generalises the check-in flip's
   `core_flip_log` (119/0) to EVERY transition. al_approver_id writes routing + decision notes; `init_transitions_db`
   at gm startup; 3 tests. **NEXT: retrofit the F1 exemption gates to log would-have-happened vs suppressed.**
-- `[decision]` **F1 STILL deferred** (own passes): payback_to_al (HIGH-RISK leave reroute, second-opinion) ·
-  leave/swap approver overrides · the RARE no_supervisor_posts sites (death/birth leave · supersession announces
-  ×8 · OT-rest · swap · family-status · callout — finish before Thyda go-live) · no_al/no_ot · the audit-coupled
-  no_points/no_lateness · the F1-gate transition-note retrofit.
+- `[ship]` **F1 `payback_to_al` BUILT + PROVEN + RED-TEAMED** (Thyda's pay-back→AL reroute) — owner rule: owed-min
+  ÷ their OWN shift (full shift = 1.0 AL; `gm_bot.al.payback_to_al_days`). The 3 payback sites deduct AL via the
+  ATOMIC `shared.database.al_deduct_for_sick` (deduct + record on the sick case in ONE txn) instead of a debt;
+  `_wipe_sick_payback` refunds the EXACT AL on papers-accept (idempotent). Additive `sick_cases.al_deducted`
+  column. 8 tests incl. before/after on a REAL staging row. Default (no exception) = byte-identical (a debt).
+- `[gotcha]` **RED-TEAM CATCH — payback_to_al double-charge.** The first cut did `al_deduct()` then `sick_set()`
+  as two ops inside a try/except that falls back to `payback_add_debt`; if the store failed AFTER the deduct
+  (e.g. the column not yet on that DB), the staffer got BOTH an AL deduction AND a fall-back debt. Fixed by
+  making deduct+record ATOMIC (one txn) — a failure rolls back both, so the fall-back-to-debt is safe. Lesson:
+  any "do X then record X, else fall back" money path MUST be atomic or it double-charges on partial failure.
+- `[gotcha]` **payback_to_al test-mode safety** — `al_deduct` is display-only in att-test mode, so the atomic
+  function writes nothing AND stores no `al_deducted` then → a later papers-refund can't MINT AL from a phantom
+  record. A test-mode walk shows the deduction without mutating.
+- `[ship]` **Owner challenged my "build it fresh" caution — rightly.** For a staging-only (not-deployed) change
+  with a before/after proof + red-team as the net, "now, with full context loaded" beat "fresh pass" (which
+  re-derives from docs + risks a missed nuance). The deferral reflex was over-caution; the net is the real
+  safety, not freshness.
+- `[decision]` **F1 STILL deferred** (own passes): leave/swap approver overrides · rare no_supervisor_posts sites
+  (death/birth · supersession ×8 · OT-rest · swap · family-status · callout) · no_al/no_ot · audit-coupled
+  no_points/no_lateness · the F1-gate transition-note retrofit. (al_approver_id + payback_to_al now DONE.)
 
 ### 🔍 Findings
 - **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure

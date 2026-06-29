@@ -47,7 +47,7 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 - `no_nudges` → guard the nudge/reminder sends · `no_supervisor_posts` → guard the Supervisors-group post · `no_management_posts` → guard the Management post · `no_attendance`/`no_lateness`/`no_payback`/`no_al`/`no_ot`/`no_points` → guard the respective compute/record · `payback_to_al` → in the payback-debt path, deduct AL instead of booking payback · `*_approver_id` → override the approval routing.
 - Owner's live set first: **Tyty** = vip_exempt (all) · **Thyda** = `no_supervisor_posts` + `payback_to_al` + AL-approver=Tyty (keeps points).
 
-> **⚠ `payback_to_al` DESIGN + OPEN OWNER DECISION (investigated 2026-06-29; NOT built — HIGH-RISK leave/money).**
+> **✅ `payback_to_al` BUILT + PROVEN + RED-TEAMED (2026-06-29; staging, NOT deployed — HIGH-RISK leave/money).**
 > At each `payback_add_debt` site (late = `late` min · leave-early-sick = `_remaining` min · paperless-sick =
 > full-shift min · the test site) — if `payback_to_al` → call `al_deduct(staff_id, AL_days)` INSTEAD of
 > `payback_add_debt(...)`, write a `transitions.note` (old='payback debt N min', new='AL −X days'), and do NOT
@@ -55,7 +55,9 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 > EXACT AL deducted (store the deducted amount on the sick case / a record) instead of crediting a debt.
 > **✅ CONVERSION RULE DECIDED (owner 2026-06-29): minutes ÷ that staffer's OWN scheduled shift length** (a
 > full missed shift = 1.0 AL; 302/540 ≈ 0.56). **✅ BUILT + TESTED: the PURE converter `gm_bot.al.payback_to_al_days(owed_minutes, shift_len_min)`** (proportional, 2dp, fail-safe on a bad shift; 3 tests).
-> **REMAINING (HIGH-RISK balance-write — fresh focused pass + self-red-team + staging before/after proof):**
+> **✅ DONE (built + proven + red-teamed — 8 tests, before/after on a real staging row; deduct+record is the
+> ATOMIC `al_deduct_for_sick`, fixing a red-team-found double-charge where deduct-then-store could leave AL
+> deducted AND a fall-back debt):**
 > (1) wire the 3 live sites — `if payback_to_al: al_deduct(staff, payback_to_al_days(min, shift_len))` +
 > `transitions.note` + SKIP `payback_add_debt`; (2) **exact reversal** for the SICK sites — store the deducted
 > AL on the sick case (additive `al_deducted` column), and `_wipe_sick_payback` (papers accepted) refunds it

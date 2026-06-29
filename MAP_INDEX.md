@@ -144,7 +144,7 @@
 
 ## gm_bot/
 - `gm_bot/al.py` — Annual-leave pure logic (session 28). No DB/Telegram.
-    · back_at_work_date, is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map, al_span_label, approvals_needed, quorum_reached, quorum_rejected, senior_timers
+    · back_at_work_date, is_short_notice, short_notice_days, points_cost, fractional_al, _al_off, al_charged_days, al_day_count, al_deduction_map, al_span_label, approvals_needed, quorum_reached, quorum_rejected, payback_to_al_days, senior_timers
 - `gm_bot/alarms.py` — gm_bot.alarms — the durable ALARM SINK + mirror-to-Claude (B1, session 58, 2026-06-28).
     · init_alarms_db, log_alarm, mark_delivered, ack_alarm, ack_open_of_kinds, recent_alarms, open_alarms
 - `gm_bot/analyzer.py` — Scans ops_messages for operational concerns and saves them to gm_concerns.
@@ -156,7 +156,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+224, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+225, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/checkin_net.py` — gm_bot.checkin_net — the C2 cut-over BRIDGE: the live check-in verdict routed through core.flip's
@@ -319,7 +319,7 @@
 - `shared/clock.py` — Phnom-Penh wall-clock helpers.
     · pp_now, pp_today
 - `shared/database.py` — PostgreSQL database — all tables and queries.
-    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+306, grep)
+    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+308, grep)
 - `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
     · make_error_handler
 - `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).

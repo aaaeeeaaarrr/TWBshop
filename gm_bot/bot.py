@@ -2014,12 +2014,14 @@ async def _handle_staff_location(update: Update, context: ContextTypes.DEFAULT_T
             # late arrival → ONE combined message: the verdict + the payback picker (so the reason
             # and the slot picker can't be read separately).
             try:
-                payback_add_debt(staff["id"], late, "late arrival", shift_date)
-                d = payback_open_debt(staff["id"])
-                if d:
-                    await _offer_payback(context, staff, d["balance"], user.id, late_min=late)
+                if _payback_or_al(staff, late, "late arrival", shift_date):
+                    await msg.reply_text(ui._V_LATE % (late, late))   # F1: rerouted to AL → no slot picker
                 else:
-                    await msg.reply_text(ui._V_LATE % (late, late))
+                    d = payback_open_debt(staff["id"])
+                    if d:
+                        await _offer_payback(context, staff, d["balance"], user.id, late_min=late)
+                    else:
+                        await msg.reply_text(ui._V_LATE % (late, late))
             except Exception as e:
                 logger.error("payback debt create failed: %s", e)
                 await msg.reply_text(ui._V_LATE % (late, late))
@@ -3990,14 +3992,71 @@ _SICK_RETURN_CHECK = ("I hope you're feeling better now 🤍 Are you coming in t
                       "សង្ឃឹមថាប្អូនធូរស្បើយហើយ 🤍 ស្អែកប្អូនមកធ្វើការមែនទេ?")
 
 
+def _payback_or_al(staff: dict, owed_min: int, reason: str, date_iso: str, case_id=None) -> bool:
+    """F1 `payback_to_al`: if this staffer reroutes pay-back to ANNUAL LEAVE, deduct the proportional AL
+    (owner rule 2026-06-29: owed_min ÷ their OWN scheduled shift) INSTEAD of creating a pay-back debt —
+    recording the deducted amount on the sick case (`case_id`, for the EXACT papers-refund) + a transition
+    note — and return True so the caller skips the debt / slot-picker UI. Default (no `payback_to_al`) →
+    create the debt exactly as today + return False. Fail-safe: any error → create the debt (today's path).
+    Test-mode-safe: al_deduct is display-only in att-test mode, so al_deducted is NOT stored then (a stored
+    amount with no real deduction would let the papers-refund MINT AL)."""
+    sid = staff["id"]
+    amt = 0.0
+    try:
+        from gm_bot import exceptions_live
+        if exceptions_live.exempt(sid, "payback_to_al"):
+            from gm_bot.attendance import to_min
+            from gm_bot.al import payback_to_al_days
+            ws0, we0 = to_min(staff.get("work_start")), to_min(staff.get("work_end"))
+            shift_len = ((we0 - ws0) % 1440 or 1440) if (ws0 is not None and we0 is not None) else 540
+            amt = payback_to_al_days(owed_min, shift_len)   # 0 if not exempt / unknown shift → falls to a debt
+    except Exception:
+        amt = 0.0
+    if amt > 0:
+        try:
+            from shared.database import al_deduct_for_sick
+            al_deduct_for_sick(sid, amt, case_id)   # ATOMIC deduct + record (test-mode-safe); RAISES → nothing done
+            try:
+                from core import transitions
+                transitions.note("twb", "exempt:payback_to_al", sid,
+                                 old="payback debt %d min (%s)" % (owed_min, reason),
+                                 new="AL -%.2f days" % amt, detail=date_iso)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            # atomic deduct rolled back → NOTHING was deducted → safe to fall back to a debt (no double-charge)
+            logger.exception("payback_to_al deduct failed for %s — falling back to a pay-back debt", sid)
+    payback_add_debt(sid, owed_min, reason, date_iso)
+    return False
+
+
 def _wipe_sick_payback(staff_id: int, the_date_iso: str) -> bool:
-    """Cancel the paperless-sick pay-back debt for this sick date (accepted papers within window)."""
+    """Cancel the sick pay-back for this date when papers are accepted in-window. F1 `payback_to_al`:
+    there's no debt — REFUND the exact AL deducted at filing instead (S1, idempotent). Also credits any
+    real pay-back DEBT for the date (the normal path; covers a legacy debt from before the exception)."""
+    did = False
+    try:
+        from gm_bot import exceptions_live
+        if exceptions_live.exempt(staff_id, "payback_to_al"):
+            from shared.database import sick_refund_al_for_date
+            if sick_refund_al_for_date(staff_id, the_date_iso) > 0:
+                did = True
+                try:
+                    from core import transitions
+                    transitions.note("twb", "exempt:payback_to_al", staff_id,
+                                     old="AL deducted for sick", new="AL refunded (papers accepted)",
+                                     detail=the_date_iso)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     for d in payback_all_open():
         if (d["staff_id"] == staff_id and "sick" in (d.get("reason") or "").lower()
                 and str(d.get("created_date")) == the_date_iso and d["balance"] > 0):
             payback_credit(d["id"], d["balance"])
-            return True
-    return False
+            did = True
+    return did
 
 
 def _sick_return_kb(case_id: int) -> InlineKeyboardMarkup:
@@ -4352,7 +4411,7 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         _checked_in_for_shift = bool((att_get_session(persona["id"], date_iso) or {}).get("checked_in_at"))
     except Exception:
         _checked_in_for_shift = False
-    sick_create(persona["id"], "me", date_iso, "provisional", reason=reason)
+    _sick_case_id = sick_create(persona["id"], "me", date_iso, "provisional", reason=reason)
     await _sick_supersede(context, persona, date_iso)   # away → stand down any redefine/AL that day
     from gm_bot.attendance import to_min, remaining_shift_min
     ws, we = to_min(persona.get("work_start")), to_min(persona.get("work_end"))
@@ -4363,9 +4422,9 @@ async def _sickme_book(context, persona: dict, date_iso: str, reason: str) -> No
         # booked at check-in, and they're still paid the shift + repay the missed tail. Papers cancel it.
         _remaining = remaining_shift_min(ws, shift_min, date_iso, _now_pp())
         if _remaining > 0:
-            payback_add_debt(persona["id"], _remaining, "leave-early sick", date_iso)
+            _payback_or_al(persona, _remaining, "leave-early sick", date_iso, case_id=_sick_case_id)
     else:
-        payback_add_debt(persona["id"], shift_min, "paperless sick", date_iso)   # absent sick = full shift
+        _payback_or_al(persona, shift_min, "paperless sick", date_iso, case_id=_sick_case_id)   # absent sick = full shift
     await _att_send(context, (persona.get("telegram_ids") or [None])[0], "Staff",
         persona.get("call_name") or persona["canonical_name"],
         "OK — rest well 🤍 If you see a doctor, send me a photo of the papers.\n"
