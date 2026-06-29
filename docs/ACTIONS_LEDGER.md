@@ -9,6 +9,19 @@
 
 ## Done (with proof)
 
+- **2026-06-30 — CLIENT/BUILDER LEAK FIXED + DEPLOYED + VERIFIED (owner-caught; routing fix, NO data change).**
+  Owner saw the 21:45 [SHADOW] nightly digest arrive on the CLIENT GM bot (@twb_gm_bot) — a builder/system
+  message on a client bot (separation law). Audited all 6 direct owner-DMs in the gm bot: **2 system leaks
+  fixed → route via the MONITOR** (`_shadow_digest_job` → `_monitor_send_sync`; the dead-button alert →
+  `_alarm`→Monitor+sink); the other 4 are client-ops (no-show · monthly AL accrual · pay-split proration
+  restored · AL re-ping escalation) → correctly STAY on GM (owner-as-client-manager). Watchdog/sentinel/
+  audit already route via `_alarm`→Monitor. Deployed by tag `session-58-monitorfix-d2settle-20260630`=`0687ec3`
+  at 01:42 PP (deep-quiet window) — this batch ALSO landed D2-settle (flag-off no-op). **PROOF (independent
+  prod re-read):** gm active PID 1546601 NR=0, clean boot, `gm_shadow_digest` registered; deployed code carries
+  the shadow-digest→`_monitor_send_sync` + dead-button→`_alarm` routing; checkin=True · points/settle=False ·
+  shadow_run=on · 0 exceptions. Suite 1267p. The next 21:45 [SHADOW] digest will arrive on @TWB_Monitor_bot,
+  not the GM bot (owner to confirm). No data moved.
+
 - **2026-06-29 — D2-points net + #5 settle payback-slot model + settle-shadow DEPLOYED FLAG-OFF (NO-OP) +
   VERIFIED (HIGH-RISK: live attendance prod deploy at the night-shift edge, owner-authorized; queue-safe; NO
   data change).** Owner: "go ahead, deploy, don't stop to ask." Deployed the staged batch to twbshop-gm by tag
