@@ -867,6 +867,26 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 
 ## Session 58 — two live issues + the flip/self-healing strategy (2026-06-28)
 
+### ✅ C2 — check-in cut-over net DEPLOYED FLAG-OFF (live no-op); the flip owner-gated (2026-06-29)
+- `[ship]` **C2 wired + deployed flag-OFF** — `gm_bot/checkin_net.py::verdict_via_net` routes the live check-in
+  verdict (`bot.py`~1915) through `core.flip.decide('twb','checkin',…)`. FLAG OFF (default) = byte-identical to
+  today, PROVEN on prod (`is_authoritative('twb','checkin')`=False → the deploy changed nothing). tag
+  `session-58-c2-checkin-net-20260629`=`340f017`; gm PID 1519626 NR=0; suite 1223p/2s; 7 C2 tests.
+- `[ship]` **The verdict math is parity-IDENTICAL for TWB's 5/5 config — not just "~98%".** Verified line-by-line
+  `core.attendance.verdict` == `gm_bot.checkin.verdict` (same 24h-circle math + grace/early thresholds), and the
+  bridge feeds core the SAME resolved start `ws` live used → flipping 'checkin' is expected to be a TRUE no-op.
+- `[gotcha]` **The old shadow "0–2% mismatches" were an artifact**, not real verdict divergence — they came from
+  comparing core's RAW verdict to live's POST-grace state. C2 routes raw-vs-raw and applies grace/go-live/come-in-
+  sick AFTER the net to the chosen result, so that artifact disappears (core's result gets the same grace).
+- `[gotcha]` **`init_flip_db` was shipped (C1) but never wired to a startup** → the `core_flip`/`core_flip_log`
+  tables didn't exist on prod. Harmless (decide()/is_authoritative fail-safe to live when the table is missing),
+  but the flip + divergence log need them → now created at gm startup (additive, idempotent).
+- `[decision]` **Kept the DB-touching bridge OUT of the pure `gm_bot/checkin.py`** (its "no DB" purity is a
+  load-bearing, unit-tested claim) — new tiny `gm_bot/checkin_net.py` instead. Lazy core imports; fail-safe to live.
+- `[sell]` **"Flip the payroll brain without fear", demonstrated on a LIVE path** — core becomes authoritative one
+  flag at a time, byte-identical until proven, with auto-revert on divergence + an instant manual revert + a
+  proactive Sentinel `detect_flip_divergence` belt + an `_alarm→Monitor` DM. The cut-over safety story made real.
+
 ### 🔍 Findings
 - **Chenda/Fang payback off-by-one (overnight) = a "cover every surface" miss, NOT a math bug.** The pure
   payback logic (`gm_bot/payback.py` slot_windows/redefine_window) is overnight-safe and the booking BINDING

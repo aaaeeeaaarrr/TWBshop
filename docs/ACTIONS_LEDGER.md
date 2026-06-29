@@ -9,6 +9,21 @@
 
 ## Done (with proof)
 
+- **2026-06-29 — C2 CHECK-IN CUT-OVER NET DEPLOYED FLAG-OFF + VERIFIED NO-OP (HIGH-RISK: live attendance/payroll
+  path; prod deploy; independent post-settlement proof).** The first payroll cut-over wiring (S58 execution-run
+  step C2, steps 1–4). Built `gm_bot/checkin_net.py::verdict_via_net` routing the live check-in verdict
+  (`bot.py`~1915) through `core.flip.decide('twb','checkin',…)`; `init_flip_db` wired into gm startup. Verified
+  parity line-by-line (`core.attendance.verdict` == `gm_bot.checkin.verdict` for TWB's 5/5 grace/early, fed the
+  same resolved start). **DEPLOYED** by tag `session-58-c2-checkin-net-20260629` = `340f017` in the 11:57-AM-PP
+  quiet window; **only twbshop-gm restarted** (retail/b2b/listener/hire/wizard untouched). **PROOF (independent
+  prod re-read):** server HEAD==`340f017` · gm active PID 1519626 NR=0 · clean boot (Scheduler+Application
+  started, no traceback/401) · `is_authoritative('twb','checkin')` = **False** → FLAG OFF → the deploy is a
+  BYTE-IDENTICAL no-op (live verdicts unchanged) · `core_flip`/`core_flip_log` tables created on prod · suite
+  1223p/2s · 7 C2 regression tests (no-op · flag-off-ignores-core · auto-revert · vocab · fail-safe). **▶ STEP
+  C2.5 — THE FLIP — IS OWNER-GATED** (`core.flip.set_authoritative('twb','checkin',True,'cut-over')`; instant
+  revert `…,False`; auto-reverts on divergence + Sentinel `detect_flip_divergence` belt + `_alarm→Monitor`).
+  shadow_run (currently on) can retire after the flip.
+
 - **2026-06-26 — LIVE GM BOT RESTORED (server GM token fix; HIGH-RISK secrets + prod-restart, independent
   before/after proof).** Incident: staff messaging the GM bot got NO menu. Root cause: the GM BotFather token was
   rotated + updated in **dev** `secrets.py` but NEVER propagated to the **server** — the server's `secrets.py` still
