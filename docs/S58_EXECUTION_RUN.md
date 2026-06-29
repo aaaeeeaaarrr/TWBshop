@@ -77,6 +77,11 @@ Read `core.exceptions.get_exceptions("twb", staff_id)` at each live gate, 1-by-1
 > **Note: D1 (the replay-scorer) is LOW value** — the money-math (`core.points`/`settle`/`ledger`) is already
 > parity-locked + the flip-net already supports those paths, so D2 can flip each directly (net auto-reverts).
 > points = lowest-value path (parity + derives from the flipped verdict); payback/settle = higher-value, more complex.
+> **✅ #5 CLOSED 2026-06-29 (carefully, core-only + parity-tested):** `core.settle.payback_extension_window` +
+> `settle_payback_slot` model a PAYBACK-SLOT checkout (extension-worked clears the debt, never banks OT) — the
+> gap that blocked the settle cut-over. The settle shadow now COMPARES payback slots (was 'informational'),
+> staged. So `settle` is now flippable for ALL settle types; D2-settle = route settle through the net flag-off
+> (like points) once the shadow confirms slot agreement on real checkouts.
 - **D1:** generalize the replay-scorer (`scripts/replay_checkins.py` is the check-in one) to score points/payback/settle candidates on real history (the per-path net for D2 + the fix-bake-off).
 - **D2:** net + flip each, 1-by-1: recording → points → payback → settle. Each: per-path net (D1) → staging before/after on a real row → flag-off deploy → flip → watch. Auto-reverts on divergence.
 

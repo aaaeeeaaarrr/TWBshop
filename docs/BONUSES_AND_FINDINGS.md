@@ -944,6 +944,17 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   the check-in points events through `core.flip.decide('twb','points',…)`, parallel to C2; the bot.py points block
   builds the event LIST → routes → records the chosen list. FLAG OFF = byte-identical; FLAG ON = core.points owns
   points (parity-locked, auto-reverts). 6 tests. The flip is owner-gated (`set_authoritative('twb','points',True)`).
+- `[ship]` **core.settle PAYBACK-SLOT model (roadmap #5) CLOSED** — `payback_extension_window` (whole /
+  stay-late-tail / come-early-head) + `settle_payback_slot` (extension-worked clears the debt first, NEVER
+  banks OT); parity-tested vs the live `_settle_redefined_shift` branch + `gm_bot.ot.split_ot_pb` (6 tests).
+  Then `core.shadow_hook.shadow_settle` now COMPARES payback-slot settles via the model (live passes the
+  measured `ext_worked`) instead of recording 'informational' — additive + isolated (shadow gated/best-effort,
+  money logic untouched). **Unblocks the settle cut-over** — core can now score every settle type. Staged.
+- `[gotcha]` **A payback slot is settled differently from a normal/OT shift** — the credit is the EXTENSION
+  worked (the part beyond the normal portion: tail if stay-late, head if come-early, whole if a day-off slot),
+  measured directly against the window so a LATE arrival on the normal portion can't eat the repayment, and it
+  can NEVER bank OT (owner). This is why `core.settle.settle_shift` (the OT path) couldn't score it — a separate
+  model was needed.
 - `[decision]` **D1 replay-scorer is LOW value, D2 flips directly.** The money-math (`core.points`/`settle`/`ledger`)
   is already parity-locked + the flip-net already supports points/payback/settle, so D2 wires each path through the
   net flag-off (like C2) and the owner flips — no separate replay/scoring step needed. points = lowest-value D2 path

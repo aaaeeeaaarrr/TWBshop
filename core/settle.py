@@ -44,3 +44,34 @@ def settle_shift(worked_min: int, normal_len_min: int, pb_balance_min: int, bank
     return {"ot_earned": earned, "pb_cleared": pb_cleared, "ot_banked": ot_banked,
             "ot_dropped": ot - ot_banked, "new_pb": max(0, int(pb_balance_min)) - pb_cleared,
             "new_bank": int(bank_min) + ot_banked}
+
+
+# ── PAYBACK-SLOT settle (roadmap #5) — a redefine whose reason is "payback slot" repays a debt; it is
+# settled DIFFERENTLY from a normal/OT shift: the credit is the EXTENSION actually worked (the part of the
+# approved window that is over and above the normal portion), and it NEVER banks OT. Closing this gap lets
+# the platform score a payback-slot checkout (the settle shadow recorded these "informational" until now).
+
+def payback_extension_window(appr_start_min: int, appr_end_min: int, normal_len_min: int,
+                             start_unchanged: bool) -> tuple:
+    """The EXTENSION sub-window of an approved payback-slot shift [appr_start, appr_end] — the part that
+    repays the debt (the rest is the normal portion). All in ABSOLUTE minutes from a common base; the
+    caller passes appr_end = appr_start + duration so overnight is handled by construction. Rules (parity
+    with gm_bot/bot.py::_settle_redefined_shift): normal_len<=0 (a day-off slot) → the WHOLE window;
+    start unchanged (stay-late) → the TAIL [appr_start+normal_len, appr_end]; start moved earlier
+    (come-early) → the HEAD [appr_start, appr_end-normal_len]. Returns (ext_start_min, ext_end_min)."""
+    nlen = int(normal_len_min or 0)
+    if nlen <= 0:
+        return int(appr_start_min), int(appr_end_min)
+    if start_unchanged:
+        return int(appr_start_min) + nlen, int(appr_end_min)      # stay-late tail
+    return int(appr_start_min), int(appr_end_min) - nlen          # come-early head
+
+
+def settle_payback_slot(ext_worked_min: int, pb_balance_min: int) -> dict:
+    """A PAYBACK-SLOT checkout: the EXTENSION actually worked clears the debt FIRST; a slot NEVER banks OT
+    (owner, Jun 11 — it repays only, can't mint OT). Returns {pb_cleared, ot_banked(=0), new_pb}. Parity:
+    live does split_ot_pb(ext_worked, pb) then forces ot_banked=0. Pair with payback_extension_window +
+    worked_minutes(ci, co, ext_start, ext_end) to derive ext_worked from the real check-in/out."""
+    pb_cleared, _ot = split_ot_pb(ext_worked_min, pb_balance_min)
+    return {"pb_cleared": pb_cleared, "ot_banked": 0,
+            "new_pb": max(0, int(pb_balance_min)) - pb_cleared}

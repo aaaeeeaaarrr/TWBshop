@@ -8,12 +8,28 @@ The guarantees this locks (HIGH-RISK: live attendance/payroll path):
 
 All tests use throwaway org ids (never the live 'twb' flip row). conftest forces the staging DB.
 """
+import pytest
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from core import flip
 from gm_bot import checkin as ci
 from gm_bot.checkin_net import verdict_via_net
+
+
+@pytest.fixture(autouse=True)
+def _isolate_flip():
+    """Clear the c2t_* flip authority + divergence log before each test, so divergence rows accumulating
+    across suite re-runs can't trip the auto-revert threshold (the override test logs 1 divergence/run →
+    ~10 runs would otherwise auto-revert it, flipping its result). Test-isolation only."""
+    flip.init_flip_db()
+    from shared.database import _db
+    with _db() as c:
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM core_flip_log WHERE org_id LIKE %s", ("c2t_%",))
+            cur.execute("DELETE FROM core_flip WHERE org_id LIKE %s", ("c2t_%",))
+    yield
 
 TZ = ZoneInfo("Asia/Phnom_Penh")
 SD = "2026-06-29"

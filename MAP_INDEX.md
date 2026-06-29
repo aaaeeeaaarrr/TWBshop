@@ -122,7 +122,7 @@
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
     · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
-    · worked_minutes, ot_earned, split_ot_pb, settle_shift
+    · worked_minutes, ot_earned, split_ot_pb, settle_shift, payback_extension_window, settle_payback_slot
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
     · _record, compare_checkin, compare_settle, record_settle_info, mark_reconciled, _classify_checkin, _classify_settle, _classify_for, build_digest, comparison_stats, comparison_stats_by_kind, comparison_span, recent_mismatches
 - `core/shadow_hook.py` — core.shadow_hook — the SAFE bridge that runs the new platform core BESIDE the live bot.

@@ -56,7 +56,7 @@ def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early, reso
 
 
 def shadow_settle(staff: dict, shift_date, normal_len, pb_before, reason,
-                  live_worked, live_ot_banked, live_pb_cleared) -> None:
+                  live_worked, live_ot_banked, live_pb_cleared, ext_worked=None) -> None:
     """Run core's checkout-SETTLE math on the SAME real redefine checkout + record core-vs-live (the
     money split: OT banked / payback cleared). Best-effort + fully isolated; no-op unless shadow_run=on.
     `live_worked` is the worked-minutes live computed (used as the shared input so a ±1 worked-rounding
@@ -70,9 +70,18 @@ def shadow_settle(staff: dict, shift_date, normal_len, pb_before, reason,
         live = {"worked": int(live_worked), "ot_banked": int(live_ot_banked),
                 "pb_cleared": int(live_pb_cleared), "reason": reason or "redefine"}
         if (reason or "") == "payback slot":
-            record_settle_info("twb", staff["id"], live,
-                               "payback-slot ext-worked settle not modeled in core yet (roadmap #5)")
-            logger.info("[SHADOW] settle (payback-slot, informational) — %s", who)
+            # roadmap #5 CLOSED: core now scores a payback-slot settle (the EXTENSION worked clears the
+            # debt FIRST; a slot never banks OT). COMPARE when live passed the ext_worked it measured;
+            # fall back to informational only if it didn't (so a ±1 worked-rounding nuance can't masquerade).
+            if ext_worked is not None:
+                from core.settle import settle_payback_slot
+                out = settle_payback_slot(int(ext_worked), int(pb_before or 0))
+                new = {"worked": int(live_worked), "ot_banked": out["ot_banked"], "pb_cleared": out["pb_cleared"]}
+                agree = compare_settle("twb", staff["id"], live, new, source="live")
+                logger.info("[SHADOW] settle (payback-slot) %s — %s", "AGREE" if agree else "MISMATCH", who)
+            else:
+                record_settle_info("twb", staff["id"], live, "payback-slot settle: no ext_worked provided")
+                logger.info("[SHADOW] settle (payback-slot, informational) — %s", who)
             return
         from core.settle import settle_shift
         out = settle_shift(int(live_worked), int(normal_len or 0), int(pb_before or 0),

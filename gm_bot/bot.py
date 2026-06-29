@@ -2692,6 +2692,7 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
             return 0, ot_bank_balance(staff["id"])
         debt = payback_open_debt(staff["id"])
         pb = max(0, debt["minutes_owed"] - debt["minutes_paid"]) if debt else 0
+        ext_worked = None   # set in the payback-slot branch below; fed to the settle shadow (roadmap #5)
         if (sc.get("reason") or "") == "payback slot":
             # PAYBACK CREDIT = the EXTENSION actually worked, measured DIRECTLY against the extension
             # window — NOT worked−normal_len, which a LATE arrival on the normal portion silently
@@ -2737,7 +2738,7 @@ def _settle_redefined_shift(staff: dict, shift_date: str, now_pp) -> tuple[int, 
         try:   # SHADOW-RUN (gated off by default; fully isolated — core/shadow_hook.py): record core's
             from core.shadow_hook import shadow_settle      # settle math vs live's on this REAL checkout
             shadow_settle(staff, shift_date, sc.get("normal_len"), pb, (sc.get("reason") or ""),
-                          worked, ot_banked, pb_cleared)
+                          worked, ot_banked, pb_cleared, ext_worked=ext_worked)
         except Exception:
             pass
         return banked, new_bal
