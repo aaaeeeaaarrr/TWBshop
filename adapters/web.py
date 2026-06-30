@@ -35,6 +35,16 @@ def handle_request(method: str, path: str, body: dict, org_id: str = "twb"):
     return (200 if res.get("ok") else 400), res
 
 
+def _sanitize_network_body(body: dict) -> dict:
+    """Strip fields an UNTRUSTED HTTP client must not set (DL-F3): `config` would override the tenant's own
+    verdict/leave rules (e.g. grace_min=999 → never late). The server loads the tenant's real config itself; a
+    network caller never supplies it. (`org_id` is left in so handle_request still 403s it — an explicit reject,
+    not a silent strip.) In-process/test callers go through handle_request directly and may inject config."""
+    b = dict(body or {})
+    b.pop("config", None)
+    return b
+
+
 def serve(host: str = "127.0.0.1", port: int = 8080):  # pragma: no cover - optional runner
     """Thin stdlib HTTP server (no dependency). For a real deployment swap in any WSGI/ASGI host — the
     mapping (handle_request) is what matters; this just wires it to sockets.
@@ -56,7 +66,7 @@ def serve(host: str = "127.0.0.1", port: int = 8080):  # pragma: no cover - opti
                 body = json.loads(self.rfile.read(n) or b"{}")
             except json.JSONDecodeError:
                 body = {}
-            status, res = handle_request("POST", self.path, body)
+            status, res = handle_request("POST", self.path, _sanitize_network_body(body))
             payload = json.dumps(res, default=str).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")

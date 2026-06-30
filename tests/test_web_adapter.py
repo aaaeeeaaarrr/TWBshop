@@ -25,6 +25,13 @@ def test_body_org_id_is_rejected():
     assert status == 403 and "org_id" in res["error"]
 
 
+def test_network_body_strips_config():
+    """DL-F3: the HTTP network boundary drops a client-supplied `config` (it would override the tenant's own
+    verdict/leave rules). In-process callers (the tests above) still pass config to handle_request directly."""
+    clean = web._sanitize_network_body({"config": {"grace_min": 999}, "when": "2026-06-20T23:00:00+00:00"})
+    assert "config" not in clean and clean["when"] == "2026-06-20T23:00:00+00:00"
+
+
 def test_serve_defaults_to_localhost():
     """WEB-ADAPTER (s55): serve() must default to 127.0.0.1, never 0.0.0.0, until W3 auth exists."""
     import inspect

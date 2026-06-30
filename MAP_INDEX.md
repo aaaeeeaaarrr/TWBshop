@@ -20,7 +20,7 @@
 - `adapters/telegram_provision.py` — adapters.telegram_provision — the AUTO-CONFIGURE half of guided BotFather setup.
     · _verify_and_configure, provision
 - `adapters/web.py` — adapters.web — a WEB channel for the platform (the "web?" option in the onboarding wizard). Maps an
-    · handle_request, serve
+    · handle_request, _sanitize_network_body, serve
 
 ## b2b_bot/
 - `b2b_bot/__init__.py`
@@ -362,7 +362,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+67, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+69, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

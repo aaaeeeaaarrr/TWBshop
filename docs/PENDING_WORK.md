@@ -162,7 +162,14 @@
 - [ ] Company name decision (`docs/COMPANY_NAME_IDEAS.md`).
 - [ ] Public-exposure hardening (W3): set `ORG_SECRET_KEY` + CSRF + login rate-limit + HTTPS before anything is
       public. *(s57: `core_staff` sensitive-PII column encryption is now BUILT + gated on `ORG_SECRET_KEY` — setting
-      the key activates it; `core_org_secrets` already encrypts the same way. CSRF/rate-limit/HTTPS still to do.)*
+      the key activates it; `core_org_secrets` already encrypts the same way.)*
+  - [x] **W3 #1 — wizard builder-vs-customer role** (deny-by-default `_guard`; deployed inert; `tests/test_wizard_roles.py`).
+  - [x] **W3 #2 — auth FAIL-CLOSED + PII behind authz** (TI-F1 loopback fail-closed · TI-F2 no-user deny-closed ·
+        TI-F5 PII masked + write-belt · TI-F3 session↔org · DL-F2 generic web-checkin error · DL-F3 web-adapter
+        config strip). Wizard-only, INERT; `tests/test_wizard_auth_failclosed.py` (11). 2026-06-30.
+  - [ ] **W3 #4 — CSRF + login rate-limit** (TI-F4/F6) — the next focused pass (crosses every POST form).
+  - [ ] **W3 #5 — move the gm monitoring jobs to a builder service** (Sep-F2) — structural; deploy touches live gm (owner-gated).
+  - [ ] `ORG_SECRET_KEY` (owner) · HTTPS (owner, public-hosting step).
 
 ## 📚 Standing open loops (older threads — detail in ROADMAP / HISTORY)
 - [ ] Accountant bot — P2 HIGH-RISK money matcher + the staging walk + Bakong.

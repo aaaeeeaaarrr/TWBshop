@@ -1,5 +1,6 @@
-"""Wizard auth (W3 foundation): OFF by default (localhost open); when WIZARD_AUTH=1, login is required —
-except when no users exist yet (no lockout, so the owner can seed). Passwords are hashed, never plaintext."""
+"""Wizard auth (W3 foundation): OFF by default (localhost open); when WIZARD_AUTH=1, login is required.
+The no-user bootstrap window is DENY-CLOSED (→ /login, not wide open — TI-F2); the owner seeds the first
+user via CLI (create_user). Passwords are hashed, never plaintext."""
 import core.db as cdb
 from shared.database import _db
 import wizard.app as wa
@@ -36,10 +37,20 @@ def test_auth_off_is_open(monkeypatch):
     assert create_app(ORG).test_client().get("/").status_code == 200
 
 
-def test_auth_on_no_users_no_lockout(monkeypatch):
+def test_auth_on_no_users_failclosed_not_lockout(monkeypatch):
+    """Auth ON + no user seeded yet: the console is DENY-CLOSED (→ /login), NOT wide open (TI-F2 fix). No
+    permanent lockout — the owner seeds the first builder via CLI (create_user) then logs in."""
     _clean()
     monkeypatch.setattr(wa, "auth_enabled", lambda: True)
-    assert create_app(ORG).test_client().get("/").status_code == 200     # no users → not locked out
+    try:
+        c = create_app(ORG).test_client()
+        r = c.get("/")
+        assert r.status_code in (302, 303) and "/login" in r.headers["Location"]   # fail-closed, not 200-open
+        create_user(ORG, "owner", "pw")                                            # seed (CLI) → no lockout
+        c.post("/login", data={"username": "owner", "password": "pw"})
+        assert c.get("/").status_code == 200                                       # reaches the console
+    finally:
+        _clean()
 
 
 def test_auth_on_requires_login_then_lets_in(monkeypatch):

@@ -12,7 +12,9 @@ SECRETS (bot tokens etc.) live in the encrypted org-secret store, are NEVER rend
 and are never written to the readable config. Apply validates server-side + writes ONLY whitelisted knobs.
 Auth + CSRF + encryption-at-rest land in W3 (with public access).
 """
+import ipaddress
 import json
+import logging
 import os
 import re
 from html import escape
@@ -29,7 +31,7 @@ from core.shadow import comparison_stats, comparison_stats_by_kind, recent_misma
 from core.reports import attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 from core import exceptions as exc
 from core.onboarding_flow import (list_staff, add_staff_manual, remove_staff, get_staff, update_staff,
-                                  update_staff_profile, PROFILE_TEXT, PROFILE_DATE, PROFILE_BOOL,
+                                  update_staff_profile, PROFILE_TEXT, PROFILE_DATE, PROFILE_BOOL, _SENSITIVE_PII,
                                   list_groups, set_group_role, GROUP_ROLES,
                                   list_candidates, group_id_for_role,
                                   ensure_checkin_token, staff_by_checkin_token)
@@ -531,8 +533,14 @@ def render_staff(org_id: str) -> str:
 
 
 def _pf(label, name, value, typ="text", ph="", sensitive=False):
-    """One labelled profile field. `sensitive` marks PII (owner-only today; encrypt before public — W3)."""
+    """One labelled profile field. `sensitive` marks PII → gated behind _pii_authorized() (TI-F5): an
+    unauthorized session gets a masked, read-only field and the raw value is NEVER emitted into the page
+    (and it carries no `name`, so it can't be POSTed back to overwrite the stored value)."""
     lock = " <span style='color:#9333ea'>🔒</span>" if sensitive else ""
+    if sensitive and not _pii_authorized():
+        return ("<div style='margin:5px 0'><label style='display:inline-block;width:215px;color:#374151'>%s%s"
+                "</label><input type='text' value='•••• hidden' disabled "
+                "style='width:250px;color:#9ca3af'></div>" % (escape(label), lock))
     return ("<div style='margin:5px 0'><label style='display:inline-block;width:215px;color:#374151'>%s%s</label>"
             "<input type='%s' name='%s' value='%s' placeholder='%s' style='width:250px'></div>"
             % (escape(label), lock, typ, escape(name), escape("" if value is None else str(value)), escape(ph)))
@@ -1859,6 +1867,16 @@ def auth_enabled() -> bool:
     return os.environ.get("WIZARD_AUTH") == "1"
 
 
+def _is_loopback_request() -> bool:
+    """True iff the request's TCP peer is loopback (127.0.0.0/8 or ::1). Uses request.remote_addr — the real
+    peer — NEVER a spoofable X-Forwarded-For. Through the SSH tunnel the peer is 127.0.0.1, so the owner's
+    localhost workflow reads as loopback (inert); a direct public hit on an accidental 0.0.0.0 bind does not."""
+    try:
+        return ipaddress.ip_address((request.remote_addr or "").strip()).is_loopback
+    except ValueError:
+        return False
+
+
 # ── ROLE: builder (us, the platform operator) vs customer (a client business) — deny-by-default authz ──
 # PRODUCT SECURITY & IP law: a logged-in CLIENT must never reach the builder/cut-over console. Anything a
 # customer may reach is in CUSTOMER_OK; everything NOT listed is BUILDER-only → a new route can't silently
@@ -1901,19 +1919,41 @@ def _is_builder_session() -> bool:
         return False
 
 
+PII_ROLES = frozenset({"builder", "owner", "customer"})   # entitled to view their own org's employee PII
+
+
+def _pii_authorized() -> bool:
+    """May the current session view employee PII (national id · passport · tax · SSN · address · bank)?
+    Deny-by-default (TI-F5): auth OFF → the owner's localhost (yes — inert); auth ON → only a known role.
+    A future lesser/unknown role gets MASKED PII, never the raw value."""
+    if not auth_enabled():
+        return True
+    try:
+        return session.get("role") in PII_ROLES
+    except Exception:
+        return False
+
+
 def _builder_link(html: str) -> str:
     """A nav fragment pointing at a BUILDER route — shown to a builder, hidden from a customer (so a customer
     page carries no admin/cut-over links). Inert (shows) while auth is OFF, preserving the owner's view."""
     return html if _is_builder_session() else ""
 
 
-def render_login() -> str:
+def render_login(org_id: str = "twb") -> str:
     err = ("<div class='saved' style='background:#fee2e2;border-color:#fca5a5'>Wrong username or password.</div>"
            if request.args.get("err") else "")
-    body = ("<h1>🔒 Wizard login</h1>%s<div class='box'><form method='post' action='/login'>"
+    hint = ""
+    try:
+        if user_count(org_id) == 0:                     # transient bootstrap state — guide the operator
+            hint = ("<div class='saved' style='background:#fef3c7;border-color:#fcd34d'>⚙ No accounts exist "
+                    "yet — seed the first user on the server, then log in.</div>")
+    except Exception:
+        pass
+    body = ("<h1>🔒 Wizard login</h1>%s%s<div class='box'><form method='post' action='/login'>"
             "Username <input type='text' name='username'><br><br>"
             "Password <input type='password' name='password'><br><br>"
-            "<button type='submit'>Log in</button></form></div>" % err)
+            "<button type='submit'>Log in</button></form></div>" % (err, hint))
     return _page("Login", body)
 
 
@@ -1946,8 +1986,9 @@ def _do_web_checkin(staff: dict, lat, lon) -> dict:
                             grace_min=int(v.get("grace_min", 5)), early_bonus_min=int(v.get("early_bonus_min", 5)))
         res["ok"] = res.get("bound", False)
         return res
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:120]}
+    except Exception:
+        logging.getLogger("wizard").exception("web check-in failed (staff %s)", staff.get("staff_id"))
+        return {"ok": False, "error": "couldn't check you in — please try again"}   # generic (DL-F2: no raw exc)
 
 
 def _do_web_checkout(staff: dict, lat, lon) -> dict:
@@ -1961,8 +2002,9 @@ def _do_web_checkout(staff: dict, lat, lon) -> dict:
                              w["start"], w["end"], "Asia/Phnom_Penh")
         res["ok"] = res.get("bound", False)
         return res
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:120]}
+    except Exception:
+        logging.getLogger("wizard").exception("web check-out failed (staff %s)", staff.get("staff_id"))
+        return {"ok": False, "error": "couldn't check you out — please try again"}   # generic (DL-F2)
 
 
 def render_checkin(token: str, result: dict = None) -> str:
@@ -2197,11 +2239,28 @@ def create_app(org_id: str = "twb") -> Flask:
 
     @app.before_request
     def _guard():
-        if not auth_enabled() or request.endpoint in AUTH_EXEMPT:
-            return       # auth off (localhost/tunnel) or a public endpoint (staff token check-in, login…)
+        # TI-F1 — FAIL-CLOSED backstop: with auth OFF the wizard is a localhost-only tool (the SSH tunnel IS
+        # the auth). Refuse any NON-loopback request, so an accidental public / 0.0.0.0 bind without
+        # WIZARD_AUTH=1 still can't expose the console. Inert today (bound to 127.0.0.1 + tunnelled → every
+        # peer is loopback). When auth is ON, public peers are expected and fall through to the login gate.
+        if not auth_enabled():
+            if not _is_loopback_request():
+                abort(403)
+            return
+        if request.endpoint in AUTH_EXEMPT:
+            return       # public endpoints under auth: login, static, health, the staff token check-in
+        # TI-F2 — bootstrap window: auth ON but no user seeded yet. Do NOT open the whole console; allow only
+        # the exempt routes above and send everything else to login. Seed the first builder server-side
+        # (core.db.create_user(org, user, pw, role='builder')) then log in — no lockout (seeding is CLI, not web).
         if user_count(org_id) == 0:
-            return       # no users yet → don't lock out (seed the first builder, then flip WIZARD_AUTH=1)
+            return redirect("/login")
         if not session.get("user"):
+            return redirect("/login")
+        # TI-F3 — session↔org binding: a session is valid ONLY for the tenant it logged into. At multi-tenant
+        # (one process serving several orgs, or a shared WIZARD_SECRET across per-org processes) this stops a
+        # cookie minted for org A being replayed against org B. Mismatch / legacy session → clear + re-login.
+        if session.get("org") != org_id:
+            session.clear()
             return redirect("/login")
         if _is_builder(session.get("role")):
             return       # builder → everything
@@ -2412,6 +2471,9 @@ def create_app(org_id: str = "twb") -> Flask:
             # universal HR-profile fields (the core whitelist decides what's writable — no arbitrary columns)
             prof = {k: request.form.get(k) for k in (PROFILE_TEXT + PROFILE_DATE) if k in request.form}
             prof.update({k: (k in request.form) for k in PROFILE_BOOL})
+            if not _pii_authorized():                  # TI-F5 server-side belt: an unauthorized POST can't
+                for k in _SENSITIVE_PII:               # write PII even with a hand-crafted form
+                    prof.pop(k, None)
             update_staff_profile(org_id, sid, prof)
             return redirect("/staff/edit/%d?saved=1" % sid)
         return redirect("/staff")
@@ -2485,7 +2547,7 @@ def create_app(org_id: str = "twb") -> Flask:
 
     @app.get("/login")
     def login():
-        return render_login()
+        return render_login(org_id)
 
     @app.post("/login")
     def login_post():
@@ -2494,6 +2556,7 @@ def create_app(org_id: str = "twb") -> Flask:
         if role:
             session["user"] = u
             session["role"] = role
+            session["org"] = org_id                       # bind the session to THIS tenant (TI-F3)
             return redirect("/" if _is_builder(role) else "/customer")   # a customer landing on / would 403
         return redirect("/login?err=1")
 

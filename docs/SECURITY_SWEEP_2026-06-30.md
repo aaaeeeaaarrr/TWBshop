@@ -35,14 +35,27 @@ customer pages. Wizard-only, INERT until `WIZARD_AUTH=1`; `tests/test_wizard_rol
 activation: seed a builder + flip `WIZARD_AUTH=1`. ⚠ a client user MUST be created `role='customer'`. The
 items below are the REMAINING W3 work (each still localhost-mitigated).
 
+**UPDATE 2026-06-30 — W3 #2 DONE (auth FAIL-CLOSED + PII behind authz):** three invariants now hold in the
+single HTTP chokepoint (`wizard/app.py::_guard`), all INERT for the owner's localhost/tunnel workflow:
+- **TI-F1 fixed** — `_is_loopback_request()` (real TCP peer, never a spoofable `X-Forwarded-For`); with auth
+  OFF a NON-loopback request is `403`'d, so an accidental public / `0.0.0.0` bind without `WIZARD_AUTH=1`
+  can't expose the console. Today's bind (127.0.0.1 + tunnel → every peer is loopback) is unchanged.
+- **TI-F2 fixed** — the no-user bootstrap window is now DENY-CLOSED (auth ON + 0 users → everything → `/login`,
+  not wide-open). No lockout: the first builder is seeded server-side via `core.db.create_user(...)` (CLI), and
+  `/login` shows a bootstrap hint.
+- **TI-F5 fixed** — `_pii_authorized()` gates the 6 PII fields (national_id · passport · tax_id · SSN · address
+  · bank): an unauthorized session sees a masked, name-less field (raw value never emitted) AND a server-side
+  belt in `/staff/update` strips `_SENSITIVE_PII` from a non-authorized POST (can't overwrite). Encryption-at-rest
+  is already built — the owner just sets `ORG_SECRET_KEY`. Guard: `tests/test_wizard_auth_failclosed.py` (11).
+
 ## PARKED — pre-public ("W3") / multi-client structural (mitigated now by localhost + single-tenant)
 Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role system / public hardening).
 
 ### Tenant isolation (wizard) — the real cross-tenant gate, all behind the localhost bind today
-- **TI-F1 (HIGH@public)** wizard auth OFF by default (`WIZARD_AUTH`), `wizard/app.py:1855`. Fail-closed off-loopback.
-- **TI-F5 (HIGH@public)** PII (national_id/passport/tax_id/SSN/bank) rendered with no auth (`app.py:546`); set `ORG_SECRET_KEY`.
-- **TI-F3 (HIGH@multi-tenant)** session has no org binding (`app.py:2145`); at multi-tenant, store + re-check `org_id` per request, never trust host/path.
-- **TI-F2 (MED/HIGH)** auth bypassed when an org has no seeded user (`app.py:2155`) — allow only a bootstrap route.
+- **TI-F1 ✅ FIXED 2026-06-30** — loopback fail-closed in `_guard` (auth OFF → a non-loopback peer is 403'd).
+- **TI-F5 ✅ FIXED 2026-06-30** — PII behind `_pii_authorized()` (masked render + server-side write belt); set `ORG_SECRET_KEY` to encrypt at rest (already built).
+- **TI-F3 (HIGH@multi-tenant)** session has no org binding (`app.py:2145`); at multi-tenant, store + re-check `org_id` per request, never trust host/path. **← NEXT W3 pass.**
+- **TI-F2 ✅ FIXED 2026-06-30** — the no-user bootstrap window is deny-closed (→ `/login`), only a CLI-seeded builder gets in.
 - **TI-F4 (MED)** no CSRF on state-changing POSTs (apply/staff-del/payroll-run/till-close…).
 - **TI-F6 (LOW/MED)** public token check-in routes un-rate-limited (isolation itself is correct: org is token-derived).
 - **TI-F7 (LOW)** 2 latent cross-org queries not route-reachable (`core/shadow.py:68,168`) — scope before exposing.
@@ -81,8 +94,8 @@ Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role 
 ## Prioritized order before any public / multi-client exposure (W3)
 1. Wizard **builder-vs-customer role** (Sep-F3 + DL-F1) — gate `/`, `/shadow`, `/whatif`, badges, cut-over;
    strip `← admin` from customer pages. *The one place a client could see builder machinery.*
-2. **Auth fail-closed + PII behind authz + `ORG_SECRET_KEY`** (TI-F1, TI-F5).
-3. **Session↔org binding** (TI-F3) — the actual cross-tenant gate at multi-tenant.
+2. ✅ **DONE — Auth fail-closed + PII behind authz** (TI-F1, TI-F2, TI-F5); `ORG_SECRET_KEY` is owner-gated.
+3. **Session↔org binding** (TI-F3) — the actual cross-tenant gate at multi-tenant. **← NEXT.**
 4. **CSRF + rate-limit + HTTPS** (TI-F4, TI-F6); generic web-checkin errors (DL-F2); strip web-adapter
    client-config override + `shift_id` (DL-F3/F4).
 5. **Move the monitoring jobs to a builder service** (Sep-F2) at multi-client.

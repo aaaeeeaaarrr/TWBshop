@@ -1064,3 +1064,42 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   **D1 fix-bake-off:** the check-in replay-scorer already exists (`scripts/replay_checkins.py`); the
   "N candidate fixes → score on real history → pick best" is a PROCESS I can run on-demand via replay +
   multi-agent; a generic per-path scorer is future (pairs with the per-path flips).
+
+### 🔒 W3 #2/#3 — wizard auth FAIL-CLOSED + PII behind authz + session↔org binding (2026-06-30, wizard-only, INERT)
+- `[ship]` **TI-F1 auth fail-closed off-loopback** — `wizard/app.py::_guard` now refuses any NON-loopback request
+  when `WIZARD_AUTH` is off (`_is_loopback_request()` checks the real TCP peer, never a spoofable
+  `X-Forwarded-For`). So an accidental public / `0.0.0.0` bind WITHOUT the auth flag can no longer expose the
+  console — "localhost is the auth" is now enforced by code, not just by the bind. INERT today (127.0.0.1 + SSH
+  tunnel → every peer is loopback → byte-identical).
+- `[ship]` **TI-F2 no-user bootstrap is deny-closed** — auth ON + 0 users used to OPEN the whole console
+  ("no lockout"); now it redirects everything to `/login` and the owner seeds the first builder via CLI
+  (`create_user`). Same anti-lockout outcome, without the wide-open window. Updated the old
+  `test_auth_on_no_users_no_lockout` to assert the new (correct) contract.
+- `[ship]` **TI-F5 PII behind authz** — `_pii_authorized()` gates the 6 PII fields (national_id · passport ·
+  tax_id · SSN · address · bank): an unauthorized session gets a masked, **name-less** input (raw value never
+  emitted, can't be POSTed back) AND `/staff/update` strips `_SENSITIVE_PII` from a non-authorized POST
+  server-side (a hand-crafted form can't overwrite PII). Pairs with the already-built encryption-at-rest
+  (owner sets `ORG_SECRET_KEY`).
+- `[ship]` **TI-F3 session↔org binding** — login stamps `session['org']=org_id`; the guard rejects (clears +
+  re-login) any session whose org ≠ this process's org. Stops a cookie minted for org A being replayed against
+  org B at multi-tenant / shared-`WIZARD_SECRET`. Forward-compat belt (single-tenant-per-process today → inert).
+- `[ship]` **DL-F2 generic web-checkin error** — `_do_web_checkin/out` now log the exception server-side and
+  return a generic "couldn't … try again" (was `str(e)[:120]` → could leak a DB host / internal path to the
+  staffer's browser).
+- `[ship]` **DL-F3 web-adapter strips a client `config`** — `adapters/web.py::_sanitize_network_body` drops a
+  body `config` at the HTTP boundary (it could override the tenant's own verdict rules, e.g. grace=999 → never
+  late). In-process/test callers still inject config via `handle_request` directly. (The adapter is still INERT
+  — no runner wires it; this is defense-in-depth for when one does.)
+- `[gotcha]` **Changing a security DEFAULT will (correctly) break the test that pinned the OLD behavior.** The
+  full suite caught exactly one failure — `test_auth_on_no_users_no_lockout` — which encoded the pre-fix
+  "no-user = open" rule. That's the guard working: a behavior change MUST update its pinning test (I updated it
+  to assert deny-closed), never silence it. 1 failure, 0 surprises.
+- `[gotcha]` **Mask editable PII by dropping the field `name`, not by masking its value.** A masked *value* in
+  an editable field would be submitted back and overwrite the real PII. The masked control is `disabled` + has
+  no `name` → the browser never submits it → zero corruption risk; the server-side strip is the real enforcement.
+- `[sell]` **"Bind it to localhost and it's already safe; expose it and it fails closed."** The wizard can be a
+  trivially-secure single-tenant tool today AND not become a liability the instant someone mis-binds it — a clean
+  security story for a product that ships to many operators of varying skill.
+- `[decision]` **CSRF + login rate-limit (TI-F4/F6) deferred to their own focused pass** — they cross every POST
+  form (broad surface), so they're cleaner as a dedicated change than bundled here. `ORG_SECRET_KEY` + HTTPS stay
+  owner-gated (public-hosting step). Guard: `tests/test_wizard_auth_failclosed.py` (11) + the web-adapter test.
