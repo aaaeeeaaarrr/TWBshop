@@ -9,6 +9,23 @@
 
 ## Done (with proof)
 
+- **2026-06-30 — W3 #2/#3 WIZARD AUTH FAIL-CLOSED + PII-BEHIND-AUTHZ + SESSION↔ORG built + DEPLOYED + VERIFIED
+  (wizard-only, INERT until WIZARD_AUTH=1; no live-bot/data change).** Auto-bedrock (security/permissions).
+  Hardened the single HTTP auth chokepoint `wizard/app.py::_guard`: **TI-F1** loopback fail-closed (auth-off +
+  a non-loopback peer → 403, so an accidental public/0.0.0.0 bind can't expose the console) · **TI-F2** no-user
+  bootstrap deny-closed (→ /login, was wide-open) · **TI-F5** the 6 PII fields masked + name-less for an
+  unauthorized session + a server-side write-belt in /staff/update (a hand-crafted POST can't overwrite PII) ·
+  **TI-F3** session↔org binding (a cookie minted for org A can't drive org B) · **DL-F2** generic web-checkin
+  error (was raw `str(e)`) · **DL-F3** web-adapter strips a client `config` at the HTTP boundary. 11 new guard
+  tests (`tests/test_wizard_auth_failclosed.py`) + updated the old no-lockout test to the deny-closed contract;
+  suite 1290p/0f. Per-arc sweep: only 2 HTTP surfaces repo-wide (wizard + the inert web-adapter), both handled.
+  **PROOF (tag `session-58-w3-failclosed-20260630`=`d71e824`):** server HEAD==`d71e824`==tag; twbshop-wizard
+  restarted (MainPID 1564915, NRestarts 0, clean boot "Wizard viewer … on 127.0.0.1:8090", no traceback);
+  deployed code carries the change (grep `_is_loopback_request`/`_pii_authorized`=6, `_sanitize_network_body`=2);
+  WIZARD_AUTH unset → localhost:8090/ returns **200** (byte-identical no-op = inert proof); **bots UNTOUCHED —
+  gm pid 1546601 unchanged, retail/listener/hire active, b2b inactive (known)**. No data moved. Owner-gated
+  activation unchanged: seed a builder + `WIZARD_AUTH=1`; `ORG_SECRET_KEY` (PII encryption) + HTTPS still owner.
+
 - **2026-06-30 — W3 #1 WIZARD BUILDER-vs-CUSTOMER ROLE built + DEPLOYED + VERIFIED (wizard-only, INERT until
   WIZARD_AUTH=1; no live-bot/data change).** Closes the security core of Sep-F3 + DL-F1 (a logged-in client
   is 403'd from the builder/cut-over console). Deny-by-default `_guard` + CUSTOMER_OK allowlist (route-verified
