@@ -9,6 +9,17 @@
 
 ## Done (with proof)
 
+- **2026-06-30 — W3 #1 WIZARD BUILDER-vs-CUSTOMER ROLE built + DEPLOYED + VERIFIED (wizard-only, INERT until
+  WIZARD_AUTH=1; no live-bot/data change).** Closes the security core of Sep-F3 + DL-F1 (a logged-in client
+  is 403'd from the builder/cut-over console). Deny-by-default `_guard` + CUSTOMER_OK allowlist (route-verified
+  against the code) + role-aware login + `'owner'`-alias anti-lockout + admin nav links hidden from customer
+  pages + `core/db.py` role-column self-migrate. 8 tests (`tests/test_wizard_roles.py`); suite 1278p.
+  **PROOF (tag `session-58-wizard-role-20260630`=`3cbd697`):** server HEAD=3cbd697; twbshop-wizard/hire/
+  automations restarted (all active, clean boot); WIZARD_AUTH unset → wizard localhost:8090/ returns 200
+  (byte-identical no-op); gm UNTOUCHED (PID 1546601). Also landed sweep F4 (hire) + automations redaction;
+  gm-F1 (test-watchdog) batched. **Owner-gated activation: `create_user('twb',u,pw,role='builder')` then
+  WIZARD_AUTH=1. ⚠ a client user MUST be created role='customer' (default 'owner'=builder).**
+
 - **2026-06-30 — 3 MORE client/builder leaks found (EXHAUSTIVE sweep) + fixed (owner: "full due diligence; no
   more system things from the GM bot"; routing fix, NO data change).** The first audit checked only the gm
   PROCESS; this swept EVERY sender (full server crontab · every `api.telegram.org/bot` POST · every
