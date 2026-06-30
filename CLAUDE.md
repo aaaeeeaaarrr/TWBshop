@@ -57,6 +57,28 @@ mirrored to the global rules on request via `python bootstrap.py --push-global`.
 
 ---
 
+## ▶▶ DRASTIC / STRUCTURAL-CHANGE PROTOCOL — sweep the CLASS, never the one instance (owner, 2026-06-30)
+Born from a SHALLOW fix: asked to stop the GM (client) bot sending BUILDER/system messages, I fixed the one
+file I was shown — and left **3 more leaks** (a cron, a watchdog, a service) because I audited one file, not
+the CLASS. As TWBshop converts into CLIENT #1 and this project becomes the PRODUCT sold to many clients, most
+asks are STRUCTURAL (a law / convention / separation / rename / "always"/"never"/"everywhere"). For ANY such
+change, **AUTO-BEDROCK THE SCOPE** (not just the deploy mechanics):
+1. **Sweep the whole repo for the CLASS, not the instance.** GREP every place the pattern can live — every
+   file · caller · sender · cron · service · channel · bot — not just the one shown. Blast radius is GREPPED,
+   not guessed (Rule 4's per-arc sweep, made MANDATORY + automatic here). "I found and fixed it" is FALSE
+   until the grep is exhaustive (process AND crons AND services AND scripts, not one file).
+2. **ENUMERATE → classify → fix each.** List every instance; classify (does the law apply, or is it a real
+   exception?); fix or justify each, out loud.
+3. **Leave a STRUCTURAL GUARD.** Add a regression test that FAILS on a NEW violation, so the law is enforced
+   by the suite FOREVER, not by my memory (e.g. `tests/test_client_builder_separation.py`). A law without a
+   guard is a hope.
+4. **REPORT the full enumerated list + the guard** — never claim "fixed" from one example.
+Trigger shapes: law · rule · convention · separation · rename · migration · "always/never/everywhere/all/
+every" · "drastic" · anything defining how the PRODUCT behaves across clients. **When unsure whether a change
+is structural, TREAT IT AS STRUCTURAL.** (Mirror to global on request: `python bootstrap.py --push-global`.)
+
+---
+
 ## ▶ BONUSES & FINDINGS — always capture (standing practice, owner 2026-06-23)
 As we build, ALWAYS append the **bonuses** (unexpected wins · sellable angles · leverage) and **findings**
 (discoveries · gotchas · decisions) to **`docs/BONUSES_AND_FINDINGS.md`** — capture EVERYTHING, the owner

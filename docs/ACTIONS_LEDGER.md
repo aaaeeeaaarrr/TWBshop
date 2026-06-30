@@ -20,7 +20,11 @@
   route to Monitor; monitor.py/monitor_bot.py ARE the Monitor; automations + gm owner-menu + gm client-ops
   (no-show/AL/pay) are genuinely CLIENT (correct on GM); fetch_report_receipts doesn't send. Deploy =
   git-checkout on the server (crons auto-pick-up) + restart twbshop-listener; gm UNCHANGED (not restarted).
-  [proof appended after deploy]
+  **PROOF (deployed tag `session-58-separation-sweep-20260630`=`bf6935f`):** server HEAD=bf6935f; all 3 files
+  carry `notify_monitor`, 0 `GM_BOT_TOKEN` sends left in them; twbshop-listener restarted (PID 1557586, NR=0,
+  active); **gm UNTOUCHED (PID 1546601 unchanged)**; REAL-PATH PROOF — `morning_report.py --send` on prod
+  printed "(--send: delivered via Monitor)" → the digest now arrives on @TWB_Monitor_bot, not the GM bot.
+  STRUCTURAL GUARD added: `tests/test_client_builder_separation.py` (fails on any new client-token system POST).
 
 - **2026-06-30 — CLIENT/BUILDER LEAK FIXED + DEPLOYED + VERIFIED (owner-caught; routing fix, NO data change).**
   Owner saw the 21:45 [SHADOW] nightly digest arrive on the CLIENT GM bot (@twb_gm_bot) — a builder/system
