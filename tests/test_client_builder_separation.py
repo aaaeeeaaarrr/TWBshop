@@ -76,3 +76,41 @@ def test_the_2026_06_30_leak_fixes_stay_fixed():
         "the gm shadow digest must route via the Monitor (_monitor_send_sync), not context.bot"
     assert 'await _alarm(context, "dead_button"' in gm, \
         "the gm dead-button alert must route via _alarm (Monitor + sink), not context.bot"
+    # the 2 in-process PTB leaks the exhaustive sweep found (test-watchdog in gm, hire assessment pipeline)
+    assert 'await _alarm(context, "test_watchdog"' in gm, \
+        "the gm TEST WATCHDOG must route via _alarm (Monitor + sink), not context.bot"
+    hire = (REPO / "hire_bot/assessment_pipeline.py").read_text(encoding="utf-8", errors="replace")
+    assert "notify_monitor" in hire, \
+        "the hire assessment-pipeline failure must route via the Monitor (notify_monitor), not the hire bot"
+
+
+# Builder keywords that must NEVER sit next to a client-bot owner-DM (they mark a builder/system message).
+_BUILDER_KW = ("watchdog", "sentinel", "pipeline failed", "traceback", "copy to claude", "shadow digest")
+_BOT_FILES = ("gm_bot/bot.py", "hire_bot/assessment_pipeline.py", "hire_bot/bot.py",
+              "b2b_bot/bot.py", "telegram_bot/bot.py", "accountant/bot.py")
+
+
+def test_no_builder_keyword_owner_dm_via_a_client_bot():
+    """The IN-PROCESS PTB blind spot the raw-POST guard can't see (F1/F4, found by the 2026-06-30 exhaustive
+    sweep): a `context.bot`/`bot.send_message` to the OWNER whose nearby text carries a BUILDER keyword must
+    route via `_alarm` (gm) or `shared.monitor_notify` (other bots) — never a client bot's own send. Heuristic
+    tripwire with tight keywords (avoids false positives on client-ops DMs); the DRASTIC-CHANGE protocol in
+    CLAUDE.md covers the semantic rest."""
+    offenders = []
+    for rel in _BOT_FILES:
+        p = REPO / rel
+        if not p.exists():
+            continue
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+        for i, ln in enumerate(lines):
+            if "send_message(" not in ln:
+                continue
+            window = "\n".join(lines[i:i + 6])           # the call + a few lines of its argument text
+            if "OWNER_TELEGRAM_ID" not in window:
+                continue
+            if any(kw in window.lower() for kw in _BUILDER_KW):
+                offenders.append("%s:%d" % (rel, i + 1))
+    assert not offenders, (
+        "Builder-keyword owner-DM sent via a CLIENT bot at: %s\n"
+        "Route builder/system messages via _alarm (gm) or shared.monitor_notify (other bots) — NOT the "
+        "client bot's own send (owner 2026-06-30: no system things on a client bot)." % offenders)

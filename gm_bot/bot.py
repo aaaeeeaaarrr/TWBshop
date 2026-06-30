@@ -6297,19 +6297,13 @@ async def _test_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     if new:
         body = ("🚨 TEST WATCHDOG — %d new inconsistency(ies) just appeared in your test rows "
                 "(copy to Claude):\n\n" % len(new)) + "\n".join("• " + p for p in new)
-        for i in range(0, len(body), 3500):
-            try:
-                await context.bot.send_message(config.OWNER_TELEGRAM_ID, body[i:i + 3500])
-            except Exception:
-                break
+        # builder/system concern → Monitor + sink (like the live watchdog), NOT the client GM bot
+        await _alarm(context, "test_watchdog", body, severity="warn")
     elif cleared:
-        try:
-            await context.bot.send_message(
-                config.OWNER_TELEGRAM_ID,
-                "✅ Test watchdog: %d issue(s) cleared%s." %
-                (len(cleared), "" if not still_open else " (%d still open)" % still_open))
-        except Exception:
-            pass
+        await _alarm(context, "test_watchdog",
+                     "✅ Test watchdog: %d issue(s) cleared%s." %
+                     (len(cleared), "" if not still_open else " (%d still open)" % still_open),
+                     severity="warn")
     gm_set_state("test_watchdog_last", cur_json)
 
 

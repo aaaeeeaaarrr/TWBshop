@@ -1,8 +1,23 @@
 """D2 — the points cut-over net (gm_bot.checkin_net.points_via_net through core.flip 'points').
 FLAG OFF (default) → byte-identical to live's events; FLAG ON → core.points.checkin_points is authoritative
 (parity-locked → same result), auto-reverting on divergence. Throwaway orgs; conftest forces staging."""
+import pytest
+
 from core import flip
 from gm_bot.checkin_net import points_via_net
+
+
+@pytest.fixture(autouse=True)
+def _isolate():
+    """Clear the d2pts_* flip authority + divergence log before each test, so divergence rows accumulating
+    across suite re-runs can't trip the auto-revert threshold (same lesson as the C2/settle flip tests)."""
+    flip.init_flip_db()
+    from shared.database import _db
+    with _db() as c:
+        with c.cursor() as cur:
+            cur.execute("DELETE FROM core_flip_log WHERE org_id LIKE %s", ("d2pts_%",))
+            cur.execute("DELETE FROM core_flip WHERE org_id LIKE %s", ("d2pts_%",))
+    yield
 
 
 def test_flag_off_returns_live_events():

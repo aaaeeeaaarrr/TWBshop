@@ -26,6 +26,11 @@ handler = RotatingFileHandler("logs/automations.log", maxBytes=5_000_000, backup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                     handlers=[handler, logging.StreamHandler()])
 logger = logging.getLogger("automations")
+try:                                            # redact bot tokens from logs — this runner resolves live tokens
+    from shared.log_redact import install_log_hygiene
+    install_log_hygiene()
+except Exception:
+    pass
 
 from core.db import init_core_db
 from core import automations as au

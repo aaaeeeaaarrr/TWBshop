@@ -105,14 +105,16 @@ async def run_full_assessment(
 
     except Exception as e:
         logger.error("run_full_assessment failed for attempt %s: %s", attempt_id, e, exc_info=True)
-        # Fail silently — quiz completion must not be blocked by assessment failure
+        # Fail silently — quiz completion must not be blocked by assessment failure. The failure itself is a
+        # BUILDER/system concern (degraded machinery + a raw error) → route to the MONITOR bot, NOT the client
+        # hire bot (client/builder separation law, 2026-06-30).
         try:
-            await bot.send_message(
-                __import__("config").OWNER_TELEGRAM_ID,
-                f"⚠️ Assessment pipeline failed for attempt #{attempt_id}.\n"
-                f"Error: {str(e)[:300]}\n"
-                f"Raw scores still available in DB."
-            )
+            import asyncio
+            from shared.monitor_notify import notify_monitor
+            await asyncio.to_thread(
+                notify_monitor,
+                "⚠️ Assessment pipeline failed for attempt #%s.\nError: %s\nRaw scores still in DB."
+                % (attempt_id, str(e)[:300]))
         except Exception:
             pass
         return None
