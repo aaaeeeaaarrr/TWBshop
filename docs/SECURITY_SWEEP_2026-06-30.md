@@ -56,8 +56,8 @@ Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role 
 - **TI-F5 ✅ FIXED 2026-06-30** — PII behind `_pii_authorized()` (masked render + server-side write belt); set `ORG_SECRET_KEY` to encrypt at rest (already built).
 - **TI-F3 (HIGH@multi-tenant)** session has no org binding (`app.py:2145`); at multi-tenant, store + re-check `org_id` per request, never trust host/path. **← NEXT W3 pass.**
 - **TI-F2 ✅ FIXED 2026-06-30** — the no-user bootstrap window is deny-closed (→ `/login`), only a CLI-seeded builder gets in.
-- **TI-F4 (MED)** no CSRF on state-changing POSTs (apply/staff-del/payroll-run/till-close…).
-- **TI-F6 (LOW/MED)** public token check-in routes un-rate-limited (isolation itself is correct: org is token-derived).
+- **TI-F4 ✅ FIXED 2026-06-30** — `SESSION_COOKIE_SAMESITE='Strict'` + a lenient cross-origin POST reject (the belt); gated on auth-on → inert today.
+- **TI-F6 ✅ FIXED 2026-06-30** — login (brute-force) + public token check-in (abuse) now rate-limited in-memory (per-app, by IP); gated on auth-on.
 - **TI-F7 (LOW)** 2 latent cross-org queries not route-reachable (`core/shadow.py:68,168`) — scope before exposing.
 
 ### Client data-leakage (wizard / inert web adapter)
@@ -96,7 +96,8 @@ Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role 
    strip `← admin` from customer pages. *The one place a client could see builder machinery.*
 2. ✅ **DONE — Auth fail-closed + PII behind authz** (TI-F1, TI-F2, TI-F5); `ORG_SECRET_KEY` is owner-gated.
 3. **Session↔org binding** (TI-F3) — the actual cross-tenant gate at multi-tenant. **← NEXT.**
-4. **CSRF + rate-limit + HTTPS** (TI-F4, TI-F6); generic web-checkin errors (DL-F2); strip web-adapter
-   client-config override + `shift_id` (DL-F3/F4).
-5. **Move the monitoring jobs to a builder service** (Sep-F2) at multi-client.
+4. ✅ **DONE — CSRF + rate-limit** (TI-F4, TI-F6) + generic web-checkin errors (DL-F2) + web-adapter
+   client-config strip (DL-F3). HTTPS stays owner-gated (public-hosting step); DL-F4 (`shift_id` in the inert
+   web-adapter JSON) is LOW, deferred.
+5. **Move the monitoring jobs to a builder service** (Sep-F2) at multi-client. **← NEXT (owner-gated deploy — touches live gm).**
 6. Secrets LOW consistency (wizard/stock redaction, regex extension).

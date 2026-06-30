@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import time
 from html import escape
 from urllib.parse import quote
 
@@ -1934,6 +1935,21 @@ def _pii_authorized() -> bool:
         return False
 
 
+def _rate_ok(buckets: dict, name: str, key: str, limit: int, window_s: int) -> bool:
+    """In-memory sliding-window rate-limiter (per-app, single-process — the wizard runs threaded=False).
+    True = allowed, False = over `limit` requests in the last `window_s` seconds for this key (TI-F6)."""
+    now = time.time()
+    b = buckets.setdefault(name, {})
+    k = key or "?"
+    hits = [t for t in b.get(k, []) if now - t < window_s]
+    hits.append(now)
+    b[k] = hits[-(limit + 1):]                            # bound per-key memory
+    if len(b) > 20000:                                   # crude prune so distinct IPs can't balloon memory
+        for kk in [kk for kk, v in b.items() if not v or now - v[-1] > window_s]:
+            b.pop(kk, None)
+    return len(hits) <= limit
+
+
 def _builder_link(html: str) -> str:
     """A nav fragment pointing at a BUILDER route — shown to a builder, hidden from a customer (so a customer
     page carries no admin/cut-over links). Inert (shows) while auth is OFF, preserving the owner's view."""
@@ -2236,6 +2252,9 @@ def create_app(org_id: str = "twb") -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("WIZARD_SECRET") or ("dev-" + os.urandom(16).hex())
     app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # cap request bodies at 2MB (memory-DoS guard)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Strict"     # CSRF: the session cookie isn't sent cross-site (TI-F4)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True         # (SESSION_COOKIE_SECURE is set at HTTPS time — W3 public)
+    app._rate_buckets = {}                                # per-app rate-limit state (test-isolated; persists per process)
 
     @app.before_request
     def _guard():
@@ -2267,6 +2286,28 @@ def create_app(org_id: str = "twb") -> Flask:
         if request.endpoint in CUSTOMER_OK:
             return       # customer → only the allowlist
         abort(403)       # deny-by-default: a builder-only / unknown route is forbidden to a customer
+
+    @app.before_request
+    def _csrf_and_ratelimit():
+        # All gated behind auth_enabled() → INERT for the owner's localhost/tunnel workflow (TI-F4/F6). Runs
+        # after _guard: for a route _guard rejected, _guard's response wins and this never runs.
+        if not auth_enabled():
+            return
+        # CSRF (TI-F4): SameSite=Strict on the cookie is the primary defense; this is the belt — a state-
+        # changing request whose Origin is PRESENT and cross-host is rejected (same-origin / Origin-less pass,
+        # so legitimate clients that omit Origin aren't broken).
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            origin = request.headers.get("Origin")
+            if origin:
+                from urllib.parse import urlparse
+                if urlparse(origin).netloc != request.host:
+                    abort(403)
+        # Rate-limit (TI-F6): brute-force on login + abuse of the public token check-in. Per-app buckets, by IP.
+        ep, ip = request.endpoint, (request.remote_addr or "?")
+        if ep == "login_post" and not _rate_ok(app._rate_buckets, "login", ip, 10, 300):
+            abort(429)
+        if ep in ("checkin_post", "checkout_post") and not _rate_ok(app._rate_buckets, "checkin", ip, 30, 60):
+            abort(429)
 
     @app.after_request
     def _security_headers(resp):

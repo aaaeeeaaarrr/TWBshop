@@ -167,7 +167,8 @@
   - [x] **W3 #2 — auth FAIL-CLOSED + PII behind authz** (TI-F1 loopback fail-closed · TI-F2 no-user deny-closed ·
         TI-F5 PII masked + write-belt · TI-F3 session↔org · DL-F2 generic web-checkin error · DL-F3 web-adapter
         config strip). Wizard-only, INERT; `tests/test_wizard_auth_failclosed.py` (11). 2026-06-30.
-  - [ ] **W3 #4 — CSRF + login rate-limit** (TI-F4/F6) — the next focused pass (crosses every POST form).
+  - [x] **W3 #4 — CSRF + login/check-in rate-limit** (TI-F4/F6) — SameSite=Strict + lenient cross-origin POST
+        reject + per-app in-memory rate-limit; gated on auth-on (inert today). `tests/test_wizard_csrf_ratelimit.py` (8). 2026-06-30.
   - [ ] **W3 #5 — move the gm monitoring jobs to a builder service** (Sep-F2) — structural; deploy touches live gm (owner-gated).
   - [ ] `ORG_SECRET_KEY` (owner) · HTTPS (owner, public-hosting step).
 

@@ -1103,3 +1103,27 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[decision]` **CSRF + login rate-limit (TI-F4/F6) deferred to their own focused pass** — they cross every POST
   form (broad surface), so they're cleaner as a dedicated change than bundled here. `ORG_SECRET_KEY` + HTTPS stay
   owner-gated (public-hosting step). Guard: `tests/test_wizard_auth_failclosed.py` (11) + the web-adapter test.
+
+### 🔒 W3 #4 — CSRF + login/check-in rate-limit (2026-06-30, wizard-only, INERT)
+- `[ship]` **TI-F4 CSRF, lean + centralized (NO per-form tokens).** `SESSION_COOKIE_SAMESITE='Strict'` is the
+  primary defense (the session cookie isn't sent cross-site); a lenient cross-origin POST check (`Origin` present
+  AND cross-host → 403; same-origin / Origin-less → pass) is the belt. One `before_request`, zero form edits —
+  so a new form can't "forget its token". Gated on `auth_enabled()` → inert today.
+- `[ship]` **TI-F6 rate-limit** — a per-app in-memory sliding window (`_rate_ok`): login 10/5min (brute-force),
+  public token check-in 30/min (abuse), by IP. Gated on auth-on.
+- `[gotcha]` **Per-APP rate-limit buckets, not a module global — that's what makes it test-isolated.** A
+  module-global bucket keyed by IP would accumulate across the whole suite (every test logs in from 127.0.0.1)
+  and trip the limit for a LATER test. Storing the buckets on the `app` object → each `create_app()` (each test)
+  gets fresh buckets → no cross-test pollution; in prod `create_app()` runs once so the window persists per process.
+- `[decision]` **SameSite over synchronizer tokens (for now).** The wizard's forms are Python string-concatenation
+  (no Jinja auto-inject), so a token-per-form is error-prone (miss one form → it breaks, since validation rejects
+  token-less POSTs). SameSite=Strict + the Origin belt is the modern primary CSRF defense and needs zero form
+  edits; a synchronizer token is a future hardening if a specific flow needs it.
+- `[decision]` **`SESSION_COOKIE_SECURE` deferred to HTTPS** — setting it now would break `http://localhost`
+  (the cookie wouldn't be sent over the SSH tunnel). It lands with the public-hosting/HTTPS step (owner-gated).
+- `[gotcha]` **Lenient Origin check on purpose.** Rejecting an *absent* Origin would break legitimate clients
+  (some omit it); only a PRESENT, cross-host Origin is blocked. SameSite carries the load; the Origin check is
+  defense-in-depth. Guard: `tests/test_wizard_csrf_ratelimit.py` (8).
+- `[sell]` **W3 tail nearly closed without the owner** — #1 role, #2/#3 fail-closed+PII+session-org, #4
+  CSRF+rate-limit all built+deployed+inert; only #5 (gm monitoring jobs → a builder service, which restarts the
+  live gm bot) + `ORG_SECRET_KEY`/HTTPS genuinely need the owner. A clean "secure-by-default before public" story.
