@@ -266,6 +266,7 @@ def init_core_db() -> None:
                     PRIMARY KEY (org_id, username)
                 )
             """)
+            cur.execute("ALTER TABLE core_org_users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'owner'")
             # CONFIG AUDIT — who changed what config knob, when (PRODUCT SECURITY law #5: auditability).
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS core_config_audit (

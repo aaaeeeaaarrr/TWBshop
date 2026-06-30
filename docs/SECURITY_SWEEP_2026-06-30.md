@@ -28,6 +28,13 @@ exposed publicly or serves multiple tenants — which is the explicit roadmap, s
 - **Guard extended:** `tests/test_client_builder_separation.py` now also fails on a builder-keyword owner-DM
   via a client bot (the in-process PTB class), and locks Sep-F1/F4. (The raw-POST class was already guarded.)
 
+**UPDATE 2026-06-30 — W3 #1 DONE:** the wizard **builder-vs-customer auth role** (the security core of Sep-F3
++ DL-F1) is now BUILT + tested — deny-by-default `_guard` (a customer is 403'd from the builder/cut-over
+console), role-aware login, `'owner'`-alias anti-lockout, and the `← admin`/`admin` nav links hidden from
+customer pages. Wizard-only, INERT until `WIZARD_AUTH=1`; `tests/test_wizard_roles.py` (8). Owner-gated
+activation: seed a builder + flip `WIZARD_AUTH=1`. ⚠ a client user MUST be created `role='customer'`. The
+items below are the REMAINING W3 work (each still localhost-mitigated).
+
 ## PARKED — pre-public ("W3") / multi-client structural (mitigated now by localhost + single-tenant)
 Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role system / public hardening).
 

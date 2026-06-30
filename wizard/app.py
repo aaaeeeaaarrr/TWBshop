@@ -18,7 +18,7 @@ import re
 from html import escape
 from urllib.parse import quote
 
-from flask import Flask, request, redirect, session, Response
+from flask import Flask, request, redirect, session, Response, abort
 
 from core.tenant_config import get_config, set_config, raw_overrides, DEFAULTS
 from core.db import (set_org_secret, has_org_secret, verify_user, user_count,
@@ -291,7 +291,7 @@ def _health_banner(org_id: str) -> str:
 def render_customer(org_id: str = "twb", saved: bool = False) -> str:
     cfg = get_config(org_id)
     saved_banner = '<div class="saved">✓ Your changes were applied.</div>' if saved else ""
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/dashboard'>⚡ dashboard</a> · "
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/dashboard'>⚡ dashboard</a> · "
             "<a href='/setup'>setup</a> · <a href='/staff'>staff</a> · "
             "<a href='/expertise'>expertise</a> · <a href='/groups'>groups</a> · <a href='/bot'>bot setup</a></div>"
             "<h1>⚙️ Configure your system</h1>"
@@ -433,7 +433,7 @@ def render_expertise(org_id: str) -> str:
     day_boxes = " ".join("<label style='font-weight:normal'><input type='checkbox' name='days' value='%s'> %s</label>"
                          % (d, d) for d in _DAYS)
     body = (
-        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/staff'>staff</a></div>"
+        "<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a> · <a href='/staff'>staff</a></div>"
         "<h1>🧠 Expertise &amp; coverage</h1>"
         "<p class='note'>Define each skill and how many you need WORKING at all times; add overrides to need "
         "more (or fewer) on certain days/hours. The bot can use this to approve leave only when coverage holds.</p>"
@@ -503,7 +503,7 @@ def render_staff(org_id: str) -> str:
         for s in staff) or ("<tr><td colspan='6' class='note'>No staff yet — the bot can <b>discover</b> them "
                             "from your staff group (it stages whoever posts), or add one below / paste a list.</td></tr>")
     body = (
-        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
+        "<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a> · <a href='/expertise'>expertise</a></div>"
         "<h1>👥 Staff</h1>"
         "<p class='note'>Your platform roster. The bot's <b>discover-confirm</b> fills this from your group; you "
         "can also add/edit by hand here. (TWB's existing live staff migrate here at cut-over.) Overnight is fine "
@@ -736,7 +736,7 @@ def render_setup(org_id: str) -> str:
     done_n = st["done"]
     ready_banner = ("<div class='saved'>🎉 You're ready to go live!</div>" if done_n == st["total"] else "")
     body = (
-        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/bot'>bot</a> · "
+        "<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a> · <a href='/bot'>bot</a> · "
         "<a href='/groups'>groups</a> · <a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
         "<h1>🚀 Setup — %d of %d done</h1>%s"
         "<p class='note'>Work through these in any order. The bot does the heavy lifting — you just confirm.</p>"
@@ -964,7 +964,7 @@ def render_dashboard(org_id: str) -> str:
            "<div class='box' style='background:#eff6ff;border-color:#bfdbfe'>👋 <b>New here?</b> "
            "Answer a few quick questions and we'll set the right tools up for you — "
            "<a href='/welcome'>start setup →</a> <span class='note'>(a minute · skippable)</span></div>")
-    body = ("<div class='nav'><a href='/presets'>🎚️ set the vibe</a> · <a href='/optimize'>🚀 what we automate</a> · <a href='/customer/config'>detailed view</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/presets'>🎚️ set the vibe</a> · <a href='/optimize'>🚀 what we automate</a> · <a href='/customer/config'>detailed view</a>" + _builder_link(" · <a href='/'>admin</a>") + "</div>"
             "<h1>⚡ Your system</h1>" + _wb +
             "<form method='get' action='/ask' style='margin:8px 0'><input name='q' "
             "placeholder='💬 Ask your business… e.g. any shrinkage?' "
@@ -1149,7 +1149,7 @@ def render_reports(org_id: str) -> str:
         pay_box = ("<div class='box'><h3>💼 Payroll</h3>%s &nbsp;<a href='/payroll'>open →</a></div>"
                    % (("<b>$%g</b> latest run <span class='note'>(%s)</span>"
                        % (float(lr["total"]), escape(lr["period"]))) if lr else "<span class='note'>no pay runs yet</span>"))
-    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a>" + _builder_link(" · <a href='/'>admin</a>") + "</div>"
             "<h1>📊 Reports — attendance</h1>"
             "<p class='note'>Period: %s &nbsp;·&nbsp; <a href='/reports/export?days=%d'>⬇ Export CSV</a></p>"
             "<div class='box'><b>%d check-ins · %d late · %d%% on-time</b> "
@@ -1193,7 +1193,7 @@ def render_roadmap() -> str:
         secs += ("<div class='box'><h3 style='color:%s'>%s — %d</h3>"
                  "<ul style='list-style:none;padding-left:0'>%s</ul></div>"
                  % (color, label, len(buckets.get(st, [])), rows))
-    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a>" + _builder_link(" · <a href='/'>admin</a>") + "</div>"
             "<h1>🗺️ Capability roadmap</h1>"
             "<p class='note'>Every option across all cards, by status — the whole idea menu in one place. "
             "Tap any card on the dashboard to switch one on.</p>%s" % secs)
@@ -1760,7 +1760,7 @@ def render_packages(org_id: str) -> str:
                     "<span style='color:#16a34a'>✓ current</span>" if is_cur else "",
                     escape(", ".join(catlist)), escape(pkg),
                     "disabled" if is_cur else "", "current plan" if is_cur else "switch to this"))
-    body = ("<div class='nav'><a href='/customer'>← dashboard</a> · <a href='/'>admin</a></div>"
+    body = ("<div class='nav'><a href='/customer'>← dashboard</a>" + _builder_link(" · <a href='/'>admin</a>") + "</div>"
             "<h1>🎟️ Plans</h1><p class='note'>What each plan unlocks. Switching changes which cards are active "
             "vs locked on the dashboard — your client only sees their slice.</p>%s" % rows)
     return _page("Plans", body)
@@ -1803,7 +1803,7 @@ def render_groups(org_id: str) -> str:
     table = "".join(rows) or ("<tr><td colspan='3' class='note'>No groups yet — add your bot to your "
                               "Telegram groups; once someone posts there, the group shows up here.</td></tr>")
     body = (
-        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · <a href='/staff'>staff</a> · "
+        "<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a> · <a href='/staff'>staff</a> · "
         "<a href='/expertise'>expertise</a> · <a href='/bot'>bot setup</a></div>"
         "<h1>💬 Groups</h1>"
         "<p class='note'>Add your bot to your Telegram groups; they appear here automatically. Tag your "
@@ -1836,7 +1836,7 @@ def render_bot_setup(org_id: str) -> str:
              "<li>Back in BotFather: <code>/setprivacy</code> → <b>Disable</b> — so the bot can read your "
              "staff group for discover-confirm.</li></ol>")
     body = (
-        "<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a> · "
+        "<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a> · "
         "<a href='/staff'>staff</a> · <a href='/expertise'>expertise</a></div>"
         "<h1>🤖 Create &amp; connect your bot</h1>%s"
         "<div class='box'><b>Status:</b> %s</div>"
@@ -1857,6 +1857,54 @@ def auth_enabled() -> bool:
     core.db.create_user(org, username, password). ⚠ before PUBLIC exposure also add CSRF + login rate-limit
     + HTTPS (W3). Until then the wizard stays localhost-only behind the SSH tunnel."""
     return os.environ.get("WIZARD_AUTH") == "1"
+
+
+# ── ROLE: builder (us, the platform operator) vs customer (a client business) — deny-by-default authz ──
+# PRODUCT SECURITY & IP law: a logged-in CLIENT must never reach the builder/cut-over console. Anything a
+# customer may reach is in CUSTOMER_OK; everything NOT listed is BUILDER-only → a new route can't silently
+# become customer-visible. ALL inert while auth is OFF (the owner's localhost/tunnel still sees everything).
+AUTH_EXEMPT = frozenset({"login", "login_post", "logout", "healthz", "static",
+                         "checkin", "checkin_post", "checkout_post"})
+BUILDER_ROLES = frozenset({"builder", "owner"})   # 'owner' = legacy default + bootstrap builder (anti-lockout)
+CUSTOMER_OK = frozenset({
+    "customer", "customer_config", "customer_apply",
+    "welcome", "welcome_answer", "welcome_skip",
+    "automations_page", "automations_save", "automations_send",
+    "automations_custom_add", "automations_custom_remove",
+    "presets_page", "presets_apply", "policy_page",
+    "expertise", "exp_role_add", "exp_role_del", "exp_ov_add", "exp_ov_del",
+    "staff", "staff_add", "staff_del", "staff_import", "staff_edit", "staff_link", "staff_update",
+    "staff_exceptions", "staff_exceptions_preset", "staff_exceptions_save",
+    "setup", "templates", "templates_apply", "groups", "groups_role", "bot_setup", "bot_provision",
+    "audit", "dashboard", "reports", "ask_page", "optimize_page", "roadmap",
+    "stock_page", "stock_add", "stock_count", "stock_price", "stock_receive",
+    "expenses_page", "expenses_add", "pos_page", "pos_sale",
+    "till_page", "till_open", "till_event", "till_close",
+    "payroll_page", "payroll_salary", "payroll_run", "investigate_page",
+    "reports_export", "card_detail", "packages", "card_save", "health",
+})
+# BUILDER-only (deny-by-default; listed for clarity): index · whatif · shadow · packages_set · export ·
+# import_get · import_post.
+
+
+def _is_builder(role) -> bool:
+    return role in BUILDER_ROLES
+
+
+def _is_builder_session() -> bool:
+    """Auth OFF → the localhost/tunnel owner sees everything (workflow unchanged). Auth ON → only a builder."""
+    if not auth_enabled():
+        return True
+    try:
+        return _is_builder(session.get("role"))
+    except Exception:
+        return False
+
+
+def _builder_link(html: str) -> str:
+    """A nav fragment pointing at a BUILDER route — shown to a builder, hidden from a customer (so a customer
+    page carries no admin/cut-over links). Inert (shows) while auth is OFF, preserving the owner's view."""
+    return html if _is_builder_session() else ""
 
 
 def render_login() -> str:
@@ -1975,7 +2023,7 @@ def render_whatif(org_id: str) -> str:
                     for k, n in sorted(res["by_transition"].items(), key=lambda x: -x[1])) or "<li>none</li>"
     ex = "".join("<li class='note'>%s &nbsp; %s → %s</li>" % (escape(e["at"][:16]), escape(e["from"]), escape(e["to"]))
                  for e in res["examples"])
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a></div>"
             "<h1>🔮 What-if — check-in verdict</h1>"
             "<div class='box'><p class='note'>How would changing the grace / early thresholds reclassify your "
             "recent check-ins? (Live config: grace %d, early %d.) Read-only — nothing is applied.</p>"
@@ -2011,7 +2059,7 @@ def render_audit(org_id: str) -> str:
            escape("—" if r["old_val"] is None else r["old_val"]),
            escape("—" if r["new_val"] is None else r["new_val"]), escape(r["who"] or "?"))
         for r in rows) or "<li class='note'>No config changes recorded yet.</li>"
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a></div>"
             "<h1>📝 Config change log</h1>%s<div class='box'><p class='note'>Who changed which setting, when. "
             "Newest first. (Secrets log the act, never the value.)</p><ul>%s</ul></div>" % (chain_box, items))
     return _page("Audit", body)
@@ -2108,7 +2156,7 @@ def _render_mismatches(org_id: str) -> str:
 
 def render_export(org_id: str) -> str:
     blob = json.dumps(raw_overrides(org_id), indent=2, default=str)
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/import'>import</a></div>"
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/import'>import</a></div>"
             "<h1>⬇️ Export config</h1>"
             "<div class='box'><h3>Your customizations</h3><p class='note'>What you've changed from the "
             "defaults.</p><ul>%s</ul></div>"
@@ -2120,7 +2168,7 @@ def render_export(org_id: str) -> str:
 
 
 def render_import(org_id: str, msg: str = "") -> str:
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/export'>export</a></div>"
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/export'>export</a></div>"
             "<h1>⬆️ Import config</h1>%s<div class='box'>"
             "<p class='note'>Paste an exported config. Only safe (non-live) settings are applied — exactly "
             "like the editor: live knobs are ignored, every change is logged.</p>"
@@ -2136,7 +2184,7 @@ def render_health(org_id: str) -> str:
     else:
         icon = {"warn": "⚠️", "info": "ℹ️"}
         rows = "".join("<li>%s %s</li>" % (icon.get(lvl, "•"), escape(msg)) for lvl, msg in issues)
-    body = ("<div class='nav'><a href='/'>← admin</a> · <a href='/customer'>customer</a></div>"
+    body = ("<div class='nav'>" + _builder_link("<a href='/'>← admin</a> · ") + "<a href='/customer'>customer</a></div>"
             "<h1>🩺 Config health-check</h1><div class='box'><p class='note'>Likely setup mistakes or "
             "inconsistencies (read-only — nothing changed).</p><ul>%s</ul></div>" % rows)
     return _page("Health", body)
@@ -2149,12 +2197,17 @@ def create_app(org_id: str = "twb") -> Flask:
 
     @app.before_request
     def _guard():
-        if not auth_enabled() or request.endpoint in ("login", "login_post", "logout", "healthz", "static",
-                                                       "checkin", "checkin_post", "checkout_post"):
-            return       # staff check in/out via their token link, not a wizard login
-        if user_count(org_id) == 0 or session.get("user"):   # no users yet → don't lock out (seed first)
-            return
-        return redirect("/login")
+        if not auth_enabled() or request.endpoint in AUTH_EXEMPT:
+            return       # auth off (localhost/tunnel) or a public endpoint (staff token check-in, login…)
+        if user_count(org_id) == 0:
+            return       # no users yet → don't lock out (seed the first builder, then flip WIZARD_AUTH=1)
+        if not session.get("user"):
+            return redirect("/login")
+        if _is_builder(session.get("role")):
+            return       # builder → everything
+        if request.endpoint in CUSTOMER_OK:
+            return       # customer → only the allowlist
+        abort(403)       # deny-by-default: a builder-only / unknown route is forbidden to a customer
 
     @app.after_request
     def _security_headers(resp):
@@ -2437,9 +2490,11 @@ def create_app(org_id: str = "twb") -> Flask:
     @app.post("/login")
     def login_post():
         u = (request.form.get("username") or "").strip()
-        if verify_user(org_id, u, request.form.get("password") or ""):
+        role = verify_user(org_id, u, request.form.get("password") or "")
+        if role:
             session["user"] = u
-            return redirect("/")
+            session["role"] = role
+            return redirect("/" if _is_builder(role) else "/customer")   # a customer landing on / would 403
         return redirect("/login?err=1")
 
     @app.get("/logout")
