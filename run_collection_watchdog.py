@@ -47,31 +47,17 @@ def _alert(text: str) -> None:
     if last and datetime.utcnow() - last < timedelta(hours=ALERT_GAP_HOURS):
         print("alert suppressed (throttle):", text)
         return
-    data = urllib.parse.urlencode({
-        "chat_id": config.OWNER_TELEGRAM_ID,
-        "text": "🚨 COLLECTION WATCHDOG\n" + text,
-    }).encode()
-    # Send via the GM bot — the bot the owner actually has a DM open with (the retail token got
-    # 400 "chat not found": the owner never started that bot). A bot token sends fine even while
-    # its polling process is DOWN, so alerts still deliver mid-outage. Retail token = fallback.
-    sent = False
-    for token in (getattr(config, "GM_BOT_TOKEN", "") or "", config.BOT_TOKEN):
-        if not token:
-            continue
-        try:
-            url = "https://api.telegram.org/bot%s/sendMessage" % token
-            with urllib.request.urlopen(url, data=data, timeout=20) as resp:
-                json.load(resp)
-            sent = True
-            break
-        except Exception as e:
-            print("alert send failed via %s…: %s" % (token[:8], e))
-    if not sent:
-        print("ALERT DELIVERY FAILED on all tokens:", text)
+    # A "collection is down" alert is a BUILDER/system concern → route via the MONITOR bot, NOT the client
+    # GM/retail bot (client/builder separation law). notify_monitor is a direct Bot API POST, so it still
+    # delivers mid-outage even while the Monitor's own polling process is down — the same guarantee the
+    # GM-token send had.
+    from shared.monitor_notify import notify_monitor
+    if not notify_monitor("🚨 COLLECTION WATCHDOG\n" + text):
+        print("ALERT DELIVERY FAILED (Monitor):", text)
         return
     with open(STATE_FILE, "w") as f:
         f.write(datetime.utcnow().isoformat())
-    print("alert sent:", text)
+    print("alert sent (Monitor):", text)
 
 
 def main() -> None:

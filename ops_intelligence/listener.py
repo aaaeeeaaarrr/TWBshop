@@ -108,24 +108,20 @@ _ERR_LAST_ALERT = 0.0
 
 
 def _alert_owner(text: str) -> None:
-    """Throttled owner DM via the GM bot token (Bot API works regardless of any polling process —
-    same pattern as the collection watchdog). The listener is a Telethon userbot, so the shared
-    PTB error handler can't cover it; this closes the per-message blind spot: errors used to be
-    log-only and invisible (the gm_save_concern lesson)."""
+    """Throttled owner alert via the MONITOR bot — the listener is OUR plumbing, so its errors are a
+    BUILDER/system concern and must NOT go via a client bot (client/builder separation law). notify_monitor
+    is a direct Bot API POST → it works regardless of any polling process (the same guarantee the GM-token
+    send had). The listener is a Telethon userbot, so the shared PTB error handler can't cover it; this
+    closes the per-message blind spot (the gm_save_concern lesson)."""
     global _ERR_LAST_ALERT
     import time as _t
-    import urllib.parse
-    import urllib.request
     now = _t.time()
     if now - _ERR_LAST_ALERT < 1800:
         return
-    token = getattr(config, "GM_BOT_TOKEN", "") or config.BOT_TOKEN
     try:
-        data = urllib.parse.urlencode({"chat_id": config.OWNER_TELEGRAM_ID,
-                                       "text": "⚠ Listener: " + text}).encode()
-        urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % token,
-                               data=data, timeout=15)
-        _ERR_LAST_ALERT = now
+        from shared.monitor_notify import notify_monitor
+        if notify_monitor("⚠ Listener: " + text):
+            _ERR_LAST_ALERT = now
     except Exception:
         logger.exception("owner alert failed")
 

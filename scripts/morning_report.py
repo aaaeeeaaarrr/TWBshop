@@ -71,25 +71,13 @@ def build_report(org_id: str = "twb") -> str:
 
 
 def _send_to_owner(text: str) -> bool:
-    """Best-effort DM the digest to the owner via the gm bot (the nightly cron's --send). A standalone HTTP
-    POST so it needs no async/PTB; truncates to Telegram's limit; never raises. Reads the token from config
-    (does NOT write secrets)."""
-    import json as _json
-    import urllib.parse
-    import urllib.request
+    """DM the digest to the owner via the MONITOR bot — this is a BUILDER/system report (audit + Sentinel +
+    alarm-sink + shadow), so it must NOT go via the client GM bot (client/builder separation law). Routes
+    through shared.monitor_notify (the ONE Monitor channel; prod-gated; a direct POST, no async). Never raises."""
     try:
-        import config
-        token = getattr(config, "GM_BOT_TOKEN", None)
-        owner = getattr(config, "OWNER_TELEGRAM_ID", None)
-        if not token or not owner:
-            print("(--send: no GM_BOT_TOKEN / OWNER_TELEGRAM_ID set)")
-            return False
-        body = text if len(text) <= 4000 else (text[:3950] + "\n…(truncated — run morning_report.py for full)")
-        data = urllib.parse.urlencode({"chat_id": owner, "text": body}).encode()
-        with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % token,
-                                    data=data, timeout=20) as r:
-            ok = _json.load(r).get("ok")
-        print("(--send: delivered to owner)" if ok else "(--send: Telegram returned not-ok)")
+        from shared.monitor_notify import notify_monitor
+        ok = notify_monitor(text)
+        print("(--send: delivered via Monitor)" if ok else "(--send: Monitor not-ok / not prod / no token)")
         return bool(ok)
     except Exception as e:
         print("(--send failed: %s)" % e)

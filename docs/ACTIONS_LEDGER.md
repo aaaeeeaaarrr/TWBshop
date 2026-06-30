@@ -9,6 +9,19 @@
 
 ## Done (with proof)
 
+- **2026-06-30 — 3 MORE client/builder leaks found (EXHAUSTIVE sweep) + fixed (owner: "full due diligence; no
+  more system things from the GM bot"; routing fix, NO data change).** The first audit checked only the gm
+  PROCESS; this swept EVERY sender (full server crontab · every `api.telegram.org/bot` POST · every
+  OWNER_TELEGRAM_ID/GM_BOT_TOKEN use). Found 3 builder/system senders leaking via a client token → all routed
+  to the MONITOR via `shared.monitor_notify`: `scripts/morning_report.py` (08:00 digest cron — owner's
+  screenshot), `run_collection_watchdog.py` (collection-down cron), `ops_intelligence/listener.py::_alert_owner`
+  (listener error alert). VERIFIED no others: gm `_alarm` (watchdog/sentinel/audit/config/send-health) +
+  shared `make_error_handler` (crashes → Monitor, confirmed by the owner's 08:13 crash on the Monitor) already
+  route to Monitor; monitor.py/monitor_bot.py ARE the Monitor; automations + gm owner-menu + gm client-ops
+  (no-show/AL/pay) are genuinely CLIENT (correct on GM); fetch_report_receipts doesn't send. Deploy =
+  git-checkout on the server (crons auto-pick-up) + restart twbshop-listener; gm UNCHANGED (not restarted).
+  [proof appended after deploy]
+
 - **2026-06-30 — CLIENT/BUILDER LEAK FIXED + DEPLOYED + VERIFIED (owner-caught; routing fix, NO data change).**
   Owner saw the 21:45 [SHADOW] nightly digest arrive on the CLIENT GM bot (@twb_gm_bot) — a builder/system
   message on a client bot (separation law). Audited all 6 direct owner-DMs in the gm bot: **2 system leaks
