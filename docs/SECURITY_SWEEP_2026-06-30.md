@@ -72,8 +72,11 @@ Tracked here + in `docs/PENDING_WORK.md`. Each is owner-gated (some need a role 
 - **Sep-F3 (HIGH@public)** the wizard has NO builder-vs-customer auth ROLE (`app.py:2150`); a logged-in client
   would VIEW `/shadow` cut-over internals. (Read-only — no flip is operable from the wizard; flips are CLI.)
 - **Sep-F2 / Cat-2 (MED→HIGH@multi-client)** the monitoring JOBS (watchdog/sentinel/shadow-digest/auto-audit)
-  + the flip/shadow/transition engine run INSIDE the client gm bot process. Output is now Monitor-routed; the
-  JOBS themselves move to a builder monitor service at multi-client (CLAUDE.md backlog #1/#4).
+  + the flip/shadow/transition engine run INSIDE the client gm bot process. Output is now Monitor-routed. **✅
+  FOUNDATION BUILT 2026-06-30** — `scripts/builder_monitor.py` (the standalone org-scoped alerting sweep,
+  additive/inert; the daily digest already runs standalone via `morning_report.py`); the **cut-over** (remove the
+  5 jobs from gm + schedule the monitor) stays OWNER-GATED (restarts the live gm bot) + is a multi-client trigger.
+  Enumeration + steps → `docs/BUILDER_MONITOR_CUTOVER.md`. Guard: `tests/test_builder_monitor.py`.
 
 ### Secrets — LOW / defense-in-depth
 - `run_wizard.py` / `run_stock.py` lack `install_log_hygiene` (no tokens there today → low) — add for consistency.

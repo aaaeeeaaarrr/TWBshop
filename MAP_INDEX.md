@@ -266,6 +266,8 @@
     · main
 - `scripts/anchor_audit.py` — Anchor every org's audit-chain HEAD to the external anchor file (core.audit_anchor). Run on a schedule
     · _orgs, main
+- `scripts/builder_monitor.py` — builder_monitor — a STANDALONE, org-scoped, read-only BUILDER MONITORING sweep (W3 #5 foundation).
+    · watchdog_delta, sentinel_new, all_orgs, sweep_org, _emit, run, main
 - `scripts/config_diff.py` — Config-diff preview (E, lean) — run the org's recent REAL check-ins through a few grace values at once
     · main
 - `scripts/facts.py` — facts.py — the truth registry: one home per machine-knowable fact, + its lineage.

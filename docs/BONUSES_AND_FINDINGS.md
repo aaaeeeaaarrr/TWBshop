@@ -1127,3 +1127,24 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[sell]` **W3 tail nearly closed without the owner** — #1 role, #2/#3 fail-closed+PII+session-org, #4
   CSRF+rate-limit all built+deployed+inert; only #5 (gm monitoring jobs → a builder service, which restarts the
   live gm bot) + `ORG_SECRET_KEY`/HTTPS genuinely need the owner. A clean "secure-by-default before public" story.
+
+### 🔒 W3 #5 foundation — standalone builder-monitor (2026-06-30, additive, INERT, no deploy)
+- `[decision]` **Scope-honest: did NOT build a speculative always-on all-org monitor service.** #5 is a
+  MULTI-CLIENT structural item — tolerable in gm today (lone tenant), and `run_audit` audits TWB's *legacy
+  single-tenant* ledger (its audit half is twb-only; only Sentinel is org-scoped). A full continuous service is
+  ahead of need + partly redundant with `morning_report.py` (which already runs the daily read-only digest
+  standalone). Built the lean turnkey FOUNDATION instead, and recorded the cut-over as owner-gated.
+- `[ship]` **`scripts/builder_monitor.py`** — the ALERTING half (the piece still embedded in gm): a standalone,
+  org-scoped, read-only sweep (audit + Sentinel) that dedupes (own `bmon_*` state) and routes NEW alarms to the
+  sink + Monitor. **Dry-run default** (read-only, proven: a live staging dry-run emitted 61 staging-artifact
+  alarms + "[DRY-RUN — nothing persisted or sent]"); `--send` persists + DMs the Monitor (prod-gated). Iterates
+  `all_orgs()`. Reuses the live logic; its dedupe is **parity-locked** to the gm originals (`_watchdog_delta`/
+  `_sentinel_new_alarms`) by `tests/test_builder_monitor.py` (6) so the two copies can't drift.
+- `[gotcha]` **The gm `_sentinel_new_alarms` doesn't guard a corrupt prev-state (would raise); the standalone
+  does.** Unreachable in practice (both sides only ever write valid json.dumps), so it's an intentional superset,
+  not drift — parity is asserted on valid inputs. A latent gm-hardening the owner can port at cut-over.
+- `[gotcha]` **Enumerated the CLASS (5 builder jobs) grepped, not guessed** (DRASTIC protocol): `_auto_audit` ·
+  `_live_watchdog` · `_sentinel_sweep` · `_shadow_digest` · `_test_watchdog`. Everything else in the gm scheduler
+  (checkin/AL/no-show/pay/reaper/closer/re-ping/digests) is genuine client-ops → correctly stays on gm.
+- `[decision]` **Cut-over stays OWNER-GATED** — step 2 (remove the jobs from gm) restarts the live attendance
+  bot (HIGH-RISK), and the trigger is multi-client, not a single tenant. Full plan → `docs/BUILDER_MONITOR_CUTOVER.md`.

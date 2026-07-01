@@ -169,7 +169,10 @@
         config strip). Wizard-only, INERT; `tests/test_wizard_auth_failclosed.py` (11). 2026-06-30.
   - [x] **W3 #4 — CSRF + login/check-in rate-limit** (TI-F4/F6) — SameSite=Strict + lenient cross-origin POST
         reject + per-app in-memory rate-limit; gated on auth-on (inert today). `tests/test_wizard_csrf_ratelimit.py` (8). 2026-06-30.
-  - [ ] **W3 #5 — move the gm monitoring jobs to a builder service** (Sep-F2) — structural; deploy touches live gm (owner-gated).
+  - [~] **W3 #5 — move the gm monitoring jobs to a builder service** (Sep-F2) — **FOUNDATION built** 2026-06-30
+        (`scripts/builder_monitor.py` standalone org-scoped alerting sweep, inert; `docs/BUILDER_MONITOR_CUTOVER.md`;
+        `tests/test_builder_monitor.py` 6). **Cut-over OWNER-GATED** (removes the 5 jobs from gm → restarts the live
+        gm bot; multi-client trigger — no gain at a single tenant). The daily digest already runs standalone (`morning_report.py`).
   - [ ] `ORG_SECRET_KEY` (owner) · HTTPS (owner, public-hosting step).
 
 ## 📚 Standing open loops (older threads — detail in ROADMAP / HISTORY)
