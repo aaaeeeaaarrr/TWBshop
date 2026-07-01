@@ -9,6 +9,21 @@
 
 ## Done (with proof)
 
+- **2026-06-30 — W3 #4 WIZARD CSRF + LOGIN/CHECK-IN RATE-LIMIT built + DEPLOYED + VERIFIED (wizard-only, INERT
+  until WIZARD_AUTH=1; no live-bot/data change).** Auto-bedrock (security). Centralized, NO per-form tokens:
+  **TI-F4** `SESSION_COOKIE_SAMESITE='Strict'` (the session cookie isn't sent cross-site — the primary CSRF
+  defense) + a lenient cross-origin POST reject (Origin present + cross-host → 403; same-origin / Origin-less
+  pass) in ONE before_request · **TI-F6** a per-app in-memory rate-limit (`_rate_ok`): login 10/5min
+  (brute-force), public token check-in 30/min (abuse), by IP. All gated behind `auth_enabled()` → byte-identical
+  today. Per-app buckets (not a module global) → test-isolated. 8 guard tests (`tests/test_wizard_csrf_ratelimit.py`);
+  suite 1297p/0f. **PROOF (tag `session-58-w3-csrf-ratelimit-20260630`=`34d1141`):** server HEAD==`34d1141`==tag;
+  twbshop-wizard restarted MainPID 1589950 NR=0, clean boot ("Wizard viewer … on 127.0.0.1:8090"), no traceback;
+  deployed code carries the change (grep `_csrf_and_ratelimit`/`def _rate_ok`/`SESSION_COOKIE_SAMESITE` each =1);
+  WIZARD_AUTH unset → localhost:8090/ = **200** (inert); **bots UNTOUCHED — gm pid 1546601 unchanged,
+  retail/listener/hire active**. No data moved. **▶▶ The entire autonomous-safe W3 tail is now DONE (#1 role ·
+  #2/#3 fail-closed+PII+session↔org · #4 CSRF+rate-limit) — only W3 #5 (gm monitoring jobs → a builder service,
+  owner-gated live-gm deploy) + `ORG_SECRET_KEY`/HTTPS remain.**
+
 - **2026-06-30 — W3 #2/#3 WIZARD AUTH FAIL-CLOSED + PII-BEHIND-AUTHZ + SESSION↔ORG built + DEPLOYED + VERIFIED
   (wizard-only, INERT until WIZARD_AUTH=1; no live-bot/data change).** Auto-bedrock (security/permissions).
   Hardened the single HTTP auth chokepoint `wizard/app.py::_guard`: **TI-F1** loopback fail-closed (auth-off +
