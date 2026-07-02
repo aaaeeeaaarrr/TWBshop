@@ -199,3 +199,11 @@
 - [ ] Marketing automation (Telegram channel → FB/IG → TikTok) — parked (`docs/ROADMAP.md` §F).
 - [ ] AI order-taker (AI-assist behind a human, no auto-userbot) — parked.
 - [ ] WOC customer-number extraction (123k-photo archive; ~$250 Haiku) — parked, ⚠ privacy/legal flag on outreach.
+
+## ▶ CAPACITY / SCALE (2026-07-03 — measured; full plan → `docs/CAPACITY_AND_SCALE.md`)
+- [ ] **DB pooling (pgbouncer or app-side)** — 16/25 connections in use TODAY; also the tier-0→1 gate.
+- [ ] **Multi-tenant runtime host** (one process, N tenant bot apps) — design before client #5; kills the
+      process-per-bot RAM wall (~30 clients on the current box).
+- [ ] **Backup/restore drill** — prove a managed-PG restore once; droplet is cattle (repo+secrets+bootstrap).
+- [ ] **ops_messages retention knob** (the one heavy table = TWB's comms add-on; make retention a product lever).
+- [ ] **Anomalous-access sentinel rule + per-tenant canary values** — with first external clients (W3 window).

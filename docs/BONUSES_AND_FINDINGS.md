@@ -1215,3 +1215,14 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   base-window shift materialization can't model them yet. The engine didn't just verify — it produced the
   next build item (redefine/split-aware shift materialization = the known resolver-self-derive step).
   In-window warns are deduped (no re-burst) and age out of the 7d window.
+- `[finding]` **DB connections are the system's tightest constraint TODAY: 16 of 25 in use** (per-call
+  `_db()`, no pool, six services). First wall at multi-tenant → pooling queued. Everything else is idle:
+  1 vCPU at load 0.08, six services = 226 MB RAM combined, the ENTIRE attendance platform ≈ 2 MB of DB
+  (ops_messages' 156 MB is TWB's comms-archive add-on, not platform overhead).
+- `[bonus]` **The per-client footprint is provably tiny** (a client = org row + config levers + a sparse
+  event stream ≈ 0.5–2 MB/month): the sellable line "a full business runs in megabytes" is MEASURED, not
+  marketing. Full tier plan + anti-learning posture → `docs/CAPACITY_AND_SCALE.md`.
+- `[bonus]` **"Nothing to decompile" as the anti-AI moat**: clients (web OR future app) receive rendered
+  views + entitled data + knobs — the engine, the verification substrate, and the learned fault/ontology
+  library never cross the wire. The irreducible residue (black-box probing your OWN knobs) is the same
+  residue Salesforce lives with.
