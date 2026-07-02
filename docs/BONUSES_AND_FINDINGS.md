@@ -1185,3 +1185,15 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[finding]` **prod `core_audit` is EMPTY → the (now-installed) nightly anchor no-ops until config-change
   rows flow**; `ANCHOR_HMAC_KEY` unset = plaintext anchors (owner one-liner, W3-class). The anchor CRON was
   missing entirely until tonight — found only by reading the real crontab.
+- `[ship]` **`core/flowcheck.py` — the declarative flow tier** (owner 2026-07-03: every step of every
+  ladder, across hundreds of tenant/shadowrun configs, verified to reach its next destination): a RULE
+  registry swept per-org by ONE sentinel detector; new flow = one line, multi-tenant by construction.
+  First rules: session→checkout · shadow-mismatch→`reconciled` (a shadowrun log is itself a step with a
+  terminal) · onboarding candidate→confirmed/skipped.
+- `[finding]` **Flowcheck's FIRST PROD RUN caught a real design gap in ~2 minutes:** the live→core shadow
+  feed is CHECK-IN-ONLY — 20 platform sessions could never complete. Refined with a feed-capability probe
+  (one info finding per org instead of 20 warns about one upstream gap; the rule self-arms when checkouts
+  flow). The fix (wire the checkout feed) → PENDING_WORK. The engine paying for itself on day one.
+- `[bonus]` **Flowcheck doubles as a sellable per-client SLA monitor later** ("your approvals never sit
+  >X hours unseen — verified"), and `shadow_comparisons.reconciled` now has ENFORCED meaning: mismatch
+  triage is a step with a deadline, which is what makes the owner's daily fault-review loop converge.

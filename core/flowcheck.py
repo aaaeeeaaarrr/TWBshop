@@ -29,9 +29,25 @@ def _now() -> datetime:
 
 def _stuck_sessions(org_id: str, now: datetime) -> list:
     """checked_in (older than 26h, within 7d) whose shift has NO checked_out — the next step never came.
-    26h > any legal shift+OT span; pairs by shift_id (the UNIQUE(shift_id,type) session identity)."""
+    26h > any legal shift+OT span; pairs by shift_id (the UNIQUE(shift_id,type) session identity).
+    FEED PROBE (first prod run, 2026-07-03, caught a real gap): an org whose event feed carries NO
+    checkout events at all (TWB's shadow hook is check-in-only today) can't have this step verified —
+    per-session warns would be 20× noise about ONE upstream gap. Such an org gets a single 'feed gap'
+    finding instead; the full rule self-arms the moment checkouts start flowing."""
     with _db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT count(*) n FROM attendance_events WHERE org_id=%s AND type='checked_out' "
+                        "AND at > %s", (org_id, now - timedelta(days=14)))
+            feeds_checkout = cur.fetchone()["n"] > 0
+            if not feeds_checkout:
+                cur.execute("SELECT count(*) n FROM attendance_events WHERE org_id=%s AND type='checked_in' "
+                            "AND at > %s", (org_id, now - timedelta(days=14)))
+                if cur.fetchone()["n"] == 0:
+                    return []                       # no attendance feed at all → nothing to verify
+                return [{"flow": "core_session", "key": "%s:feed_gap" % org_id, "severity": "info",
+                         "detail": "org feeds check-ins but NO checkout events exist — the platform "
+                                   "session loop can't complete (wire the checkout feed); the "
+                                   "per-session rule arms itself once checkouts flow", "age_min": None}]
             cur.execute("""
                 SELECT e.shift_id, e.staff_id, e.at FROM attendance_events e
                 WHERE e.org_id=%s AND e.type='checked_in' AND e.at < %s AND e.at > %s

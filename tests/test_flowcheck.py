@@ -20,10 +20,11 @@ def _org():
     return org
 
 
-def _mk_shift(cur, org):
+def _mk_shift(cur, org, start_h_ago=40):
+    # UNIQUE(org_id, staff_id, start_dt) + NOW() is transaction-stable → each shift needs its own start
     cur.execute("INSERT INTO shifts (org_id, staff_id, start_dt, end_dt, business_day) "
-                "VALUES (%s,1,NOW() - interval '40 hours', NOW() - interval '31 hours', '2026-07-01') "
-                "RETURNING shift_id", (org,))
+                "VALUES (%s,1,NOW() - %s * interval '1 hour', NOW() - %s * interval '1 hour', '2026-07-01') "
+                "RETURNING shift_id", (org, start_h_ago, start_h_ago - 9))
     return cur.fetchone()["shift_id"]
 
 
@@ -32,13 +33,30 @@ def _event(cur, org, shift_id, typ, at):
                 "VALUES (%s,%s,1,%s,%s,%s)", (org, shift_id, typ, at, json.dumps({})))
 
 
-def test_stuck_session_fires_then_clears_on_checkout():
+def test_checkin_only_feed_yields_one_info_finding_not_per_session_noise():
+    """The 2026-07-03 first-prod-run lesson: TWB's shadow feed is check-in-only → 20 per-session warns
+    about ONE upstream gap. The probe collapses that to a single info 'feed gap' finding."""
     org = _org()
     now = datetime.now(TZ)
     with _db() as conn:
         with conn.cursor() as cur:
-            sid = _mk_shift(cur, org)
-            _event(cur, org, sid, "checked_in", now - timedelta(hours=30))
+            for i in range(3):
+                sid = _mk_shift(cur, org, start_h_ago=40 + i)
+                _event(cur, org, sid, "checked_in", now - timedelta(hours=30))
+    found = [f for f in flowcheck.check(org, now) if f["flow"] == "core_session"]
+    assert len(found) == 1 and found[0]["severity"] == "info" and "feed_gap" in found[0]["key"]
+
+
+def test_stuck_session_fires_then_clears_when_the_feed_carries_checkouts():
+    org = _org()
+    now = datetime.now(TZ)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            done = _mk_shift(cur, org, start_h_ago=64)     # a completed session proves the feed
+            _event(cur, org, done, "checked_in", now - timedelta(hours=64))
+            _event(cur, org, done, "checked_out", now - timedelta(hours=55))
+            sid = _mk_shift(cur, org, start_h_ago=31)
+            _event(cur, org, sid, "checked_in", now - timedelta(hours=30))  # the stuck one
     stuck = flowcheck.check(org, now)
     assert any(f["flow"] == "core_session" and str(sid) in f["key"] for f in stuck)
     with _db() as conn:
@@ -47,12 +65,16 @@ def test_stuck_session_fires_then_clears_on_checkout():
     assert not any(f["flow"] == "core_session" for f in flowcheck.check(org, now))
 
 
-def test_fresh_checkin_is_not_stuck():
+def test_fresh_checkin_and_empty_org_are_silent():
     org = _org()
     now = datetime.now(TZ)
+    assert not any(f["flow"] == "core_session" for f in flowcheck.check(org, now))   # no feed at all
     with _db() as conn:
         with conn.cursor() as cur:
-            sid = _mk_shift(cur, org)
+            done = _mk_shift(cur, org, start_h_ago=64)
+            _event(cur, org, done, "checked_in", now - timedelta(hours=64))
+            _event(cur, org, done, "checked_out", now - timedelta(hours=55))
+            sid = _mk_shift(cur, org, start_h_ago=4)
             _event(cur, org, sid, "checked_in", now - timedelta(hours=3))   # mid-shift → healthy
     assert not any(f["flow"] == "core_session" for f in flowcheck.check(org, now))
 

@@ -14,6 +14,10 @@
 - [ ] **Retail increments** (batch with the next retail deploy; code for the error-handler sink mirror is already in
       `shared/` and rides ANY restart): port b2b's `_startup_summary_check` missed-summary catch-up · durable record for
       AI staff-message flags (audit #14).
+- [ ] **Wire the CHECKOUT feed into the shadow hook** (flowcheck's FIRST CATCH, 2026-07-03: the live→core
+      feed is check-in-only, so the platform's own session loop never completes — core can't self-derive
+      worked-minutes at cut-over without it). Same isolated/gated pattern as `shadow_checkin`; the
+      per-session flow rule arms itself automatically the moment checkouts flow.
 - [ ] **Retention tidy** for `core_send_ledger` + `core_flip_log` (unbounded growth; low-risk chore, not urgent).
 - [ ] **Phase-5 continuous checker** (owner-gated): the scheduled agent reading sink+ledger+beats per tenant — the
       substrate it reads is now fully built + being written.

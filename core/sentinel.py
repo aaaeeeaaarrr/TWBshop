@@ -169,8 +169,9 @@ def detect_broken_flows(org_id: str, now: datetime) -> list:
     them onto every existing cadence. A stuck shadow-mismatch (never `reconciled`) is WARN-with-teeth:
     it is the platform's own accuracy signal rotting."""
     from core import flowcheck
-    return [_alarm("flow:%s" % f["flow"], "%s:%s" % (org_id, f["key"]), WARN,
-                   f["detail"], f.get("age_min")) for f in flowcheck.check(org_id, now)]
+    return [_alarm("flow:%s" % f["flow"], "%s:%s" % (org_id, f["key"]),
+                   f.get("severity", WARN), f["detail"], f.get("age_min"))
+            for f in flowcheck.check(org_id, now)]
 
 
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
