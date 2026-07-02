@@ -1178,3 +1178,10 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   "system health" tile (uptime/liveness per feature, from real beats).
 - `[bonus]` **Coverage-matrix audit method** (4 parallel agents: 3 send-site sweeps × 1 independent
   verifier inventory, then bipartite match) — reusable for any future law-class sweep.
+- `[proof]` **The self-healing loop demonstrated LIVE by the owner's own Monitor screenshots** (2026-07-02):
+  HENG flagged at 00:00 (open session + unsettled slot #297 + dangling booking #91) → 07:00 "3 cleared",
+  zero human, zero API — and the deploy-time read confirmed the MONEY outcome: #297=done, #91=done (worked
+  + settled with credit, not reaped). Detection → durable alarm → automatic terminal → self-closing confirmation.
+- `[finding]` **prod `core_audit` is EMPTY → the (now-installed) nightly anchor no-ops until config-change
+  rows flow**; `ANCHOR_HMAC_KEY` unset = plaintext anchors (owner one-liner, W3-class). The anchor CRON was
+  missing entirely until tonight — found only by reading the real crontab.
