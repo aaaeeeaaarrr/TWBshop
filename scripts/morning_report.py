@@ -1,6 +1,7 @@
 """Morning report (B3 generator) — a READ-ONLY digest of the platform's overnight state, so Claude / the
 B3 nightly cloud-agent (or the owner) can see "what happened + what needs attention" at a glance without
-reading a terminal full of logs. It NEVER writes anything.
+reading a terminal full of logs. It writes NOTHING except its own liveness heartbeat (observability law
+2026-07-02 — a digest cron that silently stops running is itself a dead-end).
 
 Pulls four reliable sources:
   1. /audit  — live money/data-integrity problems (run_audit over the REAL ledger)
@@ -88,10 +89,21 @@ def main() -> int:
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     org = args[0] if args else "twb"
+    hb = None
+    if "--send" in flags:             # heartbeat only the SCHEDULED (cron) shape, not ad-hoc reads
+        try:
+            from core.heartbeat import beat, init_heartbeats_db
+            init_heartbeats_db()
+            beat("twb", "cron:morning_report", 1560, phase="start")
+            hb = beat
+        except Exception as e:
+            print("heartbeat unavailable (non-fatal):", e)
     report = build_report(org)
     print(report)
     if "--send" in flags:
         _send_to_owner(report)        # the nightly cron uses this; without --send it's just read-only print
+        if hb:
+            hb("twb", "cron:morning_report", 1560, phase="ok")
     return 0
 
 

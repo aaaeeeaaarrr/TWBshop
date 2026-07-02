@@ -86,3 +86,10 @@ Today `mark_b2b_orders_paid` + `mark_b2b_cake_orders_paid` + `set_b2b_customer_c
 ## Status (original)
 Plan ready + prep done. Code unchanged (B2B disabled). The staging CODE build (F2/F3/F4 + tests + red-team) is
 safe-autonomous (B2B disabled, no live money); the prod INDEX application + the re-enable stay joint with the owner.
+
+## F5 (added 2026-07-02, observability audit dead-end #13) — markpaid owner-approval DM has NO re-nudge
+`b2b_bot/staff_commands.py::callback_markpaid_method` DMs the owner the Confirm/Reject card inside a
+`try/except logger.error` with no retry and no watcher: a failed DM = staff sees "⏳ awaiting approval"
+forever, owner never learns, money never applied. Fix at re-enable WITH the F2/F3/F4 session: copy the
+existing hourly verification-nudge tick pattern (`run_verification_nudge_tick`) onto pending
+`b2b_markpaid_requests`, and sink-alarm the send failure (observability law T2).

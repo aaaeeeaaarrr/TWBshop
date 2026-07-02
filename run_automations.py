@@ -73,11 +73,32 @@ def tick():
 def main():
     init_core_db()
     logger.info("Automations runner up — every %d min (opted-in tenants only)", INTERVAL_MIN)
+    try:
+        from core.heartbeat import init_heartbeats_db
+        init_heartbeats_db()
+    except Exception:
+        logger.exception("init_heartbeats_db failed (non-fatal)")
     while True:
+        # observability law: the runner beats per tick so a wedged/dead service alarms via the sweep
+        try:
+            from core.heartbeat import beat
+            beat("twb", "svc:automations_tick", INTERVAL_MIN * 3, phase="start")
+        except Exception:
+            pass
         try:
             tick()
+            try:
+                from core.heartbeat import beat
+                beat("twb", "svc:automations_tick", INTERVAL_MIN * 3, phase="ok")
+            except Exception:
+                pass
         except Exception:
             logger.exception("tick failed")
+            try:
+                from core.heartbeat import beat
+                beat("twb", "svc:automations_tick", INTERVAL_MIN * 3, phase="err", err="tick failed (see log)")
+            except Exception:
+                pass
         time.sleep(INTERVAL_MIN * 60)
 
 

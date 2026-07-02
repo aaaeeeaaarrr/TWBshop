@@ -135,6 +135,12 @@ instant-revert; never a blind switch. Companion record: `docs/BONUSES_AND_FINDIN
    not all converted).
 
 ### THE BUILD (the fresh session's primary task — in order)
+> **▶ STEPS 1–4 DONE 2026-07-02** — the enumerated audit → `docs/OBSERVABILITY_AUDIT_2026-07-02.md`
+> (16 dead-ends: 12 fixed, 3 parked with rationale, 1 = the anchor-cron deploy step); the LAW (3 tiers)
+> → `docs/OBSERVABILITY_LAW.md`; the guard → `tests/test_observability_law.py`; substrate =
+> `core/heartbeat.py` + `core/sends.py` + 4 new sentinel detectors + `_client_alert` + the error-handler
+> sink mirror. Intraday = the new detectors riding the EXISTING 30-min sweep + 3-min watchdog + 1-min
+> cron probe (no new scheduler needed — leaner than the sketch below). Step 5 remains owner-gated.
 1. **DEAD-END / LADDER-TERMINAL AUDIT (read-only first):** grep every escalation · ladder · notification · owner-DM
    site across the repo (process + crons + services + all bots). For each, verify it has **{a durable log · a terminal
    step · a downstream verifier that the NEXT step actually fired}**. Output the enumerated list of every **DEAD-END**

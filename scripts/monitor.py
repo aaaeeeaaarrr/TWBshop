@@ -28,7 +28,8 @@ import urllib.parse
 import urllib.request
 
 OWNER_CHAT_ID = os.environ.get("MONITOR_OWNER_CHAT_ID", "1313155971")
-SERVICES = ["twbshop-retail", "twbshop-b2b", "twbshop-gm", "twbshop-listener", "twbshop-hire"]
+SERVICES = ["twbshop-retail", "twbshop-b2b", "twbshop-gm", "twbshop-listener", "twbshop-hire",
+            "twbshop-automations", "twbshop-wizard"]   # +2 per the 2026-07-02 dead-end audit (were unwatched)
 EXPECTED_INACTIVE = {"twbshop-b2b"}  # deliberately stopped - shown on the board, never alarmed
 SSH_ALIAS = "twbshop"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -65,6 +65,16 @@ try:
     init_transitions_db()  # owner law: OLD-vs-NEW comparison log for every cut-over (additive; written by gates)
 except Exception:
     logging.getLogger(__name__).exception("init_transitions_db failed — transition notes off (best-effort)")
+from core.heartbeat import init_heartbeats_db
+try:
+    init_heartbeats_db()   # observability law: job/cron liveness beats (additive; detect_stale_heartbeats reads)
+except Exception:
+    logging.getLogger(__name__).exception("init_heartbeats_db failed — jobs run unmeasured (best-effort)")
+from core.sends import init_send_ledger_db
+try:
+    init_send_ledger_db()  # observability law: proactive-send outbox intent→sent|failed (additive)
+except Exception:
+    logging.getLogger(__name__).exception("init_send_ledger_db failed — sends unledgered (best-effort)")
 from shared.database import seed_staff_genders
 seed_staff_genders()      # fill the gender column from the owner roster (idempotent; logs unmatched)
 from shared.database import points_seed_catalogue, set_att_test, gm_get_state

@@ -1498,6 +1498,22 @@ async def _alarm(context, kind: str, body: str, severity: str = "warn") -> None:
         pass
 
 
+async def _client_alert(context, kind: str, body: str, severity: str = "warn") -> None:
+    """The durable sibling of _alarm for CLIENT-OPS owner alerts (missing report · sales anomaly ·
+    AL-ladder escalation …): persist to the gm_alarms sink FIRST — so a one-shot alert is never lost
+    to a failed DM (the sweep's detect_undelivered_alarms re-raises it within ~30 min, the morning
+    report next day) — THEN deliver on the CLIENT GM bot to the owner-as-client-manager (H1 refinement:
+    client-ops stays OFF the builder Monitor; _alarm is for builder/system concerns). Never raises."""
+    from gm_bot import alarms
+    aid = alarms.log_alarm(kind, body, severity=severity, is_test=_att_test_mode())
+    try:
+        msg, _ = await _send_once_retrying(context, config.OWNER_TELEGRAM_ID, body, None, None)
+        if msg is not None:
+            alarms.mark_delivered(aid)
+    except Exception:
+        pass
+
+
 async def _note_staff_send_failure(context, target, role: str) -> None:
     """Record a transient LIVE staff-send failure; if a burst just formed, DM the owner ONCE
     (cooldown'd). alarmed_at is set BEFORE the DM so a failing alarm can't pile up on the hot path —
@@ -1569,6 +1585,7 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
                 return None
         except Exception:
             pass
+    from core import sends as send_ledger
     from gm_bot.attendance import strip_khmer
     if _att_test_mode():
         # everything routes to the OWNER in test → English-only by default. /testkhmer on keeps the
@@ -1576,14 +1593,25 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
         prefix = "🧪 [→ %s%s]\n" % (role, (": " + to_name) if to_name else "")
         full = prefix + text
         body = full if gm_get_state("att_test_khmer") == "true" else strip_khmer(full)
+        _sid = send_ledger.record("twb", "gm", role or "att", config.OWNER_TELEGRAM_ID,
+                                  ref=subject_staff_id, is_test=True)
         msg, _ = await _send_once_retrying(context, config.OWNER_TELEGRAM_ID, body, kb, parse_mode)
+        send_ledger.mark(_sid, ok=msg is not None, message_id=getattr(msg, "message_id", None),
+                         err=None if msg is not None else "send failed")
         return msg
     target = config.SUPERVISORS_CHAT_ID if group else to_uid
     if not target:
+        # observability law: a proactive message with NO resolvable chat id is a silent config gap —
+        # ledger it as failed so detect_stuck_sends surfaces the class instead of a bare None return.
+        send_ledger.mark(send_ledger.record("twb", "gm", role or "att", "none", ref=subject_staff_id),
+                         ok=False, err="no_target")
         return None
     # the owner reads English only; staff/groups get the full bilingual text
     body = strip_khmer(text) if target == config.OWNER_TELEGRAM_ID else text
+    _sid = send_ledger.record("twb", "gm", role or "att", target, ref=subject_staff_id)
     msg, transient = await _send_once_retrying(context, target, body, kb, parse_mode)
+    send_ledger.mark(_sid, ok=msg is not None, message_id=getattr(msg, "message_id", None),
+                     err=None if msg is not None else ("transient (retries exhausted)" if transient else "send failed"))
     if msg is None and transient:
         await _note_staff_send_failure(context, target, role)
     return msg
@@ -4675,9 +4703,10 @@ async def _missing_mid_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "mid" for r in rows):
-            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor
-            await _send_once_retrying(context, config.OWNER_TELEGRAM_ID,
-                                      "⏰ No midday report in TWB REPORT for %s yet (17:30)." % day)
+            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor.
+            # Sink-first (observability law): a one-shot per-day alert must survive a failed DM.
+            await _client_alert(context, "no_report",
+                                "⏰ No midday report in TWB REPORT for %s yet (17:30)." % day)
     except Exception as e:
         logger.error("missing-mid check failed: %s", e)
 
@@ -4688,10 +4717,13 @@ async def _missing_final_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         rows = get_daily_reports_for_day(day)
         if not any(r.get("report_kind") == "final" for r in rows):
-            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor
-            await _send_once_retrying(context, config.OWNER_TELEGRAM_ID,
-                                      "🚨 No FINAL report stored for business day %s (checked 06:30). "
-                                      "The day's books are missing — staff didn't post, or collection is down." % day)
+            # client-OPERATIONAL (the client manager's books) → the client GM bot, NOT the builder Monitor.
+            # Sink-first + severity money: this is the books-missing alert — if the DM fails, tomorrow's
+            # run checks a DIFFERENT day, so without the sink this day's alert was lost FOREVER.
+            await _client_alert(context, "no_report",
+                                "🚨 No FINAL report stored for business day %s (checked 06:30). "
+                                "The day's books are missing — staff didn't post, or collection is down." % day,
+                                severity="money")
     except Exception as e:
         logger.error("missing-final check failed: %s", e)
 
@@ -5190,7 +5222,7 @@ async def _maybe_flag_sales_anomaly(context, full: dict) -> None:
              result["median"], result["n"], result["drop_pct"])
         if reasons:
             body += "\nPossible context: " + "; ".join(reasons)
-        await context.bot.send_message(chat_id=config.OWNER_TELEGRAM_ID, text=body)
+        await _client_alert(context, "sales_anomaly", body)
         logger.info("Sales anomaly flagged for %s (down %.1f%%)",
                     full["business_day"], result["drop_pct"])
     except Exception as e:
@@ -6382,9 +6414,11 @@ async def _live_watchdog_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                      "✅ Live watchdog: %d issue(s) cleared%s." %
                      (len(cleared), "" if not still_open else " (%d still open)" % still_open),
                      severity="info")
-    if still_open == 0:    # data is clean → SELF-CLOSE the integrity alarms in the sink (auto-ack)
+    if still_open == 0:    # data is clean → SELF-CLOSE the integrity alarms in the sink (auto-ack).
+        # "watchdog_cleared" included (2026-07-02): the ✅ notices themselves were piling up as
+        # open/unacked in every morning report (2→2→3…) — a resolution record needs no attention.
         from gm_bot import alarms
-        alarms.ack_open_of_kinds(["watchdog", "daily_audit", "audit_failed"])
+        alarms.ack_open_of_kinds(["watchdog", "daily_audit", "audit_failed", "watchdog_cleared"])
     gm_set_state("live_watchdog_last", cur_json)
 
 
@@ -6572,8 +6606,10 @@ async def _al_reping_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                 _gm_log("al_reping", req["staff_id"], detail={"req": req["id"], "ping_no": ping_no, "sent": sent})
                 logger.info("[AL-LADDER] req #%s re-ping #%d → %d senior(s)", req["id"], ping_no, sent)
             elif action == "escalate":
-                await context.bot.send_message(
-                    config.OWNER_TELEGRAM_ID,
+                # sink-first (observability law): al_mark_escalated below stops the ladder re-firing,
+                # so a lost DM here would orphan the escalation — the durable alarm carries it instead.
+                await _client_alert(
+                    context, "al_escalated",
                     "🔺 AL request #%s still unapproved after %d re-pings — it needs your decision."
                     % (req["id"], cfg.get("reping_max", 4)))
                 al_mark_escalated(req["id"])
@@ -8032,6 +8068,23 @@ async def _log_every_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         pass
 
 
+# OBSERVABILITY LAW: expected max silence (minutes, slack included) per scheduled gm job — read by the
+# heartbeat listener installed in build_app and by core.sentinel.detect_stale_heartbeats via the beats
+# themselves. EVERY job registered on the job_queue MUST have an entry (guard:
+# tests/test_observability_law.py) so a new job cannot ship without declaring its liveness contract.
+_JOB_EXPECTED_GAP_MIN = {
+    "gm_checkin_scheduler": 10, "gm_payback_ladder": 1560, "gm_booking_reminder": 240,
+    "gm_sick_papers_deadline": 1560, "gm_no_show_sweep": 1560, "gm_callout": 1560,
+    "gm_pay_restore": 1560, "gm_auto_audit": 1560, "gm_test_watchdog": 10,
+    "gm_live_watchdog": 15, "gm_session_closer": 1560, "gm_payback_reaper": 1560,
+    "gm_sentinel_sweep": 90, "gm_shadow_digest": 1560, "gm_reason_nudge": 30,
+    "gm_al_reping": 90, "gm_daily_analysis": 1560, "gm_periodic_analysis": 720,
+    "gm_auto_skip_proposals": 240, "gm_clarification_ladder": 15, "gm_lateness_ladder": 15,
+    "gm_weekly_attendance_digest": 1560, "gm_al_deduction": 1560, "gm_al_accrual": 1560,
+    "gm_missing_mid_report": 1560, "gm_missing_final_report": 1560, "gm_stock_order": 1560,
+}
+
+
 def build_app() -> Application:
     if not config.GM_BOT_TOKEN:
         raise ValueError("GM_BOT_TOKEN not set in config/secrets")
@@ -8315,5 +8368,32 @@ def build_app() -> Application:
         time=__import__("datetime").time(hour=0, minute=0),
         name="gm_stock_order",
     )
+
+    # ── OBSERVABILITY LAW (2026-07-02): every scheduled job heartbeats ─────────────────────────
+    # ONE APScheduler listener beats core_job_heartbeats after EVERY job execution — no per-job
+    # wrapper, so a future job cannot be registered and silently skip liveness. Expected gaps live
+    # in the module-level _JOB_EXPECTED_GAP_MIN (above build_app); the guard test
+    # (tests/test_observability_law.py) FAILS if a registered job name is missing from it.
+    # HONEST LIMIT: PTB catches callback exceptions itself (→ the error handler → the alarm sink),
+    # so the listener proves the job FIRED; in-callback crashes surface via the error-handler path.
+    try:
+        from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+        def _hb_on_job_event(event):
+            """Scheduler-thread hook — MUST never raise; beat() is itself best-effort."""
+            try:
+                from core import heartbeat
+                job = app.job_queue.scheduler.get_job(event.job_id)
+                name = getattr(job, "name", None) or str(event.job_id)
+                gap = _JOB_EXPECTED_GAP_MIN.get(name, 1560)
+                exc = getattr(event, "exception", None)
+                heartbeat.beat("twb", name, gap, phase="err" if exc else "ok",
+                               err=repr(exc) if exc else None)
+            except Exception:
+                logger.exception("heartbeat job-listener failed (non-fatal)")
+
+        app.job_queue.scheduler.add_listener(_hb_on_job_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    except Exception:
+        logger.exception("heartbeat listener not installed (non-fatal — jobs run unmeasured)")
 
     return app

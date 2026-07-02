@@ -72,4 +72,16 @@ async def run(limit: int):
 
 if __name__ == "__main__":
     limit = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+    # observability law: the daily receipt-archive cron beats so a silent stop alarms via the sweep
+    try:
+        from core.heartbeat import beat, init_heartbeats_db
+        init_heartbeats_db()
+        beat("twb", "cron:fetch_report_receipts", 1560, phase="start")
+    except Exception as e:
+        print("heartbeat unavailable (non-fatal):", e)
     asyncio.run(run(limit))
+    try:
+        from core.heartbeat import beat
+        beat("twb", "cron:fetch_report_receipts", 1560, phase="ok")
+    except Exception:
+        pass

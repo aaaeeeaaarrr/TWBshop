@@ -97,6 +97,71 @@ def detect_config_health(org_id: str, now: datetime) -> list:
         return []
 
 
+def detect_undelivered_alarms(org_id: str, now: datetime) -> list:
+    """OBSERVABILITY LAW: an alarm written to the durable sink whose owner-DM never landed (delivered=FALSE)
+    is a message shouting into a void — re-raise it within the half-hour, not at the next 08:00 digest.
+    CRITICAL if any of them is a money alarm."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) n, count(*) FILTER (WHERE severity='money') m FROM gm_alarms "
+                        "WHERE delivered=FALSE AND acked=FALSE AND is_test=FALSE "
+                        "AND at < %s AND at > %s",
+                        (now - timedelta(minutes=15), now - timedelta(days=7)))
+            r = cur.fetchone()
+    if not r["n"]:
+        return []
+    sev = CRITICAL if r["m"] else WARN
+    return [_alarm("alarm_delivery", org_id, sev,
+                   "%d alarm(s) in the sink were never delivered to the owner (%d money) — "
+                   "read them: python scripts/alarms.py --open" % (r["n"], r["m"]))]
+
+
+def detect_stale_heartbeats(org_id: str, now: datetime) -> list:
+    """OBSERVABILITY LAW: a dead checker is the ultimate dead-end (the 2026-06-11 cron-daemon incident).
+    Every scheduled job/cron/service-loop beats core_job_heartbeats with its OWN expected gap; anything
+    silent past its gap, or running-but-failing, alarms here. A silent 'cron:*' job is CRITICAL — the
+    cron DAEMON itself is likely down, so every other cron is too."""
+    from core import heartbeat
+    out = []
+    for h in heartbeat.stale(org_id, now):
+        sev = CRITICAL if (h["kind"] == "silent" and h["job"].startswith("cron:")) else WARN
+        out.append(_alarm("heartbeat", "%s:%s" % (org_id, h["job"]), sev,
+                          "job '%s' %s — %s" % (h["job"], h["kind"], h["detail"]), h.get("overdue_min")))
+    return out
+
+
+def detect_stuck_sends(org_id: str, now: datetime) -> list:
+    """OBSERVABILITY LAW: a proactive send that never completed — an 'intent' ledger row with no outcome
+    (the process died mid-send) or a 'failed' row (every retry lost). Attempted ≠ delivered."""
+    from core import sends
+    out = []
+    for s in sends.stuck(org_id, now):
+        detail = ("send #%s (%s/%s → %s) stuck at 'intent' — the sender died mid-send"
+                  % (s["id"], s["channel"], s["kind"], s["target"])) if s["status"] == "intent" else (
+                  "send #%s (%s/%s → %s) failed after retries: %s"
+                  % (s["id"], s["channel"], s["kind"], s["target"], (s.get("err") or "?")[:120]))
+        out.append(_alarm("sends", "%s:%s" % (org_id, s["id"]), WARN, detail))
+    return out
+
+
+def detect_silent_flip_revert(org_id: str, now: datetime) -> list:
+    """BELT for the cut-over net: an auto-revert flips authority off and expects its CALLER to alarm —
+    a future caller that forgets leaves the revert a silent DB-only event (and detect_flip_divergence
+    stops watching once authoritative=FALSE). Any recent auto-revert alarms here regardless of caller."""
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT path, reason, updated_at FROM core_flip "
+                            "WHERE org_id=%s AND authoritative=FALSE AND reason LIKE 'auto-revert%%' "
+                            "AND updated_at > %s", (org_id, now - timedelta(hours=48)))
+                rows = cur.fetchall()
+        return [_alarm("flip", "%s:%s:reverted" % (org_id, r["path"]), CRITICAL,
+                       "path '%s' AUTO-REVERTED to the old engine (%s) — review the divergence before "
+                       "re-flipping" % (r["path"], r["reason"])) for r in rows]
+    except Exception:
+        return []   # no flip table yet → nothing to watch
+
+
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
 # stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only.
 DETECTORS = [
@@ -104,6 +169,10 @@ DETECTORS = [
     ("malformed_checkin", detect_malformed_checkin),
     ("flip_divergence", detect_flip_divergence),
     ("config_health", detect_config_health),
+    ("undelivered_alarms", detect_undelivered_alarms),
+    ("stale_heartbeats", detect_stale_heartbeats),
+    ("stuck_sends", detect_stuck_sends),
+    ("silent_flip_revert", detect_silent_flip_revert),
 ]
 
 

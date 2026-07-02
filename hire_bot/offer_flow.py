@@ -152,14 +152,11 @@ async def request_owner_approval(
         "",
         "Please approve or reject:",
     ]
+    # OBSERVABILITY LAW (2026-07-02): record the state FIRST — the old shape held this UPDATE inside
+    # the same try as the send, so a failed owner-DM left NO state anywhere (the top hire dead-end:
+    # the trial-approval gate could vanish silently while the applicant waits). Nothing gates on
+    # 'pending_approval' (check_offer_gates requires 'owner_approved_trial'), so a re-run re-sends.
     try:
-        await bot.send_message(
-            config.OWNER_TELEGRAM_ID,
-            "\n".join(lines),
-            parse_mode="HTML",
-            reply_markup=owner_approval_kb(attempt_id),
-        )
-        # Store pending approval
         conn = _db(); cur = conn.cursor()
         try:
             cur.execute("""
@@ -171,7 +168,25 @@ async def request_owner_approval(
         finally:
             cur.close(); conn.close()
     except Exception as e:
+        logger.error("request_owner_approval state write failed: %s", e)
+    try:
+        await bot.send_message(
+            config.OWNER_TELEGRAM_ID,
+            "\n".join(lines),
+            parse_mode="HTML",
+            reply_markup=owner_approval_kb(attempt_id),
+        )
+    except Exception as e:
         logger.error("request_owner_approval failed: %s", e)
+        # durable escape: the sink alarm (delivered=FALSE) is re-raised to the owner by the gm
+        # sentinel sweep within ~30 min — the approval request can no longer vanish silently.
+        try:
+            from gm_bot.alarms import log_alarm
+            log_alarm("hire_approval_notify_failed",
+                      "Hire bot: the trial-approval card for attempt #%s FAILED to send (%s) — a candidate "
+                      "is waiting on Approve/Reject. Re-run the pipeline or open the hire flow." % (attempt_id, e))
+        except Exception:
+            pass
 
 
 async def send_offer_message(

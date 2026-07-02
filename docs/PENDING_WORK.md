@@ -5,6 +5,20 @@
 > this is the index so nothing slips. Tick items here as they ship. (Also see `docs/ROADMAP.md`,
 > `docs/ACTIONS_LEDGER.md`, `docs/POSBUSINESS_HARVEST_PLAN.md`, `docs/BONUSES_AND_FINDINGS.md`.)
 
+## ▶ OBSERVABILITY LAW — remaining increments (2026-07-02; steps 1–4 SHIPPED, see `docs/OBSERVABILITY_AUDIT_2026-07-02.md`)
+- [ ] **Swap + shift-change CHASE ladders** (T2 upgrade): today stuck ones are only DETECTED (`v_swaps`/`v_shift_changes`);
+      an AL-style re-ping→escalate→expire ladder sends new messages to real staff = behavioral → owner shapes it first.
+      Also: senior-card coords live in `bot_data` (in-memory, orphaned on restart) — persist like `al_pings` when building.
+- [ ] **B2B markpaid owner-approval re-nudge** (audit dead-end #13, the worst money dead-end — B2B DISABLED so dormant):
+      fix WITH owner at re-enable, pattern = the existing hourly verification-nudge tick. → `docs/B2B_LANDMINE_FIX_PLAN.md`.
+- [ ] **Retail increments** (batch with the next retail deploy; code for the error-handler sink mirror is already in
+      `shared/` and rides ANY restart): port b2b's `_startup_summary_check` missed-summary catch-up · durable record for
+      AI staff-message flags (audit #14).
+- [ ] **Retention tidy** for `core_send_ledger` + `core_flip_log` (unbounded growth; low-risk chore, not urgent).
+- [ ] **Phase-5 continuous checker** (owner-gated): the scheduled agent reading sink+ledger+beats per tenant — the
+      substrate it reads is now fully built + being written.
+- [ ] **monitor_bot self-watch** (noted in the audit; low value — it's a read surface, delivery works without it).
+
 ## ▶▶ SESSION-55 WRAP — the LIVE pending map (one scan; nothing lost)
 > A huge multi-thread session (audit → hardening → token incident → swap rule → questionnaire → automations →
 > comms). This block is the single "what's left." Detail is in the sections below + the linked docs. (2026-06-26.)

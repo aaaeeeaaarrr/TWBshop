@@ -87,6 +87,8 @@
     · init_flip_db, is_authoritative, set_authoritative, record_divergence, recent_divergence, should_auto_revert, decide
 - `core/health.py` — core.health — read-only config health-check. Scans a tenant's config + setup for likely mistakes /
     · config_health
+- `core/heartbeat.py` — core.heartbeat — self-describing JOB/CRON liveness (observability law, 2026-07-02).
+    · _now, init_heartbeats_db, beat, stale
 - `core/insights.py` — core.insights — a cross-domain 'needs attention' feed (read-only): one place that scans every ON domain for
     · attention_feed
 - `core/investigate.py` — core.investigate — the Investigation / loss-prevention card: forensic queries that pinpoint WHEN something
@@ -119,8 +121,10 @@
     · attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
 - `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
     · resolve_day
+- `core/sends.py` — core.sends — the durable SEND LEDGER: intent → sent | failed (observability law, 2026-07-02).
+    · _now, init_send_ledger_db, record, mark, stuck
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
-    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, sweep, summary_line
+    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, detect_undelivered_alarms, detect_stale_heartbeats, detect_stuck_sends, detect_silent_flip_revert, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
     · worked_minutes, ot_earned, split_ot_pb, settle_shift, payback_extension_window, settle_payback_slot
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
@@ -156,7 +160,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+226, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+227, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/checkin_net.py` — gm_bot.checkin_net — the C2 cut-over BRIDGE: the live check-in verdict routed through core.flip's
@@ -329,11 +333,11 @@
 - `shared/database.py` — PostgreSQL database — all tables and queries.
     · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+308, grep)
 - `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
-    · make_error_handler
+    · _sink, _mark_delivered, make_error_handler
 - `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
     · RedactTokenFilter, redact, install_log_hygiene
 - `shared/monitor_notify.py` — shared.monitor_notify — deliver a BUILDER/system alarm to the owner via the MONITOR bot (NOT a client
-    · notify_monitor
+    · _prod, notify_monitor
 - `shared/runtime_guard.py` — Runtime guard: refuse to start a live Telegram/Telethon poller off production.
     · assert_polling_allowed
 - `shared/stock_shared.py` — Shared stock tables — the accountant <-> stock-lane seam (design §E7 / §E11).

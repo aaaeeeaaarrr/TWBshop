@@ -32,4 +32,17 @@ def main():
 
 
 if __name__ == "__main__":
+    # observability law: the nightly anchor cron beats — the 2026-07-02 audit found the anchor cron
+    # itself was MISSING from the server crontab for weeks and nothing noticed. Now its absence alarms.
+    try:
+        from core.heartbeat import beat, init_heartbeats_db
+        init_heartbeats_db()
+        beat("twb", "cron:anchor_audit", 1560, phase="start")
+    except Exception as e:
+        print("heartbeat unavailable (non-fatal):", e)
     main()
+    try:
+        from core.heartbeat import beat
+        beat("twb", "cron:anchor_audit", 1560, phase="ok")
+    except Exception:
+        pass

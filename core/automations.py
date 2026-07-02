@@ -193,13 +193,19 @@ def dispatch(org_id, send_fn, now=None, cooldown_hours: int = DISPATCH_COOLDOWN_
 
 def token_sender(bot_token: str):
     """A send_fn that posts to a Telegram chat via a bot token (channel-agnostic Bot API). The bot must be IN
-    the target chat (or the user must have started it). The real send; tests inject a mock instead."""
+    the target chat (or the user must have started it). The real send; tests inject a mock instead.
+    Observability law: a Telegram-level rejection (HTTP 200 but ok:false) RAISES, so dispatch() skips
+    _record_sent and the recipe retries next tick — the old shape recorded a silent rejection as 'sent'."""
+    import json
     import urllib.request
     import urllib.parse
 
     def _send(chat_id, text):
         data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-        urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % bot_token, data=data, timeout=10)
+        with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % bot_token,
+                                    data=data, timeout=10) as r:
+            if not json.load(r).get("ok"):
+                raise RuntimeError("telegram rejected the send (ok:false)")
     return _send
 
 

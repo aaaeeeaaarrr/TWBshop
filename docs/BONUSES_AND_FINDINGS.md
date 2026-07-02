@@ -1148,3 +1148,33 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   (checkin/AL/no-show/pay/reaper/closer/re-ping/digests) is genuine client-ops → correctly stays on gm.
 - `[decision]` **Cut-over stays OWNER-GATED** — step 2 (remove the jobs from gm) restarts the live attendance
   bot (HIGH-RISK), and the trigger is multi-client, not a single tenant. Full plan → `docs/BUILDER_MONITOR_CUTOVER.md`.
+
+## §s59 — OBSERVABILITY / END-TO-END VERIFICATION program, steps 1–4 (2026-07-02)
+- `[ship]` **The observability substrate** — `core/heartbeat.py` (self-describing job/cron liveness; the
+  expected gap lives IN the row → no registry to drift) + `core/sends.py` (proactive-send outbox
+  intent→sent|failed) + 4 new sentinel detectors (undelivered-alarms · stale-heartbeats · stuck-sends ·
+  silent-flip-revert) + `_client_alert` (sink-first CLIENT-ops sibling of `_alarm`) + the shared error
+  handler mirroring EVERY bot crash to the sink. Audit → `docs/OBSERVABILITY_AUDIT_2026-07-02.md`; law →
+  `docs/OBSERVABILITY_LAW.md`; guard → `tests/test_observability_law.py`.
+- `[bonus]` **One APScheduler listener heartbeats ALL 27 gm jobs — including every FUTURE one** (zero
+  per-job wrapper; the guard forces each new job name to declare its gap in `_JOB_EXPECTED_GAP_MIN`).
+- `[bonus]` **The 1-min collection-watchdog cron doubles as the cron-DAEMON liveness probe** (its beat
+  going silent = the whole crontab is dead → CRITICAL within ~10 min; the 2026-06-11 incident class), and
+  it now cross-checks the gm brain's own watcher jobs OUT-of-process (gm 'active' but JobQueue stalled was
+  previously invisible). No single process is its own only witness.
+- `[bonus]` **Recompute-FYI law tier** — a recurring digest/nudge whose next run re-derives fresh state
+  needs NO per-send ledger (its cadence is its retry; T3 heartbeats guarantee the cadence lives) → avoided
+  chokepointing ~20 benign sites. Leanness from classification, not from skipping.
+- `[finding]` **Self-swallowed sends are WORSE than bare sends** — `try/except logger.error` around a send
+  bypasses the global error handler entirely (no Monitor DM, no sink). Review heuristic for every new flow.
+- `[finding]` **Docstrings drift; guards don't** — `alarms.py` CLAIMED the no-report alert + error-handler
+  wrote the sink (neither did); the watchdog docstring said cron `*/30` (real crontab: every minute); the
+  server had NO nightly `anchor_audit.py` cron despite docs. Server ground-truth first, always.
+- `[finding]` **Hire trial-approval DM held its DB write INSIDE the send's try** → a failed owner DM left
+  zero state while the applicant waited forever. Fixed (state first; failure → sink alarm). Grep this shape
+  in future intake flows.
+- `[bonus]` **The substrate IS the Phase-5 agent's food** — the future continuous multi-tenant checker
+  reads sink+ledger+beats+transitions, all now being written. Also sellable later as a client-facing
+  "system health" tile (uptime/liveness per feature, from real beats).
+- `[bonus]` **Coverage-matrix audit method** (4 parallel agents: 3 send-site sweeps × 1 independent
+  verifier inventory, then bipartite match) — reusable for any future law-class sweep.

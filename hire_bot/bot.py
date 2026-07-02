@@ -588,6 +588,15 @@ async def _handle_correction_question(update: Update, context: ContextTypes.DEFA
         )
     except Exception as e:
         logger.error("_handle_correction_question owner fwd failed: %s", e)
+        # observability law: we promise the applicant a reply below — a lost forward must leave a
+        # durable trace (the gm sweep re-raises undelivered sink alarms to the owner within ~30 min).
+        try:
+            from gm_bot.alarms import log_alarm
+            log_alarm("hire_question_lost",
+                      "Hire bot: applicant question (attempt #%s) FAILED to forward to you: %.300s"
+                      % (attempt_id, update.message.text))
+        except Exception:
+            pass
     await update.message.reply_text(
         "Thank you. We will review your question and get back to you.\n\n"
         "អរគុណ។ យើងនឹងពិនិត្យ ហើយឆ្លើយតបប្អូន។",
@@ -607,6 +616,13 @@ async def _handle_offer_question(update: Update, context: ContextTypes.DEFAULT_T
         )
     except Exception as e:
         logger.error("_handle_offer_question owner fwd failed: %s", e)
+        try:
+            from gm_bot.alarms import log_alarm
+            log_alarm("hire_question_lost",
+                      "Hire bot: applicant OFFER question (attempt #%s) FAILED to forward to you: %.300s"
+                      % (attempt_id, update.message.text))
+        except Exception:
+            pass
     await update.message.reply_text(
         "Thank you. We will reply to you directly.\n\n"
         "អរគុណ។ យើងនឹងឆ្លើយតបប្អូនដោយផ្ទាល់។"

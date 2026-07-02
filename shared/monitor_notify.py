@@ -14,12 +14,21 @@ import urllib.request
 import config
 
 
+def _prod() -> bool:
+    """Separated so tests can exercise the send path (stubbed urlopen) WITHOUT setting TWBSHOP_ENV=prod
+    — which would flip active_database_url onto the PROD DB. Never point a test at prod."""
+    return os.environ.get("TWBSHOP_ENV") == "prod"
+
+
 def notify_monitor(text: str) -> bool:
     """POST `text` to the owner via the Monitor bot. Returns True on delivery, False otherwise. Never raises.
     Sends ONLY from the live (prod) environment — never from tests/staging/dev — so a test that exercises an
     alarm path can't message the owner a real DM (the s58 test-leakage bug: a couple of test runs POSTed real
-    'DAVY audit' / 'TestBot crashed' DMs before this guard)."""
-    if os.environ.get("TWBSHOP_ENV") != "prod":
+    'DAVY audit' / 'TestBot crashed' DMs before this guard).
+    OBSERVABILITY LAW (2026-07-02): every attempt is ledgered (core_send_ledger intent→sent|failed) so a
+    builder DM that never lands is caught by detect_stuck_sends instead of vanishing into a returned False
+    the caller drops. Ledger writes are best-effort — they never block the send."""
+    if not _prod():
         return False
     try:
         from secrets import MONITOR_BOT_TOKEN
@@ -28,11 +37,28 @@ def notify_monitor(text: str) -> bool:
     owner = getattr(config, "OWNER_TELEGRAM_ID", 0)
     if not MONITOR_BOT_TOKEN or not owner:
         return False
+    sid = None
+    try:
+        from core.sends import mark, record
+        sid = record("twb", "monitor", "builder_notify", owner)
+    except Exception:
+        sid = None
+
+    def _mark(ok, err=None):
+        try:
+            if sid:
+                mark(sid, ok=ok, err=err)
+        except Exception:
+            pass
+
     try:
         body = text if len(text) <= 4000 else (text[:3950] + "\n…(truncated — full in the alarm sink/log)")
         data = urllib.parse.urlencode({"chat_id": owner, "text": body}).encode()
         with urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % MONITOR_BOT_TOKEN,
                                     data=data, timeout=15) as r:
-            return bool(json.load(r).get("ok"))
-    except Exception:
+            ok = bool(json.load(r).get("ok"))
+        _mark(ok, err=None if ok else "telegram responded not-ok")
+        return ok
+    except Exception as e:
+        _mark(False, err=repr(e))
         return False
