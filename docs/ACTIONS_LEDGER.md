@@ -9,6 +9,19 @@
 
 ## Done (with proof)
 
+- **2026-07-02 — F1 EXCEPTION GAPS (3a swap-approver override · 3b escalate-to-Tyty reroute) BUILT + DEPLOYED +
+  VERIFIED INERT (tag `session-58-thyda-gaps-20260702`=`48628c3`).** Completes Thyda's spec surface ("all
+  approved by Tyty" + "escalate to Tyty"). **3a** `swap_approver_id`: `_swap_authz` + `_approvers_for(...,'swap')`
+  routing (mirrors the proven al_approver_id) → her day-off swaps go to the override approver only, quorum 1;
+  special-leave is declarative (no approval flow — nothing to wire). **3b** `escalate_to_id`: new exception field;
+  `_att_send` reroutes her Supervisors-group posts to a private DM (wins over `no_supervisor_posts` suppress;
+  Management posts untouched); wizard ⚙ Exceptions renders the picker. Safe-by-construction (no exception set →
+  byte-identical). 10 tests (`tests/test_thyda_exceptions_gaps.py`); 241 blast-radius tests green. **PROOF:** server
+  HEAD==`48628c3`==tag; twbshop-gm (MainPID 1645320) + twbshop-wizard (1645317) restarted, NRestarts 0, clean boot
+  ("Scheduler started"+"Application started", no traceback/401); deployed code carries `_swap_authz`(2)/`escalate_to_id`(3)/
+  `escalate_to`(1); **0 staff have exceptions set → byte-identical inert** (Thyda #34, Tyty #28 both `{}`); retail/b2b/
+  listener/hire UNTOUCHED. **▶ ACTIVATE (owner): set Thyda's exceptions in the wizard + a TEST-MODE WALK.**
+
 - **2026-07-02 — THYDA (id 34) ENTIRE payback backlog taken from AL (owner: "do all 3" — part of setting her
   up as a payback_to_al staffer; HIGH-RISK payroll, auto-bedrock).** Her debt #158 balance = owed 2250 − paid 0 =
   **2250 min** still owed ('paperless sick', from 2026-06-21). Verified authoritative (read-only): paid=0 is correct —

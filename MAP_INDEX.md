@@ -80,7 +80,7 @@
 - `core/derive.py` — core.derive — the SELF-DERIVING resolver: the core decides what a day is from its OWN state
     · set_override, clear_overrides, _modifiers, resolve
 - `core/exceptions.py` — core.exceptions — per-staff EXCEPTIONS / overrides (F1, session 58, 2026-06-28).
-    · _clean_exceptions, get_exceptions, set_exceptions, apply_preset, is_exempt, approver_for, summary
+    · _clean_exceptions, get_exceptions, set_exceptions, apply_preset, is_exempt, approver_for, escalate_to, summary
 - `core/expenses.py` — core.expenses — a real, minimal expense log (the Accountant domain on the platform): record expenses by
     · add_expense, list_expenses, expense_summary
 - `core/flip.py` — core.flip — the instant-revert NET for cutting a path over to the core engine (C1, self-healing program).
@@ -156,7 +156,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+225, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+226, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/checkin_net.py` — gm_bot.checkin_net — the C2 cut-over BRIDGE: the live check-in verdict routed through core.flip's
@@ -170,7 +170,7 @@
 - `gm_bot/events.py` — gm_events — append-only audit log for the GM/attendance bot (owner, 2026-06-21).
     · init_events_db, log_event, recent_events
 - `gm_bot/exceptions_live.py` — gm_bot.exceptions_live — F1: the LIVE bridge that reads per-staff EXCEPTIONS (core/exceptions.py) at
-    · exceptions_of, exempt, approver
+    · exceptions_of, exempt, approver, escalate_to
 - `gm_bot/finance.py` — REPORT-group daily-books parser.
     · _parse_number, _alias_list, _match_field, is_daily_report, parse_report_text, looks_like_report_attempt, lost_exceeds, business_day_for, classify_report, recompute, format_correction, parse_full
 - `gm_bot/flow.py` — Flow-state engine — the foundation under every real attendance ladder (H1, session 28).
@@ -282,6 +282,10 @@
     · _points, main
 - `scripts/fix_long_payback.py` — Vetted data-fix (owner Jun 22): correct Long's #154 payback over-charge from the leave-early-sick bug.
     · _read, main
+- `scripts/fix_thyda_payback_to_al.py` — Owner instruction (2026-07-02): take Thyda's (id 34) ENTIRE current payback backlog from her AL
+    · read, main
+- `scripts/fix_vannary_payback_to_al.py` — Owner one-off (2026-07-01): take Vannary's (id 17) remaining PAYBACK from her AL instead of
+    · read, main
 - `scripts/gen_map_index.py` — Generate MAP_INDEX.md — Layer 2, the AUTO file inventory.
     · pkg_dirs, _info, _entry, render, main
 - `scripts/integration_audit.py` — integration_audit.py - the INTEGRATOR's cross-lane sweep (what no single lane can see).
