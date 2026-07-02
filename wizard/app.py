@@ -676,9 +676,10 @@ def render_staff_exceptions(org_id: str, staff_id: int) -> str:
 
     # 3) approval routing — a staff picker per request type
     others = [o for o in list_staff(org_id) if o["staff_id"] != staff_id]
-    appr = "<div class='box'><h3>Approval routing</h3>"
+    appr = "<div class='box'><h3>Approval &amp; escalation routing</h3>"
     for (k, lbl, hlp) in exc.APPROVAL_FIELDS:
-        picks = "<option value=''>— normal approval ladder —</option>"
+        _none_lbl = "— normal (Supervisors group) —" if k == "escalate_to_id" else "— normal approval ladder —"
+        picks = "<option value=''>" + _none_lbl + "</option>"
         for o in others:
             picks += ("<option value='" + str(o["staff_id"]) + "'"
                       + (" selected" if cur.get(k) == o["staff_id"] else "") + ">"

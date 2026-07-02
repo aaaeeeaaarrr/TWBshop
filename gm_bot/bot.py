@@ -1536,8 +1536,29 @@ async def _att_send(context, to_uid, role: str, to_name: str, text: str,
     if group and subject_staff_id is not None:
         try:
             from gm_bot import exceptions_live
-            _ex_key = "no_management_posts" if "Management" in (role or "") else "no_supervisor_posts"
-            if exceptions_live.exempt(subject_staff_id, _ex_key):
+            _mgmt = "Management" in (role or "")
+            _ex_key = "no_management_posts" if _mgmt else "no_supervisor_posts"
+            # ESCALATION REROUTE (F1 gap 3b): a Supervisors-group post ABOUT this staffer is delivered
+            # PRIVATELY to their escalate_to person instead of the group ("never to Supervisors, to X").
+            # Reroute WINS over suppress. Falls through to normal delivery (test mode still → owner).
+            if not _mgmt:
+                _esc_sid = exceptions_live.escalate_to(subject_staff_id)
+                if _esc_sid:
+                    _esc = next((s for s in staff_all("active")
+                                 if s["id"] == _esc_sid and (s.get("telegram_ids") or [])), None)
+                    if _esc:
+                        try:
+                            from core import transitions
+                            transitions.note("twb", "escalate:no_supervisor_posts", subject_staff_id,
+                                             old="Supervisors group", new="DM→staff:%s" % _esc_sid,
+                                             detail="%s post rerouted" % role)
+                        except Exception:
+                            pass
+                        to_uid = (_esc.get("telegram_ids") or [None])[0]
+                        to_name = _esc.get("call_name") or _esc.get("canonical_name") or "escalate"
+                        role, group, subject_staff_id = "Escalation", False, None
+                        text = "🔔 [Escalated to you]\n" + text
+            if group and subject_staff_id is not None and exceptions_live.exempt(subject_staff_id, _ex_key):
                 try:    # transition log (owner law): record WHAT we're suppressing, for old-vs-new compare
                     from core import transitions
                     transitions.note("twb", "exempt:%s" % _ex_key, subject_staff_id,
@@ -3043,7 +3064,10 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
     # agreed as a party — don't ask them again as a senior (they can't impartially approve their own
     # swap). Their party-agreement counts toward the quorum (see approvals_needed in _swap_senior_callback).
     cards = context.bot_data.setdefault("swap_cards", {}).setdefault(sw["id"], [])
-    for sen in [s for s in _seniors() if s["id"] not in (sw["requester_id"], sw["partner_id"])]:
+    # F1 (gap 3a): route to the swap_approver_id override if set, else the senior ladder. No override →
+    # _approvers_for returns _seniors(exclude=requester); filtering both parties = identical to before.
+    for sen in [s for s in _approvers_for(sw["requester_id"], "swap")
+                if s["id"] not in (sw["requester_id"], sw["partner_id"])]:
         body, kb = _swap_card(sw, req, partner, audience="senior", show_cov=False)
         msg = await _att_send(context, (sen.get("telegram_ids") or [None])[0], "Senior",
                               sen.get("call_name") or sen["canonical_name"], body, kb=kb,
@@ -3070,10 +3094,6 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
     Test: owner taps as a senior (votes aren't deduped per-senior, so two taps reach quorum)."""
     query = update.callback_query
     await query.answer()
-    if not _att_test_mode():
-        sen = staff_get_by_uid(update.effective_user.id)
-        if not sen or not sen.get("is_senior"):
-            return
     sw = swap_get(int(query.data.split(":")[2]))
     if not sw or sw["status"] != "partner_ok":
         await query.edit_message_text(query.message.text + "\n\n(already decided)")
@@ -3085,7 +3105,19 @@ async def _swap_senior_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # senior needed (was: only the requester counted; a senior PARTNER got asked twice).
     party_is_senior = bool((requester and requester.get("is_senior"))
                            or (partner and partner.get("is_senior")))
-    needed = alm.approvals_needed(party_is_senior)
+    # F1 (gap 3a): a swap_approver_id override means ONLY that person may decide, quorum 1; else the
+    # senior ladder with the normal quorum. No override → byte-identical to today.
+    from gm_bot import exceptions_live
+    _ov_swap = exceptions_live.approver(sw["requester_id"], "swap")
+    sen = None
+    if not _att_test_mode():
+        sen = staff_get_by_uid(update.effective_user.id)
+        authorized, needed = _swap_authz(sen["id"] if sen else None,
+                                         bool(sen and sen.get("is_senior")), party_is_senior, _ov_swap)
+        if not sen or not authorized:
+            return
+    else:
+        needed = 1 if _ov_swap else alm.approvals_needed(party_is_senior)
     votes = swap_add_senior_vote(int(sw["id"]), query.data.split(":")[3])
     await query.edit_message_text(query.message.text + "\n\n✓ voted: %s" % query.data.split(":")[3])
     if query.data.split(":")[3] == "not_approve":
@@ -3212,6 +3244,16 @@ def _al_authz(sen_id: int, sen_is_senior: bool, requester_is_senior: bool, overr
     if override_approver_id:
         return (sen_id == override_approver_id), 1
     return bool(sen_is_senior), alm.approvals_needed(bool(requester_is_senior))
+
+
+def _swap_authz(sen_id, sen_is_senior: bool, party_is_senior: bool, override_approver_id) -> tuple:
+    """PURE: (authorized, needed) for a day-off-swap decision by sen_id. F1 (gap 3a): a swap_approver_id
+    override means ONLY that approver may decide and ONE approval finalises; otherwise any senior with the
+    normal swap quorum (2, or 1 if a party is a senior). Mirrors _al_authz. No override → identical to today."""
+    from gm_bot import al as alm
+    if override_approver_id:
+        return (sen_id == override_approver_id), 1
+    return bool(sen_is_senior), alm.approvals_needed(bool(party_is_senior))
 
 
 def _al_availability_lines(requester: dict, days: list[str],

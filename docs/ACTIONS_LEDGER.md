@@ -9,6 +9,34 @@
 
 ## Done (with proof)
 
+- **2026-07-02 — THYDA (id 34) ENTIRE payback backlog taken from AL (owner: "do all 3" — part of setting her
+  up as a payback_to_al staffer; HIGH-RISK payroll, auto-bedrock).** Her debt #158 balance = owed 2250 − paid 0 =
+  **2250 min** still owed ('paperless sick', from 2026-06-21). Verified authoritative (read-only): paid=0 is correct —
+  every come-early payback slot (06:00-12:00) credited 0 because she checked in at/after her noon start (06-27 384
+  late, 06-29 420 late, 06-30 569 late vs the 06:00 slot start); the 'done' bookings are came-normal 0-extension,
+  NOT a settle bug. Conversion (own-shift basis, same as Vannary): 2250 ÷ 720-min (12:00-00:00) shift = **3.125 AL
+  days**. Atomic vetted script `scripts/fix_thyda_payback_to_al.py --apply` (abort-guarded; reversible S1):
+  (1) `al_left` 17.5 → **14.375**; (2) debt #158 `minutes_paid`→2250, status **cleared**; (3) her `booked` 07-02
+  come-early slot + redefine #322 → **cancelled**. **PROOF (independent separate-process re-read):** debt #158 =
+  2250/2250/cleared · al_left = 14.375 · 07-02 booking+redefine = cancelled · Thyda no longer on the open-payback
+  list. No deploy (data-only). Reverse: al_left += 3.125 · debt #158 paid=0/open · booking+redefine #322 back.
+  **Script staged, not yet committed** (rides the next `push`).
+
+- **2026-07-01 — VANNARY (id 17) payback taken from AL instead of worked back (owner one-off, HIGH-RISK payroll,
+  auto-bedrock).** Owner: "Vannary has some payback… only this time take it from her AL." Her debt #163 balance =
+  owed 644 − paid 60 = **584 min** still owed (verified authoritative: the 60 paid = the 06-28 stay-late slot she
+  worked; the 06-30 come-early slot credited 0 because she checked in 06:01 PP = 241 late vs its 02:00 start — no
+  settle bug). Conversion (own-shift basis, the `payback_to_al` rule): 584 ÷ 840-min (her real ~14h 06:00-20:00
+  shift) = 0.695 → **owner-confirmed 0.70 AL**. Atomic vetted script `scripts/fix_vannary_payback_to_al.py --apply`
+  (abort-guarded on exact pre-state; reversible S1): (1) `staff_registry.al_left` 17.0 → **16.30**; (2) debt #163
+  `minutes_paid`→644, status **cleared**; (3) her still-`booked` 07-01 come-early slot + redefine #320 →
+  **cancelled** (stops her working it back AND a false 241-late tonight; with the debt cleared the auto-booker
+  won't re-create come-early slots). **PROOF (independent separate-process re-read):** debt #163 = 644/644/cleared ·
+  al_left = 16.3 · 07-01 booking+redefine = cancelled · Vannary no longer on the open-payback list (was 11 open,
+  now 7) · every other person's payback untouched. No deploy (data-only; the gm bot reads live). Reverse if needed:
+  al_left += 0.70 · debt #163 paid=60/open · booking+redefine #320 back to booked/approved. **Script staged, not
+  yet committed** (rides the next `push`).
+
 - **2026-06-30 — W3 #4 WIZARD CSRF + LOGIN/CHECK-IN RATE-LIMIT built + DEPLOYED + VERIFIED (wizard-only, INERT
   until WIZARD_AUTH=1; no live-bot/data change).** Auto-bedrock (security). Centralized, NO per-form tokens:
   **TI-F4** `SESSION_COOKIE_SAMESITE='Strict'` (the session cookie isn't sent cross-site — the primary CSRF
@@ -429,13 +457,6 @@
   `al_cancel_and_refund`, each one CAS transaction) — fewer parts, mechanically auditable. Full build
   brief + the 5 must-hold invariants + my added checks → **`docs/AL_DEDUCTION_REDESIGN.md`**. Build on
   staging, then the F14 guard on the corrected base.
-
-- **⏰ Jul 1 (AUTOMATED · MUTED · SELF-DESTRUCT — owner: no redundancy): Kimying full-split
-  restore.** `_pay_restore_job` (daily 07:05 PP) restores 145/30 from her seeded `pay_restore:42`
-  record once June passes, and DMs the owner. Do NOT mention in open-loops reports; act ONLY if no
-  DM arrived by Jul 2. **Once fired & good: DELETE this entry entirely** — her state record is
-  auto-cleared by the job itself, the job is GENERIC (serves every future hire — stays), and her
-  proration history lives in Done below. Nothing Kimying-specific remains in code after that.
 
 ## Parked for owner (autonomous run Jun 13 — answer later, NOT blocking)
 

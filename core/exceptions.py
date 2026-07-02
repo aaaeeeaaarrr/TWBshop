@@ -59,6 +59,8 @@ EXCEPTION_GROUPS = [
 ]
 
 # Approval-routing overrides — (key, label, help). Value = a staff_id (who approves), or absent = normal ladder.
+# escalate_to_id is a NOTIFICATION reroute (not an approval): their Supervisors-group attendance posts go
+# to that person's private DM instead. It renders in the same picker section for convenience.
 APPROVAL_FIELDS = [
     ("al_approver_id", "Annual Leave approved by",
      "Only this person approves their AL, instead of the normal senior ladder."),
@@ -66,6 +68,9 @@ APPROVAL_FIELDS = [
      "Only this person approves their special leave."),
     ("swap_approver_id", "Day-off swaps approved by",
      "Only this person approves their day-off swaps."),
+    ("escalate_to_id", "Attendance posts go to (instead of Supervisors group)",
+     "When set, this person's lateness / leave / sick / no-show posts are sent PRIVATELY to this "
+     "person instead of the Supervisors group. Achieves 'never to Supervisors, escalate to X'."),
 ]
 
 # Employment-type presets — one pick sets a sensible bundle; fine-tune the toggles after.
@@ -155,6 +160,12 @@ def is_exempt(exc: dict, key: str) -> bool:
 def approver_for(exc: dict, kind: str) -> int | None:
     """The override approver staff_id for kind in {'al','leave','swap'}, or None = the normal ladder."""
     return (exc or {}).get("%s_approver_id" % kind)
+
+
+def escalate_to(exc: dict) -> int | None:
+    """The staff_id this person's Supervisors-group attendance posts are REROUTED to (a private DM),
+    or None = the normal Supervisors group. A notification reroute, not an approval. Safe on None/{}."""
+    return (exc or {}).get("escalate_to_id")
 
 
 def summary(exc: dict) -> str:

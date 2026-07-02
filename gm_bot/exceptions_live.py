@@ -19,7 +19,7 @@ Approval routing uses `approver(staff_id, kind)` → a staff_id override, or Non
 
 TWBshop is org 'twb'. INERT until a gate calls these AND the staffer has an exception set.
 """
-from core.exceptions import get_exceptions, is_exempt, approver_for
+from core.exceptions import get_exceptions, is_exempt, approver_for, escalate_to as _escalate_to
 
 ORG = "twb"
 
@@ -47,5 +47,15 @@ def approver(staff_id, kind: str):
     Fail-safe → None."""
     try:
         return approver_for(exceptions_of(staff_id), kind)
+    except Exception:
+        return None
+
+
+def escalate_to(staff_id):
+    """The staff_id this staffer's Supervisors-group attendance posts REROUTE to (a private DM), or
+    None = the normal Supervisors group. Fail-safe → None (normal behaviour). The gm bot resolves the
+    returned staff_id to a telegram uid at the send site."""
+    try:
+        return _escalate_to(exceptions_of(staff_id))
     except Exception:
         return None
