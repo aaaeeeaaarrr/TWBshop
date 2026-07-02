@@ -55,6 +55,45 @@ def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early, reso
         logger.exception("[SHADOW] check-in hook failed — LIVE UNAFFECTED")
 
 
+def shadow_checkout(staff_id: int, at_iso: str, staff: dict = None) -> None:
+    """Feed the live CHECK-OUT into the platform core so its session loop COMPLETES (flowcheck's first
+    prod catch, 2026-07-03: the feed was check-in-only — platform sessions could never reach their next
+    step, and core can't self-derive worked-minutes at cut-over without checkouts). EVENT FEED ONLY —
+    the money comparison already rides shadow_settle; the event is idempotent (UNIQUE(shift_id,type)).
+    Hooked inside shared.database.att_check_out = the ONE live checkout write (auto · manual · closer ·
+    sim), so no path can be missed. Same guarantees as shadow_checkin: best-effort, isolated, [SHADOW]-
+    tagged, no-op unless shadow_run=on; ALSO no-op in attendance test mode (sim checkouts are role-play).
+    KNOWN LIMIT (honest): binds via the BASE work window (end+180min tolerance) — a checkout >3h past
+    the base end (a big redefine extension) logs 'unbound' and the session stays incomplete → flowcheck
+    surfaces it visibly instead of silently. `staff` injectable for tests."""
+    if not shadow_enabled():
+        return
+    try:
+        from datetime import datetime
+
+        from shared.database import gm_get_state, staff_all
+        if gm_get_state("attendance_test_mode") == "true":
+            return
+        if staff is None:
+            staff = next((s for s in staff_all("active") if s["id"] == staff_id), None)
+        if not staff:
+            logger.info("[SHADOW] checkout skipped — staff %s not in the active registry", staff_id)
+            return
+        from core.attendance import check_out
+        when = datetime.fromisoformat(at_iso) if isinstance(at_iso, str) else at_iso
+        res = check_out("twb", staff_id, when, staff.get("work_start"), staff.get("work_end"),
+                        "Asia/Phnom_Penh")
+        who = staff.get("call_name") or staff.get("canonical_name") or staff_id
+        if res.get("bound"):
+            logger.info("[SHADOW] checkout fed — %s (shift %s, worked %s min%s)", who,
+                        res.get("shift_id"), res.get("worked_min"),
+                        ", duplicate" if res.get("duplicate") else "")
+        else:
+            logger.info("[SHADOW] checkout unbound — %s (%s)", who, res.get("reason"))
+    except Exception:
+        logger.exception("[SHADOW] checkout hook failed — LIVE UNAFFECTED")
+
+
 def shadow_settle(staff: dict, shift_date, normal_len, pb_before, reason,
                   live_worked, live_ot_banked, live_pb_cleared, ext_worked=None) -> None:
     """Run core's checkout-SETTLE math on the SAME real redefine checkout + record core-vs-live (the

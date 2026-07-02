@@ -1197,3 +1197,15 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
 - `[bonus]` **Flowcheck doubles as a sellable per-client SLA monitor later** ("your approvals never sit
   >X hours unseen — verified"), and `shadow_comparisons.reconciled` now has ENFORCED meaning: mismatch
   triage is a step with a deadline, which is what makes the owner's daily fault-review loop converge.
+- `[ship]` **The checkout feed** — `shadow_checkout` hooked inside `att_check_out` (the ONE live checkout
+  write) + `scripts/backfill_core_checkouts.py` for history: the platform session loop now COMPLETES,
+  which also unblocks core self-deriving worked-minutes at cut-over. Mismatch SLA 48h→24h (owner: a fault
+  that could reach other clients must land in the NEXT daily review).
+- `[bonus]` **§MAINTENANCE INVISIBILITY codified** (owner ask "fix anything without affecting clients"):
+  the 4 fix shapes (instant config · additive-dark + per-tenant flag + auto-revert · behavior-preserving ·
+  queue-drain restart) — we ALREADY have the machinery (s56 instant-config + the C2/D2/F1 flip nets +
+  polling-queues); tonight named it a contract with proof obligations. Honest ceiling stated: ~2-3s reply
+  delay during a quiet-window restart; nothing ever lost. This is ALSO a sales page ("we upgrade under
+  you; your flows never change uninvited").
+- `[finding]` **attendance_sessions FKs staff_registry** — any test/backfill seeding live-table rows needs
+  a registry row first (bit the feed test; documented for future harnesses).

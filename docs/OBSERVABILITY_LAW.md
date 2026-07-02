@@ -61,7 +61,7 @@ sink-first · the one-shot alerts (no-report ×2, sales anomaly, AL escalation) 
 that stops beating · the watchdog losing a service or the gm-brain check · a sentinel detector removed
 · `token_sender` accepting `ok:false`.
 
-## THE GOAL (owner, 2026-07-03 — the standing statement; paste-ready)
+## THE GOAL (owner, 2026-07-03 v2 — the standing statement; paste-ready)
 
 > **GOAL — TOTAL VERIFIED OPERATION (the platform's defining property).**
 > We are building a multi-tenant business-management platform whose defining property is that it
@@ -70,13 +70,43 @@ that stops beating · the watchdog losing a service or the gm-brain check · a s
 > expected step (or a legitimate terminal) is mechanically checked within a declared time. Anything
 > that fails to arrive raises an alarm that itself cannot be lost. Detection and safe self-healing run
 > 24/7 in plain code at zero model cost, whether or not anyone is watching.
-> The operating loop: shadowruns on real TWBshop data (customer #1) surface every fault; the daily
-> fault review reads the sink and the flow checks; every fix ships with a regression guard, so a fault
-> class, once fixed, can never return — accuracy only ratchets upward. Safe classes auto-fix;
-> money/payroll/deploy fixes are auto-prepared and human-approved, never auto-run.
+> The operating loop — ever-accuracy, ever-efficiency, ever-fix, toward zero faults: shadowruns on
+> real TWBshop data (customer #1) surface every fault; a fault that could reach other clients must
+> surface within ONE daily review cycle (24h SLA, tighter as we mature); every fix ships with a
+> regression guard, so a fault class, once fixed, can never return — accuracy only ratchets upward.
+> Safe classes auto-fix; money/payroll/deploy fixes are auto-prepared and human-approved, never
+> auto-run.
+> MAINTENANCE IS INVISIBLE TO CLIENTS: fixes are code/config changes that never alter a client's flow
+> uninvited — config applies instantly with no restart; behavior changes ship dark behind per-tenant
+> flags with instant revert and auto-revert-on-divergence; repairs restart only in quiet windows where
+> polling queues every message so nothing is ever lost. Clients keep operating while the platform
+> improves underneath them.
 > No feature is "built" until it declares its steps, terminals, SLAs, and liveness heartbeat —
 > enforced by the suite (`docs/OBSERVABILITY_LAW.md` · `tests/test_observability_law.py` ·
 > `core/flowcheck.py`). Clients receive only the hardened result.
+
+## MAINTENANCE INVISIBILITY — the contract (owner, 2026-07-03)
+
+Every fix must take one of these four shapes, each with a proof obligation; anything else is a design
+error to raise before building:
+
+1. **Config change** — applies INSTANTLY, no restart (`get_config` reads fresh per call; atomic +
+   race-locked writes; proven s56). Zero client impact by construction.
+2. **Additive-dark code** — ships inert (flag-off / no-exception-set / `CREATE IF NOT EXISTS`),
+   byte-identical until a per-tenant flag flips it; the flip is instant (DB flag, no restart),
+   instantly revertible, and auto-reverts on divergence (`core.flip`). The C2/D2/F1 nets are the
+   proven pattern. Zero behavior change until CHOSEN, per tenant.
+3. **Behavior-preserving repair** — same outputs, healthier plumbing (tonight's chokepoints/ledgers).
+   Proof = the suite + byte-identical/no-op verification on prod.
+4. **Process restart** (when code on a live bot must reload) — the honest ceiling: long-polling means
+   Telegram QUEUES every client message during the ~2–3s gap and the bot drains them on resume —
+   **nothing is ever lost**; jobs are restart-safe (state in DB, idempotent, catch-up sweeps, and now
+   heartbeat-verified). Residual client-visible artifact: a few seconds' reply delay, done in quiet
+   windows. Never webhooks (a down endpoint DROPS, a poller QUEUES).
+
+Multi-tenant note: one process serves many tenants, so shape 4 briefly touches all — but shapes 1–3
+carry per-tenant RISK isolation (org-scoped flags/config), which is the part that matters: a fix for
+client A cannot change client B's behavior uninvited.
 
 ## Known not-covered (deliberate, with rationale)
 

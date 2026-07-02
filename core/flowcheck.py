@@ -62,9 +62,14 @@ def _stuck_sessions(org_id: str, now: datetime) -> list:
              "age_min": int((now - r["at"]).total_seconds() // 60)} for r in rows]
 
 
+# The owner's SLA (2026-07-03): a mismatch is a fault that could reach OTHER clients — it must land in
+# the NEXT daily fault review, not the one after. 24h = alarm the same/next morning; was 48h at birth.
+MISMATCH_SLA_H = 24
+
+
 def _unreconciled_mismatches(org_id: str, now: datetime) -> list:
-    """A LIVE shadow mismatch older than 48h that never reached its terminal (`reconciled`) — the
-    owner's law: every shadowrun log must arrive at understood/fixed/accepted, whatever the tenant
+    """A LIVE shadow mismatch older than MISMATCH_SLA_H that never reached its terminal (`reconciled`) —
+    the owner's law: every shadowrun log must arrive at understood/fixed/accepted, whatever the tenant
     config combination. 14d floor keeps ancient pre-law rows out."""
     with _db() as conn:
         with conn.cursor() as cur:
@@ -73,12 +78,12 @@ def _unreconciled_mismatches(org_id: str, now: datetime) -> list:
                 WHERE org_id=%s AND agree=FALSE AND reconciled=FALSE AND source='live'
                   AND at < %s AND at > %s
                 ORDER BY id LIMIT 20
-            """, (org_id, now - timedelta(hours=48), now - timedelta(days=14)))
+            """, (org_id, now - timedelta(hours=MISMATCH_SLA_H), now - timedelta(days=14)))
             rows = cur.fetchall()
     return [{"flow": "shadow_mismatch", "key": "cmp:%s" % r["id"],
-             "detail": "shadow %s mismatch #%s (staff %s, %s) unreconciled >48h — resolve it: fix the "
+             "detail": "shadow %s mismatch #%s (staff %s, %s) unreconciled >%dh — resolve it: fix the "
                        "engine, or mark reconciled with the reason"
-                       % (r["kind"], r["id"], r["staff_id"], r["at"].strftime("%d/%m")),
+                       % (r["kind"], r["id"], r["staff_id"], r["at"].strftime("%d/%m"), MISMATCH_SLA_H),
              "age_min": int((now - r["at"]).total_seconds() // 60)} for r in rows]
 
 

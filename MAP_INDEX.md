@@ -132,7 +132,7 @@
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
     · _record, compare_checkin, compare_settle, record_settle_info, mark_reconciled, _classify_checkin, _classify_settle, _classify_for, build_digest, comparison_stats, comparison_stats_by_kind, comparison_span, recent_mismatches
 - `core/shadow_hook.py` — core.shadow_hook — the SAFE bridge that runs the new platform core BESIDE the live bot.
-    · shadow_enabled, shadow_checkin, shadow_settle
+    · shadow_enabled, shadow_checkin, shadow_checkout, shadow_settle
 - `core/shifts.py` — core.shifts — the shift entity: materialize a real interval + resolve which shift an instant belongs to.
     · shift_window, ensure_shift, shift_for_instant
 - `core/sick.py` — core.sick — own-sick outcome rule (channel-agnostic). The distinguishing fact is CHECK-IN:
@@ -272,6 +272,8 @@
     · main
 - `scripts/anchor_audit.py` — Anchor every org's audit-chain HEAD to the external anchor file (core.audit_anchor). Run on a schedule
     · _orgs, main
+- `scripts/backfill_core_checkouts.py` — Backfill the platform core's MISSING checked_out events from the LIVE attendance_sessions truth
+    · missing_checkouts, live_checkout_for, main
 - `scripts/builder_monitor.py` — builder_monitor — a STANDALONE, org-scoped, read-only BUILDER MONITORING sweep (W3 #5 foundation).
     · watchdog_delta, sentinel_new, all_orgs, sweep_org, _emit, run, main
 - `scripts/config_diff.py` — Config-diff preview (E, lean) — run the org's recent REAL check-ins through a few grace values at once

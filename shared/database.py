@@ -4804,6 +4804,14 @@ def att_check_out(staff_id: int, shift_date: str, at_iso: str) -> None:
         with conn.cursor() as cur:
             cur.execute("""UPDATE attendance_sessions SET checked_out_at=%s, status='closed'
                            WHERE staff_id=%s AND shift_date=%s""", (at_iso, staff_id, shift_date))
+    # OBSERVABILITY flow tier (2026-07-03): complete the platform session loop — feed the SAME checkout
+    # into the shadow core (idempotent event; gated shadow_run=on; skips test mode; can NEVER raise into
+    # live). Here, not at the call sites: this is the ONE checkout write (auto · manual · closer · sim).
+    try:
+        from core.shadow_hook import shadow_checkout
+        shadow_checkout(staff_id, at_iso)
+    except Exception:
+        pass
 
 
 def att_open_past_sessions(today_iso: str, is_test: bool = False) -> list[dict]:
