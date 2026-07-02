@@ -14,10 +14,11 @@
 - [ ] **Retail increments** (batch with the next retail deploy; code for the error-handler sink mirror is already in
       `shared/` and rides ANY restart): port b2b's `_startup_summary_check` missed-summary catch-up · durable record for
       AI staff-message flags (audit #14).
-- [ ] **Wire the CHECKOUT feed into the shadow hook** (flowcheck's FIRST CATCH, 2026-07-03: the live→core
-      feed is check-in-only, so the platform's own session loop never completes — core can't self-derive
-      worked-minutes at cut-over without it). Same isolated/gated pattern as `shadow_checkin`; the
-      per-session flow rule arms itself automatically the moment checkouts flow.
+- [x] **Wire the CHECKOUT feed into the shadow hook** — ✅ DONE 2026-07-03 (tag `session-59c-checkoutfeed-20260703`:
+      `shadow_checkout` inside `att_check_out` + 360 backfilled + person-level flow rule). Its successor item:
+- [ ] **Redefine/split-aware shift MATERIALIZATION in core** (flowcheck's 2nd catch: a split-shift 2nd window /
+      come-early day pairs its checkout to a different shift row — core must materialize shifts from the resolved
+      day (day_overrides/derive), not the base window; unblocks exact worked-minutes self-derivation at cut-over).
 - [ ] **Retention tidy** for `core_send_ledger` + `core_flip_log` (unbounded growth; low-risk chore, not urgent).
 - [ ] **Phase-5 continuous checker** (owner-gated): the scheduled agent reading sink+ledger+beats per tenant — the
       substrate it reads is now fully built + being written.
