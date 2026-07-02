@@ -25,8 +25,17 @@
       burst-waiting `_acquire` (5s timeout), poisoned-conn eviction, **every raw `psycopg2.connect`
       folded through `raw_connect()`** (14 files; closes the 2026-06-14 ledger bypass item) + structural
       guard `tests/test_no_raw_db_connections.py` + sentinel `db_headroom` detector (warn 80%/crit 92%).
-      Full suite 1361p on the new pool. **Deploy: canaries (wizard·hire·automations) tonight; gm·retail·
-      listener restart AFTER the morning-wave verification** (each service restarts exactly once).
+      Full gate **1381p/0f**. **▶ DEPLOYED (canary half) + VERIFIED 2026-07-03 ~03:15 PP** — commit
+      `8f0b7d7` = tag `session-60-parta-20260703`; server HEAD==8f0b7d7; wizard PID 1688053 · hire
+      1688059 · automations 1688052, all NR=0, clean boots, "DB pool → PROD" banner in each journal,
+      wizard :8090=200; post-deploy `heartbeat.stale('twb')=[]` + sink 0 open; the 1-min watchdog cron
+      + 08:00 digest now run the pooled code from disk = overnight burn-in. **REMAINING: gm·retail·
+      listener restart in the morning lull** (after the wave verification; retail BEFORE 14:00 PP; then
+      re-run `repair_core_mispairs` for any pairs the old-code 06:00 wave creates). **A2's historical
+      repair APPLIED on prod: 14/14 pairs merged, 0 remaining (independent re-read); worked-minutes
+      cross-checked against live settle numbers (Thyda 510 ✓ Vannary 839 ✓).** ⚠ deploy gotcha logged:
+      a stale server tag (`session-59b`) non-zeroed `git fetch --tags` and silently stopped the &&
+      chain — verify HEAD moved, never trust the chain.
 - [x] **A2. Redefine/split-aware shift MATERIALIZATION in core** — BUILT 2026-07-03 (~03:30 PP).
       **Prod data killed the split hypothesis**: every mispair (Nak's 20:56/20:57, Thyda's 06:00) =
       the check-in fed live's RESOLVED start while the checkout bound the BASE window → two orphan
