@@ -29,13 +29,20 @@
       `8f0b7d7` = tag `session-60-parta-20260703`; server HEAD==8f0b7d7; wizard PID 1688053 · hire
       1688059 · automations 1688052, all NR=0, clean boots, "DB pool → PROD" banner in each journal,
       wizard :8090=200; post-deploy `heartbeat.stale('twb')=[]` + sink 0 open; the 1-min watchdog cron
-      + 08:00 digest now run the pooled code from disk = overnight burn-in. **REMAINING: gm·retail·
-      listener restart in the morning lull** (after the wave verification; retail BEFORE 14:00 PP; then
-      re-run `repair_core_mispairs` for any pairs the old-code 06:00 wave creates). **A2's historical
-      repair APPLIED on prod: 14/14 pairs merged, 0 remaining (independent re-read); worked-minutes
-      cross-checked against live settle numbers (Thyda 510 ✓ Vannary 839 ✓).** ⚠ deploy gotcha logged:
-      a stale server tag (`session-59b`) non-zeroed `git fetch --tags` and silently stopped the &&
-      chain — verify HEAD moved, never trust the chain.
+      + 08:00 digest now run the pooled code from disk = overnight burn-in. **▶ SUPERSEDED SAME NIGHT:
+      the FULL fleet deployed ~03:30 PP** (owner's keep-going put me on watch pre-wave → restarting gm
+      in the 03:20 deep-quiet beat a morning restart AND puts the 06:00 wave on the FINAL A2 code):
+      gm PID 1688522 (pool banner · `gm_retention_tidy` registered · C2 flip SURVIVED checkin=True,
+      points/settle=False · shadow_run=on · Thyda/Tyty exceptions intact) · retail 1688712 (meta
+      pre-seeded → NO false catch-up, clean "Bot started") · listener 1688706 — all NR=0; each service
+      restarted exactly ONCE for the batch. Post-fleet-restart: `heartbeat.stale=[]` · sink 0 open ·
+      **our droplet = 6 conns steady (pool minimums), burst hard-capped 4/process** (cluster 16/25
+      incl. ~10 DO-internal). **A2's historical repair APPLIED on prod: 14/14 pairs merged, 0 remaining
+      (independent re-read); worked-minutes cross-checked against live settle numbers (Thyda 510 ✓
+      Vannary 839 ✓).** ⚠ deploy gotcha logged: a stale server tag (`session-59b`) non-zeroed
+      `git fetch --tags` and silently stopped the && chain — verify HEAD moved, never trust the chain.
+      **REMAINING (observation only): the ~06:00 wave `[SHADOW] checkout fed` lines — now expected to
+      bind RESOLVED windows, zero new mispairs — + the 08:00 digest clean.**
 - [x] **A2. Redefine/split-aware shift MATERIALIZATION in core** — BUILT 2026-07-03 (~03:30 PP).
       **Prod data killed the split hypothesis**: every mispair (Nak's 20:56/20:57, Thyda's 06:00) =
       the check-in fed live's RESOLVED start while the checkout bound the BASE window → two orphan
