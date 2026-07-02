@@ -65,6 +65,35 @@ def test_stuck_session_fires_then_clears_when_the_feed_carries_checkouts():
     assert not any(f["flow"] == "core_session" for f in flowcheck.check(org, now))
 
 
+def test_split_shift_mispair_is_not_flagged_but_true_noshow_is():
+    """The engine's 2nd catch (2026-07-03): a split/redefine day's checkout can pair to a DIFFERENT
+    shift row — the PERSON completed, the rows mispaired. Person-level completion suppresses that
+    (else a split-shift staffer re-warns EVERY day); a staffer with NO checkout at all still flags."""
+    org = _org()
+    now = datetime.now(TZ)
+    with _db() as conn:
+        with conn.cursor() as cur:
+            other = _mk_shift(cur, org, start_h_ago=64)              # feed-proof + the mispair target
+            _event(cur, org, other, "checked_in", now - timedelta(hours=64))
+            _event(cur, org, other, "checked_out", now - timedelta(hours=55))
+            split2 = _mk_shift(cur, org, start_h_ago=40)             # second-window check-in…
+            _event(cur, org, split2, "checked_in", now - timedelta(hours=40))
+            mispair = _mk_shift(cur, org, start_h_ago=36)            # …whose checkout landed elsewhere
+            _event(cur, org, mispair, "checked_out", now - timedelta(hours=31))
+    assert not any(f["flow"] == "core_session" for f in flowcheck.check(org, now)), \
+        "person-level completion must suppress the split/redefine mispair"
+    cdb.ensure_org(org + "b", org + "b", "Asia/Phnom_Penh")
+    with _db() as conn:
+        with conn.cursor() as cur:
+            lost = _mk_shift(cur, org + "b", start_h_ago=64)
+            _event(cur, org + "b", lost, "checked_in", now - timedelta(hours=64))
+            _event(cur, org + "b", lost, "checked_out", now - timedelta(hours=55))
+            never = _mk_shift(cur, org + "b", start_h_ago=40)        # no checkout anywhere after
+            _event(cur, org + "b", never, "checked_in", now - timedelta(hours=40))
+    assert any(f["flow"] == "core_session" and str(never) in f["key"]
+               for f in flowcheck.check(org + "b", now)), "a true never-checked-out day must still flag"
+
+
 def test_fresh_checkin_and_empty_org_are_silent():
     org = _org()
     now = datetime.now(TZ)

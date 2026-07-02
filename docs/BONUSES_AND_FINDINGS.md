@@ -1209,3 +1209,9 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   you; your flows never change uninvited").
 - `[finding]` **attendance_sessions FKs staff_registry** — any test/backfill seeding live-table rows needs
   a registry row first (bit the feed test; documented for future harnesses).
+- `[finding]` **flowcheck's SECOND catch (2026-07-03, minutes after the feed went live):** 360 historical
+  sessions completed from live truth, and the ~22 that COULDN'T pair are a coherent class — split-shift
+  second windows (staff 8's ~14:00 check-ins) + redefine/come-early days (Thyda's 05-08h ones): core's
+  base-window shift materialization can't model them yet. The engine didn't just verify — it produced the
+  next build item (redefine/split-aware shift materialization = the known resolver-self-derive step).
+  In-window warns are deduped (no re-burst) and age out of the 7d window.

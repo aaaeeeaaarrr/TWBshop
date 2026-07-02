@@ -48,16 +48,27 @@ def _stuck_sessions(org_id: str, now: datetime) -> list:
                          "detail": "org feeds check-ins but NO checkout events exist — the platform "
                                    "session loop can't complete (wire the checkout feed); the "
                                    "per-session rule arms itself once checkouts flow", "age_min": None}]
+            # STAFF-level completion (2nd refinement, 2026-07-03): the rule's true question is "did
+            # this PERSON's session complete?" — core's base-window materialization can pair a
+            # split-shift second window / redefine day's checkout to a DIFFERENT shift row (the
+            # engine's 2nd catch; the structural fix = redefine/split-aware materialization, queued).
+            # So: a check-in is complete if the SAME staffer has ANY checkout within 26h after it; a
+            # genuinely never-checked-out person still flags. Kills a would-be daily-noise generator
+            # (a split-shift staffer would have re-warned EVERY day) while keeping the law true.
             cur.execute("""
                 SELECT e.shift_id, e.staff_id, e.at FROM attendance_events e
                 WHERE e.org_id=%s AND e.type='checked_in' AND e.at < %s AND e.at > %s
                   AND NOT EXISTS (SELECT 1 FROM attendance_events o
                                   WHERE o.shift_id=e.shift_id AND o.type='checked_out')
+                  AND NOT EXISTS (SELECT 1 FROM attendance_events p
+                                  WHERE p.org_id=e.org_id AND p.staff_id=e.staff_id
+                                    AND p.type='checked_out'
+                                    AND p.at >= e.at AND p.at <= e.at + interval '26 hours')
                 ORDER BY e.at LIMIT 20
             """, (org_id, now - timedelta(hours=26), now - timedelta(days=7)))
             rows = cur.fetchall()
     return [{"flow": "core_session", "key": "shift:%s" % r["shift_id"],
-             "detail": "staff %s checked in %s but the shift never reached checked-out/closed"
+             "detail": "staff %s checked in %s but never reached a checkout (person-level, 26h)"
                        % (r["staff_id"], r["at"].strftime("%d/%m %H:%M")),
              "age_min": int((now - r["at"]).total_seconds() // 60)} for r in rows]
 
