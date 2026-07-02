@@ -99,8 +99,13 @@ def test_sentinel_detector_floor():
     from core import sentinel
     names = {n for n, _ in sentinel.DETECTORS}
     assert names >= {"shadow_stalled", "malformed_checkin", "flip_divergence", "config_health",
-                     "undelivered_alarms", "stale_heartbeats", "stuck_sends", "silent_flip_revert"}, \
+                     "undelivered_alarms", "stale_heartbeats", "stuck_sends", "silent_flip_revert",
+                     "broken_flows"}, \
         "a sentinel detector was removed — the observability net may not shrink"
+    from core import flowcheck
+    rule_names = {n for n, _ in flowcheck.RULES}
+    assert rule_names >= {"core_session", "shadow_mismatch", "onboarding_candidate"}, \
+        "a flowcheck rule was removed — flow coverage may not shrink"
 
 
 def test_automations_sender_rejects_telegram_not_ok():

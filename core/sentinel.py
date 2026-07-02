@@ -162,8 +162,21 @@ def detect_silent_flip_revert(org_id: str, now: datetime) -> list:
         return []   # no flip table yet → nothing to watch
 
 
+def detect_broken_flows(org_id: str, now: datetime) -> list:
+    """OBSERVABILITY LAW, flow tier (owner 2026-07-03): every step of every ladder — across ANY tenant
+    config combination — must reach its next destination or a legitimate terminal within its SLA.
+    Declarative rules live in core.flowcheck (one line per flow, swept for every org); this bridges
+    them onto every existing cadence. A stuck shadow-mismatch (never `reconciled`) is WARN-with-teeth:
+    it is the platform's own accuracy signal rotting."""
+    from core import flowcheck
+    return [_alarm("flow:%s" % f["flow"], "%s:%s" % (org_id, f["key"]), WARN,
+                   f["detail"], f.get("age_min")) for f in flowcheck.check(org_id, now)]
+
+
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
-# stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only.
+# stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only. Prefer a DECLARATIVE
+# rule in core.flowcheck.RULES for anything shaped "step A must reach step B within T" — it multi-tenants
+# for free; hand-rolled detectors are for the bespoke rest.
 DETECTORS = [
     ("shadow_stalled", detect_shadow_stalled),
     ("malformed_checkin", detect_malformed_checkin),
@@ -173,6 +186,7 @@ DETECTORS = [
     ("stale_heartbeats", detect_stale_heartbeats),
     ("stuck_sends", detect_stuck_sends),
     ("silent_flip_revert", detect_silent_flip_revert),
+    ("broken_flows", detect_broken_flows),
 ]
 
 

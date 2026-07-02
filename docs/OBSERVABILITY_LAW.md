@@ -40,7 +40,8 @@ its retry, and T3 guarantees the cadence itself is alive.
 | `gm_alarms` sink (`gm_bot/alarms.py`) | durable alarm outbox with `delivered`/`acked` flags | on event |
 | `core/sends.py` ledger | intent→sent\|failed for proactive sends (`_att_send`, `notify_monitor`) | on send |
 | `core/heartbeat.py` | per-(org, job) liveness beats with self-declared gaps | per job/cron run |
-| `core/sentinel.py` — 8 detectors | shadow-dark · malformed check-in · flip divergence · config health · **undelivered alarms** · **stale heartbeats** · **stuck sends** · **silent flip-revert** | every 30 min (gm sweep) + nightly digest + on demand |
+| `core/sentinel.py` — 9 detectors | shadow-dark · malformed check-in · flip divergence · config health · **undelivered alarms** · **stale heartbeats** · **stuck sends** · **silent flip-revert** · **broken flows** | every 30 min (gm sweep) + nightly digest + on demand |
+| `core/flowcheck.py` — declarative flow rules | "step A must reach step B (or a terminal) within T", one line per flow, swept for EVERY org — the multi-tenant answer to hand-rolled checkers. First rules: core session must reach checkout/close · a LIVE shadow mismatch must reach `reconciled` (a shadowrun log is itself a step) · an onboarding candidate must reach confirmed/skipped | rides the sweep via detect_broken_flows |
 | gm live watchdog (`run_audit`) | money/data invariants over the real ledger | every 3 min |
 | collection watchdog (cron) | services active · collection fresh · **gm's own watcher jobs beating** (out-of-process) | every minute |
 | morning report (cron 08:00 PP) | audit + sentinel + open/undelivered sink alarms + shadow digest | daily |
@@ -59,6 +60,23 @@ heartbeat listener removed · `_att_send`/`notify_monitor` de-ledgered · `_clie
 sink-first · the one-shot alerts (no-report ×2, sales anomaly, AL escalation) unrouted · a cron script
 that stops beating · the watchdog losing a service or the gm-brain check · a sentinel detector removed
 · `token_sender` accepting `ok:false`.
+
+## THE GOAL (owner, 2026-07-03 — the standing statement; paste-ready)
+
+> **GOAL — TOTAL VERIFIED OPERATION (the platform's defining property).**
+> We are building a multi-tenant business-management platform whose defining property is that it
+> VERIFIES ITSELF: every event, message, click, ladder step, scheduled job, and shadowrun — across
+> every tenant and every config combination — leaves a durable log, and its arrival at the NEXT
+> expected step (or a legitimate terminal) is mechanically checked within a declared time. Anything
+> that fails to arrive raises an alarm that itself cannot be lost. Detection and safe self-healing run
+> 24/7 in plain code at zero model cost, whether or not anyone is watching.
+> The operating loop: shadowruns on real TWBshop data (customer #1) surface every fault; the daily
+> fault review reads the sink and the flow checks; every fix ships with a regression guard, so a fault
+> class, once fixed, can never return — accuracy only ratchets upward. Safe classes auto-fix;
+> money/payroll/deploy fixes are auto-prepared and human-approved, never auto-run.
+> No feature is "built" until it declares its steps, terminals, SLAs, and liveness heartbeat —
+> enforced by the suite (`docs/OBSERVABILITY_LAW.md` · `tests/test_observability_law.py` ·
+> `core/flowcheck.py`). Clients receive only the hardened result.
 
 ## Known not-covered (deliberate, with rationale)
 

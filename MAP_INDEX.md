@@ -85,6 +85,8 @@
     · add_expense, list_expenses, expense_summary
 - `core/flip.py` — core.flip — the instant-revert NET for cutting a path over to the core engine (C1, self-healing program).
     · init_flip_db, is_authoritative, set_authoritative, record_divergence, recent_divergence, should_auto_revert, decide
+- `core/flowcheck.py` — core.flowcheck — the universal "did it reach its NEXT step?" engine (observability law, flow tier).
+    · _now, _stuck_sessions, _unreconciled_mismatches, _stalled_candidates, check
 - `core/health.py` — core.health — read-only config health-check. Scans a tenant's config + setup for likely mistakes /
     · config_health
 - `core/heartbeat.py` — core.heartbeat — self-describing JOB/CRON liveness (observability law, 2026-07-02).
@@ -124,7 +126,7 @@
 - `core/sends.py` — core.sends — the durable SEND LEDGER: intent → sent | failed (observability law, 2026-07-02).
     · _now, init_send_ledger_db, record, mark, stuck
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
-    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, detect_undelivered_alarms, detect_stale_heartbeats, detect_stuck_sends, detect_silent_flip_revert, sweep, summary_line
+    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, detect_undelivered_alarms, detect_stale_heartbeats, detect_stuck_sends, detect_silent_flip_revert, detect_broken_flows, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
     · worked_minutes, ot_earned, split_ot_pb, settle_shift, payback_extension_window, settle_payback_slot
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
