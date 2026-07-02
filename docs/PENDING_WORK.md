@@ -8,18 +8,21 @@
 ## ▶ OBSERVABILITY LAW — remaining increments (2026-07-02; steps 1–4 SHIPPED, see `docs/OBSERVABILITY_AUDIT_2026-07-02.md`)
 - [ ] **Swap + shift-change CHASE ladders** (T2 upgrade): today stuck ones are only DETECTED (`v_swaps`/`v_shift_changes`);
       an AL-style re-ping→escalate→expire ladder sends new messages to real staff = behavioral → owner shapes it first.
-      Also: senior-card coords live in `bot_data` (in-memory, orphaned on restart) — persist like `al_pings` when building.
+      ✅ its groundwork DONE 2026-07-03 (S60 A9): ALL card coords (senior + requester + partner, swap AND
+      shift-change) now persist in `approval_cards` + union-read — restart-safe, ladder-ready.
 - [ ] **B2B markpaid owner-approval re-nudge** (audit dead-end #13, the worst money dead-end — B2B DISABLED so dormant):
       fix WITH owner at re-enable, pattern = the existing hourly verification-nudge tick. → `docs/B2B_LANDMINE_FIX_PLAN.md`.
-- [ ] **Retail increments** (batch with the next retail deploy; code for the error-handler sink mirror is already in
-      `shared/` and rides ANY restart): port b2b's `_startup_summary_check` missed-summary catch-up · durable record for
-      AI staff-message flags (audit #14).
+- [x] **Retail increments** — ✅ BUILT 2026-07-03 (S60 A5): b2b's `_startup_summary_check` ported (catch-up +
+      `retail_last_summary_date` recording) + staff-flag sink-first durable record (audit #14); 4 tests. Rides the
+      one retail restart (morning lull, before the 14:00 PP summary hour).
 - [x] **Wire the CHECKOUT feed into the shadow hook** — ✅ DONE 2026-07-03 (tag `session-59c-checkoutfeed-20260703`:
       `shadow_checkout` inside `att_check_out` + 360 backfilled + person-level flow rule). Its successor item:
-- [ ] **Redefine/split-aware shift MATERIALIZATION in core** (flowcheck's 2nd catch: a split-shift 2nd window /
-      come-early day pairs its checkout to a different shift row — core must materialize shifts from the resolved
-      day (day_overrides/derive), not the base window; unblocks exact worked-minutes self-derivation at cut-over).
-- [ ] **Retention tidy** for `core_send_ledger` + `core_flip_log` (unbounded growth; low-risk chore, not urgent).
+- [x] **Redefine/split-aware shift MATERIALIZATION in core** — ✅ BUILT 2026-07-03 (S60 A2). The mispairs were
+      100% redefine-ASYMMETRY (check-in fed the resolved start, checkout bound the base), not splits — cure =
+      `check_in/check_out(windows=…)` + the checkout feed resolving via `shift_date` + `derive.resolved_windows`
+      (native, cut-over-ready) + `scripts/repair_core_mispairs.py` for the historical orphans; 8 tests.
+- [x] **Retention tidy** — ✅ BUILT 2026-07-03 (S60 A4): `core/retention.py` + daily `gm_retention_tidy` 03:40 PP
+      (flip_log >30d · send_ledger >90d; evidence tables untouched); rides the next gm restart.
 - [ ] **Phase-5 continuous checker** (owner-gated): the scheduled agent reading sink+ledger+beats per tenant — the
       substrate it reads is now fully built + being written.
 - [ ] **monitor_bot self-watch** (noted in the audit; low value — it's a read surface, delivery works without it).

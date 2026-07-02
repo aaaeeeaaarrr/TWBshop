@@ -52,3 +52,27 @@ def resolve(org_id, staff_id, day_iso, base_start_min, base_end_min, day_off_wee
     being fed live's resolve_day, but sourced from core state (cut-over-ready)."""
     return resolve_day(_modifiers(org_id, staff_id, day_iso), base_start_min, base_end_min,
                        day_off_weekday, date.fromisoformat(day_iso).weekday())
+
+
+def resolved_windows(org_id, staff_id, day_iso, base_windows, day_off_weekday=None):
+    """The day's effective WINDOW LIST [(start,end), …] from core's own overrides — the multi-window
+    sibling of resolve(), for shift MATERIALIZATION (A2): an away day (al/sick/special/swap-off, or the
+    weekly day off without a swap-work) → None (nothing to bind); a redefine replaces the whole day
+    with its one moved window (live's model — a redefine DEFINES the day); otherwise the base windows
+    unchanged (a split shift = 2 entries). base_windows accepts core_staff.shift_windows dicts or
+    (start, end) tuples."""
+    mods = _modifiers(org_id, staff_id, day_iso)
+    if mods["al"] or mods["sick"] or mods["special"] or mods["override"] == "off":
+        return None
+    if mods["redefine"]:
+        sm, em = (int(x) % 1440 for x in mods["redefine"])
+        return [("%02d:%02d" % (sm // 60, sm % 60), "%02d:%02d" % (em // 60, em % 60))]
+    if (day_off_weekday is not None and mods["override"] != "work"
+            and date.fromisoformat(day_iso).weekday() == int(day_off_weekday)):
+        return None
+    out = []
+    for w in (base_windows or []):
+        s, e = (w.get("start"), w.get("end")) if isinstance(w, dict) else (w[0], w[1])
+        if s and e:
+            out.append((s, e))
+    return out or None

@@ -31,8 +31,8 @@ FAKE_NAME     = "ChaosApplicant"
 
 
 def _db():
-    from secrets import DATABASE_URL
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 def get_intake():

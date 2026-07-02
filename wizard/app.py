@@ -1989,18 +1989,38 @@ def render_staff_link(org_id: str, staff_id: int) -> str:
     return _page("Check-in link", body)
 
 
+def _web_windows(staff: dict):
+    """The staffer's effective windows for TODAY (A2): all their shift_windows (split-aware, not just
+    [0]) with core_day_overrides applied (redefine/away). Falls back to the raw base windows so an
+    override-store hiccup can't block a check-in. Overnight note: the binding also materializes
+    yesterday's windows, so a post-midnight tap still lands on the running shift."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    base = staff.get("shift_windows") or []
+    try:
+        from core.derive import resolved_windows
+        today = datetime.now(ZoneInfo("Asia/Phnom_Penh")).date().isoformat()
+        wins = resolved_windows(staff["org_id"], staff["staff_id"], today, base)
+        if wins is not None:
+            return wins
+    except Exception:
+        logging.getLogger("wizard").exception("resolved_windows failed — using base windows")
+    return [(w.get("start"), w.get("end")) for w in base if w.get("start") and w.get("end")]
+
+
 def _do_web_checkin(staff: dict, lat, lon) -> dict:
     from datetime import datetime, timezone
     from core.attendance import check_in as core_check_in
     org = staff["org_id"]
-    w = (staff.get("shift_windows") or [{}])[0]
-    if not w.get("start") or not w.get("end"):
+    wins = _web_windows(staff)
+    if not wins:
         return {"ok": False, "error": "no shift set for you yet — your manager sets your hours"}
     v = get_config(org).get("categories", {}).get("attendance", {}).get("verdict", {})
     try:
-        res = core_check_in(org, staff["staff_id"], datetime.now(timezone.utc), w["start"], w["end"],
+        res = core_check_in(org, staff["staff_id"], datetime.now(timezone.utc), wins[0][0], wins[0][1],
                             "Asia/Phnom_Penh", location=({"lat": lat, "lon": lon} if lat else None),
-                            grace_min=int(v.get("grace_min", 5)), early_bonus_min=int(v.get("early_bonus_min", 5)))
+                            grace_min=int(v.get("grace_min", 5)), early_bonus_min=int(v.get("early_bonus_min", 5)),
+                            windows=wins)
         res["ok"] = res.get("bound", False)
         return res
     except Exception:
@@ -2011,12 +2031,12 @@ def _do_web_checkin(staff: dict, lat, lon) -> dict:
 def _do_web_checkout(staff: dict, lat, lon) -> dict:
     from datetime import datetime, timezone
     from core.attendance import check_out as core_check_out
-    w = (staff.get("shift_windows") or [{}])[0]
-    if not w.get("start") or not w.get("end"):
+    wins = _web_windows(staff)
+    if not wins:
         return {"ok": False, "error": "no shift set for you yet"}
     try:
         res = core_check_out(staff["org_id"], staff["staff_id"], datetime.now(timezone.utc),
-                             w["start"], w["end"], "Asia/Phnom_Penh")
+                             wins[0][0], wins[0][1], "Asia/Phnom_Penh", windows=wins)
         res["ok"] = res.get("bound", False)
         return res
     except Exception:

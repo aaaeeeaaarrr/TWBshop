@@ -174,6 +174,34 @@ def detect_broken_flows(org_id: str, now: datetime) -> list:
             for f in flowcheck.check(org_id, now)]
 
 
+def _headroom_alarm(used: int, cap: int) -> list:
+    """Pure threshold rule: warn at 80% of the hard connection cap, critical at 92% —
+    while there is still room to shed load (lower TWBSHOP_DB_POOL_MAX, stop a service)
+    before Postgres starts refusing connections. Key carries the tier so an
+    escalation warn→critical alarms anew despite the flow:key dedupe."""
+    if not cap:
+        return []
+    detail = ("%d/%d PG connections in use — the cluster cap is the tightest system "
+              "constraint (~10 of it is DO-internal; docs/CAPACITY_AND_SCALE.md §1)" % (used, cap))
+    if used >= cap * 0.92:
+        return [_alarm("db_conns", "cluster:critical", CRITICAL, detail)]
+    if used >= cap * 0.80:
+        return [_alarm("db_conns", "cluster:warn", WARN, detail)]
+    return []
+
+
+def detect_db_headroom(org_id: str, now: datetime) -> list:
+    """CAPACITY: the managed-PG cluster allows 25 connections total; each service pools
+    up to TWBSHOP_DB_POOL_MAX so a fleet-wide burst can approach the wall. Cluster-wide
+    (not per-org) by nature — one org's sweep covering it is enough at any tenant count."""
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) AS used, "
+                        "current_setting('max_connections')::int AS cap FROM pg_stat_activity")
+            row = cur.fetchone()
+    return _headroom_alarm(int(row["used"]), int(row["cap"]))
+
+
 # Registered flows — add one tuple per flow as the platform grows (reverse-shadow divergence, stuck payback,
 # stuck approval, missed job, invariant breaches, …). Detectors stay pure + read-only. Prefer a DECLARATIVE
 # rule in core.flowcheck.RULES for anything shaped "step A must reach step B within T" — it multi-tenants
@@ -188,6 +216,7 @@ DETECTORS = [
     ("stuck_sends", detect_stuck_sends),
     ("silent_flip_revert", detect_silent_flip_revert),
     ("broken_flows", detect_broken_flows),
+    ("db_headroom", detect_db_headroom),
 ]
 
 

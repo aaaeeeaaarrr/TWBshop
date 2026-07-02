@@ -93,3 +93,10 @@ safe-autonomous (B2B disabled, no live money); the prod INDEX application + the 
 forever, owner never learns, money never applied. Fix at re-enable WITH the F2/F3/F4 session: copy the
 existing hourly verification-nudge tick pattern (`run_verification_nudge_tick`) onto pending
 `b2b_markpaid_requests`, and sink-alarm the send failure (observability law T2).
+
+## F6 (added 2026-07-03, s60): `_startup_summary_check` can abort the boot
+Found while porting it to retail (S60 A5): b2b's `post_init` catch-up is UNWRAPPED — a transient
+Telegram error during the missed-summary send raises out of post_init, which kills `run_polling`
+→ systemd restart-loops the service at exactly the moment Telegram is flaky. Retail's port wraps
+it (non-fatal, the daily job is the retry cadence); apply the same 3-line try/except to
+`b2b_bot/bot.py::_startup_summary_check` at re-enable, with the F2–F5 batch.

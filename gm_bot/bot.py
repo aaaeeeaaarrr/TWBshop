@@ -2444,14 +2444,19 @@ async def _sc_send_coapprove_card(context, cid: int, g: dict, proposer: dict, st
                             sen.get("call_name") or sen["canonical_name"], body, kb=kb)
         if m is not None:
             cards.append((m.chat_id, m.message_id))
+            from shared.database import approval_card_add
+            approval_card_add("shift_change", cid, m.chat_id, m.message_id)   # restart-safe (A9)
 
 
 async def _refresh_senior_cards(context, cid: int, status_line: str | None = None) -> None:
     """Re-render EVERY co-approving senior's card for this change to the current status: the Co-approve
     buttons vanish once resolved, the 👁 toggle persists, and the staffer's final verdict lands on ALL
     of them (owner, Jun 15: previously only the proposer learned the staffer's decision)."""
-    from shared.database import shift_change_get
-    cards = context.bot_data.get("sc_senior_cards", {}).get(cid, [])
+    from shared.database import approval_cards_get, shift_change_get
+    # union in-memory + persisted coords (a restart orphans bot_data — A9); peek, not pop:
+    # these cards keep re-rendering through the whole lifecycle
+    cards = list(context.bot_data.get("sc_senior_cards", {}).get(cid, []))
+    cards += [c for c in approval_cards_get("shift_change", cid) if c not in cards]
     if not cards:
         return
     g = shift_change_get(cid)
@@ -3034,6 +3039,8 @@ async def submit_swap(context, requester: dict, partner: dict, req_off_date: str
                           parse_mode="HTML")
     if msg is not None:   # register so _swap_apply can flip the partner card to the verdict
         context.bot_data.setdefault("swap_partner_cards", {})[swap_id] = (msg.chat_id, msg.message_id)
+        from shared.database import approval_card_add
+        approval_card_add("swap_partner", swap_id, msg.chat_id, msg.message_id)   # restart-safe (A9)
     return swap_id
 
 
@@ -3102,11 +3109,17 @@ async def _swap_partner_callback(update: Update, context: ContextTypes.DEFAULT_T
                               parse_mode="HTML")
         if msg is not None:
             cards.append((msg.chat_id, msg.message_id))
+            from shared.database import approval_card_add
+            approval_card_add("swap", sw["id"], msg.chat_id, msg.message_id)   # restart-safe (A9)
 
 
 async def _swap_flip_requester_card(context, sw: dict, req: dict, partner: dict) -> None:
     """Re-render the requester's OWN swap card (if registered) to the current state, keeping its toggle."""
     sc = context.bot_data.get("swap_req_cards", {}).get(sw["id"])
+    if not sc:   # a restart orphaned bot_data → the persisted coords (A9)
+        from shared.database import approval_cards_get
+        _pc = approval_cards_get("swap_req", sw["id"])
+        sc = _pc[0] if _pc else None
     if not sc or not req or not partner:
         return
     body, kb = _swap_card(sw, req, partner, audience="requester", show_cov=False)
@@ -3193,7 +3206,11 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
     # 👁 Show-who's-working toggle so coverage stays checkable after the decision (like AL).
     sw2 = swap_get(sw["id"])   # status now approved/rejected
     _fbody, _fkb = _swap_card(sw2, req, partner, audience="senior", show_cov=False)
-    for _cid, _mid in context.bot_data.get("swap_cards", {}).pop(sw["id"], []):
+    # union in-memory + persisted coords (a restart orphans bot_data — A9); pop = one finalize sweep
+    from shared.database import approval_cards_pop
+    _sw_cards = list(context.bot_data.get("swap_cards", {}).pop(sw["id"], []))
+    _sw_cards += [c for c in approval_cards_pop("swap", sw["id"]) if c not in _sw_cards]
+    for _cid, _mid in _sw_cards:
         try:
             await context.bot.edit_message_text(_fbody, chat_id=_cid, message_id=_mid,
                                                 reply_markup=_fkb, parse_mode="HTML")
@@ -3201,6 +3218,11 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
             pass
     # flip the partner's card + the requester's own card to the verdict too (toggle stays on both)
     _pc = context.bot_data.get("swap_partner_cards", {}).pop(sw["id"], None)
+    if not _pc:   # restart-orphaned → persisted coords (A9)
+        _pp = approval_cards_pop("swap_partner", sw["id"])
+        _pc = _pp[0] if _pp else None
+    else:
+        approval_cards_pop("swap_partner", sw["id"])   # keep the store in step
     if _pc:
         pbody, pkb = _swap_card(sw2, req, partner, audience="partner", show_cov=False)
         try:
@@ -3210,6 +3232,7 @@ async def _swap_apply(context, sw: dict, approved: bool) -> None:
             pass
     await _swap_flip_requester_card(context, sw2, req, partner)
     context.bot_data.get("swap_req_cards", {}).pop(sw["id"], None)
+    approval_cards_pop("swap_req", sw["id"])   # terminal — clear the persisted coords too (A9)
     if approved:
         # the 4 dated overrides were written atomically inside swap_approve_claim (with the F14 check)
         for s, role in ((req, "Requester"), (partner, "Partner")):
@@ -6442,6 +6465,18 @@ async def _payback_noshow_reaper_job(context: ContextTypes.DEFAULT_TYPE) -> None
         logger.error("payback no-show reaper failed: %s", e)
 
 
+async def _retention_tidy_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily age-out of the platform's own unbounded bookkeeping (flip log · send ledger) — capacity
+    hygiene, docs/CAPACITY_AND_SCALE.md §5.3. Data/evidence tables are never touched here."""
+    try:
+        from core import retention
+        counts = retention.tidy()
+        if any(counts.values()):
+            logger.info("retention tidy: %s", counts)
+    except Exception as e:
+        logger.error("retention tidy failed: %s", e)
+
+
 def _sentinel_new_alarms(found, prev_json):
     """Pure: (sweep() alarms, prior 'sentinel_last' JSON) -> (new_alarms, current_json). Dedupe key =
     flow:key, so a persistent issue alarms ONCE (not every sweep). Testable without the async job."""
@@ -7331,6 +7366,8 @@ async def _att_dispatch(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 await context.bot.edit_message_text(rbody, chat_id=pc, message_id=pm,
                                                     reply_markup=rkb, parse_mode="HTML")
                 context.bot_data.setdefault("swap_req_cards", {})[swap_id] = (pc, pm)
+                from shared.database import approval_card_add
+                approval_card_add("swap_req", swap_id, pc, pm)   # restart-safe (A9)
             except Exception:
                 pass
         pend.pop("_summary", None)   # swap renders its own rich card — skip the generic prompt edit
@@ -8077,6 +8114,7 @@ _JOB_EXPECTED_GAP_MIN = {
     "gm_sick_papers_deadline": 1560, "gm_no_show_sweep": 1560, "gm_callout": 1560,
     "gm_pay_restore": 1560, "gm_auto_audit": 1560, "gm_test_watchdog": 10,
     "gm_live_watchdog": 15, "gm_session_closer": 1560, "gm_payback_reaper": 1560,
+    "gm_retention_tidy": 1560,
     "gm_sentinel_sweep": 90, "gm_shadow_digest": 1560, "gm_reason_nudge": 30,
     "gm_al_reping": 90, "gm_daily_analysis": 1560, "gm_periodic_analysis": 720,
     "gm_auto_skip_proposals": 240, "gm_clarification_ladder": 15, "gm_lateness_ladder": 15,
@@ -8260,6 +8298,10 @@ def build_app() -> Application:
     app.job_queue.run_daily(_payback_noshow_reaper_job,
                             time=__import__("datetime").time(hour=0, minute=5),
                             name="gm_payback_reaper")
+    # retention tidy: daily 03:40 PP (20:40 UTC) — deep-quiet; ages out the flip log + send ledger only
+    app.job_queue.run_daily(_retention_tidy_job,
+                            time=__import__("datetime").time(hour=20, minute=40),
+                            name="gm_retention_tidy")
     # universal Sentinel sweep: every 30 min — stuck flows / impossible states / the shadow-net-itself ->
     # NEW alarms routed to the sink + owner (de-duped). The proactive complement to the /audit watchdog.
     app.job_queue.run_repeating(_sentinel_sweep_job, interval=1800, first=120, name="gm_sentinel_sweep")

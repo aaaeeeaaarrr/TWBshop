@@ -12,7 +12,7 @@
 | RAM | 2 GB (+2G swap) | 577 MB (1.4 G available) | all six services = **226 MB combined** (gm 60 · listener 45 · retail 40 · hire 38 · wizard 30 · automations 13) |
 | Disk | 48 GB | 9.4 GB (20%) | repo+logs+receipt archive = 635 MB |
 | DB total | managed PG | **177 MB** | 156 MB of it = `ops_messages` (TWB's comms-archive add-on, not a platform requirement); the ENTIRE attendance platform ≈ 2 MB |
-| DB connections | **25 max** | **16 in use** | ⚠ the tightest constraint in the whole system — per-call `_db()` with no pool |
+| DB connections | **25 max** | **16 in use** | ⚠ the tightest constraint in the whole system. CORRECTED 2026-07-03: ~10 of the 16 are DO's own machinery; OUR app holds ~6 (a `SimpleConnectionPool(1,10)` has existed in `_db()` since 2026-05-22 — the earlier "no pool" reading was wrong). Real risk = the BURST ceiling (6 services × max 10 = 60 potential vs ~15 usable) + thread-unsafe Simple pool. FIXED (A1): `ThreadedConnectionPool`, per-process cap 4 (`TWBSHOP_DB_POOL_MAX`), burst-waiting acquire, poisoned-conn eviction, + sentinel `db_headroom` detector (warn ≥80%, critical ≥92%) |
 
 Reading: one full-featured, 24/7, 42-staff business — bots, brain, shadowrun, observability net —
 costs ~a quarter of the smallest droplet. The system is *light by construction*.
@@ -77,10 +77,20 @@ not mechanisms.
 
 ## 5. DESIGN ACTIONS QUEUED (in bite order)
 
-1. **DB pooling** (pgbouncer or app-side) — relieves today's 16/25 AND is the tier-0→1 gate.
+1. **DB pooling** — ✅ DONE 2026-07-03 (A1): app-side pool right-sized (Threaded, cap 4/process,
+   burst-wait, dead-conn eviction) + every raw `psycopg2.connect` folded through `raw_connect()`
+   (structural guard `tests/test_no_raw_db_connections.py`) + a `db_headroom` sentinel detector.
+   pgbouncer/DO-pool deliberately NOT added at tier 0 (app usage ≈ 6 conns steady; the measured 16
+   included ~10 DO-internal) — it becomes real at tier 1.
 2. **Multi-tenant runtime host** design — before client #5.
-3. **Retention/rollup jobs** (send_ledger · flip_log · heartbeats · ops_messages policy) — already in
-   PENDING; add ops_messages retention as a product knob.
+3. **Retention/rollup jobs** — ✅ BUILT 2026-07-03 (A4): `core/retention.py` + daily `gm_retention_tidy`
+   (03:40 PP) ages out `core_flip_log` >30d + `core_send_ledger` >90d (heartbeats are 1 upserted
+   row/job = no growth; shadow_comparisons/core_transitions/gm_alarms = cut-over/audit EVIDENCE,
+   deliberately not aged). **ops_messages retention KNOB (design, not yet built):** the comms archive
+   is a per-tenant ADD-ON, so retention is a product lever — `categories.connections.comms_archive
+   .retention_days` (0 = keep forever; default 180), enforced by this same tidy job per org, priced by
+   tier. Build when the archive is first sold (or TWB's 156 MB starts to matter); until then TWB keeps
+   its full history by choice.
 4. **Backup/restore drill** — managed PG has DO backups; PROVE a restore once (droplet itself is
    cattle: repo + secrets + bootstrap rebuild it).
 5. **Webhook-ingest tier** — documented here as the tier-2 flip; do NOT build early, do NOT foreclose.

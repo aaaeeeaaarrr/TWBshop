@@ -55,7 +55,23 @@ def shadow_checkin(staff: dict, when_dt, live_state, live_late, live_early, reso
         logger.exception("[SHADOW] check-in hook failed — LIVE UNAFFECTED")
 
 
-def shadow_checkout(staff_id: int, at_iso: str, staff: dict = None) -> None:
+def _resolved_window(staff: dict, day_iso: str):
+    """Live's redefine-aware window for the day as ('HH:MM','HH:MM'), or None (not working / no
+    resolver / any failure → the caller falls back to the base window). The check-in hook feeds
+    resolve_day's start, so the checkout MUST resolve the same way or the pair lands on two
+    instances (the s59c mispair class: Nak's 20:56 come-early slots, Thyda's 06:00 ones)."""
+    try:
+        from gm_bot.attendance_ui import resolve_day
+        r = resolve_day(staff, day_iso)
+        if not r.get("working") or r.get("start_min") is None or r.get("end_min") is None:
+            return None
+        sm, em = int(r["start_min"]) % 1440, int(r["end_min"]) % 1440
+        return "%02d:%02d" % (sm // 60, sm % 60), "%02d:%02d" % (em // 60, em % 60)
+    except Exception:
+        return None
+
+
+def shadow_checkout(staff_id: int, at_iso: str, staff: dict = None, shift_date: str = None) -> None:
     """Feed the live CHECK-OUT into the platform core so its session loop COMPLETES (flowcheck's first
     prod catch, 2026-07-03: the feed was check-in-only — platform sessions could never reach their next
     step, and core can't self-derive worked-minutes at cut-over without checkouts). EVENT FEED ONLY —
@@ -63,9 +79,10 @@ def shadow_checkout(staff_id: int, at_iso: str, staff: dict = None) -> None:
     Hooked inside shared.database.att_check_out = the ONE live checkout write (auto · manual · closer ·
     sim), so no path can be missed. Same guarantees as shadow_checkin: best-effort, isolated, [SHADOW]-
     tagged, no-op unless shadow_run=on; ALSO no-op in attendance test mode (sim checkouts are role-play).
-    KNOWN LIMIT (honest): binds via the BASE work window (end+180min tolerance) — a checkout >3h past
-    the base end (a big redefine extension) logs 'unbound' and the session stays incomplete → flowcheck
-    surfaces it visibly instead of silently. `staff` injectable for tests."""
+    `shift_date` (the session's business day) lets the hook bind via the RESOLVED window — the same
+    resolution the check-in hook fed — so a redefined/come-early day pairs onto ONE instance and a
+    checkout past a redefine-extended end still binds (A2, 2026-07-03; was the KNOWN LIMIT).
+    `staff` injectable for tests."""
     if not shadow_enabled():
         return
     try:
@@ -81,8 +98,9 @@ def shadow_checkout(staff_id: int, at_iso: str, staff: dict = None) -> None:
             return
         from core.attendance import check_out
         when = datetime.fromisoformat(at_iso) if isinstance(at_iso, str) else at_iso
+        win = _resolved_window(staff, shift_date) if shift_date else None
         res = check_out("twb", staff_id, when, staff.get("work_start"), staff.get("work_end"),
-                        "Asia/Phnom_Penh")
+                        "Asia/Phnom_Penh", windows=[win] if win else None)
         who = staff.get("call_name") or staff.get("canonical_name") or staff_id
         if res.get("bound"):
             logger.info("[SHADOW] checkout fed — %s (shift %s, worked %s min%s)", who,

@@ -100,7 +100,7 @@ def test_sentinel_detector_floor():
     names = {n for n, _ in sentinel.DETECTORS}
     assert names >= {"shadow_stalled", "malformed_checkin", "flip_divergence", "config_health",
                      "undelivered_alarms", "stale_heartbeats", "stuck_sends", "silent_flip_revert",
-                     "broken_flows"}, \
+                     "broken_flows", "db_headroom"}, \
         "a sentinel detector was removed — the observability net may not shrink"
     from core import flowcheck
     rule_names = {n for n, _ in flowcheck.RULES}

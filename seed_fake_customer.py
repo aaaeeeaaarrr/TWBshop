@@ -1,11 +1,11 @@
 """Seed SHOP NOT REAL fake customer with realistic test data."""
 import sys, json
 sys.path.insert(0, r"C:\Users\Papa\TWBshop")
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 import psycopg2
 from datetime import datetime, timezone, timedelta
 
-conn = psycopg2.connect(DATABASE_URL)
+conn = raw_connect()
 cur = conn.cursor()
 
 CHAT_ID = -9999999001

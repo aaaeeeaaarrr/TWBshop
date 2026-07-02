@@ -2,15 +2,11 @@
 key tables exist, NO prod data leaked (every table empty except the seeded rules),
 and staff_registry carries the columns the AL/payroll code reads."""
 import os
-from urllib.parse import urlsplit, urlunsplit
-import psycopg2
-import config
 
-STAGING_DB = "twbshop_staging"
-p = urlsplit(config.DATABASE_URL)
-staging_url = urlunsplit((p.scheme, p.netloc, "/" + STAGING_DB, p.query, p.fragment))
+os.environ.setdefault("TWBSHOP_ENV", "staging")  # this tool verifies STAGING, only ever
+from shared.database import raw_connect
 
-conn = psycopg2.connect(staging_url)
+conn = raw_connect()
 with conn.cursor() as cur:
     cur.execute("SELECT current_database()")
     print("connected to:", cur.fetchone()[0])

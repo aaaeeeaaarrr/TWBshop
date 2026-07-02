@@ -9,12 +9,12 @@ Cleans up all test data after.
 """
 import sys
 sys.path.insert(0, '/root/TWBshop')
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 import psycopg2
 import json
 from datetime import datetime, timezone
 
-conn = psycopg2.connect(DATABASE_URL)
+conn = raw_connect()
 cur = conn.cursor()
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

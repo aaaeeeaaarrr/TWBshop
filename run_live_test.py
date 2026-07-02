@@ -17,7 +17,8 @@ logger = logging.getLogger("live_test")
 sys.path.insert(0, "/root/TWBshop")
 
 import psycopg2
-from secrets import DATABASE_URL, HIRE_BOT_TOKEN
+from secrets import HIRE_BOT_TOKEN
+from shared.database import raw_connect
 from telegram import Bot
 
 ATTEMPT_ID = 2   # __TEST_Perfect__ — 87 answers, Chanmony-style hiding signal in C-Q8
@@ -28,7 +29,7 @@ OWNER_TG_ID = config.OWNER_TELEGRAM_ID
 
 
 def _db():
-    return psycopg2.connect(DATABASE_URL)
+    return raw_connect()
 
 
 # ── Step 0: Ensure session exists for attempt 2 ──────────────────────────────

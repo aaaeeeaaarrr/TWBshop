@@ -10,7 +10,8 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from shared.database import _db
-from core.shifts import ensure_shift, shift_for_instant
+from core.shifts import (EARLY_WINDOW_MIN, LATE_WINDOW_MIN, ensure_shift, shift_for_instant,
+                         shift_window)
 
 
 def _emit_event(org_id, shift_id, staff_id, etype, at, detail) -> bool:
@@ -25,12 +26,25 @@ def _emit_event(org_id, shift_id, staff_id, etype, at, detail) -> bool:
             return cur.fetchone() is not None
 
 
-def _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz):
+def _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz, windows=None):
     """Materialize the candidate shifts (the local day + the day before, in tz) then bind `when_dt` to one
-    by interval — overnight-correct: a 2am check-in binds to yesterday's still-running shift."""
+    by interval — overnight-correct: a 2am check-in binds to yesterday's still-running shift.
+
+    `windows` (optional): the day's RESOLVED window list [(start,end), …] — a redefined/come-early day
+    (one moved window) or a split shift (two windows). When given, every window is materialized and the
+    instant binds to the nearest, so a check-in and its checkout land on the SAME instance (the s59c
+    mispair class: check-in on the resolved start, checkout on the base → two orphan half-shifts).
+    When None → exactly the single-window behaviour."""
     local_day = when_dt.astimezone(ZoneInfo(tz)).date()
-    for d in (local_day, local_day - timedelta(days=1)):
-        ensure_shift(org_id, staff_id, d, work_start, work_end, tz)
+    for ws, we in (windows or [(work_start, work_end)]):
+        for d in (local_day, local_day - timedelta(days=1)):
+            # Materialize only a window that could actually CONTAIN this instant (the same
+            # tolerances the bind uses) — a candidate that can't bind would just be an empty
+            # orphan row.
+            s, e = shift_window(ws, we, d, tz)
+            if (s - timedelta(minutes=EARLY_WINDOW_MIN) <= when_dt
+                    <= e + timedelta(minutes=LATE_WINDOW_MIN)):
+                ensure_shift(org_id, staff_id, d, ws, we, tz)
     return shift_for_instant(org_id, staff_id, when_dt)
 
 
@@ -58,10 +72,11 @@ def verdict(when_dt, start_dt, tz: str = "Asia/Phnom_Penh",
 
 def check_in(org_id, staff_id, when_dt, work_start, work_end,
              tz: str = "Asia/Phnom_Penh", location=None,
-             grace_min: int = 5, early_bonus_min: int = 5) -> dict:
+             grace_min: int = 5, early_bonus_min: int = 5, windows=None) -> dict:
     """Bind the check-in to its shift + return the verdict (state + minutes), emitting one checked_in
-    event. Verdict matches live (grace/early thresholds, minute-of-day). `when_dt` must be tz-aware."""
-    shift = _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz)
+    event. Verdict matches live (grace/early thresholds, minute-of-day). `when_dt` must be tz-aware.
+    `windows`: the day's resolved window list (redefine/split) — see _bind_shift."""
+    shift = _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz, windows)
     if not shift:
         return {"bound": False, "reason": "no shift near this instant"}
     state, late, early = verdict(when_dt, shift["start_dt"], tz, grace_min, early_bonus_min)
@@ -72,10 +87,13 @@ def check_in(org_id, staff_id, when_dt, work_start, work_end,
             "state": state, "minutes_late": late, "minutes_early": early, "duplicate": not inserted}
 
 
-def check_out(org_id, staff_id, when_dt, work_start, work_end, tz: str = "Asia/Phnom_Penh") -> dict:
+def check_out(org_id, staff_id, when_dt, work_start, work_end, tz: str = "Asia/Phnom_Penh",
+              windows=None) -> dict:
     """Bind the check-out to its shift + emit one checked_out event with worked minutes (capped at the
-    shift end — lingering past end banks nothing, mirroring live). Pure interval math."""
-    shift = _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz)
+    shift end — lingering past end banks nothing, mirroring live). Pure interval math.
+    `windows`: the day's resolved window list (redefine/split) — MUST be the same resolution the
+    check-in used, or the pair lands on two instances (see _bind_shift)."""
+    shift = _bind_shift(org_id, staff_id, when_dt, work_start, work_end, tz, windows)
     if not shift:
         return {"bound": False, "reason": "no shift near this instant"}
     end_for_calc = min(when_dt, shift["end_dt"])

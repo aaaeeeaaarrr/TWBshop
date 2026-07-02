@@ -8,7 +8,7 @@ Safe to re-run: checks for existing candidate/assessment before inserting.
 import json
 import sys
 sys.path.insert(0, '/root/TWBshop')
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 import psycopg2
 
 # ── Mapping helpers ───────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ FINDINGS = [
 # ── Import ────────────────────────────────────────────────────────────────────
 
 def run():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = raw_connect()
     cur = conn.cursor()
     try:
         # 1. Find or create candidate

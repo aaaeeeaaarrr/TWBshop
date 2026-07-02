@@ -79,9 +79,40 @@ async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # Scheduled job callbacks
 # ---------------------------------------------------------------------------
 
+async def _send_daily_summary(bot) -> None:
+    """The one logical daily post (totals + fulfillment). Records the day it went out so
+    the boot-time catch-up can tell a sent day from a missed one."""
+    await send_production_summary(bot)
+    await send_fulfillment_list(bot)
+    from shared.database import set_bot_meta
+    set_bot_meta("retail_last_summary_date",
+                 datetime.datetime.now(datetime.timezone.utc).date().isoformat())
+
+
+def _summary_catchup_due(now_utc, last_recorded_day) -> bool:
+    """Pure: booted at/after today's summary time with no record of today's send?"""
+    past = (now_utc.hour, now_utc.minute) >= (config.SUMMARY_HOUR, config.SUMMARY_MINUTE)
+    return past and last_recorded_day != now_utc.date().isoformat()
+
+
+async def _startup_summary_check(app) -> None:
+    """Missed-summary catch-up (ports b2b's `_startup_summary_check`; observability audit
+    follow-on): if the bot was DOWN when the daily job should have fired, the staff group
+    silently lost that day's production totals — send them on boot instead."""
+    try:
+        from shared.database import get_bot_meta
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        if _summary_catchup_due(now_utc, get_bot_meta("retail_last_summary_date")):
+            logger.info("Startup: missed daily summary — sending now")
+            await _send_daily_summary(app.bot)
+    except Exception:
+        # a failed catch-up must not abort the BOOT (post_init exceptions kill run_polling);
+        # the daily job is the retry cadence
+        logger.exception("startup summary catch-up failed (non-fatal)")
+
+
 async def _job_daily_summary(context: ContextTypes.DEFAULT_TYPE) -> None:
-    await send_production_summary(context.bot)
-    await send_fulfillment_list(context.bot)
+    await _send_daily_summary(context.bot)
 
 
 async def _job_check_missing_photos(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -95,7 +126,7 @@ async def _job_check_missing_photos(context: ContextTypes.DEFAULT_TYPE) -> None:
 def main() -> None:
     database.init_db()
 
-    app = Application.builder().token(config.BOT_TOKEN).build()
+    app = Application.builder().token(config.BOT_TOKEN).post_init(_startup_summary_check).build()
     from shared.error_handler import make_error_handler
     app.add_error_handler(make_error_handler("Retail"))   # crashes are never silent
 

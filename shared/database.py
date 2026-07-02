@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -18,7 +19,16 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-_pool: psycopg2.pool.SimpleConnectionPool | None = None
+_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+# The managed-PG cluster allows 25 connections TOTAL and DigitalOcean's own machinery
+# holds ~10 of them (measured 2026-07-03), so ~15 are usable across ALL our services +
+# crons + one-off scripts. Six always-on processes share that budget: the per-process
+# cap below bounds the worst-case burst (psycopg2 returns idle conns above minconn=1
+# to the server, so steady state stays ~1 per process). Override per service with
+# TWBSHOP_DB_POOL_MAX if one ever genuinely needs more.
+_POOL_MAX = max(1, int(os.environ.get("TWBSHOP_DB_POOL_MAX", "4")))
+_POOL_ACQUIRE_TIMEOUT_S = 5.0
 
 
 def active_database_url() -> str:
@@ -52,7 +62,7 @@ def active_database_url() -> str:
     )
 
 
-def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
+def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
         url = active_database_url()  # raises if TWBSHOP_ENV is unset/unknown
@@ -60,23 +70,53 @@ def _get_pool() -> psycopg2.pool.SimpleConnectionPool:
         # Announce the DB target on first connection — prod AND staging, never silent —
         # so a mis-set env is obvious from the very first log line.
         logger.warning("DB pool → %s database (TWBSHOP_ENV=%s)", env.upper(), env)
-        _pool = psycopg2.pool.SimpleConnectionPool(1, 10, url)
+        # Threaded, not Simple: DB calls happen off the main loop today (error-handler
+        # sink mirror, monitor notify, hire assessment pipeline all run in threads) and
+        # SimpleConnectionPool is not thread-safe.
+        _pool = psycopg2.pool.ThreadedConnectionPool(1, _POOL_MAX, url)
     return _pool
+
+
+def _acquire(pool, timeout_s: float = _POOL_ACQUIRE_TIMEOUT_S):
+    """getconn that WAITS briefly when the pool is at its cap instead of failing the
+    call instantly — a burst above _POOL_MAX queues for a freed connection and only
+    raises PoolError after timeout_s. Non-pool errors (DB down) propagate immediately."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        try:
+            return pool.getconn()
+        except psycopg2.pool.PoolError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.05)
 
 
 @contextmanager
 def _db():
     pool = _get_pool()
-    conn = pool.getconn()
+    conn = _acquire(pool)
     conn.cursor_factory = psycopg2.extras.RealDictCursor
+    broken = False
     try:
         yield conn
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except psycopg2.Error:
+            broken = True  # rollback itself failed → the connection is dead
         raise
     finally:
-        pool.putconn(conn)
+        try:
+            # putconn discards a conn whose server link died mid-use (transaction
+            # status UNKNOWN) and closes extras above minconn; broken force-closes one
+            # whose rollback failed so a poisoned conn is never recycled.
+            pool.putconn(conn, close=broken)
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def raw_connect():
@@ -4001,6 +4041,58 @@ def al_mark_escalated(req_id: int) -> None:
             cur.execute("UPDATE al_requests SET escalated_at=NOW() WHERE id=%s", (req_id,))
 
 
+# ── approval-card coords (swap / shift-change senior cards) — S60 A9 ──────────────────
+# bot_data holds these in memory only, so a gm restart orphans co-seniors' cards (they never
+# re-render to the verdict) and the future chase ladders (Part C) would have nothing to
+# re-ping/supersede. Persisted like al_pings; the call sites UNION db + bot_data. The table
+# self-provisions (a card write must never depend on a separate init having run).
+
+def _ensure_approval_cards(cur) -> None:
+    cur.execute("""CREATE TABLE IF NOT EXISTS approval_cards (
+                       id BIGSERIAL PRIMARY KEY,
+                       kind TEXT NOT NULL, ref_id BIGINT NOT NULL,
+                       chat_id BIGINT NOT NULL, message_id BIGINT NOT NULL,
+                       sent_at TIMESTAMPTZ DEFAULT NOW())""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_approval_cards ON approval_cards (kind, ref_id)")
+
+
+def approval_card_add(kind: str, ref_id: int, chat_id: int, message_id: int) -> None:
+    """BEST-EFFORT — auxiliary bookkeeping inside card-send loops must never break the
+    sends themselves (bot_data still holds the coords for this process's lifetime)."""
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                _ensure_approval_cards(cur)
+                cur.execute("INSERT INTO approval_cards (kind, ref_id, chat_id, message_id) "
+                            "VALUES (%s,%s,%s,%s)", (kind, int(ref_id), chat_id, message_id))
+    except Exception:
+        logger.exception("approval_card_add failed (non-fatal): %s #%s", kind, ref_id)
+
+
+def approval_cards_get(kind: str, ref_id: int) -> list[tuple]:
+    """Peek (mid-lifecycle re-renders). Missing table = no card was ever persisted → []."""
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT chat_id, message_id FROM approval_cards "
+                            "WHERE kind=%s AND ref_id=%s ORDER BY id", (kind, int(ref_id)))
+                return [(r["chat_id"], r["message_id"]) for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
+def approval_cards_pop(kind: str, ref_id: int) -> list[tuple]:
+    """Fetch AND delete (terminal verdict sweep) — atomic so the finalize runs once."""
+    try:
+        with _db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM approval_cards WHERE kind=%s AND ref_id=%s "
+                            "RETURNING chat_id, message_id", (kind, int(ref_id)))
+                return [(r["chat_id"], r["message_id"]) for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
 def al_pings_orphaned() -> list[dict]:
     """Ping rows whose request is no longer pending (decided/expired since the last run) — to clean up the
     dangling Approve/Reject cards of seniors who never responded."""
@@ -4809,7 +4901,7 @@ def att_check_out(staff_id: int, shift_date: str, at_iso: str) -> None:
     # live). Here, not at the call sites: this is the ONE checkout write (auto · manual · closer · sim).
     try:
         from core.shadow_hook import shadow_checkout
-        shadow_checkout(staff_id, at_iso)
+        shadow_checkout(staff_id, at_iso, shift_date=shift_date)
     except Exception:
         pass
 

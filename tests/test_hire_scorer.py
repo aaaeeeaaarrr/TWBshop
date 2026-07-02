@@ -24,13 +24,13 @@ import json
 sys.path.insert(0, '/root/TWBshop')
 
 import psycopg2
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 from hire_bot.scorer import auto_grade, detect_semantic_contradictions
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def _conn():
-    return psycopg2.connect(DATABASE_URL)
+    return raw_connect()
 
 
 def _get_quiz_version_id(cur):

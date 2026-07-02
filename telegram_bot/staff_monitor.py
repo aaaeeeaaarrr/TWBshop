@@ -36,5 +36,15 @@ async def handle_staff_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if reason:
         alert += f"\nReason: {reason}"
 
+    # Durable record FIRST (observability audit #14): a failed group post must not lose
+    # the flag. Sink → post → delivered, the same shape as gm's _client_alert; an
+    # undelivered flag re-raises via the sentinel sweep.
+    from gm_bot.alarms import log_alarm, mark_delivered
+    alarm_id = log_alarm(
+        "staff_flag",
+        "%s — %s | msg: %r" % (staff_name, reason or action, text[:300]),
+        severity="money" if action == "urgent" else "warn",
+    )
     await context.bot.send_message(config.STAFF_GROUP_ID, alert)
+    mark_delivered(alarm_id)
     logger.warning("Flagged staff message from %s: %r — %s", staff_name, text, reason)

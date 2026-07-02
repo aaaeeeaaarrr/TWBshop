@@ -32,8 +32,8 @@ _msg_id_seq   = [1000]
 
 
 def _db():
-    from secrets import DATABASE_URL
-    return psycopg2.connect(DATABASE_URL)
+    from shared.database import raw_connect
+    return raw_connect()
 
 
 def setup_customer():

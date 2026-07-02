@@ -78,7 +78,7 @@
 - `core/db.py` — core.db — the platform's multi-tenant schema + persistence (entity + event log).
     · _org_secret_cipher, init_core_db, log_config_change, recent_config_audit, ensure_org, set_org_secret, has_org_secret, get_org_secret, clear_org_secret, _hash_pw, _check_pw, create_user, verify_user, user_count
 - `core/derive.py` — core.derive — the SELF-DERIVING resolver: the core decides what a day is from its OWN state
-    · set_override, clear_overrides, _modifiers, resolve
+    · set_override, clear_overrides, _modifiers, resolve, resolved_windows
 - `core/exceptions.py` — core.exceptions — per-staff EXCEPTIONS / overrides (F1, session 58, 2026-06-28).
     · _clean_exceptions, get_exceptions, set_exceptions, apply_preset, is_exempt, approver_for, escalate_to, summary
 - `core/expenses.py` — core.expenses — a real, minimal expense log (the Accountant domain on the platform): record expenses by
@@ -121,18 +121,20 @@
     · _nested, _at, apply_vibe, _fmt_knob, vibe_caption, current_vibe
 - `core/reports.py` — core.reports — read-only trends/analytics over the platform's own data (the "Reports" frontier capability;
     · attendance_report, staff_attendance_report, weekday_pattern, attendance_anomalies
+- `core/retention.py` — core.retention — bounded growth for the platform's own bookkeeping tables.
+    · tidy
 - `core/schedule.py` — core.schedule — THE schedule resolver brain (channel-agnostic). "What is this person doing on a day?"
     · resolve_day
 - `core/sends.py` — core.sends — the durable SEND LEDGER: intent → sent | failed (observability law, 2026-07-02).
     · _now, init_send_ledger_db, record, mark, stuck
 - `core/sentinel.py` — core.sentinel — the universal LIVENESS monitor: an alarm for ANYTHING that didn't reach its next ladder/step.
-    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, detect_undelivered_alarms, detect_stale_heartbeats, detect_stuck_sends, detect_silent_flip_revert, detect_broken_flows, sweep, summary_line
+    · _now, _alarm, detect_shadow_stalled, detect_malformed_checkin, detect_flip_divergence, detect_config_health, detect_undelivered_alarms, detect_stale_heartbeats, detect_stuck_sends, detect_silent_flip_revert, detect_broken_flows, _headroom_alarm, detect_db_headroom, sweep, summary_line
 - `core/settle.py` — core.settle — checkout settle math (channel-agnostic, per-tenant config). The MONEY core:
     · worked_minutes, ot_earned, split_ot_pb, settle_shift, payback_extension_window, settle_payback_slot
 - `core/shadow.py` — core.shadow — the parallel-run comparator + the nightly digest brain.
     · _record, compare_checkin, compare_settle, record_settle_info, mark_reconciled, _classify_checkin, _classify_settle, _classify_for, build_digest, comparison_stats, comparison_stats_by_kind, comparison_span, recent_mismatches
 - `core/shadow_hook.py` — core.shadow_hook — the SAFE bridge that runs the new platform core BESIDE the live bot.
-    · shadow_enabled, shadow_checkin, shadow_checkout, shadow_settle
+    · shadow_enabled, shadow_checkin, _resolved_window, shadow_checkout, shadow_settle
 - `core/shifts.py` — core.shifts — the shift entity: materialize a real interval + resolve which shift an instant belongs to.
     · shift_window, ensure_shift, shift_for_instant
 - `core/sick.py` — core.sick — own-sick outcome rule (channel-agnostic). The distinguishing fact is CHECK-IN:
@@ -162,7 +164,7 @@
 - `gm_bot/audit.py` — Invariant auditor — owner /audit (session 32, pre-go-live checklist).
     · _nm, v_payback, v_al, v_special, v_shift_changes, v_pb_overbook, v_sessions, v_ot_bank, v_noshow_vs_sessions, v_bookings, v_booking_redefine_pair, v_buybacks, v_sick, v_swaps, v_swap_exclusivity  …(+10, grep)
 - `gm_bot/bot.py` — GM Manager TWB bot — private digest to owner.
-    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+227, grep)
+    · _concern_keyboard, _format_concern, _send_concern_with_photos, send_pending_concerns, _daily_analysis_job, _auto_skip_proposals_job, cmd_start, _staff_list_keyboard, cmd_check, cmd_pending, cmd_staff, cmd_review, _format_proposal, _proposal_keyboard, _approved_keyboard  …(+228, grep)
 - `gm_bot/checkin.py` — Check-in core — pure logic (verdict + scheduling), no DB/Telegram.
     · is_share_stop, can_auto_checkout, relative_minutes, verdict, is_due, shift_for_now
 - `gm_bot/checkin_net.py` — gm_bot.checkin_net — the C2 cut-over BRIDGE: the live check-in verdict routed through core.flip's
@@ -267,6 +269,11 @@
 - `ops_intelligence/price_report.py` — Supplier price comparison report.
     · compare, summary, cheapest, report
 
+## runtime_host/
+- `runtime_host/__init__.py` — runtime_host — ONE process, N tenants (S60 A6, inert until tenant #2). See docs/RUNTIME_HOST_DESIGN.md.
+- `runtime_host/host.py` — runtime_host.host — ONE process, N tenants' Telegram bot applications (S60 A6, INERT).
+    · TenantSpec, build_apps, run
+
 ## scripts/
 - `scripts/alarms.py` — Read the GM alarm sink (B1, session 58) — so Claude / the B3 nightly agent can see EVERY alarm the
     · main
@@ -312,6 +319,8 @@
     · classify, run
 - `scripts/reconcile_facts.py` — reconcile_facts.py — run the truth-registry checker, READ-ONLY.
     · main
+- `scripts/repair_core_mispairs.py` — One-off repair for the s59c mispair class (A2, 2026-07-03): a check-in landed on the
+    · find_pairs, repair
 - `scripts/replay_checkins.py` — REPLAY accelerator (owner Jun 22 — "days instead of weeks").
     · _resolved_schedule, _live_state, main
 - `scripts/run_accountant_local.py` — LOCAL TEST launcher for the accountant bot — staging DB + dev poller + the Python-3.14
@@ -335,7 +344,7 @@
 - `shared/clock.py` — Phnom-Penh wall-clock helpers.
     · pp_now, pp_today
 - `shared/database.py` — PostgreSQL database — all tables and queries.
-    · active_database_url, _get_pool, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission, get_submissions_today  …(+308, grep)
+    · active_database_url, _get_pool, _acquire, _db, raw_connect, init_db, init_ops_db, save_ops_message, dedup_keeper, dedupe_ops_messages, gm_daily_report_message_ids, save_order, get_daily_totals, get_orders_by_user, save_photo_submission  …(+313, grep)
 - `shared/error_handler.py` — Global PTB error handler — ONE implementation for every bot (the gm_save_concern lesson:
     · _sink, _mark_delivered, make_error_handler
 - `shared/log_redact.py` — Log hygiene — keep bot TOKENS out of the log files (owner, 2026-06-21).
@@ -361,7 +370,7 @@
 
 ## telegram_bot/
 - `telegram_bot/bot.py` — Telegram bot entry point — handler registration and startup.
-    · start, unknown_command, _is_staff, cmd_summary, _job_daily_summary, _job_check_missing_photos, main
+    · start, unknown_command, _is_staff, cmd_summary, _send_daily_summary, _summary_catchup_due, _startup_summary_check, _job_daily_summary, _job_check_missing_photos, main
 - `telegram_bot/menu.py` — Menu items, aliases, and synonym tables.
     · menu_list_text
 - `telegram_bot/orders.py` — Order intake, menu matching, and confirmation flow.
@@ -378,7 +387,7 @@
 ## wizard/
 - `wizard/__init__.py` — wizard — the config viewer/editor web adapter (a thin CLIENT; the brain stays server-side).
 - `wizard/app.py` — wizard.app — the config viewer/editor (Flask). TWO views off one engine:
-    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+70, grep)
+    · _badge, _is_secret, _secret_status_html, _page, _get_path, _set_path, _fmt, _render_node, _render_catalog, render_cutover, _admin_dashboard, render_page, _field_input, _render_groups, _render_approvals  …(+71, grep)
 - `wizard/card_details.py` — wizard.card_details — what each capability would contain, by INDUSTRY STANDARD. A reference MENU the owner
 - `wizard/catalog.py` — wizard.catalog — the POSSIBILITIES the wizard can offer (the menu), distinct from the tenant's CURRENT
 - `wizard/onboarding_quiz.py` — wizard.onboarding_quiz — the first-run questionnaire (the 'packaging per client-type' front door).

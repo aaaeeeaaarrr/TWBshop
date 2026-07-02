@@ -11,7 +11,7 @@ Requires migration 2026_05_28_part_e_and_ops_assessment.sql to be run first
 import json
 import sys
 sys.path.insert(0, '/root/TWBshop')
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 import psycopg2
 
 
@@ -243,7 +243,7 @@ FINDINGS = [
 # ── Import ────────────────────────────────────────────────────────────────────
 
 def run():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = raw_connect()
     cur = conn.cursor()
     try:
         # 1. Find or create candidate (match by name AND alias hint in notes)

@@ -7,7 +7,7 @@ Safe to re-run: ON CONFLICT DO NOTHING.
 """
 import sys
 sys.path.insert(0, '/root/TWBshop')
-from secrets import DATABASE_URL
+from shared.database import raw_connect
 import psycopg2
 
 ASSESSMENT_ID = 5
@@ -97,7 +97,7 @@ MESSAGE_REFS = [
 
 
 def run():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = raw_connect()
     cur = conn.cursor()
     try:
         inserted = 0

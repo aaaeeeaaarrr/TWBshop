@@ -27,11 +27,16 @@
 ## 🧩 WIZARD (`wizard/`) — config viewer/editor web adapter (a thin CLIENT; the brain stays server-side)
 - **Entry:** `wizard/app.py::render_page` (read-only viewer — badged config + catalog) · `wizard/status.py::status_for` (the LIVE/SHADOW/PLANNED cut-over map) · `wizard/catalog.py` (menu of categories/integrations/packages) · `run_wizard.py` (localhost:8090)
 - **Read-first:** `docs/WIZARD_DESIGN.md` · CLAUDE.md ▶▶ PRODUCT SECURITY & IP · the config model `core/tenant_config.py`
-- **⚠ Gotchas:** SECURITY — server-side only, binds 127.0.0.1 (reach via `ssh -L 8090:localhost:8090 twbshop`), read-only in Stage 1, NO secrets in any page · the badge truth = `wizard/status.py` (flip a prefix SHADOW→LIVE = the cut-over) · single-threaded (shared DB pool isn't thread-safe).
+- **⚠ Gotchas:** SECURITY — server-side only, binds 127.0.0.1 (reach via `ssh -L 8090:localhost:8090 twbshop`), read-only in Stage 1, NO secrets in any page · the badge truth = `wizard/status.py` (flip a prefix SHADOW→LIVE = the cut-over) · the shared DB pool is Threaded + capped at 4/process since s60 A1 (was the old "single-threaded" caveat).
 
 ## 🔌 ADAPTERS (`adapters/`) — channel bridges into the platform brain (thin; `core/` stays channel-free)
 - **Entry:** `adapters/web.py` (HTTP check-in / onboarding) · `adapters/telegram_onboarding.py` (staff-group discover-confirm) · `adapters/telegram_provision.py` (guided BotFather verify/auto-config)
 - **⚠ Gotchas:** an adapter translates a channel ↔ `core` commands/events — it holds NO rules · `adapters/web.py::serve` must bind localhost + derive `org_id` SERVER-SIDE (never from the request body) + auth/HTTPS/rate-limit before ANY exposure (W3) — INERT today (no runner imports it).
+
+## 🏗 RUNTIME HOST (`runtime_host/`) — ONE process, N tenants' bot apps · INERT (nothing runs it)
+- **Entry:** `runtime_host/host.py::build_apps` (pure assembly, fail-soft per tenant) · `::run` (manual PTB lifecycle on one loop) · `TenantSpec` (org_id + token + registrar = config, not code)
+- **Read-first:** `docs/RUNTIME_HOST_DESIGN.md` · `docs/CAPACITY_AND_SCALE.md` §2 (the process-per-bot wall it kills)
+- **⚠ Gotchas:** INERT until tenant #2 (deliberate — no gain at one tenant) · TWB's live bots do NOT move onto it until the platform cut-over · per-tenant crash isolation = each app's own `make_error_handler("host:<org>")`; a bad spec is SKIPPED + reported, never fatal to the fleet.
 
 ## Attendance — check-in / check-out / no-show  ·  ⚠ LIVE (real staff, payroll-adjacent)
 - **Entry:** `gm_bot/bot.py` (scheduler + location handler + jobs) · `gm_bot/attendance_ui.py::resolve_day` (the ONE day-resolver) · `gm_bot/checkin.py::can_auto_checkout`

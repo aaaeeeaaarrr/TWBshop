@@ -1226,3 +1226,38 @@ Sensible defaults are live; these wait for the owner's eyes on the full build, t
   views + entitled data + knobs — the engine, the verification substrate, and the learned fault/ontology
   library never cross the wire. The irreducible residue (black-box probing your OWN knobs) is the same
   residue Salesforce lives with.
+- `[finding]` **The "16/25 conns, no pool" reading was WRONG (s60 A1, 2026-07-03):** pg_stat_activity
+  breakdown shows ~10 of the 16 are DigitalOcean's own machinery; OUR app holds ~6 — and a
+  `SimpleConnectionPool(1,10)` has lived in `_db()` since the 2026-05-22 PG migration (psycopg2's putconn
+  returns extras above minconn to the server, hence ~1/service steady). The REAL exposure was (a) the
+  burst ceiling — 6 services × max 10 = 60 potential vs ~15 usable — and (b) `SimpleConnectionPool` is
+  thread-UNSAFE while threads write today (error-handler sink mirror, monitor notify, hire pipeline).
+  Fixed: Threaded pool, cap 4/process (`TWBSHOP_DB_POOL_MAX`), burst-waiting acquire, poisoned-conn
+  eviction, `db_headroom` sentinel detector. Lesson: measure the BREAKDOWN before naming a wall.
+- `[finding]` **tests/test_hire_scorer.py connected straight to the PROD URL** (`from secrets import
+  DATABASE_URL`) — harmless in the suite only because pytest collects zero tests from it (script-style,
+  no test_ functions). Folded through `raw_connect()` with the rest of the run_*/seed/verify scripts;
+  the 2026-06-14 "guard bypass class" ledger item's code half is now CLOSED with a structural guard
+  (`tests/test_no_raw_db_connections.py`) — a new raw `psycopg2.connect(` anywhere fails the suite.
+- `[bonus]` **Fail-closed everywhere for one-off tools:** every manual import/seed/migration script now
+  requires an explicit `TWBSHOP_ENV` (prod|staging) — the "ran a seed script against prod by accident"
+  class is structurally dead, same switch the services already honor.
+- `[finding]` **The s59c "split-shift" mispair hypothesis was WRONG (s60 A2):** prod shift rows show every
+  orphan pair is the SAME shape — check-in on live's RESOLVED start (Nak's 20:56/20:57 come-early payback
+  slots, Thyda's 06:00 ones), checkout on the BASE window. Staff 8's "~14:00 check-ins" were 14:00 UTC =
+  21:00 PP — his normal overnight start. Cure = symmetric resolution (the checkout feed now resolves via
+  the session's shift_date), not split modeling. Lesson repeated: hypotheses from log shapes must be
+  checked against the ROWS before becoming build items.
+- `[bonus]` **Containment-gated materialization:** `_bind_shift` now materializes only windows that could
+  contain the instant (same tolerances as the binder, shared constants) — the empty day−1 sibling rows
+  that every check-in used to create stop existing, and the tolerances can't drift apart.
+- `[bonus]` **`core.derive.resolved_windows`** — the multi-window, override-aware sibling of `resolve()`:
+  the web channel now binds split shifts + redefines natively (was `shift_windows[0]` only), and it's the
+  exact function cut-over materialization will use.
+- `[finding]` **post_init catch-up can kill a bot's BOOT (s60 A5):** PTB propagates post_init exceptions
+  out of run_polling — b2b's unwrapped `_startup_summary_check` would restart-loop the service exactly
+  while Telegram is flaky. Retail's port wraps it (non-fatal; the daily job is the retry); b2b gets the
+  same 3 lines at re-enable → logged as F6 in `docs/B2B_LANDMINE_FIX_PLAN.md`.
+- `[bonus]` **Backup restore drill = a point-in-time fidelity proof for free (s60 A7):** the fork was
+  missing `core_job_heartbeats` — exactly right, the backup predates the s59 deploy that created it.
+  Restore-time budget measured: ~7 min to online + verify ≈ 10 min total on the smallest cluster.

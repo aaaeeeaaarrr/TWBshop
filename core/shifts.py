@@ -10,6 +10,13 @@ from shared.database import _db
 
 _UTC = ZoneInfo("UTC")
 
+# The binding tolerances: how far outside [start_dt, end_dt] an instant may fall and still
+# belong to the shift. Shared by shift_for_instant (the bind) and _bind_shift's
+# materialization gate (core.attendance) — they MUST stay one number or a shift could be
+# materialized that can't bind, or bind-searched but never materialized.
+EARLY_WINDOW_MIN = 120
+LATE_WINDOW_MIN = 180
+
 
 def shift_window(work_start: str, work_end: str, business_day, tz: str = "Asia/Phnom_Penh"):
     """PURE (no DB): the (start_dt, end_dt) UTC instants for a shift on `business_day`. work_start/work_end
@@ -44,7 +51,8 @@ def ensure_shift(org_id, staff_id, business_day, work_start, work_end,
 
 
 def shift_for_instant(org_id, staff_id, now_dt: datetime,
-                      early_window_min: int = 120, late_window_min: int = 180):
+                      early_window_min: int = EARLY_WINDOW_MIN,
+                      late_window_min: int = LATE_WINDOW_MIN):
     """The shift the instant `now_dt` belongs to — found by INTERVAL, not by date: the shift whose window
     [start − early_window, end + late_window] contains now, nearest start as the tie-break. This IS the
     overnight-correct binding (a 2am instant lands inside last night's 21:00→06:00 interval), by

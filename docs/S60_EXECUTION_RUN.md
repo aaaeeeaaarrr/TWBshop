@@ -8,32 +8,66 @@
 > sessions — progress is ticked HERE so every "keep going" resumes exactly where the last stopped.
 
 ## Part 0 — EVERY session start (the daily ritual)
-- [ ] **Fault check**: `python scripts/alarms.py --open` + prod sentinel sweep + flowcheck → fix what's
+- [x] **Fault check**: `python scripts/alarms.py --open` + prod sentinel sweep + flowcheck → fix what's
       found → every fix leaves a guard. FIRST TIME ALSO: verify the checkout hook's first real firings
       (journal `[SHADOW] checkout fed` from the ~06:00 wave) + the 9 crew sessions completed + the
       08:00 digest clean.
+      **2026-07-03 01:35 PP run: CLEAN** — sink 0 open · audit 0 · sentinel+flowcheck = only the known
+      aging-out finding (staff 1, 26/06; gone 15:01 PP) · heartbeats stale=[] · all 6 services active.
+      **⏳ STILL DUE (physically can't run before morning — it was 01:35): the ~06:00 checkout-wave
+      firings + the 08:00 digest → FIRST ITEM next session.**
 
 ## Part A — AUTONOMOUS, in order (I do; owner reads reports)
-- [ ] **A1. DB pooling** — the measured wall (16/25 conns TODAY). App-side pool in `shared/database._db`
-      (or pgbouncer on the droplet). HIGH-RISK-adjacent (touches every DB call): staging-proven, full
-      suite, quiet-window deploy, all services restarted once, verified. Done = conns drop + suite green
-      + live verify.
-- [ ] **A2. Redefine/split-aware shift MATERIALIZATION in core** (flowcheck 2nd catch): core shifts
-      materialize from the RESOLVED day (redefines/splits/come-early), not the base window → mispairs
-      end; exact worked-minutes self-derivable. Shadow-side only; parity tests; big build.
-- [ ] **A3. Settle-flip STATS PREP** (feeds YES-2): read-only digest of payback-slot settle agreement on
-      real checkouts (`shadow_comparisons kind='settle'`) → present numbers to the owner.
-- [ ] **A4. Retention tidy** — age-out jobs for `core_send_ledger`/`core_flip_log` (+heartbeat rows are
-      1/job, fine) + design the ops_messages retention KNOB (product lever). Additive, small.
-- [ ] **A5. Retail increments** — port b2b's `_startup_summary_check` to retail + durable staff-flag
-      record; ONE quiet-window retail restart (also picks up the error-handler sink mirror + noise gate).
-- [ ] **A6. Multi-tenant runtime host** — design doc + inert skeleton (one process, N tenant bot apps);
-      kills the ~30-client process wall. No live change until a 2nd tenant exists.
-- [ ] **A7. Backup/restore drill** — verify DO PG backups + attempt a restore-to-fork via API; document
-      the runbook. Escalate to Part C only if the DO console blocks the API path.
-- [ ] **A8. Anomalous-access sentinel rule + per-tenant canary values** (inert until external clients).
-- [ ] **A9. Small tail** — persist swap/shift-change senior-card coords (like `al_pings`) ·
-      monitor_bot self-watch note.
+- [x] **A1. DB pooling** — BUILT + SUITE-GREEN 2026-07-03 (~02:30 PP). **Finding: the "16/25, no pool"
+      reading was WRONG** — a `SimpleConnectionPool(1,10)` has existed since 2026-05-22; ~10 of the 16
+      are DO-internal, our app holds ~6 (1/service). The REAL fixes shipped: `ThreadedConnectionPool`
+      (threads write today — Simple is thread-UNSAFE), per-process cap 4 (`TWBSHOP_DB_POOL_MAX`),
+      burst-waiting `_acquire` (5s timeout), poisoned-conn eviction, **every raw `psycopg2.connect`
+      folded through `raw_connect()`** (14 files; closes the 2026-06-14 ledger bypass item) + structural
+      guard `tests/test_no_raw_db_connections.py` + sentinel `db_headroom` detector (warn 80%/crit 92%).
+      Full suite 1361p on the new pool. **Deploy: canaries (wizard·hire·automations) tonight; gm·retail·
+      listener restart AFTER the morning-wave verification** (each service restarts exactly once).
+- [x] **A2. Redefine/split-aware shift MATERIALIZATION in core** — BUILT 2026-07-03 (~03:30 PP).
+      **Prod data killed the split hypothesis**: every mispair (Nak's 20:56/20:57, Thyda's 06:00) =
+      the check-in fed live's RESOLVED start while the checkout bound the BASE window → two orphan
+      half-shifts. Cure = symmetric resolution: `check_in/check_out(windows=…)` (multi-window,
+      split-capable binding in `_bind_shift`), `shadow_checkout` now resolves via live `resolve_day`
+      (`att_check_out` passes `shift_date`; the >3h-extension KNOWN LIMIT is gone), native
+      `core.derive.resolved_windows` for cut-over/web, web channel wired (all windows + overrides).
+      BONUS: materialization is containment-gated → no more empty sibling rows. 8 tests
+      (`tests/test_shift_materialization.py`) + s59c feed tests green. **Historical orphans:
+      `scripts/repair_core_mispairs.py` (dry-run default) — run on prod at deploy.**
+- [x] **A3. Settle-flip STATS PREP** — DONE 2026-07-03 (read-only prod): **44/44 settle comparisons
+      agree** (Jun 23→Jul 2, 0 disagreements); **19/19 fully-modeled payback-slot settles agree
+      exactly** (worked+ot_banked+pb_cleared, credits incl. 116/86/61/60/58/57 min); 25 older rows =
+      pre-#5 informational. **Honest caveat: 0 samples with ot_banked>0** — the OT arm is parity-locked
+      by drift-guard tests only. → the "flip settle" yes-word is data-backed.
+- [x] **A4. Retention tidy** — BUILT 2026-07-03: `core/retention.py` (flip_log >30d · send_ledger >90d;
+      evidence tables deliberately untouched) + daily `gm_retention_tidy` 03:40 PP (gap declared; law
+      test green) + the ops_messages retention KNOB design → `docs/CAPACITY_AND_SCALE.md` §5.3.
+      Measured: flip_log ~470 rows/day = the only fast grower. **Rides the gm restart.**
+- [x] **A5. Retail increments** — BUILT 2026-07-03: `_startup_summary_check` ported (missed-summary
+      catch-up on boot + `retail_last_summary_date` bot-meta recording) + the staff-flag durable record
+      (sink-first → group post → mark_delivered; urgent=money severity; audit #14). 4 tests
+      (`tests/test_retail_increments.py`). **Rides the retail restart (morning lull, BEFORE 14:00 PP —
+      the summary hour — so the catch-up can't false-fire; pre-seed the meta key at deploy anyway).**
+- [x] **A6. Multi-tenant runtime host** — DESIGN + INERT SKELETON 2026-07-03: `docs/RUNTIME_HOST_DESIGN.md`
+      (one process, N PTB Applications on one loop; per-tenant crash isolation + heartbeats; tokens from
+      core_org_secrets; shares the ONE pooled DB → N tenants ≈ 0 extra conns) + `runtime_host/host.py`
+      (TenantSpec · build_apps fail-soft · manual-lifecycle run) + 2 tests. NOTHING runs it — first user
+      = the onboarding demo / tenant #2, per the capacity plan trigger.
+- [x] **A7. Backup/restore drill** — 2026-07-03: DO PG backups VERIFIED (8 dailies, ~0.23 GB, 20:13 UTC
+      cadence) + restore-to-fork EXECUTED via API (fork created from the newest backup → row counts
+      verified → fork DELETED; runbook → `docs/BACKUP_RESTORE_RUNBOOK.md`). ~~escalate~~ the API path works.
+- [x] **A8. Anomalous-access rule + canaries** — assessed HONESTLY: with auth OFF, wizard localhost-bound
+      and zero external clients there is NO signal to detect on — an inert detector with invented
+      thresholds would be draft content. The design is pinned in `docs/CAPACITY_AND_SCALE.md` §4 with its
+      build trigger (= W3 window / first external client, alongside `WIZARD_AUTH=1`). Nothing to build today.
+- [x] **A9. Small tail** — 2026-07-03: swap + shift-change senior-card coords now persist
+      (`approval_cards` self-provisioning table + union-read at all 4 sites — a gm restart no longer
+      orphans co-seniors' cards; the Part-C chase ladders get durable coords); retention ages the
+      peek-only rows (>30d). 3 tests. monitor_bot self-watch: stays a NOTE (read surface; delivery
+      works without it — audit's own disposition).
 
 ## Part B — YES-PACK: one word from the owner → I complete it fully
 | Yes-word (type it any time) | What I then do, end-to-end | Risk net |
