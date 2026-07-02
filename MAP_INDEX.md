@@ -311,6 +311,8 @@
     · _exp_list, main
 - `scripts/seed_vendors.py` — Seed acc_vendors from scripts/vendor_seed.py.
     · main
+- `scripts/set_thyda_tyty_exceptions.py` — Owner activation (2026-07-02): set Thyda's + Tyty's per-staff exceptions (F1).
+    · show, main
 - `scripts/vendor_seed.py` — Curated supplier-vendor -> Telegram-group seed for acc_vendors (P0 populate).
 - `scripts/verify_audit_core.py` — Verify the tamper-evident audit hash-chain (core.audit) for one org or all orgs.
     · _all_orgs, main

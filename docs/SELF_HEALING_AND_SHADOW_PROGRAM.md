@@ -103,3 +103,51 @@ nothing left to compare it against, and the alarms go dark. So:
 Plan captured (2026-06-27). Phase 0 brick ① (Sentinel) — ✅ BUILT + tested (`core/sentinel.py`, 5 tests). Everything
 else sequenced above. HIGH-RISK live aspects (the flips) get staging proof + the net + a quiet-window deploy +
 instant-revert; never a blind switch. Companion record: `docs/BONUSES_AND_FINDINGS.md` §s57.
+
+---
+
+## END-TO-END VERIFICATION — the "log to log to log endlessly" program (owner endorsed 2026-07-02)
+> Owner (2026-07-02, verbatim intent): *"everything we built/deployed has logs · all logs get checked that things
+> really went through 100% all the time · every escalation and ladder to its end must reach the next step · log to
+> log to log endlessly · we can do MORE checks spread through the day · later my CLIENTS get their things auto-fixed
+> in our build whenever."* This is the reliability MOAT made into an enforced invariant, not a hope.
+
+### HONEST current state (told the owner 2026-07-02 — ~80%, NOT 100%)
+- **Logged?** mostly YES — `gm_events` (per-staff actions) · `core_transitions` (every gate/reroute old→new) ·
+  `core_flip_log` (verdict cut-over 300/0) · `gm_alarms` (durable sink — keeps the alarm even if the DM fails) ·
+  `points_events` · the tamper-evident audit chain. Every NEW gate/reroute writes a transition note (e.g. the Thyda
+  escalate logs `Supervisors → Tyty`).
+- **Checked / caught?** partially always-on — detectors run 24/7 (the money **watchdog** · the **Sentinel** 30-min
+  sweep · daily `/audit` · the 08:00 nightly `morning_report --send` digest) and route problems to the sink + the
+  Monitor bot; a few **safe classes self-heal 24/7** (no-show reaper · shift-closer · AL-expiry · flip auto-revert ·
+  self-closing alarms).
+- **Every ladder reaches a verified terminal?** SOME by construction (the AL re-ping ladder: chase ×4 → escalate to
+  owner → **auto-expire** = a real end; check-in → flip_log; payback → watchdog flags any unsettled). Many one-shot
+  notifications are still "best-effort send" with no downstream "did the next step fire" verifier.
+
+### The 3 honest GAPS to close
+1. **Continuous CHECKING isn't fully autonomous.** Logs are read WHEN INVOKED (by Claude, or the nightly digest) —
+   no always-on reviewer. The piece that makes it truly "checked 100% of the time" = the **Phase-5 scheduled agent**
+   (designed, owner-gated, OFF).
+2. **Delivery ≠ done for pure notifications.** An escalation DM is logged + retried + burst-alarmed on outage, but
+   has no "the recipient acted / the next step happened" terminal (unlike a chase-to-a-decision ladder).
+3. **Not every notice routes through the durable sink** yet (the 2 money ones do; ~40 owner-DM sites classified,
+   not all converted).
+
+### THE BUILD (the fresh session's primary task — in order)
+1. **DEAD-END / LADDER-TERMINAL AUDIT (read-only first):** grep every escalation · ladder · notification · owner-DM
+   site across the repo (process + crons + services + all bots). For each, verify it has **{a durable log · a terminal
+   step · a downstream verifier that the NEXT step actually fired}**. Output the enumerated list of every **DEAD-END**
+   (a send with no did-it-land / did-next-step-fire check). Blast radius GREPPED, not guessed (per the DRASTIC protocol).
+2. **CODIFY THE LAW + a regression guard:** a new standing law — *every ladder/escalation must carry {durable log +
+   terminal + downstream verifier}; a send with no landing-check is a violation* — enforced by `tests/test_*.py` that
+   FAILS on a new dead-end (like the state-integrity + client/builder-separation guards). A law without a guard is a hope.
+3. **Route every escalation through the durable `gm_alarms` sink** + add a delivery/terminal check where missing
+   (convert the remaining ~40 owner-DM sites; each un-landed step must emit an alarm — self-healing law #4).
+4. **INTRADAY CHECKS spread through the day** — generalize the single 08:00 `morning_report --send` cron into a
+   cadence (e.g. every few hours: Sentinel sweep + watchdog + un-landed-ladder scan → sink/Monitor), so problems are
+   caught within hours, not next morning. Keep each computer-tier (no per-run model cost).
+5. **Phase-5 continuous checker extended to ALL CLIENTS** — the multi-tenant "auto-fix whenever": the always-on
+   agent reads each tenant's sink on a cadence, auto-heals the SAFE classes 24/7, and PREPARES + one-tap-queues the
+   risky ones. Ceiling law (unchanged): safe class fully auto; money/payroll/deploy = auto-prepared + one-tap only,
+   never auto-run. Clients receive only the HARDENED result (proven on TWB first — the canary discipline above).

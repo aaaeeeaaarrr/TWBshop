@@ -9,6 +9,20 @@
 
 ## Done (with proof)
 
+- **2026-07-02 — THYDA (#34) + TYTY (#28) EXCEPTIONS ACTIVATED LIVE on prod (owner "activate Thyda now"; HIGH-RISK
+  payroll/staff-record, auto-bedrock).** After building+deploying the gaps (below), SET their exceptions —
+  `core_staff.exceptions` config, live (the gm bot reads it fresh, no restart). **Thyda (#34):** `payback_to_al` ·
+  `escalate_to_id`=28 (Tyty) · `no_supervisor_posts` (fail-safe belt) · `al_approver_id`=28 · `swap_approver_id`=28 ·
+  `leave_approver_id`=28 (inert — special leave is declarative). **Tyty (#28):** `vip_exempt` preset. Script
+  `scripts/set_thyda_tyty_exceptions.py --apply` (idempotent; **`--revert`** clears both to `{}`). **PROOF (read-only,
+  the LIVE routing functions on her real exceptions):** AL card → `[(28,'Tyty')]` quorum 1 · swap → `[(28,'Tyty')]`
+  quorum 1 · `escalate_to(34)`=28 (Supervisors posts → Tyty DM) · `payback_to_al`=True · a non-override senior →
+  `(False,1)` locked out · Tyty `no_attendance`=True. **NO test-mode walk — `/testmode` is UNSAFE while live** (TWB is
+  ~24/7; it would redirect real staff msgs to the owner + mis-tag real writes `is_test`; the harness assumed
+  pre-go-live isolation). Verified by the live functions read-only + the 10 unit tests; real events (Thyda's next
+  AL/swap/sick) route to Tyty on real data + log to `core_transitions`. **REVERT:** `python
+  scripts/set_thyda_tyty_exceptions.py --revert`. No deploy (DB config only).
+
 - **2026-07-02 — F1 EXCEPTION GAPS (3a swap-approver override · 3b escalate-to-Tyty reroute) BUILT + DEPLOYED +
   VERIFIED INERT (tag `session-58-thyda-gaps-20260702`=`48628c3`).** Completes Thyda's spec surface ("all
   approved by Tyty" + "escalate to Tyty"). **3a** `swap_approver_id`: `_swap_authz` + `_approvers_for(...,'swap')`
